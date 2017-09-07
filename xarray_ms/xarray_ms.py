@@ -22,7 +22,7 @@ from .known_table_schemas import registered_schemas
 
 log = logging.getLogger("xarray-ms")
 
-def _ms_proxy(oargs, okwargs, attr, *args, **kwargs):
+def _table_proxy(oargs, okwargs, attr, *args, **kwargs):
     """
     Proxies attribute access on a cached :class:`pyrap.tables.table` file.
 
@@ -44,7 +44,7 @@ def _ms_proxy(oargs, okwargs, attr, *args, **kwargs):
 
     .. code-block:: python
 
-        FLAGS = _ms_proxy("WSRT.MS", {'readonly':True},
+        FLAGS = _table_proxy("WSRT.MS", {'readonly':True},
                     "getcol", "FLAGS", startrow=0, nrow=10)
 
     Parameters
@@ -77,7 +77,7 @@ def _ms_proxy(oargs, okwargs, attr, *args, **kwargs):
     lockoptions = okwargs.pop('lockoptions', None)
 
     if lockoptions is not None and not lockoptions == 'user':
-        log.warn("'lockoptions=%s' ignored by _ms_proxy. "
+        log.warn("'lockoptions=%s' ignored by _table_proxy. "
                     "Locking is automatically handled in 'user' "
                     "mode" % lockoptions)
 
@@ -107,7 +107,7 @@ MS_TO_NP_TYPE_MAP = {
     'BOOLEAN': np.bool,
     'COMPLEX': np.complex64,
     'DCOMPLEX': np.complex128,
-    'STRING': str,
+    'STRING': object,
 }
 
 ColumnConfig = attr.make_class("ColumnConfig", ["column", "shape",
@@ -153,8 +153,8 @@ def column_configuration(ms, column, chunks=None, table_schema=None):
     """
     okwargs = {'readonly':True}
 
-    nrows = _ms_proxy(ms, okwargs, 'nrows')
-    coldesc = _ms_proxy(ms, okwargs, 'getcoldesc', column)
+    nrows = _table_proxy(ms, okwargs, 'nrows')
+    coldesc = _table_proxy(ms, okwargs, 'getcoldesc', column)
     option = coldesc['option']
 
     if chunks is None:
@@ -189,7 +189,7 @@ def column_configuration(ms, column, chunks=None, table_schema=None):
         else:
             # Guess data shape from first data row
             try:
-                data = _ms_proxy(ms, okwargs, "getcol",
+                data = _table_proxy(ms, okwargs, "getcol",
                                 column, startrow=0, nrow=1)
             except BaseException as e:
                 ve = ValueError("Couldn't determine shape of "
@@ -239,6 +239,9 @@ def column_configuration(ms, column, chunks=None, table_schema=None):
     else:
         raise TypeError("Invalid table_schema type '%s'" % (type(table_schema)))
 
+    if not ndim == len(dims):
+        raise ValueError("Length of dims '%s' does not match ndim '%d'" % (dims, ndim))
+
     chunks = da.core.normalize_chunks(chunks, shape=shape)
     return ColumnConfig(column, shape, dims, chunks, dtype)
 
@@ -246,14 +249,14 @@ def consecutive(index, stepsize=1):
     """ Partition index into list of arrays of consecutive indices """
     return np.split(index, np.where(np.diff(index) != stepsize)[0]+1)
 
-def ms_getcol_runs(ms, col_cfg, runs):
+def table_getcol_runs(table, col_cfg, runs):
     """
     Creates a dask array backed by calls to :meth:`pyrap.tables.table.getcol`
     on `runs` of consecutive indices.
 
     Parameters
     ----------
-    ms : string
+    table : string
         Measurement Set
     col_cfg : :class:`ColumnConfig`
         Column configuration
@@ -271,8 +274,8 @@ def ms_getcol_runs(ms, col_cfg, runs):
     chunks = (row_chunks,) + col_cfg.chunks[1:]
     assert sum(row_chunks) == col_cfg.shape[0]
 
-    token = dask.base.tokenize(ms, "getcol_runs", col_cfg.column, runs)
-    name = '-'.join((ms, "getcol_runs", col_cfg.column.lower(), token))
+    token = dask.base.tokenize(table, "getcol_runs", col_cfg.column, runs)
+    name = '-'.join((table, "getcol_runs", col_cfg.column.lower(), token))
 
     # Given chunks == ((50, 50, 50, 50, 20), (3,))
     # The following results in
@@ -290,8 +293,11 @@ def ms_getcol_runs(ms, col_cfg, runs):
         key = (name,) + tuple(pluck(0, product))
         shape = tuple(pluck(1, product))
 
-        dsk[key] = (partial(_ms_proxy, startrow=run[0], nrow=len(run)),
-                            ms, okwargs, "getcol", col_cfg.column)
+        dsk[key] = (partial(np.asarray, dtype=col_cfg.dtype),
+                (partial(_table_proxy, startrow=run[0], nrow=len(run)),
+                        table, okwargs, "getcol", col_cfg.column
+                )
+        )
 
     return da.Array(dsk, name, chunks, dtype=col_cfg.dtype)
 
@@ -324,7 +330,7 @@ def xds_to_table(dataset, data_arrays):
 
     dsk = {}
 
-    ms = dataset.attrs['ms']
+    table = dataset.attrs['table']
     runs = dataset.attrs['runs']
 
     okwargs = {'readonly': False}
@@ -338,8 +344,8 @@ def xds_to_table(dataset, data_arrays):
         chunks = (row_chunks,) + array.chunks[1:]
         assert sum(row_chunks) == array.shape[0]
 
-        token = dask.base.tokenize(ms, "putcol_runs", array_name, runs)
-        name = '-'.join((ms, "putcol_runs", name, token))
+        token = dask.base.tokenize(table, "putcol_runs", array_name, runs)
+        name = '-'.join((table, "putcol_runs", name, token))
 
         # Given chunks == ((50, 50, 50, 50, 20), (3,))
         # The following results in
@@ -360,18 +366,104 @@ def xds_to_table(dataset, data_arrays):
 
             row_end = row_start + shape[0]
 
-            dsk[key] = (partial(_ms_proxy, startrow=run[0], nrow=len(run)),
-                                ms, okwargs, "putcol", array_name,
+            dsk[key] = (partial(_table_proxy, startrow=run[0], nrow=len(run)),
+                                table, okwargs, "putcol", array_name,
                                 (getitem, array, slice(row_start, row_end)))
 
             row_start = row_end
 
-    # Return MS delayed evaluation of the putcol graph
+    # Return delayed evaluation of the putcol graph
     return dask.delayed(dask.get)(merge(dsk, *(t[1].dask for t in data_arrays)), dsk.keys())
 
-def xds_from_table(ms, chunks=None, time_ordered=True, table_schema=None):
+
+def _xds_from_table(table, chunks=None, runs=None, table_schema=None):
     """
     Creates an :class:`xarray.Dataset` backed by values in a CASA table
+
+    Parameters
+    ----------
+    ms : string
+        CASA Table path
+    chunks (optional): integer
+        Row chunk size. Defaults to 10000.
+    runs (optional): list of ndarrays
+        List of arrays of consecutive indices
+    table_schema (optional): dict or string
+        schema
+
+    Returns
+    -------
+    :class:`xarray.Dataset`
+    """
+
+    okwargs = { 'readonly': True }
+    columns = _table_proxy(table, okwargs, "colnames")
+    nrows = _table_proxy(table, okwargs, "nrows")
+
+    def _gencfg(columns):
+        for c in columns:
+            try:
+                yield c, column_configuration(table, c, chunks=chunks,
+                                            table_schema=table_schema)
+            except ValueError as e:
+                log.warn("Ignoring column '%s'" % c, exc_info=True)
+
+
+    row_range = np.arange(nrows)
+
+    if chunks is None:
+        chunks = 10000
+
+    if runs is None:
+        runs = [row_range]
+
+    run_lengths = [len(r) for r in runs]
+
+    if not sum(run_lengths) == len(row_range):
+        raise ValueError("Sum of run lengths '%s' != number of rows '%s'" %
+                            (run_lengths, len(row_range)))
+
+    # Further subdivide any large runs into chunks
+    runs = [a for run in runs
+              for a in np.split(run, np.arange(chunks, run.size, chunks))]
+
+    row_index = np.concatenate(runs)
+    dataset_coords = { 'rows': row_range, 'msrows' : ('rows', row_index)}
+    array_coords = { 'rows': row_range }
+
+    # Create an xarray dataset representing the Measurement Set columns
+    data_arrays = { c.lower(): xr.DataArray(table_getcol_runs(table, cfg, runs),
+                                            coords=array_coords,
+                                            dims=cfg.dims)
+                                for c, cfg in _gencfg(columns) }
+
+    return xr.Dataset(data_arrays,
+                    coords=dataset_coords,
+                    attrs={'table':table, 'runs': runs})
+
+def xds_from_table(table, chunks=None, table_schema=None):
+    """
+    Creates an :class:`xarray.Dataset` backed by values in a CASA table
+
+    Parameters
+    ----------
+    ms : string
+        CASA Table path
+    chunks (optional): integer
+        Row chunk size. Defaults to 10000.
+    table_schema (optional): dict or string
+        schema
+
+    Returns
+    -------
+    :class:`xarray.Dataset`
+    """
+
+    return _xds_from_table(table, chunks=None, table_schema=table_schema)
+
+def xds_from_ms(ms, chunks=None, time_ordered=True):
+    """
+    Creates an :class:`xarray.Dataset` backed by values in a CASA Measurement Set
 
     Parameters
     ----------
@@ -382,39 +474,27 @@ def xds_from_table(ms, chunks=None, time_ordered=True, table_schema=None):
     time_ordered (optional): bool
         If True, the resulting arrays will be ordered
         by the time dimension. Defaults to True
-    table_schema (optional): dict or string
-        schema
 
     Returns
     -------
     :class:`xarray.Dataset`
     """
-    okwargs = { 'readonly': True }
-    columns = _ms_proxy(ms, okwargs, "colnames")
-
-    if chunks is None:
-        chunks = 10000
-
-    def _gencfg(columns):
-        for c in columns:
-            try:
-                yield c, column_configuration(ms, c, chunks=chunks,
-                                            table_schema=table_schema)
-            except ValueError as e:
-                log.warn("Ignoring column '%s'" % c, exc_info=True)
-
-    time_cfg = column_configuration(ms, "TIME", chunks=chunks,
-                                            table_schema=table_schema)
-    row_range = np.arange(time_cfg.shape[0])
 
     # If time ordering is requested, we read in the time column
     # and construct an index with timestamps as coordinates.
     # The indices grouped with each timestamp are stacked
     # in time ascending order to get a MS row index to nrows coordinate
+    okwargs = { 'readonly': True }
+    nrows = _table_proxy(ms, okwargs, "nrows")
+    row_range = np.arange(nrows)
+
     if time_ordered:
+        time_cfg = column_configuration(ms, "TIME", chunks=chunks,
+                                                table_schema="MS")
+
         # Subdivide row_range into runs of size `chunks`
         runs = np.split(row_range, np.arange(chunks, row_range.size, chunks))
-        times = ms_getcol_runs(ms, time_cfg, runs).compute()
+        times = table_getcol_runs(ms, time_cfg, runs).compute()
         # Construct a DataArray of time indices, with the actual
         # times as coordinates, but mediated through the 'aux'
         # coordinate so that xarray handles duplicate times correctly.
@@ -434,19 +514,5 @@ def xds_from_table(ms, chunks=None, time_ordered=True, table_schema=None):
     # Compute consecutive runs of row indices
     runs = consecutive(row_index)
 
-    # Further subdivide any large runs into chunks
-    runs = [a for run in runs
-              for a in np.split(run, np.arange(chunks, run.size, chunks))]
-
-    dataset_coords = { 'rows': row_range, 'msrows' : ('rows', row_index)}
-    array_coords = { 'rows': row_range }
-
-    # Create an xarray dataset representing the Measurement Set columns
-    data_arrays = { c.lower(): xr.DataArray(ms_getcol_runs(ms, cfg, runs),
-                                            coords=array_coords,
-                                            dims=cfg.dims)
-                                for c, cfg in _gencfg(columns) }
-
-    return xr.Dataset(data_arrays,
-                    coords=dataset_coords,
-                    attrs={'ms':ms, 'runs': runs})
+    return _xds_from_table(ms, chunks=chunks, runs=runs,
+                                table_schema="MS")

@@ -33,7 +33,7 @@ def scheduler_context(args):
 args = create_parser().parse_args()
 
 with scheduler_context(args):
-    ds = xarray_ms.xds_from_table(args.ms, chunks=100000, table_schema="MS")
+    ds = xarray_ms.xds_from_ms(args.ms, chunks=100000)
 
     start = time.clock()
     inv_flag = da.logical_not(ds.flag.data)
@@ -47,3 +47,8 @@ with scheduler_context(args):
     print ds
 
 
+    # Load the ANTENNA table 
+    ads = xarray_ms.xds_from_table('::'.join((args.ms, "ANTENNA")),
+                                    chunks=100000, table_schema="ANTENNA")
+
+    print ads

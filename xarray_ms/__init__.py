@@ -20,7 +20,7 @@ def get_logger():
 
 log = get_logger()
 
-from xarray_ms import xds_from_table, xds_to_table
+from xarray_ms import xds_from_table, xds_to_table, xds_from_ms
 
 def clear_file_cache():
     from .file_cache import FILE_CACHE

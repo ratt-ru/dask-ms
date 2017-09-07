@@ -46,7 +46,28 @@ MS_SCHEMA = {
     "IMAGING_WEIGHT":   TableSchema(('chans',)),
 }
 
+ANTENNA_SCHEMA = {
+    "POSITION":         TableSchema(('(x,y,z)',)),
+    "OFFSET":           TableSchema(('(x,y,z)',)),
+}
+
+FIELD_SCHEMA = {
+    "DELAY_DIR":        TableSchema(('dir', 'poly+1')),
+    "PHASE_DIR":        TableSchema(('dir', 'poly+1')),
+    "REFERENCE_DIR":    TableSchema(('dir', 'poly+1')),
+}
+
+SPECTRAL_WINDOW = {
+    "CHAN_FREQ":        TableSchema(('nchan',)),
+    "CHAN_WIDTH":       TableSchema(('nchan',)),
+    "EFFECTIVE_BW":     TableSchema(('nchan',)),
+    "RESOLUTION":       TableSchema(('nchan',)),
+}
+
 def registered_schemas():
     return {
-        "MS" : MS_SCHEMA
+        "MS" : MS_SCHEMA,
+        "ANTENNA": ANTENNA_SCHEMA,
+        "FIELD": FIELD_SCHEMA,
+        "SPECTRAL_WINDOW": SPECTRAL_WINDOW,
     }
