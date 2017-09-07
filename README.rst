@@ -2,11 +2,15 @@
 xarray Datasets from CASA Tables
 ================================
 
-Constructs a xarray_ ``Datasets`` from CASA Tables via python-casacore_.
+Constructs xarray_ ``Datasets`` from CASA Tables via python-casacore_.
 The ``DataArrays`` contained in the ``Dataset`` are dask_ arrays backed by
 deferred calls to :code:`pyrap.tables.table.getcol`.
 
 Supports writing ``DataArrays`` back to the respective column in the Table.
+
+The intention behind this package is to support the Measurement Set as
+a data source and sink for the purposes of writing parallel, distributed
+Radio Astronomy algorithms.
 
 .. code-block:: python
 
@@ -20,7 +24,7 @@ Supports writing ``DataArrays`` back to the respective column in the Table.
     # Write the flag column back to the Measurement Set
     xds_to_table(ds, "FLAG").compute()
 
-   print ds
+    print ds
 
     <xarray.Dataset>
     Dimensions:         (chans: 64, corrs: 4, rows: 6552, u,v,w: 3)
