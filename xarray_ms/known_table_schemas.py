@@ -1,67 +1,76 @@
+"""
+Measurement Set columns usually have fixed dimensions.
+Give them names here so that the xarray Dataset can
+align shared dimensions, 'chan', for instance.
+
+dtype's are also a possibility here, but valueType
+seems to be present in the Column Description.
+"""
+
 import attr
 
-TableSchema = attr.make_class("TableSchema", ["dims"])
+ColumnSchema = attr.make_class("ColumnSchema", ["dims"])
 
 # https://casa.nrao.edu/Memos/229.html#SECTION00061000000000000000
 MS_SCHEMA = {
-    "TIME":             TableSchema(()),
-    "TIME_EXTRA_PREC":  TableSchema(()),
-    "ANTENNA1":         TableSchema(()),
-    "ANTENNA2":         TableSchema(()),
-    "ANTENNA3":         TableSchema(()),
-    "FEED1":            TableSchema(()),
-    "FEED2":            TableSchema(()),
-    "FEED3":            TableSchema(()),
-    "DATA_DESC_ID":     TableSchema(()),
-    "PROCESSOR_ID":     TableSchema(()),
-    "PHASE_ID":         TableSchema(()),
-    "FIELD_ID":         TableSchema(()),
-    "INTERVAL":         TableSchema(()),
-    "EXPOSURE":         TableSchema(()),
-    "TIME_CENTROID":    TableSchema(()),
-    "PULSAR_BIN":       TableSchema(()),
-    "PULSAR_GATE":      TableSchema(()),
-    "SCAN_NUMBER":      TableSchema(()),
-    "ARRAY_ID":         TableSchema(()),
-    "OBSERVATION_ID":   TableSchema(()),
-    "STATE_ID":         TableSchema(()),
-    "BASELINE_REF":     TableSchema(()),
-    "UVW":              TableSchema(('(u,v,w)',)),
-    "UVW2":             TableSchema(('(u,v,w)',)),
-    "DATA":             TableSchema(('chans', 'corrs')),
-    "FLOAT_DATA":       TableSchema(('chans', 'corrs')),
-    "VIDEO_POINT":      TableSchema(('corrs',)),
-    "LAG_DATA":         TableSchema(('corrs',)),
-    "SIGMA":            TableSchema(('corrs',)),
-    "SIGMA_SPECTRUM":   TableSchema(('chans', 'corrs')),
-    "WEIGHT":           TableSchema(('corrs',)),
-    "WEIGHT_SPECTRUM":  TableSchema(('chans', 'corrs')),
-    "FLAG":             TableSchema(('chans', 'corrs')),
-    "FLAG_CATEGORY":    TableSchema(('flagcats', 'chans', 'corrs')),
-    "FLAG_ROWS":        TableSchema(()),
+    "TIME":             ColumnSchema(()),
+    "TIME_EXTRA_PREC":  ColumnSchema(()),
+    "ANTENNA1":         ColumnSchema(()),
+    "ANTENNA2":         ColumnSchema(()),
+    "ANTENNA3":         ColumnSchema(()),
+    "FEED1":            ColumnSchema(()),
+    "FEED2":            ColumnSchema(()),
+    "FEED3":            ColumnSchema(()),
+    "DATA_DESC_ID":     ColumnSchema(()),
+    "PROCESSOR_ID":     ColumnSchema(()),
+    "PHASE_ID":         ColumnSchema(()),
+    "FIELD_ID":         ColumnSchema(()),
+    "INTERVAL":         ColumnSchema(()),
+    "EXPOSURE":         ColumnSchema(()),
+    "TIME_CENTROID":    ColumnSchema(()),
+    "PULSAR_BIN":       ColumnSchema(()),
+    "PULSAR_GATE":      ColumnSchema(()),
+    "SCAN_NUMBER":      ColumnSchema(()),
+    "ARRAY_ID":         ColumnSchema(()),
+    "OBSERVATION_ID":   ColumnSchema(()),
+    "STATE_ID":         ColumnSchema(()),
+    "BASELINE_REF":     ColumnSchema(()),
+    "UVW":              ColumnSchema(('(u,v,w)',)),
+    "UVW2":             ColumnSchema(('(u,v,w)',)),
+    "DATA":             ColumnSchema(('chans', 'corrs')),
+    "FLOAT_DATA":       ColumnSchema(('chans', 'corrs')),
+    "VIDEO_POINT":      ColumnSchema(('corrs',)),
+    "LAG_DATA":         ColumnSchema(('corrs',)),
+    "SIGMA":            ColumnSchema(('corrs',)),
+    "SIGMA_SPECTRUM":   ColumnSchema(('chans', 'corrs')),
+    "WEIGHT":           ColumnSchema(('corrs',)),
+    "WEIGHT_SPECTRUM":  ColumnSchema(('chans', 'corrs')),
+    "FLAG":             ColumnSchema(('chans', 'corrs')),
+    "FLAG_CATEGORY":    ColumnSchema(('flagcats', 'chans', 'corrs')),
+    "FLAG_ROWS":        ColumnSchema(()),
 
     # Extra imaging columns
-    "MODEL_DATA":       TableSchema(('chans', 'corrs')),
-    "CORRECTED_DATA":   TableSchema(('chans', 'corrs')),
-    "IMAGING_WEIGHT":   TableSchema(('chans',)),
+    "MODEL_DATA":       ColumnSchema(('chans', 'corrs')),
+    "CORRECTED_DATA":   ColumnSchema(('chans', 'corrs')),
+    "IMAGING_WEIGHT":   ColumnSchema(('chans',)),
 }
 
 ANTENNA_SCHEMA = {
-    "POSITION":         TableSchema(('(x,y,z)',)),
-    "OFFSET":           TableSchema(('(x,y,z)',)),
+    "POSITION":         ColumnSchema(('(x,y,z)',)),
+    "OFFSET":           ColumnSchema(('(x,y,z)',)),
 }
 
 FIELD_SCHEMA = {
-    "DELAY_DIR":        TableSchema(('dir', 'poly+1')),
-    "PHASE_DIR":        TableSchema(('dir', 'poly+1')),
-    "REFERENCE_DIR":    TableSchema(('dir', 'poly+1')),
+    "DELAY_DIR":        ColumnSchema(('dir', 'poly+1')),
+    "PHASE_DIR":        ColumnSchema(('dir', 'poly+1')),
+    "REFERENCE_DIR":    ColumnSchema(('dir', 'poly+1')),
 }
 
 SPECTRAL_WINDOW = {
-    "CHAN_FREQ":        TableSchema(('nchan',)),
-    "CHAN_WIDTH":       TableSchema(('nchan',)),
-    "EFFECTIVE_BW":     TableSchema(('nchan',)),
-    "RESOLUTION":       TableSchema(('nchan',)),
+    "CHAN_FREQ":        ColumnSchema(('chans',)),
+    "CHAN_WIDTH":       ColumnSchema(('chans',)),
+    "EFFECTIVE_BW":     ColumnSchema(('chans',)),
+    "RESOLUTION":       ColumnSchema(('chans',)),
 }
 
 def registered_schemas():
