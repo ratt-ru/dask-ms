@@ -463,56 +463,84 @@ def xds_from_table(table, chunks=None, table_schema=None):
 
 def xds_from_ms(ms, chunks=None, time_ordered=True):
     """
-    Creates an :class:`xarray.Dataset` backed by values in a CASA Measurement Set
+    Creates an :class:`xarray.Dataset` backed by values in a CASA Measurement Set.
 
     Parameters
     ----------
     ms : string
-        CASA Table path
-    chunks (optional): integer
-        Row chunk size. Defaults to 10000.
-    time_ordered (optional): bool
-        If True, the resulting arrays will be ordered
-        by the time dimension. Defaults to True
+        CASA Measurement Set path.
+    chunks (optional) : integer
+        Row chunk size. Defaults to `10000`.
+    time_ordered (optional) : bool
+        If True, each `xarray.DataArray` on the Dataset
+        will be ordered by the time dimension.
+        Additionally the following coordinates will be created on the Dataset:
+
+            1. `time_unique` containing the ordered unique timestamps.
+            2. `time_offsets` containing the starting row offset
+                of each unique timestamp.
+
+        Defaults to `True`.
 
     Returns
     -------
     :class:`xarray.Dataset`
     """
 
-    # If time ordering is requested, we read in the time column
-    # and construct an index with timestamps as coordinates.
-    # The indices grouped with each timestamp are stacked
-    # in time ascending order to get a MS row index to nrows coordinate
     okwargs = { 'readonly': True }
     nrows = _table_proxy(ms, okwargs, "nrows")
     row_range = np.arange(nrows)
 
+    # If time ordering is requested, we read in the time column
+    # and construct an index with timestamps as coordinates.
+    # The indices grouped with each timestamp are stacked
+    # in time ascending order to get a MS row index to nrows coordinate
     if time_ordered:
         time_cfg = column_configuration(ms, "TIME", chunks=chunks,
                                                 table_schema="MS")
 
         # Subdivide row_range into runs of size `chunks`
         runs = np.split(row_range, np.arange(chunks, row_range.size, chunks))
+        # Construct a dask array and reify it to a numpy array immediately
         times = table_getcol_runs(ms, time_cfg, runs).compute()
         # Construct a DataArray of time indices, with the actual
         # times as coordinates, but mediated through the 'aux'
         # coordinate so that xarray handles duplicate times correctly.
         # See https://stackoverflow.com/a/38073919/1611416
         time_index = xr.DataArray(np.arange(times.shape[0]),
-                                    #coords= { 'time': times },
                                     coords={ 'aux': ('time', times) },
                                     dims=["time"])
 
-        # Now concatenate the indices associated with each time
-        # in ascending time order
-        row_index = np.concatenate([dary.values for t, dary
-                            in time_index.groupby('aux')])
+
+        # Construct a row_index such that the row indices associated
+        # with each unique time are ordered consecutively.
+        # Also identify unique times and their row offsets
+        row_index = []
+        unique_times = []
+        time_offsets = [0]
+
+        for ti, (t, dary) in enumerate(time_index.groupby('aux')):
+            row_index.append(dary)
+            time_offsets.append(len(dary))
+            unique_times.append(t)
+
+        row_index = np.concatenate(row_index)
+
+        extra_coords = {
+            # Unique ordered timestamps
+            "time_unique": np.asarray(unique_times),
+            # Starting row index of each unique timestamp
+             "time_offsets": np.cumsum(time_offsets[:-1]) }
+
     else:
         row_index = row_range
+        extra_coords = {}
 
     # Compute consecutive runs of row indices
     runs = consecutive(row_index)
 
-    return _xds_from_table(ms, chunks=chunks, runs=runs,
-                                table_schema="MS")
+    # Created the Dataset and add extra coordinates
+    xds = _xds_from_table(ms, chunks=chunks, runs=runs,
+                                    table_schema="MS")
+    xds.coords.update(extra_coords)
+    return xds
