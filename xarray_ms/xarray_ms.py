@@ -28,10 +28,10 @@ def _table_proxy(oargs, okwargs, attr, *args, **kwargs):
 
     `oargs` and `okwargs` are arguments passed to
     the :class:`pyrap.tables.table` constructor. `oargs` can usually
-    just be set to the name of the MS as this is the only positional
+    just be set to the name of the table as this is the only positional
     arg at the moment.
 
-    Then `attr` is the attribute to access on the Measurement Set
+    Then `attr` is the attribute to access on the table
     while `args` and `kwargs` are the arguments pass to `attr` if
     it is `callable`.
 
@@ -51,12 +51,12 @@ def _table_proxy(oargs, okwargs, attr, *args, **kwargs):
     ----------
     oargs : string or tuple or list
         positional arguments to pass to pt.table constructor.
-        Usually just the name of the ms since everything else
-        is just a kwarg
+        Usually just the name of the table since everything else
+        in :meth:`pyrap.tables.table` a kwarg.
     okwargs : dict
         keyword arguments to pass to pt.table constructor
     attr : string
-        attribute to access or method to call on Measurement Set
+        attribute to access or method to call on table
     *args (optional):
         Positional arguments passed to `attr` if `attr` is callable
     **kwargs (optional):
@@ -82,11 +82,11 @@ def _table_proxy(oargs, okwargs, attr, *args, **kwargs):
                     "mode" % lockoptions)
 
     # Get the table from the cache
-    with FILE_CACHE.open(pt.table, lockoptions='auto', *oargs, **okwargs) as ms:
+    with FILE_CACHE.open(pt.table, lockoptions='auto', *oargs, **okwargs) as table:
         try:
             # Acquire a lock and get the attr
-            ms.lock(write=write_lock)
-            fn_or_attr = getattr(ms, attr)
+            table.lock(write=write_lock)
+            fn_or_attr = getattr(table, attr)
 
             # If the attribute is callable, invoke it
             if callable(fn_or_attr):
@@ -97,10 +97,10 @@ def _table_proxy(oargs, okwargs, attr, *args, **kwargs):
 
         finally:
             # Release the lock
-            ms.unlock()
+            table.unlock()
 
-# Map MS column string types to numpy/python types
-MS_TO_NP_TYPE_MAP = {
+# Map  column string types to numpy/python types
+TABLE_TO_PY_TYPE = {
     'INT': np.int32,
     'FLOAT': np.float32,
     'DOUBLE': np.float64,
@@ -113,10 +113,10 @@ MS_TO_NP_TYPE_MAP = {
 ColumnConfig = attr.make_class("ColumnConfig", ["column", "shape",
                                                 "dims", "chunks", "dtype"])
 
-def column_configuration(ms, column, chunks=None, table_schema=None):
+def column_configuration(table, column, chunks=None, table_schema=None):
     """
     Constructs a :class:`ColumnConfig` for the given
-    Measurement Set, column and row chunks.
+    table, column and row chunks.
 
     Infers the following:
 
@@ -135,10 +135,10 @@ def column_configuration(ms, column, chunks=None, table_schema=None):
 
     Parameters
     ----------
-    ms : string
-        Measurement Set
+    table : string
+        CASA Table path
     column : string
-        Measurement Set column
+        Table column
     chunks (optional) : int
         Number of chunks to use for each row
     table_schema (optional) : string or dict
@@ -153,8 +153,8 @@ def column_configuration(ms, column, chunks=None, table_schema=None):
     """
     okwargs = {'readonly':True}
 
-    nrows = _table_proxy(ms, okwargs, 'nrows')
-    coldesc = _table_proxy(ms, okwargs, 'getcoldesc', column)
+    nrows = _table_proxy(table, okwargs, 'nrows')
+    coldesc = _table_proxy(table, okwargs, 'getcoldesc', column)
     option = coldesc['option']
 
     if chunks is None:
@@ -189,7 +189,7 @@ def column_configuration(ms, column, chunks=None, table_schema=None):
         else:
             # Guess data shape from first data row
             try:
-                data = _table_proxy(ms, okwargs, "getcol",
+                data = _table_proxy(table, okwargs, "getcol",
                                 column, startrow=0, nrow=1)
             except BaseException as e:
                 ve = ValueError("Couldn't determine shape of "
@@ -211,15 +211,15 @@ def column_configuration(ms, column, chunks=None, table_schema=None):
         value_type = coldesc['valueType']
     except KeyError:
         raise ValueError("Cannot infer dtype for column '{}'. "
-                        "MS Column Description is missing "
+                        "Table Column Description is missing "
                         "valueType. Description is '{}'"
                             .format(column, coldesc))
 
     # Try conversion to numpy/python type
     try:
-        dtype = MS_TO_NP_TYPE_MAP[value_type.upper()]
+        dtype = TABLE_TO_PY_TYPE[value_type.upper()]
     except KeyError:
-        raise ValueError("No known conversion from MS type '{}' "
+        raise ValueError("No known conversion from Table type '{}' "
                         "to python/numpy type.".format(value_type))
 
 
@@ -257,7 +257,7 @@ def table_getcol_runs(table, col_cfg, runs):
     Parameters
     ----------
     table : string
-        Measurement Set
+        CASA Table path
     col_cfg : :class:`ColumnConfig`
         Column configuration
     runs : list of :class:`numpy.ndarray`
@@ -382,7 +382,7 @@ def _xds_from_table(table, chunks=None, runs=None, table_schema=None):
 
     Parameters
     ----------
-    ms : string
+    table : string
         CASA Table path
     chunks (optional): integer
         Row chunk size. Defaults to 10000.
@@ -431,7 +431,7 @@ def _xds_from_table(table, chunks=None, runs=None, table_schema=None):
     dataset_coords = { 'rows': row_range, 'msrows' : ('rows', row_index)}
     array_coords = { 'rows': row_range }
 
-    # Create an xarray dataset representing the Measurement Set columns
+    # Create an xarray dataset representing the table columns
     data_arrays = { c.lower(): xr.DataArray(table_getcol_runs(table, cfg, runs),
                                             coords=array_coords,
                                             dims=cfg.dims)
@@ -447,7 +447,7 @@ def xds_from_table(table, chunks=None, table_schema=None):
 
     Parameters
     ----------
-    ms : string
+    table : string
         CASA Table path
     chunks (optional): integer
         Row chunk size. Defaults to 10000.
@@ -539,7 +539,7 @@ def xds_from_ms(ms, chunks=None, time_ordered=True):
     # Compute consecutive runs of row indices
     runs = consecutive(row_index)
 
-    # Created the Dataset and add extra coordinates
+    # Create the Dataset and add extra coordinates
     xds = _xds_from_table(ms, chunks=chunks, runs=runs,
                                     table_schema="MS")
     xds.coords.update(extra_coords)
