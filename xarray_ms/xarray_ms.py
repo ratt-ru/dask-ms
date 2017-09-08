@@ -477,8 +477,7 @@ def xds_from_ms(ms, chunks=None, time_ordered=True):
         Additionally the following coordinates will be created on the Dataset:
 
             1. `time_unique` containing the ordered unique timestamps.
-            2. `time_offsets` containing the starting row offset
-                of each unique timestamp.
+            2. `time_chunks` containing the frequency of each unique timestamp.
 
         Defaults to `True`.
 
@@ -514,14 +513,14 @@ def xds_from_ms(ms, chunks=None, time_ordered=True):
 
         # Construct a row_index such that the row indices associated
         # with each unique time are ordered consecutively.
-        # Also identify unique times and their row offsets
+        # Also identify unique times and their frequencies
         row_index = []
         unique_times = []
-        time_offsets = [0]
+        time_chunks = []
 
         for ti, (t, dary) in enumerate(time_index.groupby('aux')):
             row_index.append(dary)
-            time_offsets.append(len(dary))
+            time_chunks.append(len(dary))
             unique_times.append(t)
 
         row_index = np.concatenate(row_index)
@@ -529,8 +528,8 @@ def xds_from_ms(ms, chunks=None, time_ordered=True):
         extra_coords = {
             # Unique ordered timestamps
             "time_unique": np.asarray(unique_times),
-            # Starting row index of each unique timestamp
-             "time_offsets": np.cumsum(time_offsets[:-1]) }
+            # Number of times each unique timestamp occurs
+            "time_chunks": time_chunks }
 
     else:
         row_index = row_range
