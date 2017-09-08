@@ -1,4 +1,5 @@
 import collections
+from collections import OrderedDict
 import logging
 from functools import partial
 import itertools
@@ -398,6 +399,7 @@ def _xds_from_table(table, chunks=None, runs=None, table_schema=None):
 
     okwargs = { 'readonly': True }
     columns = _table_proxy(table, okwargs, "colnames")
+    columns = sorted(columns)
     nrows = _table_proxy(table, okwargs, "nrows")
 
     def _gencfg(columns):
@@ -431,11 +433,12 @@ def _xds_from_table(table, chunks=None, runs=None, table_schema=None):
     dataset_coords = { 'rows': row_range, 'msrows' : ('rows', row_index)}
     array_coords = { 'rows': row_range }
 
+    make_da = lambda cfg: xr.DataArray(table_getcol_runs(table, cfg, runs),
+                                        coords=array_coords, dims=cfg.dims)
+
     # Create an xarray dataset representing the table columns
-    data_arrays = { c.lower(): xr.DataArray(table_getcol_runs(table, cfg, runs),
-                                            coords=array_coords,
-                                            dims=cfg.dims)
-                                for c, cfg in _gencfg(columns) }
+    data_arrays = OrderedDict((c.lower(), make_da(cfg))
+                                for c, cfg in _gencfg(columns))
 
     return xr.Dataset(data_arrays,
                     coords=dataset_coords,
