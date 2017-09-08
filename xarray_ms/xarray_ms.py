@@ -516,7 +516,7 @@ def xds_from_ms(ms, chunks=None, time_ordered=True):
         # Also identify unique times and their frequencies
         row_index = []
         unique_times = []
-        time_chunks = []
+        time_chunks = [0]
 
         for ti, (t, dary) in enumerate(time_index.groupby('aux')):
             row_index.append(dary)
@@ -525,14 +525,16 @@ def xds_from_ms(ms, chunks=None, time_ordered=True):
 
         row_index = np.concatenate(row_index)
 
-        extra_coords = {
-            # Unique ordered timestamps
-            "time_unique": np.asarray(unique_times),
-            # Number of times each unique timestamp occurs
-            "time_chunks": time_chunks }
+        extra_arrays = {
+            "time_unique" : (("utime",), unique_times),
+            "time_chunks": (("utime",), np.asarray(time_chunks[1:])),
+            "time_offsets" : (("utime",), np.cumsum(time_chunks[:-1])) }
+
+        extra_coords = { "utime": np.arange(len(unique_times)) }
 
     else:
         row_index = row_range
+        extra_arrays = {}
         extra_coords = {}
 
     # Compute consecutive runs of row indices
@@ -541,5 +543,8 @@ def xds_from_ms(ms, chunks=None, time_ordered=True):
     # Create the Dataset and add extra coordinates
     xds = _xds_from_table(ms, chunks=chunks, runs=runs,
                                     table_schema="MS")
+
+    # Add extra arrays and coordinates
+    xds.update(extra_arrays)
     xds.coords.update(extra_coords)
     return xds
