@@ -1,3 +1,4 @@
+import atexit
 from collections import defaultdict
 from contextlib import contextmanager
 import logging
@@ -74,3 +75,9 @@ class OpenCache(object):
             self.refcount.clear()
 
 FILE_CACHE = OpenCache()
+
+def __clear_file_cache():
+    global FILE_CACHE
+    FILE_CACHE.clear()
+
+atexit.register(__clear_file_cache)
