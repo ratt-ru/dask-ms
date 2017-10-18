@@ -442,7 +442,7 @@ def _xds_from_table(table, chunks=None, runs=None, table_schema=None):
 
     return xr.Dataset(data_arrays,
                     coords=dataset_coords,
-                    attrs={'table':table, 'runs': runs})
+                    attrs={'table': table, 'runs': runs})
 
 def xds_from_table(table, chunks=None, table_schema=None):
     """
@@ -481,6 +481,7 @@ def xds_from_ms(ms, chunks=None, time_ordered=True):
 
             1. `time_unique` containing the ordered unique timestamps.
             2. `time_chunks` containing the frequency of each unique timestamp.
+            3. `time_offsets` containing the row index the start of each unique timestamp.
 
         Defaults to `True`.
 
