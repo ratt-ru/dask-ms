@@ -489,6 +489,9 @@ def xds_from_ms(ms, chunks=None, time_ordered=True):
     :class:`xarray.Dataset`
     """
 
+    if chunks is None:
+        chunks = 100000
+
     okwargs = { 'readonly': True }
     nrows = _table_proxy(ms, okwargs, "nrows")
     row_range = np.arange(nrows)
