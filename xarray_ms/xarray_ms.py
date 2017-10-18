@@ -551,6 +551,12 @@ def xds_from_ms(ms, chunks=None, time_ordered=True):
     xds = _xds_from_table(ms, chunks=chunks, runs=runs,
                                     table_schema="MS")
 
+    # Create coordinates for channel, correlation
+    # and polarisation dimensions
+    extra_coords.update({ "chans": np.arange(xds.dims["chans"]),
+                          "corrs": np.arange(xds.dims["corrs"]),
+                          "pols": np.arange(xds.dims["corrs"])})
+
     # Add extra arrays and coordinates
     xds.update(extra_arrays)
     xds.coords.update(extra_coords)
