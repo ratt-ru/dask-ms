@@ -3,7 +3,6 @@ from collections import OrderedDict
 import logging
 from functools import partial
 import itertools
-from operator import getitem
 import sys
 
 import six
@@ -14,8 +13,9 @@ except ImportError:
     from toolz import pluck, merge
 
 import attr
+import dask
 import dask.array as da
-import dask.core
+from dask.array.core import getter
 import numpy as np
 import xarray as xr
 
@@ -304,8 +304,8 @@ def table_getcol_runs(table, col_cfg, runs):
 
 def xds_to_table(dataset, data_arrays):
     """
-    Constructs a delayed call evaluating a dask
-    graph that calls :meth:`pyrap.tables.table.putcol`
+    Constructs a dask array consisting of individual
+    :meth:`pyrap.tables.table.putcol` calls
     on chunks of the `data_arrays` in the supplied `dataset`.
 
     .. code-block:: python
@@ -322,8 +322,11 @@ def xds_to_table(dataset, data_arrays):
 
     Returns
     -------
-    :class:`dask.Delayed`
-        delayed object
+    :class:`dask.Array`
+        A boolean dask array where each element is `True`
+        and associated with
+        a :meth:`pyrap.tables.table.putcol` command
+        for each chunk in each array in `data_arrays`.
     """
 
     if not isinstance(data_arrays, (tuple, list)):
@@ -335,9 +338,12 @@ def xds_to_table(dataset, data_arrays):
     runs = dataset.attrs['runs']
 
     okwargs = {'readonly': False}
+    success = np.ones(shape=(1,), dtype=np.bool)
 
     data_arrays = [(name, dataset[name.lower()].data)
                                 for name in data_arrays]
+
+    keys = []
 
     for array_name, array in data_arrays:
         # Reconfigure the row chunks using the supplied runs
@@ -362,19 +368,25 @@ def xds_to_table(dataset, data_arrays):
         for product, run in zip(it, runs):
             chunk_idx = tuple(pluck(0, product))
             key = (name,) + chunk_idx
-
             shape = list(pluck(1, product))
-
             row_end = row_start + shape[0]
 
             dsk[key] = (partial(_table_proxy, startrow=run[0], nrow=len(run)),
                                 table, okwargs, "putcol", array_name,
-                                (getitem, array, slice(row_start, row_end)))
+                                (getter, array, slice(row_start, row_end)))
 
             row_start = row_end
 
-    # Return delayed evaluation of the putcol graph
-    return dask.delayed(dask.get)(merge(dsk, *(t[1].dask for t in data_arrays)), dsk.keys())
+            keys.append(key)
+
+    # Construct the dask array internals
+    array_names = tuple(tup[1].name for tup in data_arrays)
+    token = dask.base.tokenize(table, *array_names)
+    name = '-'.join((table, "putcol", token))
+    chunks = da.core.normalize_chunks(1, shape=(len(keys),))
+    dsk = merge(dsk, { (name, i) : k for i, k in enumerate(keys) })
+
+    return da.Array(dsk, name, chunks, dtype=np.bool)
 
 
 def _xds_from_table(table, chunks=None, runs=None, table_schema=None):
