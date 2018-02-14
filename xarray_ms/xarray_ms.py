@@ -29,8 +29,7 @@ import xarray as xr
 from .table_proxy import TableProxy
 from .known_table_schemas import registered_schemas
 
-_DEFAULT_INDEX_COLUMNS = ("FIELD_ID", "DATA_DESC_ID", "TIME",
-                                        "ANTENNA1", "ANTENNA2")
+_DEFAULT_INDEX_COLUMNS = ("FIELD_ID", "DATA_DESC_ID", "TIME")
 
 _DEFAULT_PARTITION_COLUMNS = ("FIELD_ID", "DATA_DESC_ID")
 
