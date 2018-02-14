@@ -12,19 +12,19 @@ def scheduler_context(args):
 
     import dask
 
-    sched_type = None
+    sched_info = {}
 
     try:
         if args.scheduler in ("mt", "thread", "threaded", "threading"):
             import dask.threaded
             logging.info("Using multithreaded scheduler")
             dask.set_options(get=dask.threaded.get)
-            sched_type = ("threaded",)
+            sched_info = {"type": "threaded"}
         elif args.scheduler in ("mp", "multiprocessing"):
             import dask.multiprocessing
             logging.info("Using multiprocessing scheduler")
             dask.set_options(get=dask.multiprocessing.get)
-            sched_type = ("multiprocessing",)
+            sched_info = {"type": "multiprocessing"}
         else:
             import distributed
             local_cluster = None
@@ -45,22 +45,30 @@ def scheduler_context(args):
             client = distributed.Client(address)
             dask.set_options(get=client.get)
             client.restart()
-            sched_type = ("distributed", client, local_cluster)
+            sched_info = {
+                "type" : "distributed",
+                "client" : client,
+                "local_cluster" : local_cluster }
 
         yield
     except Exception:
         logging.exception("Error setting up scheduler", exc_info=True)
 
     finally:
-        if sched_type[0] == "distributed":
-            client, cluster = sched_type[1:3]
-
-            if client:
+        if sched_info["type"] == "distributed":
+            try:
+                client = sched_info["client"]
+            except KeyError:
+                pass
+            else:
                 client.close()
 
-            if cluster:
-                cluster.close()
-
+            try:
+                local_cluster = sched_info["local_cluster"]
+            except KeyError:
+                pass
+            else:
+                local_cluster.close()
 
 if __name__ == "__main__":
 
