@@ -192,6 +192,7 @@ def xds_to_table(xds, table_name, columns=None):
     return da.Array(dsk, name, chunks, dtype=np.bool)
 
 def _xds_from_table(table_name, table, table_schema,
+                    dsk, table_open_key,
                     ignore_cols, rows, rowchunks):
     """
     Parameters
@@ -201,6 +202,12 @@ def _xds_from_table(table_name, table, table_schema,
     table : :class:`pyrap.tables.table`
         CASA table object, used to inspect metadata
         for creating Datasets
+    table_schema : str or dict
+        Table schema.
+    dsk : dict
+        Dask graph containing ``table_open_key``
+    table_open_key : tuple
+        Tuple referencing the table open command
     ignore_cols : tuple or list
         Columns to ignore when creating the dataset.
     rows : np.ndarray
@@ -273,9 +280,6 @@ def _xds_from_table(table_name, table, table_schema,
     # Remove missing columns
     columns = columns.difference(missing)
 
-    head, tail = os.path.split(table_name.rstrip(os.sep))
-    table_open_key = ('open', tail, dask.base.tokenize(table_name))
-    dsk = { table_open_key : (TableProxy, table_name) }
 
     # Insert arrays into dataset in sorted order
     data_arrays = OrderedDict()
@@ -396,6 +400,10 @@ def xds_from_table(table_name, index_cols=None, part_cols=None,
     elif not isinstance(part_cols, tuple):
         part_cols = (part_cols,)
 
+    head, tail = os.path.split(table_name.rstrip(os.sep))
+    table_open_key = ('open', tail, dask.base.tokenize(table_name))
+    dsk = { table_open_key : (TableProxy, table_name) }
+
     def _create_dataset(table, index_cols, group_cols=(), group_values=()):
         """
         Generates a dataset, by generates a row ordering given
@@ -431,8 +439,9 @@ def xds_from_table(table_name, index_cols=None, part_cols=None,
         with pt.taql(query) as row_query:
             rows = row_query.getcol("__table_row__")
 
-        return _xds_from_table(table_name, table, table_schema, group_cols,
-                                                    rows, rowchunks)
+        return _xds_from_table(table_name, table, table_schema,
+                            dsk, table_open_key,
+                            group_cols, rows, rowchunks)
 
     with pt.table(table_name) as T:
         # Group table_name by partitioning columns,
