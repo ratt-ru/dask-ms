@@ -21,7 +21,6 @@ def get_logger():
 log = get_logger()
 
 from xarray_ms import xds_from_table, xds_to_table, xds_from_ms
+from table_proxy import TableProxy
 
-def clear_file_cache():
-    from .file_cache import FILE_CACHE
-    FILE_CACHE.clear()
+

@@ -37,22 +37,22 @@ MS_SCHEMA = {
     "BASELINE_REF":     ColumnSchema(()),
     "UVW":              ColumnSchema(('(u,v,w)',)),
     "UVW2":             ColumnSchema(('(u,v,w)',)),
-    "DATA":             ColumnSchema(('chans', 'corrs')),
-    "FLOAT_DATA":       ColumnSchema(('chans', 'corrs')),
-    "VIDEO_POINT":      ColumnSchema(('corrs',)),
-    "LAG_DATA":         ColumnSchema(('corrs',)),
-    "SIGMA":            ColumnSchema(('corrs',)),
-    "SIGMA_SPECTRUM":   ColumnSchema(('chans', 'corrs')),
-    "WEIGHT":           ColumnSchema(('corrs',)),
-    "WEIGHT_SPECTRUM":  ColumnSchema(('chans', 'corrs')),
-    "FLAG":             ColumnSchema(('chans', 'corrs')),
-    "FLAG_CATEGORY":    ColumnSchema(('flagcats', 'chans', 'corrs')),
+    "DATA":             ColumnSchema(('chan', 'corr')),
+    "FLOAT_DATA":       ColumnSchema(('chan', 'corr')),
+    "VIDEO_POINT":      ColumnSchema(('corr',)),
+    "LAG_DATA":         ColumnSchema(('corr',)),
+    "SIGMA":            ColumnSchema(('corr',)),
+    "SIGMA_SPECTRUM":   ColumnSchema(('chan', 'corr')),
+    "WEIGHT":           ColumnSchema(('corr',)),
+    "WEIGHT_SPECTRUM":  ColumnSchema(('chan', 'corr')),
+    "FLAG":             ColumnSchema(('chan', 'corr')),
+    "FLAG_CATEGORY":    ColumnSchema(('flagcats', 'chan', 'corr')),
     "FLAG_ROWS":        ColumnSchema(()),
 
     # Extra imaging columns
-    "MODEL_DATA":       ColumnSchema(('chans', 'corrs')),
-    "CORRECTED_DATA":   ColumnSchema(('chans', 'corrs')),
-    "IMAGING_WEIGHT":   ColumnSchema(('chans',)),
+    "MODEL_DATA":       ColumnSchema(('chan', 'corr')),
+    "CORRECTED_DATA":   ColumnSchema(('chan', 'corr')),
+    "IMAGING_WEIGHT":   ColumnSchema(('chan',)),
 }
 
 ANTENNA_SCHEMA = {
@@ -67,10 +67,10 @@ FIELD_SCHEMA = {
 }
 
 SPECTRAL_WINDOW = {
-    "CHAN_FREQ":        ColumnSchema(('chans',)),
-    "CHAN_WIDTH":       ColumnSchema(('chans',)),
-    "EFFECTIVE_BW":     ColumnSchema(('chans',)),
-    "RESOLUTION":       ColumnSchema(('chans',)),
+    "CHAN_FREQ":        ColumnSchema(('chan',)),
+    "CHAN_WIDTH":       ColumnSchema(('chan',)),
+    "EFFECTIVE_BW":     ColumnSchema(('chan',)),
+    "RESOLUTION":       ColumnSchema(('chan',)),
 }
 
 def registered_schemas():
