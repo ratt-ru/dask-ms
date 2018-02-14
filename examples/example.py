@@ -1,61 +1,113 @@
 import argparse
+import logging
 from contextlib import contextmanager
-import time
 
-import dask.array as da
-import xarray.ufuncs as xru
-import xarray_ms
+import dask
 
-def create_parser():
-    p = argparse.ArgumentParser()
-    p.add_argument("ms")
-    p.add_argument("--dist", action="store_true", default=False)
-    return p
+from xarray_ms import xds_from_table, xds_from_ms, xds_to_table, TableProxy
 
 @contextmanager
 def scheduler_context(args):
-    """
-    Runs MS local distributed cluster if requested
-    """
+    """ Set the scheduler to use, based on the script arguments """
+
+    import dask
+
+    sched_type = None
+
     try:
-        if args.dist == True:
-            log.info("Starting distributed dask")
-            from distributed import Client, LocalCluster
-            cluster = LocalCluster(processes=True)
-            client = Client(cluster.scheduler_address)
-        yield "OK"
+        if args.scheduler in ("mt", "thread", "threaded", "threading"):
+            import dask.threaded
+            logging.info("Using multithreaded scheduler")
+            dask.set_options(get=dask.threaded.get)
+            sched_type = ("threaded",)
+        elif args.scheduler in ("mp", "multiprocessing"):
+            import dask.multiprocessing
+            logging.info("Using multiprocessing scheduler")
+            dask.set_options(get=dask.multiprocessing.get)
+            sched_type = ("multiprocessing",)
+        else:
+            import distributed
+            local_cluster = None
+
+            if args.scheduler == "local":
+                local_cluster = distributed.LocalCluster(processes=False)
+                address = local_cluster.scheduler_address
+            elif args.scheduler.startswith('tcp'):
+                address = args.scheduler
+            else:
+                import json
+
+                with open(args.scheduler, 'r') as f:
+                    address = json.load(f)['address']
+
+            logging.info("Using distributed scheduler "
+                         "with address '{}'".format(address))
+            client = distributed.Client(address)
+            dask.set_options(get=client.get)
+            client.restart()
+            sched_type = ("distributed", client, local_cluster)
+
+        yield
+    except Exception:
+        logging.exception("Error setting up scheduler", exc_info=True)
+
     finally:
-        if args.dist == True:
-            log.info("Shutting down distributed dask")
-            client.close()
-            cluster.close()
+        if sched_type[0] == "distributed":
+            client, cluster = sched_type[1:3]
+
+            if client:
+                client.close()
+
+            if cluster:
+                cluster.close()
 
 
-args = create_parser().parse_args()
+if __name__ == "__main__":
 
-with scheduler_context(args):
-    start = time.clock()
+    from dask.diagnostics import Profiler, ProgressBar
 
-    # Create dataset from Measurement Set
-    ds = xarray_ms.xds_from_ms(args.ms, chunks=100000)
+    def create_parser():
+        parser = argparse.ArgumentParser()
+        parser.add_argument("ms")
+        parser.add_argument("-c", "--chunks", default=10000, type=int)
+        parser.add_argument("-s", "--scheduler", default="threaded")
+        return parser
 
-    # Create dataset with flag inverted
-    ds = ds.assign(flag=xru.logical_not(ds.flag))
-    assert isinstance(ds.flag.data, da.Array)
+    args = create_parser().parse_args()
 
-    # Write the flag column to the Measurement Set
-    xarray_ms.xds_to_table(ds, "FLAG").compute()
+    with scheduler_context(args):
 
-    print "Flag inversion time '%s'" % (time.clock() - start)
 
-    #Load the ANTENNA table
-    ant_ds = xarray_ms.xds_from_table('::'.join((args.ms, "ANTENNA")),
-                                    chunks=100000, table_schema="ANTENNA")
+        # Create a dataset representing the entire antenna table
+        ant_table =  '::'.join((args.ms, 'ANTENNA'))
 
-    spw_ds = xarray_ms.xds_from_table('::'.join((args.ms, "SPECTRAL_WINDOW")),
-                                    chunks=100000, table_schema="SPECTRAL_WINDOW")
+        for ant_ds in xds_from_table(ant_table):
+            print(ant_ds)
+            print(dask.compute(ant_ds.NAME.data, ant_ds.POSITION.data, ant_ds.DISH_DIAMETER.data))
 
-    print ant_ds
-    print spw_ds
-    print ds
+
+        # Create datasets representing each row of the spw table
+        spw_table =  '::'.join((args.ms, 'SPECTRAL_WINDOW'))
+
+        for spw_ds in xds_from_table(spw_table, part_cols="__row__"):
+            print(spw_ds)
+            print(spw_ds.NUM_CHAN.values)
+            print(spw_ds.CHAN_FREQ.values)
+
+
+        # Create datasets from a partioning of the MS
+        datasets = list(xds_from_ms(args.ms, chunks={'row':args.chunks}))
+
+        for ds in datasets:
+            print(ds)
+
+            # Try write the STATE_ID column back
+            write = xds_to_table(ds, args.ms, 'STATE_ID')
+            with ProgressBar(), Profiler() as prof:
+                write.compute()
+
+            # Profile
+            prof.visualize(file_path="chunked.html")
+
+
 
