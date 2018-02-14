@@ -15,51 +15,49 @@ Radio Astronomy algorithms.
 .. code-block:: python
 
     import dask.array as da
-    from xarray_ms import xds_from_table, xds_to_table
+    from xarrayms import xds_from_table, xds_to_table
 
     # Create xarray dataset from Measurement Set "WSRT.MS"
-    ds = xds_from_table("WSRT.MS", time_ordered=True, chunks=10000, table_schema="MS")
+    ds = xds_from_table("WSRT.MS")
     # Set the flag DataArray to it's inverse
     ds['flag'] = (ds.flag.dims, da.logical_not(ds.flag))
     # Write the flag column back to the Measurement Set
-    xds_to_table(ds, "FLAG").compute()
+    xds_to_table(ds, "WSRT.MS", "FLAG").compute()
 
     print ds
 
     <xarray.Dataset>
-    Dimensions:         (chans: 64, corrs: 4, rows: 6552, u,v,w: 3)
+    Dimensions:         ((u,v,w): 3, chan: 64, corr: 4, row: 6552, table_row: 6552)
     Coordinates:
-      * rows            (rows) int64 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 ...
-        msrows          (rows) int64 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 ...
-    Dimensions without coordinates: chans, corrs, u,v,w
+      * row             (row) int32 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 ...
+      * table_row       (table_row) int32 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 ...
+    Dimensions without coordinates: (u,v,w), chan, corr
     Data variables:
-        weight          (rows, corrs) float32 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 ...
-        processor_id    (rows) int32 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ...
-        uvw             (rows, u,v,w) float64 -126.8 59.13 -34.13 -253.6 118.3 ...
-        imaging_weight  (rows, chans) float32 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 ...
-        antenna2        (rows) int32 1 2 3 4 5 6 7 8 9 10 11 12 13 2 3 4 5 6 7 8 ...
-        antenna1        (rows) int32 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 ...
-        time_centroid   (rows) float64 4.457e+09 4.457e+09 4.457e+09 4.457e+09 ...
-        array_id        (rows) int32 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ...
-        observation_id  (rows) int32 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ...
-        data_desc_id    (rows) int32 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ...
-        feed1           (rows) int32 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ...
-        feed2           (rows) int32 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ...
-        scan_number     (rows) int32 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ...
-        flag_row        (rows) bool False False False False False False False ...
-        corrected_data  (rows, chans, corrs) complex64 (10+0j) (0.000240935+0j) ...
-        field_id        (rows) int32 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ...
-        flag            (rows, chans, corrs) bool True True True True True True ...
-        data            (rows, chans, corrs) complex64 1j 1j 1j 1j 1j 1j 1j 1j ...
-        exposure        (rows) float64 600.0 600.0 600.0 600.0 600.0 600.0 600.0 ...
-        model_data      (rows, chans, corrs) complex64 (10+0j) 0j 0j (10+0j) ...
-        interval        (rows) float64 600.0 600.0 600.0 600.0 600.0 600.0 600.0 ...
-        time            (rows) float64 4.457e+09 4.457e+09 4.457e+09 4.457e+09 ...
-        state_id        (rows) int32 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ...
-        sigma           (rows, corrs) float32 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 ...
+        ANTENNA1        (row) int32 dask.array<shape=(6552,), chunksize=(1000,)>
+        ANTENNA2        (row) int32 dask.array<shape=(6552,), chunksize=(1000,)>
+        ARRAY_ID        (row) int32 dask.array<shape=(6552,), chunksize=(1000,)>
+        CORRECTED_DATA  (row, chan, corr) complex64 dask.array<shape=(6552, 64, 4), chunksize=(1000, 64, 4)>
+        DATA            (row, chan, corr) complex64 dask.array<shape=(6552, 64, 4), chunksize=(1000, 64, 4)>
+        EXPOSURE        (row) float64 dask.array<shape=(6552,), chunksize=(1000,)>
+        FEED1           (row) int32 dask.array<shape=(6552,), chunksize=(1000,)>
+        FEED2           (row) int32 dask.array<shape=(6552,), chunksize=(1000,)>
+        FLAG            (row, chan, corr) bool dask.array<shape=(6552, 64, 4), chunksize=(1000, 64, 4)>
+        FLAG_ROW        (row) bool dask.array<shape=(6552,), chunksize=(1000,)>
+        IMAGING_WEIGHT  (row, chan) float32 dask.array<shape=(6552, 64), chunksize=(1000, 64)>
+        INTERVAL        (row) float64 dask.array<shape=(6552,), chunksize=(1000,)>
+        MODEL_DATA      (row, chan, corr) complex64 dask.array<shape=(6552, 64, 4), chunksize=(1000, 64, 4)>
+        OBSERVATION_ID  (row) int32 dask.array<shape=(6552,), chunksize=(1000,)>
+        PROCESSOR_ID    (row) int32 dask.array<shape=(6552,), chunksize=(1000,)>
+        SCAN_NUMBER     (row) int32 dask.array<shape=(6552,), chunksize=(1000,)>
+        SIGMA           (row, corr) float32 dask.array<shape=(6552, 4), chunksize=(1000, 4)>
+        STATE_ID        (row) int32 dask.array<shape=(6552,), chunksize=(1000,)>
+        TIME            (row) float64 dask.array<shape=(6552,), chunksize=(1000,)>
+        TIME_CENTROID   (row) float64 dask.array<shape=(6552,), chunksize=(1000,)>
+        UVW             (row, (u,v,w)) float64 dask.array<shape=(6552, 3), chunksize=(1000, 3)>
+        WEIGHT          (row, corr) float32 dask.array<shape=(6552, 4), chunksize=(1000, 4)>
     Attributes:
-        runs:     [array([   0,    1,    2, ..., 6549, 6550, 6551])]
-        ms:       WSRT.MS
+        FIELD_ID:      0
+        DATA_DESC_ID:  0
 
 -----------
 Limitations
@@ -67,11 +65,21 @@ Limitations
 
 1. Many Measurement Sets columns are defined as variably shaped,
    but the actual data is fixed.
-   For this reason, xarray-ms_ will infer the shape of the
+   xarray-ms_ will infer the shape of the
    data from the first row and must be consistent
    with that of other rows.
+   For example, this may be issue where multiple Spectral Windows
+   are present in the Measurement Set with differing channels
+   per SPW.
+
+   xarray-ms_ works around this by partitioning the
+   Measurement Set into multiple datasets.
+   The first row's shape is used to infer the shape of the partition.
+   Thus, in the case of multiple Spectral Window's, we can partition
+   the Measurement Set by DATA_DESC_ID to create a dataset for
+   each Spectral Window.
 
 .. _dask: https://dask.pydata.org
-.. _xarray-ms: pants
+.. _xarray-ms: https://github.com/ska-sa/xarray-ms
 .. _xarray: https://xarray.pydata.org
 .. _python-casacore: https://github.com/casacore/python-casacore
