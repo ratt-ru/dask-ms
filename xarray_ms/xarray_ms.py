@@ -193,7 +193,7 @@ def xds_to_table(xds, table_name, columns=None):
 
 def _xds_from_table(table_name, table, table_schema,
                     dsk, table_open_key,
-                    ignore_cols, rows, rowchunks):
+                    ignore_cols, rows, chunks):
     """
     Parameters
     ----------
@@ -213,8 +213,8 @@ def _xds_from_table(table_name, table, table_schema,
     rows : np.ndarray
         CASA table row id's defining an ordering
         of the table data.
-    rowchunks : integer
-        The chunk size for the row dimension of the resulting
+    chunks : dict
+        The chunk size for the dimensions of the resulting
         :class:`dask.array.Array`s.
 
     Returns
@@ -288,7 +288,7 @@ def _xds_from_table(table_name, table, table_schema,
         shape, dims, dtype = col_metadata[c]
         col_dask_array = generate_table_getcols(table_name, table_open_key,
                                                 dsk, c, shape, dtype, rows,
-                                                rowchunks)
+                                                chunks['row'])
 
         data_arrays[c] = xr.DataArray(col_dask_array, dims=dims)
 
@@ -299,7 +299,7 @@ def _xds_from_table(table_name, table, table_schema,
 
 def xds_from_table(table_name, index_cols=None, part_cols=None,
                                     table_schema=None,
-                                    rowchunks=_DEFAULT_ROWCHUNKS):
+                                    chunks=None):
     """
     Generator producing :class:`xarray.Dataset`(s) from the CASA table
     ``table_name`` with the rows lexicographically sorted according
@@ -378,14 +378,19 @@ def xds_from_table(table_name, index_cols=None, part_cols=None,
         If ``None`` is supplied, the end of ``table_name`` will be
         inspected to see if it matches any default schemas.
 
-    rowchunks (optional) : integer
-        Number of rows to chunk along
+    chunks (optional) : dict
+        A :code:`{dim: chunk}` dictionary, specifying the chunking
+        strategy for each dimension in the schema.
+        Defaults to :code:`{'row': 100000 }`.
 
     Yields
     ------
     `xarray.Dataset`
         datasets for each partition, each ordered by indexing columns
     """
+    if chunks is None:
+        chunks = {'row': _DEFAULT_ROWCHUNKS }
+
     if index_cols is None:
         index_cols = ()
     elif isinstance(index_cols, list):
@@ -441,7 +446,7 @@ def xds_from_table(table_name, index_cols=None, part_cols=None,
 
         return _xds_from_table(table_name, table, table_schema,
                             dsk, table_open_key,
-                            group_cols, rows, rowchunks)
+                            group_cols, rows, chunks)
 
     with pt.table(table_name) as T:
         # Group table_name by partitioning columns,
@@ -480,9 +485,30 @@ def xds_from_table(table_name, index_cols=None, part_cols=None,
             yield _create_dataset(T, index_cols)
 
 def xds_from_ms(ms, index_cols=None, part_cols=None,
-                    rowchunks=_DEFAULT_ROWCHUNKS):
+                    chunks=None):
     """
-    Constructs an xarray dataset from a Measurement Set
+    Generator yielding a series of xarray datasets representing
+    the contents a Measurement Set.
+    It defers to :func:`xds_from_table`, which should be consulted
+    for more information.
+
+    Parameters
+    ----------
+    ms : str
+        Measurement Set filename
+    index_cols (optional): tuple or list
+        Sequence of indexing columns.
+        Defaults to :code:`%(index)s`
+    part_cols (optional): tuple or list
+        Sequence of partioning columns.
+        Defaults to :code:`%(parts)s`
+    chunks (optional): dict
+        Dictionary of dimension chunks.
+
+    Yields
+    ------
+    :class:`xarray.Dataset`
+        xarray datasets for each partition
     """
 
     if index_cols is None:
@@ -500,5 +526,15 @@ def xds_from_ms(ms, index_cols=None, part_cols=None,
         part_cols = (part_cols,)
 
     for ds in xds_from_table(ms, index_cols=index_cols, part_cols=part_cols,
-                                    table_schema="MS", rowchunks=rowchunks):
+                                    table_schema="MS", chunks=chunks):
         yield ds
+
+# Set docstring variables in try/except
+# ``__doc__`` may not be present as
+# ``python -OO`` strips docstrings
+try:
+    xds_from_ms.__doc__ %= {
+        'index': _DEFAULT_INDEX_COLUMNS,
+        'parts': _DEFAULT_PARTITION_COLUMNS }
+except AttributeError:
+    pass
