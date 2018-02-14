@@ -30,14 +30,20 @@ class TableProxy(object):
         # Should we request a write-lock?
         self._write_lock = kwargs.get('readonly', True) == False
 
-        # Warn that we ignore lockoptions
-        lockoptions = kwargs.pop('lockoptions', None)
-        if lockoptions is not None and not lockoptions == 'user':
-            log.warn("'lockoptions=%s' ignored by TableProxy. "
-                        "Locking is automatically handled in 'user' "
-                        "mode" % lockoptions)
+        # Force table locking mode
+        lockoptions = 'auto'
 
-        self._table = pt.table(table_name, **kwargs)
+        try:
+            userlockopt = kwargs.pop('lockoptions')
+        except KeyError:
+            pass
+        else:
+            log.warn("lockoptions='%s' ignored by TableProxy. "
+                    "Locking is automatically handled "
+                    "in '%s' mode", userlockopt, lockoptions)
+
+        self._table = pt.table(table_name, lockoptions=lockoptions, **kwargs)
+        self._table.unlock()
 
     def __getstate__(self):
         return (self._table_name, self._kwargs)
@@ -46,7 +52,6 @@ class TableProxy(object):
         self.__init__(state[0], **state[1])
 
     def __call__(self, fn, *args, **kwargs):
-
         # Don't lock for these functions
         should_lock = fn not in ("close", "done")
 
@@ -58,7 +63,7 @@ class TableProxy(object):
             return getattr(self._table, fn)(*args, **kwargs)
 
         finally:
-            # Release the lock if a table close
+            # Release the lock
             if should_lock:
                 self._table.unlock()
 
