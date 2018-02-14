@@ -122,6 +122,7 @@ def generate_table_getcols(table_name, table_open_key, dsk_base,
     chunks = tuple((tuple(chunks),)) + tuple((c,) for c in chunk_extra)
     return da.Array(merge(dsk_base, dsk), name, chunks, dtype=dtype)
 
+@numba.jit
 def _np_put_fn(tp, c, d, s, n):
     tp("putcol", c, d, startrow=s, nrow=n)
     return np.asarray([True])
