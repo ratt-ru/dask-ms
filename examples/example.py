@@ -4,7 +4,7 @@ from contextlib import contextmanager
 
 import dask
 
-from xarray_ms import xds_from_table, xds_from_ms, xds_to_table, TableProxy
+from xarrayms import xds_from_table, xds_from_ms, xds_to_table, TableProxy
 
 @contextmanager
 def scheduler_context(args):
