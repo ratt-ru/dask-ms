@@ -103,7 +103,7 @@ def generate_table_getcols(table_name, table_open_key, dsk_base,
 
         # Split into runs of consecutive rows within this chunk
         d = np.ediff1d(rows[start_row:end_row], to_begin=2, to_end=2)
-        runs = np.nonzero(d != 1)[0]
+        runs = np.nonzero(d != 1)[0] + start_row
 
         # How many rows in this chunk?
         chunk_size = 0
