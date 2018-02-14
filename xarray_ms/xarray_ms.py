@@ -353,6 +353,27 @@ def xds_from_table(table_name, index_cols=None, part_cols=None,
     part_cols (optional) : list or tuple
         List of columns on which to partition the CASA table.
         Defaults to :code:`()`
+    table_schema (optional) : str or dict
+        A schema dictionary defining the dimension naming scheme for
+        each column in the table. For example:
+
+        .. code-block:: python
+
+            {"UVW" : ('uvw',), DATA" : ('chan', 'corr')}
+
+        will result in the UVW and DATA arrays having dimensions
+        :code:`('row', 'uvw')` and :code:`('row', 'chan', 'corr')`
+        respectively.
+
+        Alternatively a string can be supplied, which will be matched
+        against existing default schemas. Examples here include
+        :code:`"MS"`, :code`"ANTENNA"` and :code:`"SPECTRAL_WINDOW"`
+        correspoonding to ``Measurement Sets`` the ``ANTENNA`` subtable
+        and the ``SPECTRAL_WINDOW`` subtable, respectively.
+
+        If ``None`` is supplied, the end of ``table_name`` will be
+        inspected to see if it matches any default schemas.
+
     rowchunks (optional) : integer
         Number of rows to chunk along
 
