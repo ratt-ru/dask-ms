@@ -41,6 +41,28 @@ def _np_put_fn(tp, c, d, s, n):
     return np.asarray([True])
 
 def xds_to_table(xds, table_name, columns=None):
+    """
+    Generates a dask array which writes the
+    specified columns from an :class:`xarray.Dataset` into
+    the CASA table specified by ``table_name`` when
+    the :meth:`dask.array.Array.compute` method is called.
+
+    Parameters
+    ----------
+    xds : :class:`xarray.Dataset`
+        dataset containing the specified columns.
+    table_name : str
+        CASA table path
+    columns (optional): tuple or list
+        list of column names to write to the table.
+        If ``None`` all columns will be written.
+
+    Returns
+    -------
+    :class:`dask.array.Array`
+        dask array representing the write to the
+        datset.
+    """
     head, tail = os.path.split(table_name.rstrip(os.sep))
     kwargs = {'readonly': False}
     table_open_key = ('open', tail, dask.base.tokenize(table_name, kwargs))
