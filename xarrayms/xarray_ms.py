@@ -194,7 +194,7 @@ def xds_to_table(xds, table_name, columns=None):
 
 def _xds_from_table(table_name, table, table_schema,
                     dsk, table_open_key,
-                    ignore_cols, rows, chunks):
+                    columns, rows, chunks):
     """
     Parameters
     ----------
@@ -209,8 +209,8 @@ def _xds_from_table(table_name, table, table_schema,
         Dask graph containing ``table_open_key``
     table_open_key : tuple
         Tuple referencing the table open command
-    ignore_cols : tuple or list
-        Columns to ignore when creating the dataset.
+    columns : tuple or list
+        Columns present on the returned dataset.
     rows : np.ndarray
         CASA table row id's defining an ordering
         of the table data.
@@ -224,8 +224,6 @@ def _xds_from_table(table_name, table, table_schema,
         xarray dataset
     """
 
-    # The columns we're going to load, ignoring some
-    columns = set(table.colnames()).difference(ignore_cols)
     nrows = rows.size
     col_metadata = {}
 
@@ -298,9 +296,9 @@ def _xds_from_table(table_name, table, table_schema,
     return xr.Dataset(data_arrays).assign_coords(table_row=rows, row=base_rows)
 
 
-def xds_from_table(table_name, index_cols=None, part_cols=None,
-                                    table_schema=None,
-                                    chunks=None):
+def xds_from_table(table_name, columns=None,
+                    index_cols=None, part_cols=None,
+                    table_schema=None, chunks=None):
     """
     Generator producing :class:`xarray.Dataset`(s) from the CASA table
     ``table_name`` with the rows lexicographically sorted according
@@ -353,6 +351,9 @@ def xds_from_table(table_name, index_cols=None, part_cols=None,
     ----------
     table_name : str
         CASA table
+    columns (optional) : list or tuple
+        Columns present on the returned dataset.
+        Defaults to all if ``None``
     index_cols (optional) : list or tuple
         List of CASA table indexing columns. Defaults to :code:`()`.
     part_cols (optional) : list or tuple
@@ -410,7 +411,8 @@ def xds_from_table(table_name, index_cols=None, part_cols=None,
     table_open_key = ('open', tail, dask.base.tokenize(table_name))
     dsk = { table_open_key : (TableProxy, table_name) }
 
-    def _create_dataset(table, index_cols, group_cols=(), group_values=()):
+    def _create_dataset(table, columns, index_cols,
+                        group_cols=(), group_values=()):
         """
         Generates a dataset, by generates a row ordering given
 
@@ -447,9 +449,13 @@ def xds_from_table(table_name, index_cols=None, part_cols=None,
 
         return _xds_from_table(table_name, table, table_schema,
                             dsk, table_open_key,
-                            group_cols, rows, chunks)
+                            set(columns).difference(group_cols),
+                            rows, chunks)
 
     with pt.table(table_name) as T:
+        if columns is None:
+            columns = T.colnames()
+
         # Group table_name by partitioning columns,
         # We'll generate a dataset for each unique group
 
@@ -463,7 +469,8 @@ def xds_from_table(table_name, index_cols=None, part_cols=None,
 
             # For each grouping
             for group_values in zip(*groups):
-               ds = _create_dataset(T, index_cols, group_cols, group_values)
+               ds = _create_dataset(T, columns, index_cols,
+                                    group_cols, group_values)
                yield (ds.squeeze(drop=True)
                         .assign_attrs(table_row=ds.table_row.values[0]))
 
@@ -478,15 +485,16 @@ def xds_from_table(table_name, index_cols=None, part_cols=None,
 
             # For each grouping
             for group_values in zip(*groups):
-                ds = _create_dataset(T, index_cols, group_cols, group_values)
+                ds = _create_dataset(T, columns, index_cols,
+                                        group_cols, group_values)
                 yield ds.assign_attrs(zip(group_cols, group_values))
 
         # No partioning case
         else:
-            yield _create_dataset(T, index_cols)
+            yield _create_dataset(T, columns, index_cols)
 
-def xds_from_ms(ms, index_cols=None, part_cols=None,
-                    chunks=None):
+def xds_from_ms(ms, columns=None, index_cols=None, part_cols=None,
+                                                    chunks=None):
     """
     Generator yielding a series of xarray datasets representing
     the contents a Measurement Set.
@@ -497,13 +505,16 @@ def xds_from_ms(ms, index_cols=None, part_cols=None,
     ----------
     ms : str
         Measurement Set filename
-    index_cols (optional): tuple or list
+    columns (optional) : tuple or list
+        Columns present on the resulting dataset.
+        Defaults to all if ``None``.
+    index_cols (optional) : tuple or list
         Sequence of indexing columns.
         Defaults to :code:`%(index)s`
-    part_cols (optional): tuple or list
+    part_cols (optional) : tuple or list
         Sequence of partioning columns.
         Defaults to :code:`%(parts)s`
-    chunks (optional): dict
+    chunks (optional) : dict
         Dictionary of dimension chunks.
 
     Yields
@@ -526,8 +537,9 @@ def xds_from_ms(ms, index_cols=None, part_cols=None,
     elif not isinstance(part_cols, tuple):
         part_cols = (part_cols,)
 
-    for ds in xds_from_table(ms, index_cols=index_cols, part_cols=part_cols,
-                                    table_schema="MS", chunks=chunks):
+    for ds in xds_from_table(ms, columns=columns,
+                            index_cols=index_cols, part_cols=part_cols,
+                            table_schema="MS", chunks=chunks):
         yield ds
 
 # Set docstring variables in try/except
