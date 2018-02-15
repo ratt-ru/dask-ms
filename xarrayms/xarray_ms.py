@@ -436,7 +436,7 @@ def xds_from_table(table_name, columns=None,
     def _create_dataset(table, columns, index_cols,
                         group_cols=(), group_values=()):
         """
-        Generates a dataset, by generates a row ordering given
+        Generates a dataset, given:
 
         1. the partitioning defined by ``group_cols`` and ``group_values``
         2. the ordering defined by ``index_cols``
@@ -496,7 +496,7 @@ def xds_from_table(table_name, columns=None,
                yield (ds.squeeze(drop=True)
                         .assign_attrs(table_row=ds.table_row.values[0]))
 
-        # Otherwise partition by give columns
+        # Otherwise partition by given columns
         elif len(part_cols) > 0:
             part_str = ', '.join(part_cols)
             query = "SELECT %s FROM $T GROUP BY %s" % (part_str, part_str)
