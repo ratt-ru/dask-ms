@@ -31,6 +31,23 @@ _DEFAULT_INDEX_COLUMNS = ("FIELD_ID", "DATA_DESC_ID", "TIME",)
 
 _DEFAULT_ROWCHUNKS = 100000
 
+def short_table_name(table_name):
+    """
+    Returns the last part
+
+    Parameters
+    ----------
+    table_name : str
+        CASA table path
+
+    Returns
+    -------
+    str
+        Shortenend path
+
+    """
+    return os.path.split(table_name.rstrip(os.sep))[1]
+
 def table_open_graph(table_name, **kwargs):
     """
     Generate a dask graph containing table open commands
@@ -51,8 +68,8 @@ def table_open_graph(table_name, **kwargs):
         Dask graph containing the graph open command
 
     """
-    head, tail = os.path.split(table_name.rstrip(os.sep))
-    table_open_key = ('open', tail, dask.base.tokenize(table_name, kwargs))
+    token = dask.base.tokenize(table_name, kwargs)
+    table_open_key = ('open', short_table_name, token)
     dsk = { table_open_key: (partial(TableProxy, **kwargs), table_name) }
     return table_open_key, dsk
 
@@ -85,7 +102,6 @@ def xds_to_table(xds, table_name, columns=None):
         datset.
     """
 
-    head, tail = os.path.split(table_name.rstrip(os.sep))
     table_open_key, dsk = table_open_graph(table_name, readonly=False)
     rows = xds.table_row.values
 
@@ -94,8 +110,8 @@ def xds_to_table(xds, table_name, columns=None):
     elif isinstance(columns, string_types):
         columns = [columns]
 
-    token = dask.base.tokenize(tail, columns)
-    name = '-'.join((tail, "putcol", token))
+    token = dask.base.tokenize(table_name, columns)
+    name = '-'.join((short_table_name(table_name), "putcol", token))
 
     chunk = 0
     chunks = []
@@ -187,9 +203,9 @@ def generate_table_getcols(table_name, table_open_key, dsk_base,
         Dask array representing the column
     """
 
-    head, tail = os.path.split(table_name.rstrip(os.sep))
-    token = dask.base.tokenize(tail, column)
-    name = '-'.join((tail, "getcol", column.lower(), token))
+    token = dask.base.tokenize(table_name, column)
+    short_name = short_table_name(table_name)
+    name = '-'.join((short_name, "getcol", column.lower(), token))
     dsk = {}
 
     chunk_extra = shape[1:]
