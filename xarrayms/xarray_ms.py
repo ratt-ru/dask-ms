@@ -112,7 +112,8 @@ def generate_table_getcols(table_name, table_open_key, dsk_base,
 
         for start, end in zip(runs[:-1], runs[1:]):
             run_len = end - start
-            row_get_fns.append((get_fn, table_open_key, column, start, run_len))
+            row_get_fns.append((get_fn, table_open_key, column,
+                                            rows[start], run_len))
             chunk_size += run_len
 
         # Create the key-value dask entry for this chunk
@@ -181,7 +182,7 @@ def xds_to_table(xds, table_name, columns=None):
                 dsk.update(dsk_slice)
                 row_put_fns.append((_np_put_fn, table_open_key,
                                     c, dsk_slice.keys()[0],
-                                    run_start, run_end - run_start))
+                                    rows[run_start], run_end - run_start))
 
             dsk[(name, chunk)] = (np.logical_and.reduce, row_put_fns)
             chunks.append(1)
