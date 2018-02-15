@@ -69,7 +69,7 @@ def table_open_graph(table_name, **kwargs):
 
     """
     token = dask.base.tokenize(table_name, kwargs)
-    table_open_key = ('open', short_table_name, token)
+    table_open_key = ('open', short_table_name(table_name), token)
     dsk = { table_open_key: (partial(TableProxy, **kwargs), table_name) }
     return table_open_key, dsk
 
