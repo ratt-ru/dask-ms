@@ -1,11 +1,8 @@
 from __future__ import print_function
 from future_builtins import zip
 
-import argparse
 import collections
-from collections import OrderedDict
 from functools import partial
-import itertools
 import logging
 import os
 import os.path
@@ -20,18 +17,17 @@ from six import string_types
 from six.moves import range
 
 try:
-    from cytoolz import pluck, merge
+    from cytoolz import merge
 except ImportError:
-    from toolz import pluck, merge
+    from toolz import merge
 
 import xarray as xr
 
-from .table_proxy import TableProxy
-from .known_table_schemas import registered_schemas
-
-_DEFAULT_INDEX_COLUMNS = ("FIELD_ID", "DATA_DESC_ID", "TIME")
+from xarrayms.table_proxy import TableProxy
+from xarrayms.known_table_schemas import registered_schemas
 
 _DEFAULT_PARTITION_COLUMNS = ("FIELD_ID", "DATA_DESC_ID")
+_DEFAULT_INDEX_COLUMNS = ("FIELD_ID", "DATA_DESC_ID", "TIME",)
 
 _DEFAULT_ROWCHUNKS = 100000
 
@@ -303,7 +299,7 @@ def _xds_from_table(table_name, table, table_schema,
     rowchunks = da.core.normalize_chunks(chunks['row'], (rows.size,))
 
     # Insert arrays into dataset in sorted order
-    data_arrays = OrderedDict()
+    data_arrays = collections.OrderedDict()
 
     for c in sorted(columns):
         shape, dims, dtype = col_metadata[c]
