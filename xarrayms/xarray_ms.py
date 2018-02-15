@@ -305,6 +305,8 @@ def _xds_from_table(table_name, table, table_schema,
             elif isinstance(row, (list, tuple)):
                 shape = (nrows,)
                 dtype = object
+            else:
+                raise TypeError("Unhandled row type '%s'" % type(row))
 
             # Generate an xarray dimension schema
             # from supplied or inferred schemas if possible
