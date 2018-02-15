@@ -31,6 +31,31 @@ _DEFAULT_INDEX_COLUMNS = ("FIELD_ID", "DATA_DESC_ID", "TIME",)
 
 _DEFAULT_ROWCHUNKS = 100000
 
+def table_open_graph(table_name, **kwargs):
+    """
+    Generate a dask graph containing table open commands
+
+    Parameters
+    ----------
+    table_name : str
+        CASA table name
+    **kwargs (optional) :
+        Keywords arguments passed to the :meth:`pyrap.tables.table`
+        constructor, for e.g. :code:`readonly=False`
+
+    Returns
+    -------
+    tuple
+        Graph key associated with the opened table
+    dict
+        Dask graph containing the graph open command
+
+    """
+    head, tail = os.path.split(table_name.rstrip(os.sep))
+    table_open_key = ('open', tail, dask.base.tokenize(table_name, kwargs))
+    dsk = { table_open_key: (partial(TableProxy, **kwargs), table_name) }
+    return table_open_key, dsk
+
 @numba.jit
 def _np_put_fn(tp, c, d, s, n):
     tp("putcol", c, d, startrow=s, nrow=n)
@@ -59,13 +84,9 @@ def xds_to_table(xds, table_name, columns=None):
         dask array representing the write to the
         datset.
     """
+
     head, tail = os.path.split(table_name.rstrip(os.sep))
-    kwargs = {'readonly': False}
-    table_open_key = ('open', tail, dask.base.tokenize(table_name, kwargs))
-
-    table_open = partial(TableProxy, **kwargs)
-
-    dsk = { table_open_key : (table_open, table_name) }
+    table_open_key, dsk = table_open_graph(table_name, readonly=False)
     rows = xds.table_row.values
 
     if columns is None:
@@ -450,9 +471,7 @@ def xds_from_table(table_name, columns=None,
     elif not isinstance(part_cols, tuple):
         part_cols = (part_cols,)
 
-    head, tail = os.path.split(table_name.rstrip(os.sep))
-    table_open_key = ('open', tail, dask.base.tokenize(table_name))
-    dsk = { table_open_key : (TableProxy, table_name) }
+    table_open_key, dsk = table_open_graph(table_name)
 
     def _create_dataset(table, columns, index_cols,
                         group_cols=(), group_values=()):
