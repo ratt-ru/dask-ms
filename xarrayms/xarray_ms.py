@@ -35,9 +35,74 @@ _DEFAULT_PARTITION_COLUMNS = ("FIELD_ID", "DATA_DESC_ID")
 
 _DEFAULT_ROWCHUNKS = 100000
 
-def consecutive(index, stepsize=1):
-    """ Partition index into list of arrays of consecutive indices """
-    return np.split(index, np.where(np.diff(index) != stepsize)[0]+1)
+@numba.jit
+def _np_put_fn(tp, c, d, s, n):
+    tp("putcol", c, d, startrow=s, nrow=n)
+    return np.asarray([True])
+
+def xds_to_table(xds, table_name, columns=None):
+    head, tail = os.path.split(table_name.rstrip(os.sep))
+    kwargs = {'readonly': False}
+    table_open_key = ('open', tail, dask.base.tokenize(table_name, kwargs))
+
+    table_open = partial(TableProxy, **kwargs)
+
+    dsk = { table_open_key : (table_open, table_name) }
+    rows = xds.table_row.values
+
+    if columns is None:
+        columns = xds.data_vars.keys()
+    elif isinstance(columns, string_types):
+        columns = [columns]
+
+    token = dask.base.tokenize(tail, columns)
+    name = '-'.join((tail, "putcol", token))
+
+    chunk = 0
+    chunks = []
+    row_idx = 0
+
+    for c in columns:
+        data_array = getattr(xds, c)
+        dask_array = data_array.data
+
+        dsk.update(dask_array.__dask_graph__())
+
+        array_chunks = data_array.chunks
+        array_shape = data_array.shape
+
+        if not data_array.dims[row_idx] == 'row':
+            raise ValueError("xds.%s.dims[0] != 'row'" % c)
+
+        chunk_start = 0
+
+        for chunk_size in array_chunks[row_idx]:
+            chunk_end = chunk_start + chunk_size
+            row_put_fns = []
+
+            # Split into runs of consecutive rows within this chunk
+            d = np.ediff1d(rows[chunk_start:chunk_end], to_begin=2, to_end=2)
+            runs = np.nonzero(d != 1)[0] + chunk_start
+
+            for run_start, run_end in zip(runs[:-1], runs[1:]):
+                # Slice the dask array and then obtain the graph representing
+                # the slice operation. There should be only one key-value pair
+                # as we're slicing within a chunk
+                data = dask_array[run_start:run_end]
+                dsk_slice = data.__dask_graph__().dicts[data.name]
+                assert len(dsk_slice) == 1
+                dsk.update(dsk_slice)
+                row_put_fns.append((_np_put_fn, table_open_key,
+                                    c, dsk_slice.keys()[0],
+                                    rows[run_start], run_end - run_start))
+
+            dsk[(name, chunk)] = (np.logical_and.reduce, row_put_fns)
+            chunks.append(1)
+            chunk += 1
+            chunk_start = chunk_end
+
+    chunks = (tuple(chunks),)
+    return da.Array(dsk, name, chunks, dtype=np.bool)
 
 # jit some getcol wrapper calls
 @numba.jit
@@ -122,75 +187,6 @@ def generate_table_getcols(table_name, table_open_key, dsk_base,
 
     chunks = tuple((tuple(chunks),)) + tuple((c,) for c in chunk_extra)
     return da.Array(merge(dsk_base, dsk), name, chunks, dtype=dtype)
-
-@numba.jit
-def _np_put_fn(tp, c, d, s, n):
-    tp("putcol", c, d, startrow=s, nrow=n)
-    return np.asarray([True])
-
-def xds_to_table(xds, table_name, columns=None):
-    head, tail = os.path.split(table_name.rstrip(os.sep))
-    kwargs = {'readonly': False}
-    table_open_key = ('open', tail, dask.base.tokenize(table_name, kwargs))
-
-    table_open = partial(TableProxy, **kwargs)
-
-    dsk = { table_open_key : (table_open, table_name) }
-    rows = xds.table_row.values
-
-    if columns is None:
-        columns = xds.data_vars.keys()
-    elif isinstance(columns, string_types):
-        columns = [columns]
-
-    token = dask.base.tokenize(tail, columns)
-    name = '-'.join((tail, "putcol", token))
-
-    chunk = 0
-    chunks = []
-    row_idx = 0
-
-    for c in columns:
-        data_array = getattr(xds, c)
-        dask_array = data_array.data
-
-        dsk.update(dask_array.__dask_graph__())
-
-        array_chunks = data_array.chunks
-        array_shape = data_array.shape
-
-        if not data_array.dims[row_idx] == 'row':
-            raise ValueError("xds.%s.dims[0] != 'row'" % c)
-
-        chunk_start = 0
-
-        for chunk_size in array_chunks[row_idx]:
-            chunk_end = chunk_start + chunk_size
-            row_put_fns = []
-
-            # Split into runs of consecutive rows within this chunk
-            d = np.ediff1d(rows[chunk_start:chunk_end], to_begin=2, to_end=2)
-            runs = np.nonzero(d != 1)[0] + chunk_start
-
-            for run_start, run_end in zip(runs[:-1], runs[1:]):
-                # Slice the dask array and then obtain the graph representing
-                # the slice operation. There should be only one key-value pair
-                # as we're slicing within a chunk
-                data = dask_array[run_start:run_end]
-                dsk_slice = data.__dask_graph__().dicts[data.name]
-                assert len(dsk_slice) == 1
-                dsk.update(dsk_slice)
-                row_put_fns.append((_np_put_fn, table_open_key,
-                                    c, dsk_slice.keys()[0],
-                                    rows[run_start], run_end - run_start))
-
-            dsk[(name, chunk)] = (np.logical_and.reduce, row_put_fns)
-            chunks.append(1)
-            chunk += 1
-            chunk_start = chunk_end
-
-    chunks = (tuple(chunks),)
-    return da.Array(dsk, name, chunks, dtype=np.bool)
 
 def _xds_from_table(table_name, table, table_schema,
                     dsk, table_open_key,
