@@ -156,15 +156,16 @@ def generate_table_getcols(table_name, table_open_key, dsk_base,
     chunk_extra = shape[1:]
     key_extra = (0,) * len(shape[1:])
 
+    # infer the type of getter we should be using
+    get_fn = _np_get_fn if isinstance(dtype, np.dtype) else _list_get_fn
+
     # Iterate through the rows in groups of rowchunks
     # For each iteration we generate one chunk
     # in the resultant dask array
-    chunks = []
+    start_row = 0
 
-    get_fn = _np_get_fn if isinstance(dtype, np.dtype) else _list_get_fn
-
-    for chunk, start_row in enumerate(range(0, rows.size, rowchunks)):
-        end_row = min(start_row + rowchunks, rows.size)
+    for chunk, chunk_size in enumerate(rowchunks[0]):
+        end_row = start_row + chunk_size
 
         # Split into runs of consecutive rows within this chunk
         d = np.ediff1d(rows[start_row:end_row], to_begin=2, to_end=2)
@@ -175,17 +176,18 @@ def generate_table_getcols(table_name, table_open_key, dsk_base,
         # Store a list of lambdas executing getcols on consecutive runs
         row_get_fns = []
 
-        for start, end in zip(runs[:-1], runs[1:]):
-            run_len = end - start
+        for run_start, run_end in zip(runs[:-1], runs[1:]):
+            run_len = run_end - run_start
             row_get_fns.append((get_fn, table_open_key, column,
-                                            rows[start], run_len))
+                                        rows[run_start], run_len))
             chunk_size += run_len
 
         # Create the key-value dask entry for this chunk
         dsk[(name, chunk) + key_extra] = (np.concatenate, row_get_fns)
-        chunks.append(chunk_size)
 
-    chunks = tuple((tuple(chunks),)) + tuple((c,) for c in chunk_extra)
+        start_row = end_row
+
+    chunks = rowchunks + tuple((c,) for c in chunk_extra)
     return da.Array(merge(dsk_base, dsk), name, chunks, dtype=dtype)
 
 def _xds_from_table(table_name, table, table_schema,
@@ -275,6 +277,8 @@ def _xds_from_table(table_name, table, table_schema,
     # Remove missing columns
     columns = columns.difference(missing)
 
+    # Determine a row chunking scheme
+    rowchunks = da.core.normalize_chunks(chunks['row'], (rows.size,))
 
     # Insert arrays into dataset in sorted order
     data_arrays = OrderedDict()
@@ -283,7 +287,7 @@ def _xds_from_table(table_name, table, table_schema,
         shape, dims, dtype = col_metadata[c]
         col_dask_array = generate_table_getcols(table_name, table_open_key,
                                                 dsk, c, shape, dtype, rows,
-                                                chunks['row'])
+                                                rowchunks)
 
         data_arrays[c] = xr.DataArray(col_dask_array, dims=dims)
 
