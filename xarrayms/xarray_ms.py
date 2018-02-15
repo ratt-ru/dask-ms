@@ -285,7 +285,7 @@ def lookup_table_schema(table_name, lookup_str):
     raise TypeError("Invalid table_schema type '%s'" % type(table_schema))
 
 
-def _xds_from_table(table_name, table, table_schema,
+def xds_from_table_impl(table_name, table, table_schema,
                     dsk, table_open_key,
                     columns, rows, chunks):
     """
@@ -497,7 +497,7 @@ def xds_from_table(table_name, columns=None,
         1. the partitioning defined by ``group_cols`` and ``group_values``
         2. the ordering defined by ``index_cols``
 
-        and then deferring to :func:`_xds_from_table` to create the
+        and then deferring to :func:`xds_from_table_impl` to create the
         dataset with the row ordering.
         """
         if len(index_cols) > 0:
@@ -525,7 +525,7 @@ def xds_from_table(table_name, columns=None,
         with pt.taql(query) as row_query:
             rows = row_query.getcol("__table_row__")
 
-        return _xds_from_table(table_name, table, table_schema,
+        return xds_from_table_impl(table_name, table, table_schema,
                             dsk, table_open_key,
                             set(columns).difference(group_cols),
                             rows, chunks)
