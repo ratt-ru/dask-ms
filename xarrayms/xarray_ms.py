@@ -208,6 +208,46 @@ def generate_table_getcols(table_name, table_open_key, dsk_base,
     chunks = rowchunks + tuple((c,) for c in chunk_extra)
     return da.Array(merge(dsk_base, dsk), name, chunks, dtype=dtype)
 
+def lookup_table_schema(table_name, lookup_str):
+    """
+    Attempts to heuristically generate a table schema dictionary,
+    given the ``lookup_str`` argument. If this fails,
+    an empty dictionary is returned.
+
+    Parameters
+    ----------
+    table_name : str
+        CASA table path
+    lookup_str : str or ``None``
+        If a string, the resulting schema will be
+        internally looked up in the known table schemas.
+        If ``None``, the end of ``table_name`` will be
+        inspected to perform the lookup.
+
+    Returns
+    -------
+    dict
+        A dictionary of the form :code:`{column:dims}`.
+        e.g. :code:`{'UVW' : ('row', 'uvw'), 'DATA': ('row', 'chan', 'corr')}
+    """
+    schemas = registered_schemas()
+
+    if lookup_str is None:
+        def _search_schemas(table_name, schemas):
+            """ Guess the schema from the table name """
+            for k in schemas.keys():
+                if table_name.endswith('::' + k):
+                    return schemas[k]
+            return {}
+
+        return _search_schemas(table_name, schemas)
+    # Get a registered table schema
+    elif isinstance(lookup_str, string_types):
+        return schemas.get(lookup_str, {})
+
+    raise TypeError("Invalid table_schema type '%s'" % type(table_schema))
+
+
 def _xds_from_table(table_name, table, table_schema,
                     dsk, table_open_key,
                     columns, rows, chunks):
@@ -244,26 +284,9 @@ def _xds_from_table(table_name, table, table_schema,
     col_metadata = {}
 
     missing = []
-    schemas = registered_schemas()
 
-    def _search_schemas(table_name, schemas):
-        """ Guess the schema from the table name """
-        for k in schemas.keys():
-            if table_name.endswith('::' + k):
-                return schemas[k]
-
-        return {}
-
-    if table_schema is None:
-        table_schema = _search_schemas(table_name, schemas)
-
-    # Get a registered table schema
-    elif isinstance(table_schema, string_types):
-        table_schema = registered_schemas().get(table_schema, {})
-
-    # Attempt to get dimension schema for column
     if not isinstance(table_schema, collections.Mapping):
-        raise TypeError("Invalid table_schema type '%s'" % type(table_schema))
+        table_schema = lookup_table_schema(table_name, table_schema)
 
     # Work out metadata for each column
     for c in columns:
