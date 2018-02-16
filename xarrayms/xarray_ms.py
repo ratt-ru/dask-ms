@@ -371,9 +371,9 @@ def xds_from_table_impl(table_name, table, table_schema,
 
         data_arrays[c] = xr.DataArray(col_dask_array, dims=dims)
 
-    # Create the dataset, assigning coordinates in the process
-    base_rows = np.arange(rows.size, dtype=np.int32)
-    return xr.Dataset(data_arrays).assign_coords(table_row=rows, row=base_rows)
+    # Create the dataset, assigning a table_row coordinate
+    # associated with the row dimension
+    return xr.Dataset(data_arrays, coords={'table_row': ('row', rows)})
 
 
 def xds_from_table(table_name, columns=None,
