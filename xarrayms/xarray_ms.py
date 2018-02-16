@@ -69,9 +69,9 @@ def table_open_graph(table_name, **kwargs):
 
     """
     token = dask.base.tokenize(table_name, kwargs)
-    table_open_key = ('open', short_table_name(table_name), token)
-    dsk = { table_open_key: (partial(TableProxy, **kwargs), table_name) }
-    return table_open_key, dsk
+    table_key = ('open', short_table_name(table_name), token)
+    table_graph = { table_key: (partial(TableProxy, **kwargs), table_name) }
+    return table_key, table_graph
 
 @numba.jit
 def _np_put_fn(tp, c, d, s, n):
@@ -102,7 +102,7 @@ def xds_to_table(xds, table_name, columns=None):
         datset.
     """
 
-    table_open_key, dsk = table_open_graph(table_name, readonly=False)
+    table_key, dsk = table_open_graph(table_name, readonly=False)
     rows = xds.table_row.values
 
     if columns is None:
@@ -147,7 +147,7 @@ def xds_to_table(xds, table_name, columns=None):
                 dsk_slice = data.__dask_graph__().dicts[data.name]
                 assert len(dsk_slice) == 1
                 dsk.update(dsk_slice)
-                row_put_fns.append((_np_put_fn, table_open_key,
+                row_put_fns.append((_np_put_fn, table_key,
                                     c, dsk_slice.keys()[0],
                                     rows[run_start], run_end - run_start))
 
@@ -168,7 +168,7 @@ def _np_get_fn(tp, c, s, n):
 def _list_get_fn(tp, c, s, n):
     return np.asarray(_np_get_fn(tp, c, s, n))
 
-def generate_table_getcols(table_name, table_open_key, dsk_base,
+def generate_table_getcols(table_name, table_key, dsk_base,
                             column, shape, dtype, rows, rowchunks):
     """
     Generates a :class:`dask.array.Array` representing ``column``
@@ -180,7 +180,7 @@ def generate_table_getcols(table_name, table_open_key, dsk_base,
     ----------
     table_name : str
         CASA table filename path
-    table_open_key : tuple
+    table_key : tuple
         dask graph key referencing an opened table object.
     dsk_base : dict
         dask graph containing table object opening functionality.
@@ -233,7 +233,7 @@ def generate_table_getcols(table_name, table_open_key, dsk_base,
 
         for run_start, run_end in zip(runs[:-1], runs[1:]):
             run_len = run_end - run_start
-            row_get_fns.append((get_fn, table_open_key, column,
+            row_get_fns.append((get_fn, table_key, column,
                                         rows[run_start], run_len))
             chunk_size += run_len
 
@@ -286,7 +286,7 @@ def lookup_table_schema(table_name, lookup_str):
 
 
 def xds_from_table_impl(table_name, table, table_schema,
-                    dsk, table_open_key,
+                    table_graph, table_key,
                     columns, rows, chunks):
     """
     Parameters
@@ -298,9 +298,9 @@ def xds_from_table_impl(table_name, table, table_schema,
         for creating Datasets
     table_schema : str or dict
         Table schema.
-    dsk : dict
-        Dask graph containing ``table_open_key``
-    table_open_key : tuple
+    table_graph : dict
+        Dask graph containing ``table_key``
+    table_key : tuple
         Tuple referencing the table open command
     columns : tuple or list
         Columns present on the returned dataset.
@@ -365,8 +365,8 @@ def xds_from_table_impl(table_name, table, table_schema,
 
     for c in sorted(columns):
         shape, dims, dtype = col_metadata[c]
-        col_dask_array = generate_table_getcols(table_name, table_open_key,
-                                                dsk, c, shape, dtype, rows,
+        col_dask_array = generate_table_getcols(table_name, table_key,
+                                                table_graph, c, shape, dtype, rows,
                                                 rowchunks)
 
         data_arrays[c] = xr.DataArray(col_dask_array, dims=dims)
@@ -487,7 +487,7 @@ def xds_from_table(table_name, columns=None,
     elif not isinstance(part_cols, tuple):
         part_cols = (part_cols,)
 
-    table_open_key, dsk = table_open_graph(table_name)
+    table_key, dsk = table_open_graph(table_name)
 
     def _create_dataset(table, columns, index_cols,
                         group_cols=(), group_values=()):
@@ -526,7 +526,7 @@ def xds_from_table(table_name, columns=None,
             rows = row_query.getcol("__table_row__")
 
         return xds_from_table_impl(table_name, table, table_schema,
-                            dsk, table_open_key,
+                            dsk, table_key,
                             set(columns).difference(group_cols),
                             rows, chunks)
 
