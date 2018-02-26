@@ -43,7 +43,7 @@ def short_table_name(table_name):
     Returns
     -------
     str
-        Shortenend path
+        Shortened path
 
     """
     return os.path.split(table_name.rstrip(os.sep))[1]
@@ -431,15 +431,15 @@ def xds_from_table(table_name, columns=None,
     ----------
     table_name : str
         CASA table
-    columns (optional) : list or tuple
+    columns : list or tuple, optional
         Columns present on the returned dataset.
         Defaults to all if ``None``
-    index_cols (optional) : list or tuple
+    index_cols  : list or tuple, optional
         List of CASA table indexing columns. Defaults to :code:`()`.
-    part_cols (optional) : list or tuple
+    part_cols : list or tuple, optional
         List of columns on which to partition the CASA table.
         Defaults to :code:`()`
-    table_schema (optional) : str or dict
+    table_schema : str or dict, optional
         A schema dictionary defining the dimension naming scheme for
         each column in the table. For example:
 
@@ -460,7 +460,7 @@ def xds_from_table(table_name, columns=None,
         If ``None`` is supplied, the end of ``table_name`` will be
         inspected to see if it matches any default schemas.
 
-    chunks (optional) : dict
+    chunks  : dict, optional
         A :code:`{dim: chunk}` dictionary, specifying the chunking
         strategy for each dimension in the schema.
         Defaults to :code:`{'row': 100000 }`.
@@ -583,16 +583,16 @@ def xds_from_ms(ms, columns=None, index_cols=None, part_cols=None,
     ----------
     ms : str
         Measurement Set filename
-    columns (optional) : tuple or list
+    columns : tuple or list, optional
         Columns present on the resulting dataset.
         Defaults to all if ``None``.
-    index_cols (optional) : tuple or list
+    index_cols  : tuple or list, optional
         Sequence of indexing columns.
         Defaults to :code:`%(index)s`
-    part_cols (optional) : tuple or list
+    part_cols  : tuple or list, optional
         Sequence of partioning columns.
         Defaults to :code:`%(parts)s`
-    chunks (optional) : dict
+    chunks : dict, optional
         Dictionary of dimension chunks.
 
     Yields
