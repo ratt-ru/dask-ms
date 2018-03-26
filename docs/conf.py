@@ -30,7 +30,10 @@ except ImportError:
 class Mock(MagicMock):
     @classmethod
     def __getattr__(cls, name):
-            return MagicMock()
+            obj = MagicMock()
+            obj.__name__ = "name"
+            obj.__doc__ = "doc"
+            return obj
 
 MOCK_MODULES = ['numpy', 'pyrap', 'pyrap.tables']
 sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
