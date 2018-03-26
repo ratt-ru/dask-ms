@@ -20,7 +20,7 @@ def get_logger():
 
 log = get_logger()
 
-from xarray_ms import xds_from_table, xds_to_table, xds_from_ms
-from table_proxy import TableProxy
+from xarrayms.xarray_ms import xds_from_table, xds_to_table, xds_from_ms
+from xarrayms.table_proxy import TableProxy
 
 
