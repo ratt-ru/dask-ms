@@ -14,7 +14,6 @@ import time
 
 import dask
 import dask.array as da
-import numba
 import numpy as np
 import pyrap.tables as pt
 from six import string_types
@@ -77,7 +76,6 @@ def table_open_graph(table_name, **kwargs):
     table_graph = { table_key: (partial(TableProxy, **kwargs), table_name) }
     return table_key, table_graph
 
-@numba.jit
 def _np_put_fn(tp, c, d, s, n):
     tp("putcol", c, d, startrow=s, nrow=n)
     return np.asarray([True])
@@ -163,12 +161,9 @@ def xds_to_table(xds, table_name, columns=None):
     chunks = (tuple(chunks),)
     return da.Array(dsk, name, chunks, dtype=np.bool)
 
-# jit some getcol wrapper calls
-@numba.jit
 def _np_get_fn(tp, c, s, n):
     return tp("getcol", c, startrow=s, nrow=n)
 
-@numba.jit
 def _list_get_fn(tp, c, s, n):
     return np.asarray(_np_get_fn(tp, c, s, n))
 
