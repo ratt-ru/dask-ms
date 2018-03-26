@@ -32,13 +32,13 @@ You can either clone the public repository:
 
 .. code-block:: console
 
-    $ git clone git://github.com/sjperkins/xarrayms
+    $ git clone git://github.com/ska-sa/xarray-ms
 
 Or download the `tarball`_:
 
 .. code-block:: console
 
-    $ curl  -OL https://github.com/sjperkins/xarrayms/tarball/master
+    $ curl  -OL https://github.com/ska-sa/xarray-ms/tarball/master
 
 Once you have a copy of the source, you can install it with:
 
@@ -47,5 +47,5 @@ Once you have a copy of the source, you can install it with:
     $ python setup.py install
 
 
-.. _Github repo: https://github.com/sjperkins/xarrayms
-.. _tarball: https://github.com/sjperkins/xarrayms/tarball/master
+.. _Github repo: https://github.com/ska-sa/xarray-ms
+.. _tarball: https://github.com/ska-sa/xarray-ms/tarball/master

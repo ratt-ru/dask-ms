@@ -5,8 +5,8 @@ xarray Datasets from CASA Tables
 .. image:: https://img.shields.io/pypi/v/xarray-ms.svg
         :target: https://pypi.python.org/pypi/xarray-ms
 
-.. image:: https://img.shields.io/travis/sjperkins/xarray-ms.svg
-        :target: https://travis-ci.org/sjperkins/xarray-ms
+.. image:: https://img.shields.io/travis/ska-sa/xarray-ms.svg
+        :target: https://travis-ci.org/ska-sa/xarray-ms
 
 .. image:: https://readthedocs.org/projects/xarray-ms/badge/?version=latest
         :target: https://xarray-ms.readthedocs.io/en/latest/?badge=latest
