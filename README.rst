@@ -2,6 +2,16 @@
 xarray Datasets from CASA Tables
 ================================
 
+.. image:: https://img.shields.io/pypi/v/xarray-ms.svg
+        :target: https://pypi.python.org/pypi/xarray-ms
+
+.. image:: https://img.shields.io/travis/sjperkins/xarray-ms.svg
+        :target: https://travis-ci.org/sjperkins/xarray-ms
+
+.. image:: https://readthedocs.org/projects/xarray-ms/badge/?version=latest
+        :target: https://xarray-ms.readthedocs.io/en/latest/?badge=latest
+        :alt: Documentation Status
+
 Constructs xarray_ ``Datasets`` from CASA Tables via python-casacore_.
 The ``DataArrays`` contained in the ``Dataset`` are dask_ arrays backed by
 deferred calls to :code:`pyrap.tables.table.getcol`.
@@ -58,6 +68,12 @@ Radio Astronomy algorithms.
     Attributes:
         FIELD_ID:      0
         DATA_DESC_ID:  0
+
+-------------
+Documentation
+-------------
+
+https://xarray-ms.readthedocs.io.
 
 -----------
 Limitations
