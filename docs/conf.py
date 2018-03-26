@@ -35,7 +35,8 @@ class Mock(MagicMock):
             obj.__doc__ = "doc"
             return obj
 
-MOCK_MODULES = ['dask', 'numpy', 'pyrap', 'pyrap.tables', 'xarray']
+MOCK_MODULES = ['dask', 'dask.array', 'numpy',
+                'pyrap', 'pyrap.tables', 'xarray']
 sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
 import xarrayms
