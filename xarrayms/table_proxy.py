@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import logging
 
 import numpy as np
@@ -95,6 +97,6 @@ if __name__ == "__main__":
         logging.warn("dill failed", exc_info=True)
 
 
-    print ntp("getcol", "DATA", startrow=0, nrow=1).shape
+    print(ntp("getcol", "DATA", startrow=0, nrow=1).shape)
 
 
