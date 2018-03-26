@@ -59,7 +59,7 @@ def table_open_graph(table_name, **kwargs):
     ----------
     table_name : str
         CASA table name
-    **kwargs (optional) :
+    **kwargs:
         Keywords arguments passed to the :meth:`pyrap.tables.table`
         constructor, for e.g. :code:`readonly=False`
 
@@ -93,7 +93,7 @@ def xds_to_table(xds, table_name, columns=None):
         dataset containing the specified columns.
     table_name : str
         CASA table path
-    columns (optional): tuple or list
+    columns : tuple or list, optional
         list of column names to write to the table.
         If ``None`` all columns will be written.
 
