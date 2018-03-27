@@ -184,8 +184,9 @@ napoleon_google_docstring = False
 
 # Example configuration for intersphinx: refer to the Python standard library.
 intersphinx_mapping = {
-    'python': ('https://docs.python.org/3/', None),
-    'numpy': ('https://docs.scipy.org/doc/numpy/', None),
     'dask': ('https://dask.pydata.org/', None),
+    'numpy': ('https://docs.scipy.org/doc/numpy/', None),
+    'pyrap': ('https://casacore.github.io/python-casacore', None),
+    'python': ('https://docs.python.org/3/', None),
     'xarray': ('https://xarray.pydata.org/', None),
 }
