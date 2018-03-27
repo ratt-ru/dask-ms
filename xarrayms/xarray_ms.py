@@ -379,11 +379,11 @@ def xds_from_table(table_name, columns=None,
                     index_cols=None, part_cols=None,
                     table_schema=None, chunks=None):
     """
-    Generator producing :class:`xarray.Dataset`(s) from the CASA table
-    ``table_name`` with the rows lexicographically sorted according
-    to the columns in ``index_cols``.
+    Generator producing multiple :class:`xarray.Dataset` objects
+    from CASA table ``table_name`` with the rows lexicographically
+    sorted according to the columns in ``index_cols``.
     If ``part_cols`` is supplied, the table data is partitioned into
-    multiple :class:`xarray.Dataset`(s), each associated with a
+    multiple :class:`xarray.Dataset` objects, each associated with a
     permutation of the unique values for the columns in ``part_cols``.
 
     Notes
