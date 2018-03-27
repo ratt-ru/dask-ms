@@ -59,8 +59,8 @@ def table_open_graph(table_name, **kwargs):
     ----------
     table_name : str
         CASA table name
-    **kwargs (optional) :
-        Keywords arguments passed to the :meth:`pyrap.tables.table`
+    **kwargs:
+        Keywords arguments passed to the :meth:`casacore.tables.table`
         constructor, for e.g. :code:`readonly=False`
 
     Returns
@@ -93,7 +93,7 @@ def xds_to_table(xds, table_name, columns=None):
         dataset containing the specified columns.
     table_name : str
         CASA table path
-    columns (optional): tuple or list
+    columns : tuple or list, optional
         list of column names to write to the table.
         If ``None`` all columns will be written.
 
@@ -172,7 +172,7 @@ def generate_table_getcols(table_name, table_key, dsk_base,
     """
     Generates a :class:`dask.array.Array` representing ``column``
     in ``table_name`` and backed by a series of
-    `pyrap.tables.table.getcol` commands.
+    :meth:`casacore.tables.table.getcol` commands.
 
 
     Parameters
@@ -292,7 +292,7 @@ def xds_from_table_impl(table_name, table, table_schema,
     ----------
     table_name : str
         CASA table filename path
-    table : :class:`pyrap.tables.table`
+    table : :class:`casacore.tables.table`
         CASA table object, used to inspect metadata
         for creating Datasets
     table_schema : str or dict
@@ -379,11 +379,11 @@ def xds_from_table(table_name, columns=None,
                     index_cols=None, part_cols=None,
                     table_schema=None, chunks=None):
     """
-    Generator producing :class:`xarray.Dataset`(s) from the CASA table
-    ``table_name`` with the rows lexicographically sorted according
-    to the columns in ``index_cols``.
+    Generator producing multiple :class:`xarray.Dataset` objects
+    from CASA table ``table_name`` with the rows lexicographically
+    sorted according to the columns in ``index_cols``.
     If ``part_cols`` is supplied, the table data is partitioned into
-    multiple :class:`xarray.Dataset`(s), each associated with a
+    multiple :class:`xarray.Dataset` objects, each associated with a
     permutation of the unique values for the columns in ``part_cols``.
 
     Notes
@@ -398,7 +398,7 @@ def xds_from_table(table_name, columns=None,
 
     Generally, calling
 
-    ..code-block:: python
+    .. code-block:: python
 
         antds = list(xds_from_table("WSRT.MS::ANTENNA"))
 
@@ -415,7 +415,7 @@ def xds_from_table(table_name, columns=None,
     There is a *special* partition column :code:`"__row__"`
     that can be used to partition the table by row.
 
-    ..code-block:: python
+    .. code-block:: python
 
         for spwds in xds_from_table("WSRT.MS::SPECTRAL_WINDOW",
                                             part_cols="__row__"):
@@ -466,7 +466,7 @@ def xds_from_table(table_name, columns=None,
 
     Yields
     ------
-    `xarray.Dataset`
+    :class:`xarray.Dataset`
         datasets for each partition, each ordered by indexing columns
     """
     if chunks is None:

@@ -7,16 +7,16 @@ import pyrap.tables as pt
 
 class TableProxy(object):
     """
-    :class:`TableProxy` allows :class:`pyrap.tables.table` objects
+    :class:`TableProxy` allows :class:`casacore.tables.table` objects
     to be easily embeddable in a dask graph.
 
-    ..code-block:: python
+    .. code-block:: python
 
         tp = TableProxy("WSRT.MS", readonly=True)
         tp("nrow")
         tp("getcol", "DATA", startrow=0, nrow=10)
 
-    Methods on :class:pyrap.tables.table` are accessed by passing
+    Methods on :class:`casacore.tables.table` are accessed by passing
     the method name, args and kwargs to the
     :func:`TableProxy.__call__` function.
     This allows the proxy to perform per-process locking when
