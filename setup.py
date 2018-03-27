@@ -33,7 +33,7 @@ def readme():
         return f.read()
 
 setup(name='xarray-ms',
-    version="0.0.1",
+    version="0.1.0",
     description='xarray Datasets from CASA Tables.',
     long_description=readme(),
     url='http://github.com/ska-sa/xarray-ms',
