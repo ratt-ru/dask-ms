@@ -188,5 +188,5 @@ intersphinx_mapping = {
     'numpy': ('https://docs.scipy.org/doc/numpy/', None),
     'pyrap': ('https://casacore.github.io/python-casacore', None),
     'python': ('https://docs.python.org/3/', None),
-    'xarray': ('https://xarray.pydata.org/', None),
+    'xarray': ('https://xarray.pydata.org/en/stable', None),
 }
