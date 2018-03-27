@@ -12,7 +12,7 @@ To install xarray-ms, run this command in your terminal:
 
 .. code-block:: console
 
-    $ pip install xarrayms
+    $ pip install xarray-ms
 
 This is the preferred method to install xarray-ms, as it will always install the most recent stable release.
 
