@@ -466,7 +466,7 @@ def xds_from_table(table_name, columns=None,
 
     Yields
     ------
-    `xarray.Dataset`
+    :class:`xarray.Dataset`
         datasets for each partition, each ordered by indexing columns
     """
     if chunks is None:
