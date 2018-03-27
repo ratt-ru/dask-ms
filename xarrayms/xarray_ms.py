@@ -60,7 +60,7 @@ def table_open_graph(table_name, **kwargs):
     table_name : str
         CASA table name
     **kwargs:
-        Keywords arguments passed to the :meth:`pyrap.tables.table`
+        Keywords arguments passed to the :meth:`casacore.tables.table`
         constructor, for e.g. :code:`readonly=False`
 
     Returns
@@ -172,7 +172,7 @@ def generate_table_getcols(table_name, table_key, dsk_base,
     """
     Generates a :class:`dask.array.Array` representing ``column``
     in ``table_name`` and backed by a series of
-    `pyrap.tables.table.getcol` commands.
+    :meth:`casacore.tables.table.getcol` commands.
 
 
     Parameters
@@ -292,7 +292,7 @@ def xds_from_table_impl(table_name, table, table_schema,
     ----------
     table_name : str
         CASA table filename path
-    table : :class:`pyrap.tables.table`
+    table : :class:`casacore.tables.table`
         CASA table object, used to inspect metadata
         for creating Datasets
     table_schema : str or dict
