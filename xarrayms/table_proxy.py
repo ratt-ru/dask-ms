@@ -10,7 +10,7 @@ class TableProxy(object):
     :class:`TableProxy` allows :class:`pyrap.tables.table` objects
     to be easily embeddable in a dask graph.
 
-    ..code-block:: python
+    .. code-block:: python
 
         tp = TableProxy("WSRT.MS", readonly=True)
         tp("nrow")

@@ -398,7 +398,7 @@ def xds_from_table(table_name, columns=None,
 
     Generally, calling
 
-    ..code-block:: python
+    .. code-block:: python
 
         antds = list(xds_from_table("WSRT.MS::ANTENNA"))
 
@@ -415,7 +415,7 @@ def xds_from_table(table_name, columns=None,
     There is a *special* partition column :code:`"__row__"`
     that can be used to partition the table by row.
 
-    ..code-block:: python
+    .. code-block:: python
 
         for spwds in xds_from_table("WSRT.MS::SPECTRAL_WINDOW",
                                             part_cols="__row__"):
