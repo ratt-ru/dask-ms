@@ -24,28 +24,44 @@ class TableProxy(object):
 
     """
 
-    def __init__(self, table_name, **kwargs):
-        self._table_name = table_name
-        #self._args = args
-        self._kwargs = kwargs
+    # TODO(sjperkins)
+    # Replace with some sort of TTL eviction cache.
+    # Actually might be worth storing table and last access time
+    # and evicting entries whenever cache is touched.
+    # WeakValueDictionary is not sufficient here as
+    # multiprocess pickling results in object garbage collection
+    _tables = {}
 
+    def __init__(self, table_name, **kwargs):
+        key = (table_name, frozenset(kwargs.items()))
+
+        self._table_name = table_name
+        self._kwargs = kwargs
         # Should we request a write-lock?
         self._write_lock = kwargs.get('readonly', True) == False
 
-        # Force table locking mode
-        lockoptions = 'auto'
-
         try:
-            userlockopt = kwargs.pop('lockoptions')
+            self._table = TableProxy._tables[key]
         except KeyError:
-            pass
-        else:
-            log.warn("lockoptions='%s' ignored by TableProxy. "
-                    "Locking is automatically handled "
-                    "in '%s' mode", userlockopt, lockoptions)
+            # Force table locking mode
+            lockoptions = 'auto'
 
-        self._table = pt.table(table_name, lockoptions=lockoptions, **kwargs)
-        self._table.unlock()
+            try:
+                userlockopt = kwargs.pop('lockoptions')
+            except KeyError:
+                pass
+            else:
+                log.warn("lockoptions='%s' ignored by TableProxy. "
+                        "Locking is automatically handled "
+                        "in '%s' mode", userlockopt, lockoptions)
+
+            self._table = pt.table(table_name, lockoptions=lockoptions, **kwargs)
+            self._table.unlock()
+
+            TableProxy._tables[key] = self._table
+
+    def __hash__(self):
+        return hash((self._table_name, self._kwargs))
 
     def __getstate__(self):
         return (self._table_name, self._kwargs)
