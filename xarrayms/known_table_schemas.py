@@ -79,9 +79,10 @@ POLARIZATION = {
     "CORR_PRODUCT":     ColumnSchema(('corr', 'cp_idx')),
 }
 
+
 def registered_schemas():
     return {
-        "MS" : MS_SCHEMA,
+        "MS": MS_SCHEMA,
         "ANTENNA": ANTENNA_SCHEMA,
         "FIELD": FIELD_SCHEMA,
         "SPECTRAL_WINDOW": SPECTRAL_WINDOW,

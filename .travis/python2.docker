@@ -1,0 +1,7 @@
+FROM kernsuite/base:3
+RUN docker-apt-install python-pip python-casacore
+RUN pip install --upgrade pip setuptools pytest
+ADD . /code
+WORKDIR /code
+RUN pip install .
+RUN py.test -v

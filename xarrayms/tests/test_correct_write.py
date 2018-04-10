@@ -22,6 +22,7 @@ from xarrayms import xds_from_ms, xds_to_table
 
 logging.basicConfig(format="%(levelname)s - %(message)s", level=logging.WARN)
 
+
 def create_parser():
     p = argparse.ArgumentParser()
     p.add_argument("ms")
@@ -29,6 +30,7 @@ def create_parser():
     p.add_argument("-c", "--column", default="STATE_ID")
 
     return p
+
 
 args = create_parser().parse_args()
 
@@ -56,7 +58,8 @@ with pt.table(args.ms) as table:
             assert np.all(arange.compute() == xrcol.data.compute())
         finally:
             # Write original data back to the table
-            nds = ds.assign(**{args.column: xr.DataArray(original, dims="row")})
+            nds = ds.assign(
+                **{args.column: xr.DataArray(original, dims="row")})
             write = xds_to_table(nds, args.ms, args.column).compute()
 
             assert np.all(original.compute() == ds.STATE_ID.data.compute())

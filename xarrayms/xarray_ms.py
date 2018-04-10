@@ -34,6 +34,7 @@ _DEFAULT_INDEX_COLUMNS = ("FIELD_ID", "DATA_DESC_ID", "TIME",)
 
 _DEFAULT_ROWCHUNKS = 100000
 
+
 def short_table_name(table_name):
     """
     Returns the last part
@@ -50,6 +51,7 @@ def short_table_name(table_name):
 
     """
     return os.path.split(table_name.rstrip(os.sep))[1]
+
 
 def table_open_graph(table_name, **kwargs):
     """
@@ -73,12 +75,14 @@ def table_open_graph(table_name, **kwargs):
     """
     token = dask.base.tokenize(table_name, kwargs)
     table_key = ('open', short_table_name(table_name), token)
-    table_graph = { table_key: (partial(TableProxy, **kwargs), table_name) }
+    table_graph = {table_key: (partial(TableProxy, **kwargs), table_name)}
     return table_key, table_graph
+
 
 def _np_put_fn(tp, c, d, s, n):
     tp("putcol", c, d, startrow=s, nrow=n)
     return np.asarray([True])
+
 
 def xds_to_table(xds, table_name, columns=None):
     """
@@ -161,14 +165,17 @@ def xds_to_table(xds, table_name, columns=None):
     chunks = (tuple(chunks),)
     return da.Array(dsk, name, chunks, dtype=np.bool)
 
+
 def _np_get_fn(tp, c, s, n):
     return tp("getcol", c, startrow=s, nrow=n)
+
 
 def _list_get_fn(tp, c, s, n):
     return np.asarray(_np_get_fn(tp, c, s, n))
 
+
 def generate_table_getcols(table_name, table_key, dsk_base,
-                            column, shape, dtype, rows, rowchunks):
+                           column, shape, dtype, rows, rowchunks):
     """
     Generates a :class:`dask.array.Array` representing ``column``
     in ``table_name`` and backed by a series of
@@ -233,7 +240,7 @@ def generate_table_getcols(table_name, table_key, dsk_base,
         for run_start, run_end in zip(runs[:-1], runs[1:]):
             run_len = run_end - run_start
             row_get_fns.append((get_fn, table_key, column,
-                                        rows[run_start], run_len))
+                                rows[run_start], run_len))
             chunk_size += run_len
 
         # Create the key-value dask entry for this chunk
@@ -243,6 +250,7 @@ def generate_table_getcols(table_name, table_key, dsk_base,
 
     chunks = rowchunks + tuple((c,) for c in chunk_extra)
     return da.Array(merge(dsk_base, dsk), name, chunks, dtype=dtype)
+
 
 def lookup_table_schema(table_name, lookup_str):
     """
@@ -285,8 +293,8 @@ def lookup_table_schema(table_name, lookup_str):
 
 
 def xds_from_table_impl(table_name, table, table_schema,
-                    table_graph, table_key,
-                    columns, rows, chunks):
+                        table_graph, table_key,
+                        columns, rows, chunks):
     """
     Parameters
     ----------
@@ -365,8 +373,8 @@ def xds_from_table_impl(table_name, table, table_schema,
     for c in sorted(columns):
         shape, dims, dtype = col_metadata[c]
         col_dask_array = generate_table_getcols(table_name, table_key,
-                                                table_graph, c, shape, dtype, rows,
-                                                rowchunks)
+                                                table_graph, c, shape, dtype,
+                                                rows, rowchunks)
 
         data_arrays[c] = xr.DataArray(col_dask_array, dims=dims)
 
@@ -376,8 +384,8 @@ def xds_from_table_impl(table_name, table, table_schema,
 
 
 def xds_from_table(table_name, columns=None,
-                    index_cols=None, part_cols=None,
-                    table_schema=None, chunks=None):
+                   index_cols=None, part_cols=None,
+                   table_schema=None, chunks=None):
     """
     Generator producing multiple :class:`xarray.Dataset` objects
     from CASA table ``table_name`` with the rows lexicographically
@@ -470,7 +478,7 @@ def xds_from_table(table_name, columns=None,
         datasets for each partition, each ordered by indexing columns
     """
     if chunks is None:
-        chunks = {'row': _DEFAULT_ROWCHUNKS }
+        chunks = {'row': _DEFAULT_ROWCHUNKS}
 
     if index_cols is None:
         index_cols = ()
@@ -510,8 +518,8 @@ def xds_from_table(table_name, columns=None,
         if len(group_cols) == 1 and group_cols[0] == "__row__":
             where_clause = 'WHERE ROWID()=%s' % group_values[0]
         elif len(group_cols) > 0:
-            where_clause = ' AND '.join('%s=%s' % (c,v) for c, v
-                                    in zip(group_cols, group_values))
+            where_clause = ' AND '.join('%s=%s' % (c, v) for c, v
+                                        in zip(group_cols, group_values))
             where_clause = 'WHERE %s' % where_clause
         else:
             where_clause = ''
@@ -519,15 +527,15 @@ def xds_from_table(table_name, columns=None,
         # Discover the row indices producing the
         # requested ordering for each group
         query = ("SELECT ROWID() AS __table_row__ FROM $table {wc} {oc}"
-                    .format(oc=orderby_clause, wc=where_clause))
+                 .format(oc=orderby_clause, wc=where_clause))
 
         with pt.taql(query) as row_query:
             rows = row_query.getcol("__table_row__")
 
         return xds_from_table_impl(table_name, table, table_schema,
-                            dsk, table_key,
-                            set(columns).difference(group_cols),
-                            rows, chunks)
+                                   dsk, table_key,
+                                   set(columns).difference(group_cols),
+                                   rows, chunks)
 
     with pt.table(table_name) as T:
         if columns is None:
@@ -546,10 +554,10 @@ def xds_from_table(table_name, columns=None,
 
             # For each grouping
             for group_values in zip(*groups):
-               ds = _create_dataset(T, columns, index_cols,
-                                    group_cols, group_values)
-               yield (ds.squeeze(drop=True)
-                        .assign_attrs(table_row=ds.table_row.values[0]))
+                ds = _create_dataset(T, columns, index_cols,
+                                     group_cols, group_values)
+                yield (ds.squeeze(drop=True)
+                         .assign_attrs(table_row=ds.table_row.values[0]))
 
         # Otherwise partition by given columns
         elif len(part_cols) > 0:
@@ -563,15 +571,16 @@ def xds_from_table(table_name, columns=None,
             # For each grouping
             for group_values in zip(*groups):
                 ds = _create_dataset(T, columns, index_cols,
-                                        group_cols, group_values)
+                                     group_cols, group_values)
                 yield ds.assign_attrs(zip(group_cols, group_values))
 
         # No partioning case
         else:
             yield _create_dataset(T, columns, index_cols)
 
+
 def xds_from_ms(ms, columns=None, index_cols=None, part_cols=None,
-                                                    chunks=None):
+                chunks=None):
     """
     Generator yielding a series of xarray datasets representing
     the contents a Measurement Set.
@@ -615,9 +624,10 @@ def xds_from_ms(ms, columns=None, index_cols=None, part_cols=None,
         part_cols = (part_cols,)
 
     for ds in xds_from_table(ms, columns=columns,
-                            index_cols=index_cols, part_cols=part_cols,
-                            table_schema="MS", chunks=chunks):
+                             index_cols=index_cols, part_cols=part_cols,
+                             table_schema="MS", chunks=chunks):
         yield ds
+
 
 # Set docstring variables in try/except
 # ``__doc__`` may not be present as
@@ -625,6 +635,6 @@ def xds_from_ms(ms, columns=None, index_cols=None, part_cols=None,
 try:
     xds_from_ms.__doc__ %= {
         'index': _DEFAULT_INDEX_COLUMNS,
-        'parts': _DEFAULT_PARTITION_COLUMNS }
+        'parts': _DEFAULT_PARTITION_COLUMNS}
 except AttributeError:
     pass

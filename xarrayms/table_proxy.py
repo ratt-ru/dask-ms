@@ -5,6 +5,7 @@ import logging
 import numpy as np
 import pyrap.tables as pt
 
+
 class TableProxy(object):
     """
     :class:`TableProxy` allows :class:`casacore.tables.table` objects
@@ -26,11 +27,11 @@ class TableProxy(object):
 
     def __init__(self, table_name, **kwargs):
         self._table_name = table_name
-        #self._args = args
+        # self._args = args
         self._kwargs = kwargs
 
         # Should we request a write-lock?
-        self._write_lock = kwargs.get('readonly', True) == False
+        self._write_lock = kwargs.get('readonly', True) is False
 
         # Force table locking mode
         lockoptions = 'auto'
@@ -41,8 +42,8 @@ class TableProxy(object):
             pass
         else:
             log.warn("lockoptions='%s' ignored by TableProxy. "
-                    "Locking is automatically handled "
-                    "in '%s' mode", userlockopt, lockoptions)
+                     "Locking is automatically handled "
+                     "in '%s' mode", userlockopt, lockoptions)
 
         self._table = pt.table(table_name, lockoptions=lockoptions, **kwargs)
         self._table.unlock()
@@ -69,13 +70,13 @@ class TableProxy(object):
             if should_lock:
                 self._table.unlock()
 
+
 if __name__ == "__main__":
     import argparse
 
     p = argparse.ArgumentParser()
     p.add_argument("ms")
     args = p.parse_args()
-
 
     tp = TableProxy(args.ms, readonly=True)
     tp("close")
@@ -96,7 +97,4 @@ if __name__ == "__main__":
     except Exception:
         logging.warn("dill failed", exc_info=True)
 
-
     print(ntp("getcol", "DATA", startrow=0, nrow=1).shape)
-
-
