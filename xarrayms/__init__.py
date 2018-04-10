@@ -5,6 +5,7 @@ __version__ = '0.1.0'
 import logging
 import logging.handlers
 
+
 def get_logger():
     # Console formatter, mention name
     cfmt = logging.Formatter('%(name)s - %(levelname)s - %(message)s')
@@ -22,9 +23,8 @@ def get_logger():
 
     return logger
 
+
 log = get_logger()
 
 from xarrayms.xarray_ms import xds_from_table, xds_to_table, xds_from_ms
 from xarrayms.table_proxy import TableProxy
-
-

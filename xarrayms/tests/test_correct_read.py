@@ -20,6 +20,7 @@ from xarrayms import xds_from_ms
 
 logging.basicConfig(format="%(levelname)s - %(message)s", level=logging.WARN)
 
+
 def create_parser():
     DEFAULT_COLS = ["TIME", "ANTENNA1", "ANTENNA2", "UVW"]
 
@@ -29,11 +30,12 @@ def create_parser():
 
     return p
 
+
 args = create_parser().parse_args()
 
 with pt.table(args.ms) as table:
     if args.columns == "all":
-            columns = set(table.colnames())
+        columns = set(table.colnames())
     else:
         columns = set([c.strip().upper() for c in args.columns.split(',')])
 
@@ -47,19 +49,17 @@ with pt.table(args.ms) as table:
         if not ds_cols == cmp_cols:
             missing = ds_cols.symmetric_difference(cmp_cols)
             logging.warn("The following columns were requested "
-                             "but not present on the dataset. "
-                             "It will not be compared: %s",
-                             list(missing))
+                         "but not present on the dataset. "
+                         "It will not be compared: %s",
+                         list(missing))
 
             cmp_cols = cmp_cols - missing
 
-
         # Select data from the relevant data from the MS
         query = ("SELECT * FROM $table WHERE DATA_DESC_ID=%d AND FIELD_ID=%d" %
-                                                    (data_desc_id, field_id))
+                 (data_desc_id, field_id))
 
         # Compare
         with pt.taql(query) as Q:
             for c in cmp_cols:
                 assert np.all(getattr(ds, c).data.compute() == Q.getcol(c))
-
