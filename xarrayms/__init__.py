@@ -2,11 +2,11 @@ __author__ = """Simon Perkins"""
 __email__ = 'sperkins@ska.ac.za'
 __version__ = '0.1.0'
 
-import logging
-import logging.handlers
-
 
 def get_logger():
+    import logging
+    import logging.handlers
+
     # Console formatter, mention name
     cfmt = logging.Formatter('%(name)s - %(levelname)s - %(message)s')
 
@@ -15,7 +15,7 @@ def get_logger():
     ch.setLevel(logging.INFO)
     ch.setFormatter(cfmt)
 
-    logger = logging.getLogger('xarray-ms')
+    logger = logging.getLogger(__name__)
     logger.handlers = []
     logger.setLevel(logging.DEBUG)
     logger.addHandler(ch)
@@ -26,5 +26,6 @@ def get_logger():
 
 log = get_logger()
 
-from xarrayms.xarray_ms import xds_from_table, xds_to_table, xds_from_ms
-from xarrayms.table_proxy import TableProxy
+from xarrayms.xarray_ms import (xds_from_table,
+                                xds_to_table, xds_from_ms)  # noqa
+from xarrayms.table_proxy import TableProxy                 # noqa
