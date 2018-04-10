@@ -4,4 +4,4 @@ RUN pip3 install --upgrade pip setuptools pytest
 ADD . /code
 WORKDIR /code
 RUN pip3 install .
-RUN pytest
+RUN py.test -v
