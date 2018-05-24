@@ -17,6 +17,7 @@ import numpy as np
 import pyrap.tables as pt
 
 from xarrayms import xds_from_ms
+from xarrayms.xarray_ms import _DEFAULT_INDEX_COLUMNS as index_cols
 
 logging.basicConfig(format="%(levelname)s - %(message)s", level=logging.WARN)
 
@@ -30,7 +31,6 @@ def create_parser():
 
     return p
 
-
 args = create_parser().parse_args()
 
 with pt.table(args.ms) as table:
@@ -39,7 +39,9 @@ with pt.table(args.ms) as table:
     else:
         columns = set([c.strip().upper() for c in args.columns.split(',')])
 
-    for ds in xds_from_ms(args.ms, columns=columns):
+    order_by_clause = ", ".join(index_cols)
+
+    for ds in xds_from_ms(args.ms, columns=columns, index_cols=index_cols):
         data_desc_id = ds.attrs['DATA_DESC_ID']
         field_id = ds.attrs['FIELD_ID']
 
@@ -55,11 +57,17 @@ with pt.table(args.ms) as table:
 
             cmp_cols = cmp_cols - missing
 
+
+
         # Select data from the relevant data from the MS
-        query = ("SELECT * FROM $table WHERE DATA_DESC_ID=%d AND FIELD_ID=%d" %
-                 (data_desc_id, field_id))
+        query = ("SELECT * FROM $table "
+                 "WHERE DATA_DESC_ID=%d AND FIELD_ID=%d "
+                 "ORDER BY %s" %
+                 (data_desc_id, field_id, order_by_clause))
 
         # Compare
         with pt.taql(query) as Q:
             for c in cmp_cols:
-                assert np.all(getattr(ds, c).data.compute() == Q.getcol(c))
+                dask_data = getattr(ds, c).data.compute()
+                np_data = Q.getcol(c)
+                assert np.all(dask_data == np_data)
