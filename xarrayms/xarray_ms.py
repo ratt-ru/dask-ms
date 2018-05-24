@@ -10,7 +10,6 @@ from functools import partial
 import logging
 import os
 import os.path
-import time
 
 import dask
 import dask.array as da
@@ -31,8 +30,9 @@ from xarrayms.known_table_schemas import registered_schemas
 
 _DEFAULT_PARTITION_COLUMNS = ("FIELD_ID", "DATA_DESC_ID")
 _DEFAULT_INDEX_COLUMNS = ("FIELD_ID", "DATA_DESC_ID", "TIME",)
-
 _DEFAULT_ROWCHUNKS = 100000
+
+log = logging.getLogger(__name__)
 
 
 def short_table_name(table_name):
@@ -130,7 +130,6 @@ def xds_to_table(xds, table_name, columns=None):
         dsk.update(dask_array.__dask_graph__())
 
         array_chunks = data_array.chunks
-        array_shape = data_array.shape
 
         if not data_array.dims[row_idx] == 'row':
             raise ValueError("xds.%s.dims[0] != 'row'" % c)
@@ -338,7 +337,7 @@ def xds_from_table_impl(table_name, table, table_schema,
             # Read the starting row
             row = table.getcol(c, startrow=rows[0], nrow=1)
         except Exception:
-            logging.warn("Ignoring '%s' column", c, exc_info=True)
+            log.warn("Ignoring '%s' column", c)
             missing.append(c)
         else:
             # Usually we get numpy arrays
@@ -460,17 +459,23 @@ def xds_from_table(table_name, columns=None,
 
         Alternatively a string can be supplied, which will be matched
         against existing default schemas. Examples here include
-        :code:`"MS"`, :code`"ANTENNA"` and :code:`"SPECTRAL_WINDOW"`
-        correspoonding to ``Measurement Sets`` the ``ANTENNA`` subtable
+        ``MS``, ``ANTENNA`` and ``SPECTRAL_WINDOW``
+        corresponding to ``Measurement Sets`` the ``ANTENNA`` subtable
         and the ``SPECTRAL_WINDOW`` subtable, respectively.
 
         If ``None`` is supplied, the end of ``table_name`` will be
         inspected to see if it matches any default schemas.
 
-    chunks  : dict, optional
+    chunks : list of dicts or dict, optional
         A :code:`{dim: chunk}` dictionary, specifying the chunking
-        strategy for each dimension in the schema.
+        strategy of each dimension in the schema.
         Defaults to :code:`{'row': 100000 }`.
+
+        * If a dict, the chunking strategy is applied to each partition.
+        * If a list of dicts, each element is applied
+          to the associated partition. The last element is
+          extended over the remaining partitions if there
+          are insufficient elements.
 
     Yields
     ------
@@ -478,7 +483,11 @@ def xds_from_table(table_name, columns=None,
         datasets for each partition, each ordered by indexing columns
     """
     if chunks is None:
-        chunks = {'row': _DEFAULT_ROWCHUNKS}
+        chunks = [{'row': _DEFAULT_ROWCHUNKS}]
+    elif isinstance(chunks, tuple):
+        chunks = list(chunks)
+    elif isinstance(chunks, dict):
+        chunks = [chunks]
 
     if index_cols is None:
         index_cols = ()
@@ -497,7 +506,8 @@ def xds_from_table(table_name, columns=None,
     table_key, dsk = table_open_graph(table_name)
 
     def _create_dataset(table, columns, index_cols,
-                        group_cols=(), group_values=()):
+                        group_cols=(), group_values=(),
+                        chunks={}):
         """
         Generates a dataset, given:
 
@@ -555,7 +565,8 @@ def xds_from_table(table_name, columns=None,
             # For each grouping
             for group_values in zip(*groups):
                 ds = _create_dataset(T, columns, index_cols,
-                                     group_cols, group_values)
+                                     group_cols, group_values,
+                                     chunks=chunks[0])
                 yield (ds.squeeze(drop=True)
                          .assign_attrs(table_row=ds.table_row.values[0]))
 
@@ -568,15 +579,21 @@ def xds_from_table(table_name, columns=None,
                 group_cols = group_query.colnames()
                 groups = [group_query.getcol(c) for c in group_cols]
 
+            # Extend the last chunk if we don't have chunks for all groups
+            if len(chunks) < len(groups):
+                missing = len(groups) - len(chunks)
+                chunks += [chunks[-1]]*missing
+
             # For each grouping
-            for group_values in zip(*groups):
+            for group_chunk, group_values in zip(chunks, zip(*groups)):
                 ds = _create_dataset(T, columns, index_cols,
-                                     group_cols, group_values)
+                                     group_cols, group_values,
+                                     group_chunk)
                 yield ds.assign_attrs(zip(group_cols, group_values))
 
         # No partioning case
         else:
-            yield _create_dataset(T, columns, index_cols)
+            yield _create_dataset(T, columns, index_cols, chunks=chunks[0])
 
 
 def xds_from_ms(ms, columns=None, index_cols=None, part_cols=None,
@@ -600,8 +617,8 @@ def xds_from_ms(ms, columns=None, index_cols=None, part_cols=None,
     part_cols  : tuple or list, optional
         Sequence of partioning columns.
         Defaults to :code:`%(parts)s`
-    chunks : dict, optional
-        Dictionary of dimension chunks.
+    chunks : list of dicts or dict, optional
+        Dictionaries of dimension chunks.
 
     Yields
     ------
