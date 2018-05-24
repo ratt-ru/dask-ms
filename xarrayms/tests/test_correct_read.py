@@ -31,6 +31,7 @@ def create_parser():
 
     return p
 
+
 args = create_parser().parse_args()
 
 with pt.table(args.ms) as table:
@@ -56,8 +57,6 @@ with pt.table(args.ms) as table:
                          list(missing))
 
             cmp_cols = cmp_cols - missing
-
-
 
         # Select data from the relevant data from the MS
         query = ("SELECT * FROM $table "

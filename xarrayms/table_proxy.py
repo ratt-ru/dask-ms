@@ -2,8 +2,9 @@ from __future__ import print_function
 
 import logging
 
-import numpy as np
 import pyrap.tables as pt
+
+log = logging.getLogger(__name__)
 
 
 class TableProxy(object):

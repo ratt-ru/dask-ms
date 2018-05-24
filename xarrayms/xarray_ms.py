@@ -10,7 +10,6 @@ from functools import partial
 import logging
 import os
 import os.path
-import time
 
 import dask
 import dask.array as da
@@ -130,7 +129,6 @@ def xds_to_table(xds, table_name, columns=None):
         dsk.update(dask_array.__dask_graph__())
 
         array_chunks = data_array.chunks
-        array_shape = data_array.shape
 
         if not data_array.dims[row_idx] == 'row':
             raise ValueError("xds.%s.dims[0] != 'row'" % c)
