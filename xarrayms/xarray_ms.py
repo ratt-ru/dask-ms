@@ -30,8 +30,9 @@ from xarrayms.known_table_schemas import registered_schemas
 
 _DEFAULT_PARTITION_COLUMNS = ("FIELD_ID", "DATA_DESC_ID")
 _DEFAULT_INDEX_COLUMNS = ("FIELD_ID", "DATA_DESC_ID", "TIME",)
-
 _DEFAULT_ROWCHUNKS = 100000
+
+log = logging.getLogger(__name__)
 
 
 def short_table_name(table_name):
@@ -336,7 +337,7 @@ def xds_from_table_impl(table_name, table, table_schema,
             # Read the starting row
             row = table.getcol(c, startrow=rows[0], nrow=1)
         except Exception:
-            logging.warn("Ignoring '%s' column", c, exc_info=True)
+            log.warn("Ignoring '%s' column", c)
             missing.append(c)
         else:
             # Usually we get numpy arrays
