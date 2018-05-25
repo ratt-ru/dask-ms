@@ -17,17 +17,32 @@ import numpy as np
 import pyrap.tables as pt
 
 from xarrayms import xds_from_ms
-from xarrayms.xarray_ms import _DEFAULT_INDEX_COLUMNS as index_cols
+from xarrayms.xarray_ms import (_DEFAULT_PARTITION_COLUMNS,
+                                _DEFAULT_INDEX_COLUMNS,
+                                select_clause,
+                                orderby_clause,
+                                groupby_clause,
+                                where_clause)
 
 logging.basicConfig(format="%(levelname)s - %(message)s", level=logging.WARN)
 
 
+def _split_column_str(col_str):
+    cols = [c.strip().upper() for c in col_str.split(",")]
+    return [c for c in cols if c]
+
+
 def create_parser():
-    DEFAULT_COLS = ["TIME", "ANTENNA1", "ANTENNA2", "UVW"]
+    DEFAULT_SELECT = ["TIME", "ANTENNA1", "ANTENNA2", "UVW"]
 
     p = argparse.ArgumentParser()
     p.add_argument("ms")
-    p.add_argument("-c", "--columns", default=", ".join(DEFAULT_COLS))
+    p.add_argument("-gc", "--group-columns", type=_split_column_str,
+                   default=",".join(_DEFAULT_PARTITION_COLUMNS))
+    p.add_argument("-sc", "--select-columns", type=_split_column_str,
+                   default=",".join(DEFAULT_SELECT))
+    p.add_argument("-ic", "--index-columns", type=_split_column_str,
+                   default=",".join(_DEFAULT_INDEX_COLUMNS))
 
     return p
 
@@ -35,19 +50,19 @@ def create_parser():
 args = create_parser().parse_args()
 
 with pt.table(args.ms) as table:
-    if args.columns == "all":
-        columns = set(table.colnames())
-    else:
-        columns = set([c.strip().upper() for c in args.columns.split(',')])
+    index_cols = args.index_columns
+    group_cols = args.group_columns
 
-    order_by_clause = ", ".join(index_cols)
+    columns = set(table.colnames() if args.select_columns == "all"
+                  else args.select_columns)
+    order = orderby_clause(index_cols)
 
-    for ds in xds_from_ms(args.ms, columns=columns, index_cols=index_cols):
-        data_desc_id = ds.attrs['DATA_DESC_ID']
-        field_id = ds.attrs['FIELD_ID']
+    for ds in xds_from_ms(args.ms, columns=columns,
+                          part_cols=group_cols,
+                          index_cols=index_cols):
 
         ds_cols = set(ds.data_vars.keys())
-        cmp_cols = columns.difference(['DATA_DESC_ID', 'FIELD_ID'])
+        cmp_cols = columns.difference(group_cols)
 
         if not ds_cols == cmp_cols:
             missing = ds_cols.symmetric_difference(cmp_cols)
@@ -58,11 +73,10 @@ with pt.table(args.ms) as table:
 
             cmp_cols = cmp_cols - missing
 
+        where = where_clause(group_cols, [getattr(ds, c) for c in group_cols])
+
         # Select data from the relevant data from the MS
-        query = ("SELECT * FROM $table "
-                 "WHERE DATA_DESC_ID=%d AND FIELD_ID=%d "
-                 "ORDER BY %s" %
-                 (data_desc_id, field_id, order_by_clause))
+        query = "SELECT * FROM $table %s %s" % (where, order)
 
         # Compare
         with pt.taql(query) as Q:

@@ -20,12 +20,24 @@ import xarray as xr
 
 from xarrayms import xds_from_ms, xds_to_table
 
+from xarrayms.xarray_ms import (_DEFAULT_PARTITION_COLUMNS,
+                                _DEFAULT_INDEX_COLUMNS)
+
 logging.basicConfig(format="%(levelname)s - %(message)s", level=logging.WARN)
+
+
+def _split_column_str(col_str):
+    cols = [c.strip().upper() for c in col_str.split(",")]
+    return [c for c in cols if c]
 
 
 def create_parser():
     p = argparse.ArgumentParser()
     p.add_argument("ms")
+    p.add_argument("-gc", "--group-columns", type=_split_column_str,
+                   default=",".join(_DEFAULT_PARTITION_COLUMNS))
+    p.add_argument("-ic", "--index-columns", type=_split_column_str,
+                   default=",".join(_DEFAULT_INDEX_COLUMNS))
     # STATE_ID is relatively innocuous
     p.add_argument("-c", "--column", default="STATE_ID")
 
@@ -35,9 +47,13 @@ def create_parser():
 args = create_parser().parse_args()
 
 with pt.table(args.ms) as table:
-    for ds in xds_from_ms(args.ms, columns=[args.column]):
-        data_desc_id = ds.attrs['DATA_DESC_ID']
-        field_id = ds.attrs['FIELD_ID']
+    index_cols = args.index_columns
+    group_cols = args.group_columns
+
+    for ds in xds_from_ms(args.ms, columns=[args.column],
+                          part_cols=group_cols,
+                          index_cols=index_cols):
+
         row_chunks = ds.chunks["row"]
 
         xrcol = getattr(ds, args.column)

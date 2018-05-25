@@ -28,11 +28,40 @@ import xarray as xr
 from xarrayms.table_proxy import TableProxy
 from xarrayms.known_table_schemas import registered_schemas
 
-_DEFAULT_PARTITION_COLUMNS = ("FIELD_ID", "DATA_DESC_ID")
-_DEFAULT_INDEX_COLUMNS = ("FIELD_ID", "DATA_DESC_ID", "TIME",)
+_DEFAULT_PARTITION_COLUMNS = ["FIELD_ID", "DATA_DESC_ID"]
+_DEFAULT_INDEX_COLUMNS = ["TIME"]
 _DEFAULT_ROWCHUNKS = 100000
 
 log = logging.getLogger(__name__)
+
+
+def select_clause(select_cols):
+    if select_cols is None or len(select_cols) == 0:
+        return "SELECT * "
+
+    return " ".join(("SELECT", ", ".join(select_cols)))
+
+
+def orderby_clause(index_cols):
+    if len(index_cols) == 0:
+        return ""
+
+    return " ".join(("ORDERBY", ", ".join(index_cols)))
+
+
+def groupby_clause(group_cols):
+    if len(group_cols) == 0:
+        return ""
+
+    return " ".join(("GROUPBY", ", ".join(group_cols)))
+
+
+def where_clause(group_cols, group_vals):
+    if len(group_cols) == 0:
+        return ""
+
+    assign_str = ["%s=%s" % (c, v) for c, v in zip(group_cols, group_vals)]
+    return " ".join(("WHERE", " AND ".join(assign_str)))
 
 
 def short_table_name(table_name):
@@ -116,7 +145,7 @@ def xds_to_table(xds, table_name, columns=None):
     elif isinstance(columns, string_types):
         columns = [columns]
 
-    token = dask.base.tokenize(table_name, columns)
+    token = dask.base.tokenize(table_name, columns, rows)
     name = '-'.join((short_table_name(table_name), "putcol", token))
 
     chunk = 0
@@ -208,7 +237,7 @@ def generate_table_getcols(table_name, table_key, dsk_base,
         Dask array representing the column
     """
 
-    token = dask.base.tokenize(table_name, column)
+    token = dask.base.tokenize(table_name, column, rows)
     short_name = short_table_name(table_name)
     name = '-'.join((short_name, "getcol", column.lower(), token))
     dsk = {}
@@ -491,109 +520,99 @@ def xds_from_table(table_name, columns=None,
 
     if index_cols is None:
         index_cols = ()
-    elif isinstance(index_cols, list):
-        index_cols = tuple(index_cols)
-    elif not isinstance(index_cols, tuple):
-        index_cols = (index_cols,)
+    elif isinstance(index_cols, tuple):
+        index_cols = list(index_cols)
+    elif not isinstance(part_cols, list):
+        index_cols = [index_cols]
 
     if part_cols is None:
         part_cols = ()
-    elif isinstance(part_cols, list):
-        part_cols = tuple(part_cols)
-    elif not isinstance(part_cols, tuple):
-        part_cols = (part_cols,)
+    elif isinstance(part_cols, tuple):
+        part_cols = list(part_cols)
+    elif not isinstance(part_cols, list):
+        part_cols = [part_cols]
 
     table_key, dsk = table_open_graph(table_name)
 
-    def _create_dataset(table, columns, index_cols,
-                        group_cols=(), group_values=(),
-                        chunks={}):
-        """
-        Generates a dataset, given:
-
-        1. the partitioning defined by ``group_cols`` and ``group_values``
-        2. the ordering defined by ``index_cols``
-
-        and then deferring to :func:`xds_from_table_impl` to create the
-        dataset with the row ordering.
-        """
-        if len(index_cols) > 0:
-            orderby_clause = ', '.join(index_cols)
-            orderby_clause = "ORDER BY %s" % orderby_clause
-        else:
-            orderby_clause = ''
-
-        assert len(group_cols) == len(group_values)
-
-        if len(group_cols) == 1 and group_cols[0] == "__row__":
-            where_clause = 'WHERE ROWID()=%s' % group_values[0]
-        elif len(group_cols) > 0:
-            where_clause = ' AND '.join('%s=%s' % (c, v) for c, v
-                                        in zip(group_cols, group_values))
-            where_clause = 'WHERE %s' % where_clause
-        else:
-            where_clause = ''
-
-        # Discover the row indices producing the
-        # requested ordering for each group
-        query = ("SELECT ROWID() AS __table_row__ FROM $table {wc} {oc}"
-                 .format(oc=orderby_clause, wc=where_clause))
-
-        with pt.taql(query) as row_query:
-            rows = row_query.getcol("__table_row__")
-
-        return xds_from_table_impl(table_name, table, table_schema,
-                                   dsk, table_key,
-                                   set(columns).difference(group_cols),
-                                   rows, chunks)
-
     with pt.table(table_name) as T:
-        if columns is None:
-            columns = T.colnames()
-
-        # Group table_name by partitioning columns,
-        # We'll generate a dataset for each unique group
+        columns = set(T.colnames() if columns is None else columns)
 
         # Handle the case where we partition on each table row
         if len(part_cols) == 1 and part_cols[0] == "__row__":
-            query = "SELECT ROWID() AS __row__ FROM $T"
+            # Get the rows giving the ordering
+            order = orderby_clause(index_cols)
+            query = "SELECT ROWID() AS __tablerow__ FROM $T %s" % order
 
-            with pt.taql(query) as group_query:
-                group_cols = group_query.colnames()
-                groups = [group_query.getcol(c) for c in group_cols]
+            with pt.taql(query) as gq:
+                rows = gq.getcol("__tablerow__")
 
-            # For each grouping
-            for group_values in zip(*groups):
-                ds = _create_dataset(T, columns, index_cols,
-                                     group_cols, group_values,
-                                     chunks=chunks[0])
+            # Generate a dataset for each row
+            for r in range(rows.size):
+                ds = xds_from_table_impl(table_name, T, table_schema,
+                                         dsk, table_key, columns,
+                                         rows[r:r + 1], chunks[0])
+
                 yield (ds.squeeze(drop=True)
-                         .assign_attrs(table_row=ds.table_row.values[0]))
+                         .assign_attrs(table_row=rows[r]))
 
         # Otherwise partition by given columns
         elif len(part_cols) > 0:
-            part_str = ', '.join(part_cols)
-            query = "SELECT %s FROM $T GROUP BY %s" % (part_str, part_str)
+            # Aggregate indexing column values so that we can
+            # individually sort each group's rows
+            index_group_cols = ["GAGGR(%s) AS GROUP_%s" % (c, c)
+                                for c in index_cols]
+            # Get the rows for each group
+            index_group_cols.append("GROWID() as __tablerow__")
 
-            with pt.taql(query) as group_query:
-                group_cols = group_query.colnames()
-                groups = [group_query.getcol(c) for c in group_cols]
+            select = select_clause(part_cols + index_group_cols)
+            groupby = groupby_clause(part_cols)
+            orderby = orderby_clause(index_cols)
 
-            # Extend the last chunk if we don't have chunks for all groups
-            if len(chunks) < len(groups):
-                missing = len(groups) - len(chunks)
-                chunks += [chunks[-1]]*missing
+            query = "%s FROM $T %s %s" % (select, groupby, orderby)
 
-            # For each grouping
-            for group_chunk, group_values in zip(chunks, zip(*groups)):
-                ds = _create_dataset(T, columns, index_cols,
-                                     group_cols, group_values,
-                                     group_chunk)
-                yield ds.assign_attrs(zip(group_cols, group_values))
+            with pt.taql(query) as gq:
+                # For each group
+                for i in range(0, gq.nrows()):
+                    # Obtain this group's row ids and indexing columns
+                    # Need reversed since last column is lexsort's
+                    # primary sort key
+                    key, rows = gq.getvarcol("__tablerow__", i, 1).popitem()
+                    group_indices = tuple(gq.getvarcol("GROUP_%s" % c, i, 1)
+                                          .pop(key)[0]
+                                          for c in reversed(index_cols))
+
+                    # Resort row id by indexing columns,
+                    # eliminating the extra dimension introduced by getvarcol
+                    group_rows = rows[0][np.lexsort(group_indices)]
+
+                    # Get the singleton group partition values
+                    group_values = tuple(gq.getvarcol(c, i, 1).pop(key)[0]
+                                         for c in part_cols)
+
+                    # Use the last chunk if there aren't enough
+                    try:
+                        group_chunks = chunks[i]
+                    except IndexError:
+                        group_chunks = chunks[-1]
+
+                    ds = xds_from_table_impl(table_name, T, table_schema,
+                                             dsk, table_key,
+                                             columns.difference(part_cols),
+                                             group_rows, group_chunks)
+
+                    yield ds.assign_attrs(zip(part_cols, group_values))
 
         # No partioning case
         else:
-            yield _create_dataset(T, columns, index_cols, chunks=chunks[0])
+            query = ("SELECT ROWID() as __tablerow__ "
+                     "FROM $T %s" % orderby_clause(index_cols))
+
+            with pt.taql(query) as gq:
+                yield xds_from_table_impl(table_name, T, table_schema,
+                                          dsk, table_key,
+                                          columns.difference(part_cols),
+                                          gq.getcol("__tablerow__"),
+                                          chunks[0])
 
 
 def xds_from_ms(ms, columns=None, index_cols=None, part_cols=None,
