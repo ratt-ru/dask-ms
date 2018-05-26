@@ -54,19 +54,19 @@ with pt.table(args.ms) as table:
                           group_cols=group_cols,
                           index_cols=index_cols):
 
-        row_chunks = ds.chunks["row"]
-
         xrcol = getattr(ds, args.column)
 
-        # Compute original, then save it as a dask array
-        original = da.from_array(xrcol.data.compute(), chunks=row_chunks)
+        # Persist original as in memory dask array
+        original = xrcol.data.persist()
 
         try:
             # Write flipped arange to the table
-            arange = da.arange(xrcol.size, chunks=row_chunks)
+            arange = da.arange(xrcol.size, chunks=np.product(original.chunks))
             arange = da.flip(arange, 0)
+            arange = da.reshape(arange, xrcol.shape)
 
-            nds = ds.assign(**{args.column: xr.DataArray(arange, dims="row")})
+            new_xda = xr.DataArray(arange, dims=xrcol.dims)
+            nds = ds.assign(**{args.column: new_xda})
             write = xds_to_table(nds, args.ms, args.column).compute()
 
             # Check that we get the right thing back.
@@ -74,8 +74,8 @@ with pt.table(args.ms) as table:
             assert np.all(arange.compute() == xrcol.data.compute())
         finally:
             # Write original data back to the table
-            nds = ds.assign(
-                **{args.column: xr.DataArray(original, dims="row")})
+            orig_xda = xr.DataArray(original, dims=xrcol.dims)
+            nds = ds.assign(**{args.column: orig_xda})
             write = xds_to_table(nds, args.ms, args.column).compute()
 
-            assert np.all(original.compute() == ds.STATE_ID.data.compute())
+            assert np.all(original.compute() == xrcol.data.compute())

@@ -82,6 +82,25 @@ def short_table_name(table_name):
     return os.path.split(table_name.rstrip(os.sep))[1]
 
 
+def _get_row_runs(rows, row_chunks):
+    row_runs = []
+    start_row = 0
+
+    for chunk, chunk_size in enumerate(row_chunks[0]):
+        end_row = start_row + chunk_size
+
+        # Split into runs of consecutive rows within this chunk
+        d = np.ediff1d(rows[start_row:end_row], to_begin=2, to_end=2)
+        row_runs.append(np.nonzero(d != 1)[0] + rows[start_row])
+        start_row = end_row
+
+    if end_row != rows.size:
+        raise ValueError("Chunk sum didn't match the number of rows")
+
+    return row_runs
+
+
+
 def table_open_graph(table_name, **kwargs):
     """
     Generate a dask graph containing table open commands
@@ -145,53 +164,65 @@ def xds_to_table(xds, table_name, columns=None):
     elif isinstance(columns, string_types):
         columns = [columns]
 
-    token = dask.base.tokenize(table_name, columns, rows)
-    name = '-'.join((short_table_name(table_name), "putcol", token))
-
     chunk = 0
     chunks = []
     row_idx = 0
 
-    for c in columns:
-        data_array = getattr(xds, c)
+    # Get the DataArrays for each column
+    col_arrays = [getattr(xds, c) for c in columns]
+    # Tokenize putcol on the dask arrays
+    token = dask.base.tokenize(table_name, col_arrays)
+    name = '-'.join((short_table_name(table_name), "putcol",
+                     str(columns), token))
+
+    for c, data_array in zip(columns, col_arrays):
         dask_array = data_array.data
 
+        # Add the arrays graph to final graph
         dsk.update(dask_array.__dask_graph__())
-
-        array_chunks = data_array.chunks
 
         if not data_array.dims[row_idx] == 'row':
             raise ValueError("xds.%s.dims[0] != 'row'" % c)
 
+        # Get row runs for each chunk
+        row_chunks = (dask_array.chunks[0],)
+        row_runs = _get_row_runs(rows, row_chunks)
         chunk_start = 0
 
-        for chunk_size in array_chunks[row_idx]:
-            chunk_end = chunk_start + chunk_size
+        for runs in row_runs:
             row_put_fns = []
-
-            # Split into runs of consecutive rows within this chunk
-            d = np.ediff1d(rows[chunk_start:chunk_end], to_begin=2, to_end=2)
-            runs = np.nonzero(d != 1)[0] + chunk_start
-
             for run_start, run_end in zip(runs[:-1], runs[1:]):
-                # Slice the dask array and then obtain the graph representing
-                # the slice operation. There should be only one key-value pair
-                # as we're slicing within a chunk
-                data = dask_array[run_start:run_end]
-                dsk_slice = data.__dask_graph__().dicts[data.name]
-                assert len(dsk_slice) == 1
-                dsk.update(dsk_slice)
-                row_put_fns.append((_np_put_fn, table_key,
-                                    c, dsk_slice.keys()[0],
-                                    rows[run_start], run_end - run_start))
+                run_len = run_end - run_start
+                chunk_end = chunk_start + run_len
 
+                # Slice the dask array, obtain the graph representing
+                # the slice operation and add it to the graph
+                data = dask_array[chunk_start:chunk_end]
+                dsk_slice = data.__dask_graph__().dicts[data.name]
+                dsk.update(dsk_slice)
+
+                # Obtain slicing keys
+                slice_keys = [k for k in dsk_slice.keys()
+                              if isinstance(k, tuple)
+                              and k[0] == data.name]
+                # Multiple slice keys would indicate that we've sliced
+                # outside a single dask array chunk.
+                # As each set of runs operates within a single chunk,
+                # this should never happen
+                assert len(slice_keys) == 1
+
+                row_put_fns.append((_np_put_fn, table_key,
+                                    c, slice_keys[0],
+                                    run_start, run_len))
+
+                chunk_start = chunk_end
+
+            # And the results of the put functions together
             dsk[(name, chunk)] = (np.logical_and.reduce, row_put_fns)
             chunks.append(1)
             chunk += 1
-            chunk_start = chunk_end
 
-    chunks = (tuple(chunks),)
-    return da.Array(dsk, name, chunks, dtype=np.bool)
+    return da.Array(dsk, name, (tuple(chunks),), dtype=np.bool)
 
 
 def _np_get_fn(tp, c, s, n):
@@ -203,7 +234,8 @@ def _list_get_fn(tp, c, s, n):
 
 
 def generate_table_getcols(table_name, table_key, dsk_base,
-                           column, shape, dtype, rows, rowchunks):
+                           column, shape, dtype,
+                           row_chunks, row_runs):
     """
     Generates a :class:`dask.array.Array` representing ``column``
     in ``table_name`` and backed by a series of
@@ -224,12 +256,11 @@ def generate_table_getcols(table_name, table_key, dsk_base,
         Shape of the array
     dtype : np.dtype or object
         Data type of the array
-    rows : np.ndarray
-        CASA table row id's defining an ordering
-        of the table data.
-    rowchunks : integer
-        The chunk size for the row dimension of the resulting
-        :class:`dask.array.Array`s.
+    row_chunks : tuple
+        Chunk strategy for the row dimension. Should look like
+        :code:`((r1,r2,...,rn),)`
+    row_runs : list of :class:`numpy.ndarray`
+        List of row runs for each chunk
 
     Returns
     -------
@@ -237,7 +268,7 @@ def generate_table_getcols(table_name, table_key, dsk_base,
         Dask array representing the column
     """
 
-    token = dask.base.tokenize(table_name, column, rows)
+    token = dask.base.tokenize(table_name, column, row_runs)
     short_name = short_table_name(table_name)
     name = '-'.join((short_name, "getcol", column.lower(), token))
     dsk = {}
@@ -248,18 +279,10 @@ def generate_table_getcols(table_name, table_key, dsk_base,
     # infer the type of getter we should be using
     get_fn = _np_get_fn if isinstance(dtype, np.dtype) else _list_get_fn
 
-    # Iterate through the rows in groups of rowchunks
+    # Iterate through the rows in groups of row_runs
     # For each iteration we generate one chunk
     # in the resultant dask array
-    start_row = 0
-
-    for chunk, chunk_size in enumerate(rowchunks[0]):
-        end_row = start_row + chunk_size
-
-        # Split into runs of consecutive rows within this chunk
-        d = np.ediff1d(rows[start_row:end_row], to_begin=2, to_end=2)
-        runs = np.nonzero(d != 1)[0] + start_row
-
+    for chunk, runs in enumerate(row_runs):
         # How many rows in this chunk?
         chunk_size = 0
         # Store a list of lambdas executing getcols on consecutive runs
@@ -268,15 +291,13 @@ def generate_table_getcols(table_name, table_key, dsk_base,
         for run_start, run_end in zip(runs[:-1], runs[1:]):
             run_len = run_end - run_start
             row_get_fns.append((get_fn, table_key, column,
-                                rows[run_start], run_len))
+                                run_start, run_len))
             chunk_size += run_len
 
         # Create the key-value dask entry for this chunk
         dsk[(name, chunk) + key_extra] = (np.concatenate, row_get_fns)
 
-        start_row = end_row
-
-    chunks = rowchunks + tuple((c,) for c in chunk_extra)
+    chunks = row_chunks + tuple((c,) for c in chunk_extra)
     return da.Array(merge(dsk_base, dsk), name, chunks, dtype=dtype)
 
 
@@ -320,6 +341,61 @@ def lookup_table_schema(table_name, lookup_str):
     raise TypeError("Invalid table_schema type '%s'" % type(table_schema))
 
 
+
+def column_metadata(table, columns, table_schema, rows):
+    """
+    Returns :code:`{column: (shape, dim_schema, dtype)}` metadata
+    for each column in ``columns``.
+
+    Parameters
+    ----------
+    table : :class:`pyrap.tables.table`
+        CASA table object
+    columns : list of str
+        List of CASA table columns
+    table_schema : dict
+        Table schema for ``table``
+
+    Returns
+    -------
+    dict
+        :code:`{column: (shape, dim_schema, dtype)}`
+    """
+
+    nrows = rows.size
+    column_metadata = collections.OrderedDict()
+
+    # Work out metadata for each column
+    for c in sorted(columns):
+        try:
+            # Read the starting row
+            row = table.getcol(c, startrow=rows[0], nrow=1)
+        except Exception:
+            log.warn("Ignoring '%s' column")
+        else:
+            # Usually we get numpy arrays
+            if isinstance(row, np.ndarray):
+                shape = (nrows,) + row.shape[1:]
+                dtype = row.dtype
+            # In these cases, we're getting a list of (probably) strings
+            elif isinstance(row, (list, tuple)):
+                shape = (nrows,)
+                dtype = object
+            else:
+                raise TypeError("Unhandled row type '%s'" % type(row))
+
+            # Generate an xarray dimension schema
+            # from supplied or inferred schemas if possible
+            try:
+                extra = table_schema[c].dims
+            except KeyError:
+                extra = tuple('%s-%d' % (c, i) for i in range(1, len(shape)))
+
+            column_metadata[c] = (shape, ("row",) + extra, dtype)
+
+    return column_metadata
+
+
 def xds_from_table_impl(table_name, table, table_schema,
                         table_graph, table_key,
                         columns, rows, chunks):
@@ -352,59 +428,28 @@ def xds_from_table_impl(table_name, table, table_schema,
         xarray dataset
     """
 
-    nrows = rows.size
-    col_metadata = {}
-
-    missing = []
-
     if not isinstance(table_schema, collections.Mapping):
         table_schema = lookup_table_schema(table_name, table_schema)
 
-    # Work out metadata for each column
-    for c in columns:
-        try:
-            # Read the starting row
-            row = table.getcol(c, startrow=rows[0], nrow=1)
-        except Exception:
-            log.warn("Ignoring '%s' column", c)
-            missing.append(c)
-        else:
-            # Usually we get numpy arrays
-            if isinstance(row, np.ndarray):
-                shape = (nrows,) + row.shape[1:]
-                dtype = row.dtype
-            # In these cases, we're getting a list of (probably) strings
-            elif isinstance(row, (list, tuple)):
-                shape = (nrows,)
-                dtype = object
-            else:
-                raise TypeError("Unhandled row type '%s'" % type(row))
-
-            # Generate an xarray dimension schema
-            # from supplied or inferred schemas if possible
-            try:
-                extra = table_schema[c].dims
-            except KeyError:
-                extra = tuple('%s-%d' % (c, i) for i in range(1, len(shape)))
-
-            col_metadata[c] = (shape, ("row",) + extra, dtype)
-
-    # Remove missing columns
-    columns = columns.difference(missing)
+    # Get column metadata
+    col_metadata = column_metadata(table, columns, table_schema, rows)
 
     # Determine a row chunking scheme
-    rowchunks = da.core.normalize_chunks(chunks['row'], (rows.size,))
+    row_chunks = da.core.normalize_chunks(chunks['row'], (rows.size,))
+
+    # Get row runs for each chunk
+    row_runs = _get_row_runs(rows, row_chunks)
 
     # Insert arrays into dataset in sorted order
     data_arrays = collections.OrderedDict()
 
-    for c in sorted(columns):
-        shape, dims, dtype = col_metadata[c]
+    for column, (shape, dims, dtype) in col_metadata.items():
         col_dask_array = generate_table_getcols(table_name, table_key,
-                                                table_graph, c, shape, dtype,
-                                                rows, rowchunks)
+                                                table_graph, column,
+                                                shape, dtype,
+                                                row_chunks, row_runs)
 
-        data_arrays[c] = xr.DataArray(col_dask_array, dims=dims)
+        data_arrays[column] = xr.DataArray(col_dask_array, dims=dims)
 
     # Create the dataset, assigning a table_row coordinate
     # associated with the row dimension
