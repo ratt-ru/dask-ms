@@ -28,7 +28,7 @@ import xarray as xr
 from xarrayms.table_proxy import TableProxy
 from xarrayms.known_table_schemas import registered_schemas
 
-_DEFAULT_PARTITION_COLUMNS = ["FIELD_ID", "DATA_DESC_ID"]
+_DEFAULT_GROUP_COLUMNS = ["FIELD_ID", "DATA_DESC_ID"]
 _DEFAULT_INDEX_COLUMNS = ["TIME"]
 _DEFAULT_ROWCHUNKS = 100000
 
@@ -412,19 +412,19 @@ def xds_from_table_impl(table_name, table, table_schema,
 
 
 def xds_from_table(table_name, columns=None,
-                   index_cols=None, part_cols=None,
+                   index_cols=None, group_cols=None,
                    table_schema=None, chunks=None):
     """
     Generator producing multiple :class:`xarray.Dataset` objects
     from CASA table ``table_name`` with the rows lexicographically
     sorted according to the columns in ``index_cols``.
-    If ``part_cols`` is supplied, the table data is partitioned into
+    If ``group_cols`` is supplied, the table data is grouped into
     multiple :class:`xarray.Dataset` objects, each associated with a
-    permutation of the unique values for the columns in ``part_cols``.
+    permutation of the unique values for the columns in ``group_cols``.
 
     Notes
     -----
-    Both ``part_cols`` and ``index_cols`` should consist of
+    Both ``group_cols`` and ``index_cols`` should consist of
     columns that are part of the table index.
 
     However, this may not always be possible as CASA tables
@@ -445,19 +445,19 @@ def xds_from_table(table_name, columns=None,
     This may not be the case for the ``SPECTRAL_WINDOW`` subtable.
     Here, each row defines a separate spectral window, but each
     spectral window may contain different numbers of frequencies.
-    In this case, it is probably better to partition the subtable
+    In this case, it is probably better to group the subtable
     by ``row``.
 
-    There is a *special* partition column :code:`"__row__"`
-    that can be used to partition the table by row.
+    There is a *special* group column :code:`"__row__"`
+    that can be used to group the table by row.
 
     .. code-block:: python
 
         for spwds in xds_from_table("WSRT.MS::SPECTRAL_WINDOW",
-                                            part_cols="__row__"):
+                                            group_cols="__row__"):
             ...
 
-    If :code:`"__row__"` is used for partioning, then no other
+    If :code:`"__row__"` is used for grouping, then no other
     column may be used. It should also only be used for *small*
     tables, as the number of datasets produced, may be prohibitively
     large.
@@ -471,8 +471,8 @@ def xds_from_table(table_name, columns=None,
         Defaults to all if ``None``
     index_cols  : list or tuple, optional
         List of CASA table indexing columns. Defaults to :code:`()`.
-    part_cols : list or tuple, optional
-        List of columns on which to partition the CASA table.
+    group_cols : list or tuple, optional
+        List of columns on which to group the CASA table.
         Defaults to :code:`()`
     table_schema : str or dict, optional
         A schema dictionary defining the dimension naming scheme for
@@ -500,16 +500,16 @@ def xds_from_table(table_name, columns=None,
         strategy of each dimension in the schema.
         Defaults to :code:`{'row': 100000 }`.
 
-        * If a dict, the chunking strategy is applied to each partition.
+        * If a dict, the chunking strategy is applied to each group.
         * If a list of dicts, each element is applied
-          to the associated partition. The last element is
-          extended over the remaining partitions if there
+          to the associated group. The last element is
+          extended over the remaining groups if there
           are insufficient elements.
 
     Yields
     ------
     :class:`xarray.Dataset`
-        datasets for each partition, each ordered by indexing columns
+        datasets for each group, each ordered by indexing columns
     """
     if chunks is None:
         chunks = [{'row': _DEFAULT_ROWCHUNKS}]
@@ -519,26 +519,26 @@ def xds_from_table(table_name, columns=None,
         chunks = [chunks]
 
     if index_cols is None:
-        index_cols = ()
+        index_cols = []
     elif isinstance(index_cols, tuple):
         index_cols = list(index_cols)
-    elif not isinstance(part_cols, list):
+    elif not isinstance(group_cols, list):
         index_cols = [index_cols]
 
-    if part_cols is None:
-        part_cols = ()
-    elif isinstance(part_cols, tuple):
-        part_cols = list(part_cols)
-    elif not isinstance(part_cols, list):
-        part_cols = [part_cols]
+    if group_cols is None:
+        group_cols = []
+    elif isinstance(group_cols, tuple):
+        group_cols = list(group_cols)
+    elif not isinstance(group_cols, list):
+        group_cols = [group_cols]
 
     table_key, dsk = table_open_graph(table_name)
 
     with pt.table(table_name) as T:
         columns = set(T.colnames() if columns is None else columns)
 
-        # Handle the case where we partition on each table row
-        if len(part_cols) == 1 and part_cols[0] == "__row__":
+        # Handle the case where we group on each table row
+        if len(group_cols) == 1 and group_cols[0] == "__row__":
             # Get the rows giving the ordering
             order = orderby_clause(index_cols)
             query = "SELECT ROWID() AS __tablerow__ FROM $T %s" % order
@@ -555,8 +555,8 @@ def xds_from_table(table_name, columns=None,
                 yield (ds.squeeze(drop=True)
                          .assign_attrs(table_row=rows[r]))
 
-        # Otherwise partition by given columns
-        elif len(part_cols) > 0:
+        # Otherwise group by given columns
+        elif len(group_cols) > 0:
             # Aggregate indexing column values so that we can
             # individually sort each group's rows
             index_group_cols = ["GAGGR(%s) AS GROUP_%s" % (c, c)
@@ -564,8 +564,8 @@ def xds_from_table(table_name, columns=None,
             # Get the rows for each group
             index_group_cols.append("GROWID() as __tablerow__")
 
-            select = select_clause(part_cols + index_group_cols)
-            groupby = groupby_clause(part_cols)
+            select = select_clause(group_cols + index_group_cols)
+            groupby = groupby_clause(group_cols)
             orderby = orderby_clause(index_cols)
 
             query = "%s FROM $T %s %s" % (select, groupby, orderby)
@@ -585,9 +585,9 @@ def xds_from_table(table_name, columns=None,
                     # eliminating the extra dimension introduced by getvarcol
                     group_rows = rows[0][np.lexsort(group_indices)]
 
-                    # Get the singleton group partition values
+                    # Get the singleton group values
                     group_values = tuple(gq.getvarcol(c, i, 1).pop(key)[0]
-                                         for c in part_cols)
+                                         for c in group_cols)
 
                     # Use the last chunk if there aren't enough
                     try:
@@ -597,12 +597,12 @@ def xds_from_table(table_name, columns=None,
 
                     ds = xds_from_table_impl(table_name, T, table_schema,
                                              dsk, table_key,
-                                             columns.difference(part_cols),
+                                             columns.difference(group_cols),
                                              group_rows, group_chunks)
 
-                    yield ds.assign_attrs(zip(part_cols, group_values))
+                    yield ds.assign_attrs(zip(group_cols, group_values))
 
-        # No partioning case
+        # No grouping case
         else:
             query = ("SELECT ROWID() as __tablerow__ "
                      "FROM $T %s" % orderby_clause(index_cols))
@@ -610,12 +610,12 @@ def xds_from_table(table_name, columns=None,
             with pt.taql(query) as gq:
                 yield xds_from_table_impl(table_name, T, table_schema,
                                           dsk, table_key,
-                                          columns.difference(part_cols),
+                                          columns.difference(group_cols),
                                           gq.getcol("__tablerow__"),
                                           chunks[0])
 
 
-def xds_from_ms(ms, columns=None, index_cols=None, part_cols=None,
+def xds_from_ms(ms, columns=None, index_cols=None, group_cols=None,
                 chunks=None):
     """
     Generator yielding a series of xarray datasets representing
@@ -633,8 +633,8 @@ def xds_from_ms(ms, columns=None, index_cols=None, part_cols=None,
     index_cols  : tuple or list, optional
         Sequence of indexing columns.
         Defaults to :code:`%(index)s`
-    part_cols  : tuple or list, optional
-        Sequence of partioning columns.
+    group_cols  : tuple or list, optional
+        Sequence of grouping columns.
         Defaults to :code:`%(parts)s`
     chunks : list of dicts or dict, optional
         Dictionaries of dimension chunks.
@@ -642,7 +642,7 @@ def xds_from_ms(ms, columns=None, index_cols=None, part_cols=None,
     Yields
     ------
     :class:`xarray.Dataset`
-        xarray datasets for each partition
+        xarray datasets for each group
     """
 
     if index_cols is None:
@@ -652,15 +652,15 @@ def xds_from_ms(ms, columns=None, index_cols=None, part_cols=None,
     elif not isinstance(index_cols, tuple):
         index_cols = (index_cols,)
 
-    if part_cols is None:
-        part_cols = _DEFAULT_PARTITION_COLUMNS
-    elif isinstance(part_cols, list):
-        part_cols = tuple(part_cols)
-    elif not isinstance(part_cols, tuple):
-        part_cols = (part_cols,)
+    if group_cols is None:
+        group_cols = _DEFAULT_GROUP_COLUMNS
+    elif isinstance(group_cols, list):
+        group_cols = tuple(group_cols)
+    elif not isinstance(group_cols, tuple):
+        group_cols = (group_cols,)
 
     for ds in xds_from_table(ms, columns=columns,
-                             index_cols=index_cols, part_cols=part_cols,
+                             index_cols=index_cols, group_cols=group_cols,
                              table_schema="MS", chunks=chunks):
         yield ds
 
@@ -671,6 +671,6 @@ def xds_from_ms(ms, columns=None, index_cols=None, part_cols=None,
 try:
     xds_from_ms.__doc__ %= {
         'index': _DEFAULT_INDEX_COLUMNS,
-        'parts': _DEFAULT_PARTITION_COLUMNS}
+        'parts': _DEFAULT_GROUP_COLUMNS}
 except AttributeError:
     pass

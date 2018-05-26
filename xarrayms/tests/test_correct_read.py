@@ -1,6 +1,6 @@
 """
 Tests that data read from xarrayms for the default
-partioning and indexing scheme matches a taql query
+grouping and indexing scheme matches a taql query
 and getcol via pyrap.tables.
 
 Currently needs a Measurement Set to run.
@@ -17,7 +17,7 @@ import numpy as np
 import pyrap.tables as pt
 
 from xarrayms import xds_from_ms
-from xarrayms.xarray_ms import (_DEFAULT_PARTITION_COLUMNS,
+from xarrayms.xarray_ms import (_DEFAULT_GROUP_COLUMNS,
                                 _DEFAULT_INDEX_COLUMNS,
                                 select_clause,
                                 orderby_clause,
@@ -38,7 +38,7 @@ def create_parser():
     p = argparse.ArgumentParser()
     p.add_argument("ms")
     p.add_argument("-gc", "--group-columns", type=_split_column_str,
-                   default=",".join(_DEFAULT_PARTITION_COLUMNS))
+                   default=",".join(_DEFAULT_GROUP_COLUMNS))
     p.add_argument("-sc", "--select-columns", type=_split_column_str,
                    default=",".join(DEFAULT_SELECT))
     p.add_argument("-ic", "--index-columns", type=_split_column_str,
@@ -58,7 +58,7 @@ with pt.table(args.ms) as table:
     order = orderby_clause(index_cols)
 
     for ds in xds_from_ms(args.ms, columns=columns,
-                          part_cols=group_cols,
+                          group_cols=group_cols,
                           index_cols=index_cols):
 
         ds_cols = set(ds.data_vars.keys())
