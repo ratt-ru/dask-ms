@@ -76,11 +76,12 @@ with pt.table(args.ms) as table:
         where = where_clause(group_cols, [getattr(ds, c) for c in group_cols])
 
         # Select data from the relevant data from the MS
-        query = "SELECT * FROM $table %s %s" % (where, order)
+        query = "SELECT *, ROWID() as table_row FROM $table %s %s" % (where, order)
 
         # Compare
         with pt.taql(query) as Q:
-            for c in cmp_cols:
-                dask_data = getattr(ds, c).data.compute()
+            for c in list(cmp_cols) + ["table_row"]:
+                dask_array = getattr(ds, c).data
+                dask_data = dask_array if c == "table_row" else dask_array.compute()
                 np_data = Q.getcol(c)
                 assert np.all(dask_data == np_data)

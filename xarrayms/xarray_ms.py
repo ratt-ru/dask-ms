@@ -88,18 +88,22 @@ def _get_row_runs(rows, row_chunks):
 
     for chunk, chunk_size in enumerate(row_chunks[0]):
         end_row = start_row + chunk_size
+        chunk_rows = rows[start_row:end_row]
 
         # Split into runs of consecutive rows within this chunk
-        d = np.ediff1d(rows[start_row:end_row], to_begin=2, to_end=2)
-        row_runs.append(np.nonzero(d != 1)[0] + rows[start_row])
+        diff = np.ediff1d(chunk_rows, to_begin=-10, to_end=-10)
+        idx = np.nonzero(diff != 1)[0]
+        # Starting row and length of the run
+        start_and_len = np.empty((idx.size-1,2),dtype=np.int64)
+        start_and_len[:,0] = chunk_rows[idx[:-1]]
+        start_and_len[:,1] = np.diff(idx)
+        row_runs.append(start_and_len)
         start_row = end_row
 
     if end_row != rows.size:
         raise ValueError("Chunk sum didn't match the number of rows")
 
     return row_runs
-
-
 
 def table_open_graph(table_name, **kwargs):
     """
@@ -127,9 +131,15 @@ def table_open_graph(table_name, **kwargs):
     return table_key, table_graph
 
 
-def _np_put_fn(tp, c, d, s, n):
-    tp("putcol", c, d, startrow=s, nrow=n)
-    return np.asarray([True])
+def _chunk_putcols_np(table_proxy, column, runs, data):
+    start = 0
+
+    for run_start, run_len in runs:
+        table_proxy("putcol", column, data[start:start+run_len],
+                    startrow=run_start, nrow=run_len)
+        start += run_len
+
+    return np.full(runs.shape[0], True)
 
 
 def xds_to_table(xds, table_name, columns=None):
@@ -164,9 +174,7 @@ def xds_to_table(xds, table_name, columns=None):
     elif isinstance(columns, string_types):
         columns = [columns]
 
-    chunk = 0
-    chunks = []
-    row_idx = 0
+    out_chunk = 0
 
     # Get the DataArrays for each column
     col_arrays = [getattr(xds, c) for c in columns]
@@ -175,63 +183,55 @@ def xds_to_table(xds, table_name, columns=None):
     name = '-'.join((short_table_name(table_name), "putcol",
                      str(columns), token))
 
+    # Generate the graph for each column
     for c, data_array in zip(columns, col_arrays):
         dask_array = data_array.data
+        dims = data_array.dims
+        chunks = dask_array.chunks
+        shape = dask_array.shape
+
+        if dims[0] != 'row':
+            raise ValueError("xds.%s.dims[0] != 'row'" % c)
+
+        multiple = [(dim, chunk) for dim, chunk
+                    in zip(dims[1:], chunks[1:])
+                    if len(chunk) != 1]
+
+        if len(multiple) > 0:
+            raise ValueError("Column '%s' has multiple chunks in the "
+                             "following dimensions '%s'. Only chunking "
+                             "in 'row' is currently supported. "
+                             "Use 'rechunk' so that the mentioned "
+                             "dimensions contain a single chunk."
+                                % (c, multiple))
+
+        # Need extra chunk indices in the array keys
+        # that we're retrieving
+        key_extra = (0,) * len(chunks[1:])
+
+        # Get row runs for the row chunks
+        row_runs = _get_row_runs(rows, chunks)
+
+        for chunk, row_run in enumerate(row_runs):
+            # graph key for the array chunk that we'll write
+            array_chunk = (dask_array.name, chunk) + key_extra
+            # Add the write operation to the graph
+            dsk[(name, out_chunk)] = (_chunk_putcols_np, table_key,
+                                      c, row_run, array_chunk)
+            out_chunk += 1
 
         # Add the arrays graph to final graph
         dsk.update(dask_array.__dask_graph__())
 
-        if not data_array.dims[row_idx] == 'row':
-            raise ValueError("xds.%s.dims[0] != 'row'" % c)
+    return da.Array(dsk, name, ((1,)*out_chunk,), dtype=np.bool)
 
-        # Get row runs for each chunk
-        row_chunks = (dask_array.chunks[0],)
-        row_runs = _get_row_runs(rows, row_chunks)
-        chunk_start = 0
+def _chunk_getcols_np(table_proxy, column, runs):
+    return np.concatenate([table_proxy("getcol", column, rs, rl)
+                           for rs, rl in runs])
 
-        for runs in row_runs:
-            row_put_fns = []
-            for run_start, run_end in zip(runs[:-1], runs[1:]):
-                run_len = run_end - run_start
-                chunk_end = chunk_start + run_len
-
-                # Slice the dask array, obtain the graph representing
-                # the slice operation and add it to the graph
-                data = dask_array[chunk_start:chunk_end]
-                dsk_slice = data.__dask_graph__().dicts[data.name]
-                dsk.update(dsk_slice)
-
-                # Obtain slicing keys
-                slice_keys = [k for k in dsk_slice.keys()
-                              if isinstance(k, tuple)
-                              and k[0] == data.name]
-                # Multiple slice keys would indicate that we've sliced
-                # outside a single dask array chunk.
-                # As each set of runs operates within a single chunk,
-                # this should never happen
-                assert len(slice_keys) == 1
-
-                row_put_fns.append((_np_put_fn, table_key,
-                                    c, slice_keys[0],
-                                    run_start, run_len))
-
-                chunk_start = chunk_end
-
-            # And the results of the put functions together
-            dsk[(name, chunk)] = (np.logical_and.reduce, row_put_fns)
-            chunks.append(1)
-            chunk += 1
-
-    return da.Array(dsk, name, (tuple(chunks),), dtype=np.bool)
-
-
-def _np_get_fn(tp, c, s, n):
-    return tp("getcol", c, startrow=s, nrow=n)
-
-
-def _list_get_fn(tp, c, s, n):
-    return np.asarray(_np_get_fn(tp, c, s, n))
-
+def _chunk_getcols_list(table_proxy, column, runs):
+    return np.concatenate([np.asarray(table_proxy("getcol", column, rs, rl))
+                           for rs, rl in runs])
 
 def generate_table_getcols(table_name, table_key, dsk_base,
                            column, shape, dtype,
@@ -271,31 +271,21 @@ def generate_table_getcols(table_name, table_key, dsk_base,
     token = dask.base.tokenize(table_name, column, row_runs)
     short_name = short_table_name(table_name)
     name = '-'.join((short_name, "getcol", column.lower(), token))
-    dsk = {}
 
     chunk_extra = shape[1:]
     key_extra = (0,) * len(shape[1:])
 
     # infer the type of getter we should be using
-    get_fn = _np_get_fn if isinstance(dtype, np.dtype) else _list_get_fn
+    if isinstance(dtype, np.dtype):
+        _get_fn = _chunk_getcols_np
+    else:
+        _get_fn = _chunk_getcols_list
 
     # Iterate through the rows in groups of row_runs
     # For each iteration we generate one chunk
     # in the resultant dask array
-    for chunk, runs in enumerate(row_runs):
-        # How many rows in this chunk?
-        chunk_size = 0
-        # Store a list of lambdas executing getcols on consecutive runs
-        row_get_fns = []
-
-        for run_start, run_end in zip(runs[:-1], runs[1:]):
-            run_len = run_end - run_start
-            row_get_fns.append((get_fn, table_key, column,
-                                run_start, run_len))
-            chunk_size += run_len
-
-        # Create the key-value dask entry for this chunk
-        dsk[(name, chunk) + key_extra] = (np.concatenate, row_get_fns)
+    dsk = { (name, chunk) + key_extra: (_get_fn, table_key, column, runs)
+            for chunk, runs in enumerate(row_runs) }
 
     chunks = row_chunks + tuple((c,) for c in chunk_extra)
     return da.Array(merge(dsk_base, dsk), name, chunks, dtype=dtype)
