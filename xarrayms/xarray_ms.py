@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 
 try:
@@ -28,11 +30,40 @@ import xarray as xr
 from xarrayms.table_proxy import TableProxy
 from xarrayms.known_table_schemas import registered_schemas
 
-_DEFAULT_PARTITION_COLUMNS = ("FIELD_ID", "DATA_DESC_ID")
-_DEFAULT_INDEX_COLUMNS = ("FIELD_ID", "DATA_DESC_ID", "TIME",)
+_DEFAULT_GROUP_COLUMNS = ["FIELD_ID", "DATA_DESC_ID"]
+_DEFAULT_INDEX_COLUMNS = ["TIME"]
 _DEFAULT_ROWCHUNKS = 100000
 
 log = logging.getLogger(__name__)
+
+
+def select_clause(select_cols):
+    if select_cols is None or len(select_cols) == 0:
+        return "SELECT * "
+
+    return " ".join(("SELECT", ", ".join(select_cols)))
+
+
+def orderby_clause(index_cols):
+    if len(index_cols) == 0:
+        return ""
+
+    return " ".join(("ORDERBY", ", ".join(index_cols)))
+
+
+def groupby_clause(group_cols):
+    if len(group_cols) == 0:
+        return ""
+
+    return " ".join(("GROUPBY", ", ".join(group_cols)))
+
+
+def where_clause(group_cols, group_vals):
+    if len(group_cols) == 0:
+        return ""
+
+    assign_str = ["%s=%s" % (c, v) for c, v in zip(group_cols, group_vals)]
+    return " ".join(("WHERE", " AND ".join(assign_str)))
 
 
 def short_table_name(table_name):
@@ -51,6 +82,38 @@ def short_table_name(table_name):
 
     """
     return os.path.split(table_name.rstrip(os.sep))[1]
+
+
+def _get_row_runs(rows, chunks):
+    row_runs = []
+    start_row = 0
+    nruns = 0
+
+    for chunk, chunk_size in enumerate(chunks[0]):
+        end_row = start_row + chunk_size
+        chunk_rows = rows[start_row:end_row]
+
+        # Split into runs of consecutive rows within this chunk
+        diff = np.ediff1d(chunk_rows, to_begin=-10, to_end=-10)
+        idx = np.nonzero(diff != 1)[0]
+        # Starting row and length of the run
+        start_and_len = np.empty((idx.size - 1, 2), dtype=np.int64)
+        start_and_len[:, 0] = chunk_rows[idx[:-1]]
+        start_and_len[:, 1] = np.diff(idx)
+        row_runs.append(start_and_len)
+
+        start_row = end_row
+        nruns += idx.size - 1
+
+    if end_row != rows.size:
+        raise ValueError("Chunk sum didn't match the number of rows")
+
+    if 100.0 * len(chunks[0]) / nruns < 33.0:
+        log.warn("Grouping and ordering strategy has produced "
+                 "a fragmented MS row ordering. "
+                 "Disk access may be slow.")
+
+    return row_runs
 
 
 def table_open_graph(table_name, **kwargs):
@@ -79,9 +142,15 @@ def table_open_graph(table_name, **kwargs):
     return table_key, table_graph
 
 
-def _np_put_fn(tp, c, d, s, n):
-    tp("putcol", c, d, startrow=s, nrow=n)
-    return np.asarray([True])
+def _chunk_putcols_np(table_proxy, column, runs, data):
+    start = 0
+
+    for run_start, run_len in runs:
+        table_proxy("putcol", column, data[start:start + run_len],
+                    startrow=run_start, nrow=run_len)
+        start += run_len
+
+    return np.full(runs.shape[0], True)
 
 
 def xds_to_table(xds, table_name, columns=None):
@@ -116,65 +185,71 @@ def xds_to_table(xds, table_name, columns=None):
     elif isinstance(columns, string_types):
         columns = [columns]
 
-    token = dask.base.tokenize(table_name, columns)
-    name = '-'.join((short_table_name(table_name), "putcol", token))
+    out_chunk = 0
 
-    chunk = 0
-    chunks = []
-    row_idx = 0
+    # Get the DataArrays for each column
+    col_arrays = [getattr(xds, c) for c in columns]
+    # Tokenize putcol on the dask arrays
+    token = dask.base.tokenize(table_name, col_arrays)
+    name = '-'.join((short_table_name(table_name), "putcol",
+                     str(columns), token))
 
-    for c in columns:
-        data_array = getattr(xds, c)
+    # Generate the graph for each column
+    for c, data_array in zip(columns, col_arrays):
         dask_array = data_array.data
+        dims = data_array.dims
+        chunks = dask_array.chunks
+        shape = dask_array.shape
 
-        dsk.update(dask_array.__dask_graph__())
-
-        array_chunks = data_array.chunks
-
-        if not data_array.dims[row_idx] == 'row':
+        if dims[0] != 'row':
             raise ValueError("xds.%s.dims[0] != 'row'" % c)
 
-        chunk_start = 0
+        multiple = [(dim, chunk) for dim, chunk
+                    in zip(dims[1:], chunks[1:])
+                    if len(chunk) != 1]
 
-        for chunk_size in array_chunks[row_idx]:
-            chunk_end = chunk_start + chunk_size
-            row_put_fns = []
+        if len(multiple) > 0:
+            raise ValueError("Column '%s' has multiple chunks in the "
+                             "following dimensions '%s'. Only chunking "
+                             "in 'row' is currently supported. "
+                             "Use 'rechunk' so that the mentioned "
+                             "dimensions contain a single chunk."
+                             % (c, multiple))
 
-            # Split into runs of consecutive rows within this chunk
-            d = np.ediff1d(rows[chunk_start:chunk_end], to_begin=2, to_end=2)
-            runs = np.nonzero(d != 1)[0] + chunk_start
+        # Need extra chunk indices in the array keys
+        # that we're retrieving
+        key_extra = (0,) * len(chunks[1:])
 
-            for run_start, run_end in zip(runs[:-1], runs[1:]):
-                # Slice the dask array and then obtain the graph representing
-                # the slice operation. There should be only one key-value pair
-                # as we're slicing within a chunk
-                data = dask_array[run_start:run_end]
-                dsk_slice = data.__dask_graph__().dicts[data.name]
-                assert len(dsk_slice) == 1
-                dsk.update(dsk_slice)
-                row_put_fns.append((_np_put_fn, table_key,
-                                    c, dsk_slice.keys()[0],
-                                    rows[run_start], run_end - run_start))
+        # Get row runs for the row chunks
+        row_runs = _get_row_runs(rows, chunks)
 
-            dsk[(name, chunk)] = (np.logical_and.reduce, row_put_fns)
-            chunks.append(1)
-            chunk += 1
-            chunk_start = chunk_end
+        for chunk, row_run in enumerate(row_runs):
+            # graph key for the array chunk that we'll write
+            array_chunk = (dask_array.name, chunk) + key_extra
+            # Add the write operation to the graph
+            dsk[(name, out_chunk)] = (_chunk_putcols_np, table_key,
+                                      c, row_run, array_chunk)
+            out_chunk += 1
 
-    chunks = (tuple(chunks),)
-    return da.Array(dsk, name, chunks, dtype=np.bool)
+        # Add the arrays graph to final graph
+        dsk.update(dask_array.__dask_graph__())
 
-
-def _np_get_fn(tp, c, s, n):
-    return tp("getcol", c, startrow=s, nrow=n)
+    return da.Array(dsk, name, ((1,) * out_chunk,), dtype=np.bool)
 
 
-def _list_get_fn(tp, c, s, n):
-    return np.asarray(_np_get_fn(tp, c, s, n))
+def _chunk_getcols_np(table_proxy, column, runs):
+    return np.concatenate([table_proxy("getcol", column, rs, rl)
+                           for rs, rl in runs])
+
+
+def _chunk_getcols_list(table_proxy, column, runs):
+    return np.concatenate([np.asarray(table_proxy("getcol", column, rs, rl))
+                           for rs, rl in runs])
 
 
 def generate_table_getcols(table_name, table_key, dsk_base,
-                           column, shape, dtype, rows, rowchunks):
+                           column, shape, dtype,
+                           row_chunks, row_runs):
     """
     Generates a :class:`dask.array.Array` representing ``column``
     in ``table_name`` and backed by a series of
@@ -195,12 +270,11 @@ def generate_table_getcols(table_name, table_key, dsk_base,
         Shape of the array
     dtype : np.dtype or object
         Data type of the array
-    rows : np.ndarray
-        CASA table row id's defining an ordering
-        of the table data.
-    rowchunks : integer
-        The chunk size for the row dimension of the resulting
-        :class:`dask.array.Array`s.
+    row_chunks : tuple
+        Chunk strategy for the row dimension. Should look like
+        :code:`((r1,r2,...,rn),)`
+    row_runs : list of :class:`numpy.ndarray`
+        List of row runs for each chunk
 
     Returns
     -------
@@ -208,46 +282,26 @@ def generate_table_getcols(table_name, table_key, dsk_base,
         Dask array representing the column
     """
 
-    token = dask.base.tokenize(table_name, column)
+    token = dask.base.tokenize(table_name, column, row_runs)
     short_name = short_table_name(table_name)
     name = '-'.join((short_name, "getcol", column.lower(), token))
-    dsk = {}
 
     chunk_extra = shape[1:]
     key_extra = (0,) * len(shape[1:])
 
     # infer the type of getter we should be using
-    get_fn = _np_get_fn if isinstance(dtype, np.dtype) else _list_get_fn
+    if isinstance(dtype, np.dtype):
+        _get_fn = _chunk_getcols_np
+    else:
+        _get_fn = _chunk_getcols_list
 
-    # Iterate through the rows in groups of rowchunks
+    # Iterate through the rows in groups of row_runs
     # For each iteration we generate one chunk
     # in the resultant dask array
-    start_row = 0
+    dsk = {(name, chunk) + key_extra: (_get_fn, table_key, column, runs)
+           for chunk, runs in enumerate(row_runs)}
 
-    for chunk, chunk_size in enumerate(rowchunks[0]):
-        end_row = start_row + chunk_size
-
-        # Split into runs of consecutive rows within this chunk
-        d = np.ediff1d(rows[start_row:end_row], to_begin=2, to_end=2)
-        runs = np.nonzero(d != 1)[0] + start_row
-
-        # How many rows in this chunk?
-        chunk_size = 0
-        # Store a list of lambdas executing getcols on consecutive runs
-        row_get_fns = []
-
-        for run_start, run_end in zip(runs[:-1], runs[1:]):
-            run_len = run_end - run_start
-            row_get_fns.append((get_fn, table_key, column,
-                                rows[run_start], run_len))
-            chunk_size += run_len
-
-        # Create the key-value dask entry for this chunk
-        dsk[(name, chunk) + key_extra] = (np.concatenate, row_get_fns)
-
-        start_row = end_row
-
-    chunks = rowchunks + tuple((c,) for c in chunk_extra)
+    chunks = row_chunks + tuple((c,) for c in chunk_extra)
     return da.Array(merge(dsk_base, dsk), name, chunks, dtype=dtype)
 
 
@@ -291,6 +345,60 @@ def lookup_table_schema(table_name, lookup_str):
     raise TypeError("Invalid table_schema type '%s'" % type(table_schema))
 
 
+def column_metadata(table, columns, table_schema, rows):
+    """
+    Returns :code:`{column: (shape, dim_schema, dtype)}` metadata
+    for each column in ``columns``.
+
+    Parameters
+    ----------
+    table : :class:`pyrap.tables.table`
+        CASA table object
+    columns : list of str
+        List of CASA table columns
+    table_schema : dict
+        Table schema for ``table``
+
+    Returns
+    -------
+    dict
+        :code:`{column: (shape, dim_schema, dtype)}`
+    """
+
+    nrows = rows.size
+    column_metadata = collections.OrderedDict()
+
+    # Work out metadata for each column
+    for c in sorted(columns):
+        try:
+            # Read the starting row
+            row = table.getcol(c, startrow=rows[0], nrow=1)
+        except Exception:
+            log.warn("Ignoring '%s' column")
+        else:
+            # Usually we get numpy arrays
+            if isinstance(row, np.ndarray):
+                shape = (nrows,) + row.shape[1:]
+                dtype = row.dtype
+            # In these cases, we're getting a list of (probably) strings
+            elif isinstance(row, (list, tuple)):
+                shape = (nrows,)
+                dtype = object
+            else:
+                raise TypeError("Unhandled row type '%s'" % type(row))
+
+            # Generate an xarray dimension schema
+            # from supplied or inferred schemas if possible
+            try:
+                extra = table_schema[c].dims
+            except KeyError:
+                extra = tuple('%s-%d' % (c, i) for i in range(1, len(shape)))
+
+            column_metadata[c] = (shape, ("row",) + extra, dtype)
+
+    return column_metadata
+
+
 def xds_from_table_impl(table_name, table, table_schema,
                         table_graph, table_key,
                         columns, rows, chunks):
@@ -323,59 +431,28 @@ def xds_from_table_impl(table_name, table, table_schema,
         xarray dataset
     """
 
-    nrows = rows.size
-    col_metadata = {}
-
-    missing = []
-
     if not isinstance(table_schema, collections.Mapping):
         table_schema = lookup_table_schema(table_name, table_schema)
 
-    # Work out metadata for each column
-    for c in columns:
-        try:
-            # Read the starting row
-            row = table.getcol(c, startrow=rows[0], nrow=1)
-        except Exception:
-            log.warn("Ignoring '%s' column", c)
-            missing.append(c)
-        else:
-            # Usually we get numpy arrays
-            if isinstance(row, np.ndarray):
-                shape = (nrows,) + row.shape[1:]
-                dtype = row.dtype
-            # In these cases, we're getting a list of (probably) strings
-            elif isinstance(row, (list, tuple)):
-                shape = (nrows,)
-                dtype = object
-            else:
-                raise TypeError("Unhandled row type '%s'" % type(row))
-
-            # Generate an xarray dimension schema
-            # from supplied or inferred schemas if possible
-            try:
-                extra = table_schema[c].dims
-            except KeyError:
-                extra = tuple('%s-%d' % (c, i) for i in range(1, len(shape)))
-
-            col_metadata[c] = (shape, ("row",) + extra, dtype)
-
-    # Remove missing columns
-    columns = columns.difference(missing)
+    # Get column metadata
+    col_metadata = column_metadata(table, columns, table_schema, rows)
 
     # Determine a row chunking scheme
-    rowchunks = da.core.normalize_chunks(chunks['row'], (rows.size,))
+    row_chunks = da.core.normalize_chunks(chunks['row'], (rows.size,))
+
+    # Get row runs for each chunk
+    row_runs = _get_row_runs(rows, row_chunks)
 
     # Insert arrays into dataset in sorted order
     data_arrays = collections.OrderedDict()
 
-    for c in sorted(columns):
-        shape, dims, dtype = col_metadata[c]
+    for column, (shape, dims, dtype) in col_metadata.items():
         col_dask_array = generate_table_getcols(table_name, table_key,
-                                                table_graph, c, shape, dtype,
-                                                rows, rowchunks)
+                                                table_graph, column,
+                                                shape, dtype,
+                                                row_chunks, row_runs)
 
-        data_arrays[c] = xr.DataArray(col_dask_array, dims=dims)
+        data_arrays[column] = xr.DataArray(col_dask_array, dims=dims)
 
     # Create the dataset, assigning a table_row coordinate
     # associated with the row dimension
@@ -383,19 +460,19 @@ def xds_from_table_impl(table_name, table, table_schema,
 
 
 def xds_from_table(table_name, columns=None,
-                   index_cols=None, part_cols=None,
+                   index_cols=None, group_cols=None,
                    table_schema=None, chunks=None):
     """
     Generator producing multiple :class:`xarray.Dataset` objects
     from CASA table ``table_name`` with the rows lexicographically
     sorted according to the columns in ``index_cols``.
-    If ``part_cols`` is supplied, the table data is partitioned into
+    If ``group_cols`` is supplied, the table data is grouped into
     multiple :class:`xarray.Dataset` objects, each associated with a
-    permutation of the unique values for the columns in ``part_cols``.
+    permutation of the unique values for the columns in ``group_cols``.
 
     Notes
     -----
-    Both ``part_cols`` and ``index_cols`` should consist of
+    Both ``group_cols`` and ``index_cols`` should consist of
     columns that are part of the table index.
 
     However, this may not always be possible as CASA tables
@@ -416,19 +493,19 @@ def xds_from_table(table_name, columns=None,
     This may not be the case for the ``SPECTRAL_WINDOW`` subtable.
     Here, each row defines a separate spectral window, but each
     spectral window may contain different numbers of frequencies.
-    In this case, it is probably better to partition the subtable
+    In this case, it is probably better to group the subtable
     by ``row``.
 
-    There is a *special* partition column :code:`"__row__"`
-    that can be used to partition the table by row.
+    There is a *special* group column :code:`"__row__"`
+    that can be used to group the table by row.
 
     .. code-block:: python
 
         for spwds in xds_from_table("WSRT.MS::SPECTRAL_WINDOW",
-                                            part_cols="__row__"):
+                                            group_cols="__row__"):
             ...
 
-    If :code:`"__row__"` is used for partioning, then no other
+    If :code:`"__row__"` is used for grouping, then no other
     column may be used. It should also only be used for *small*
     tables, as the number of datasets produced, may be prohibitively
     large.
@@ -442,8 +519,8 @@ def xds_from_table(table_name, columns=None,
         Defaults to all if ``None``
     index_cols  : list or tuple, optional
         List of CASA table indexing columns. Defaults to :code:`()`.
-    part_cols : list or tuple, optional
-        List of columns on which to partition the CASA table.
+    group_cols : list or tuple, optional
+        List of columns on which to group the CASA table.
         Defaults to :code:`()`
     table_schema : str or dict, optional
         A schema dictionary defining the dimension naming scheme for
@@ -471,16 +548,16 @@ def xds_from_table(table_name, columns=None,
         strategy of each dimension in the schema.
         Defaults to :code:`{'row': 100000 }`.
 
-        * If a dict, the chunking strategy is applied to each partition.
+        * If a dict, the chunking strategy is applied to each group.
         * If a list of dicts, each element is applied
-          to the associated partition. The last element is
-          extended over the remaining partitions if there
+          to the associated group. The last element is
+          extended over the remaining groups if there
           are insufficient elements.
 
     Yields
     ------
     :class:`xarray.Dataset`
-        datasets for each partition, each ordered by indexing columns
+        datasets for each group, each ordered by indexing columns
     """
     if chunks is None:
         chunks = [{'row': _DEFAULT_ROWCHUNKS}]
@@ -490,113 +567,103 @@ def xds_from_table(table_name, columns=None,
         chunks = [chunks]
 
     if index_cols is None:
-        index_cols = ()
-    elif isinstance(index_cols, list):
-        index_cols = tuple(index_cols)
-    elif not isinstance(index_cols, tuple):
-        index_cols = (index_cols,)
+        index_cols = []
+    elif isinstance(index_cols, tuple):
+        index_cols = list(index_cols)
+    elif not isinstance(group_cols, list):
+        index_cols = [index_cols]
 
-    if part_cols is None:
-        part_cols = ()
-    elif isinstance(part_cols, list):
-        part_cols = tuple(part_cols)
-    elif not isinstance(part_cols, tuple):
-        part_cols = (part_cols,)
+    if group_cols is None:
+        group_cols = []
+    elif isinstance(group_cols, tuple):
+        group_cols = list(group_cols)
+    elif not isinstance(group_cols, list):
+        group_cols = [group_cols]
 
     table_key, dsk = table_open_graph(table_name)
 
-    def _create_dataset(table, columns, index_cols,
-                        group_cols=(), group_values=(),
-                        chunks={}):
-        """
-        Generates a dataset, given:
-
-        1. the partitioning defined by ``group_cols`` and ``group_values``
-        2. the ordering defined by ``index_cols``
-
-        and then deferring to :func:`xds_from_table_impl` to create the
-        dataset with the row ordering.
-        """
-        if len(index_cols) > 0:
-            orderby_clause = ', '.join(index_cols)
-            orderby_clause = "ORDER BY %s" % orderby_clause
-        else:
-            orderby_clause = ''
-
-        assert len(group_cols) == len(group_values)
-
-        if len(group_cols) == 1 and group_cols[0] == "__row__":
-            where_clause = 'WHERE ROWID()=%s' % group_values[0]
-        elif len(group_cols) > 0:
-            where_clause = ' AND '.join('%s=%s' % (c, v) for c, v
-                                        in zip(group_cols, group_values))
-            where_clause = 'WHERE %s' % where_clause
-        else:
-            where_clause = ''
-
-        # Discover the row indices producing the
-        # requested ordering for each group
-        query = ("SELECT ROWID() AS __table_row__ FROM $table {wc} {oc}"
-                 .format(oc=orderby_clause, wc=where_clause))
-
-        with pt.taql(query) as row_query:
-            rows = row_query.getcol("__table_row__")
-
-        return xds_from_table_impl(table_name, table, table_schema,
-                                   dsk, table_key,
-                                   set(columns).difference(group_cols),
-                                   rows, chunks)
-
     with pt.table(table_name) as T:
-        if columns is None:
-            columns = T.colnames()
+        columns = set(T.colnames() if columns is None else columns)
 
-        # Group table_name by partitioning columns,
-        # We'll generate a dataset for each unique group
+        # Handle the case where we group on each table row
+        if len(group_cols) == 1 and group_cols[0] == "__row__":
+            # Get the rows giving the ordering
+            order = orderby_clause(index_cols)
+            query = "SELECT ROWID() AS __tablerow__ FROM $T %s" % order
 
-        # Handle the case where we partition on each table row
-        if len(part_cols) == 1 and part_cols[0] == "__row__":
-            query = "SELECT ROWID() AS __row__ FROM $T"
+            with pt.taql(query) as gq:
+                rows = gq.getcol("__tablerow__")
 
-            with pt.taql(query) as group_query:
-                group_cols = group_query.colnames()
-                groups = [group_query.getcol(c) for c in group_cols]
+            # Generate a dataset for each row
+            for r in range(rows.size):
+                ds = xds_from_table_impl(table_name, T, table_schema,
+                                         dsk, table_key, columns,
+                                         rows[r:r + 1], chunks[0])
 
-            # For each grouping
-            for group_values in zip(*groups):
-                ds = _create_dataset(T, columns, index_cols,
-                                     group_cols, group_values,
-                                     chunks=chunks[0])
                 yield (ds.squeeze(drop=True)
-                         .assign_attrs(table_row=ds.table_row.values[0]))
+                         .assign_attrs(table_row=rows[r]))
 
-        # Otherwise partition by given columns
-        elif len(part_cols) > 0:
-            part_str = ', '.join(part_cols)
-            query = "SELECT %s FROM $T GROUP BY %s" % (part_str, part_str)
+        # Otherwise group by given columns
+        elif len(group_cols) > 0:
+            # Aggregate indexing column values so that we can
+            # individually sort each group's rows
+            index_group_cols = ["GAGGR(%s) AS GROUP_%s" % (c, c)
+                                for c in index_cols]
+            # Get the rows for each group
+            index_group_cols.append("GROWID() as __tablerow__")
 
-            with pt.taql(query) as group_query:
-                group_cols = group_query.colnames()
-                groups = [group_query.getcol(c) for c in group_cols]
+            select = select_clause(group_cols + index_group_cols)
+            groupby = groupby_clause(group_cols)
+            orderby = orderby_clause(index_cols)
 
-            # Extend the last chunk if we don't have chunks for all groups
-            if len(chunks) < len(groups):
-                missing = len(groups) - len(chunks)
-                chunks += [chunks[-1]]*missing
+            query = "%s FROM $T %s %s" % (select, groupby, orderby)
 
-            # For each grouping
-            for group_chunk, group_values in zip(chunks, zip(*groups)):
-                ds = _create_dataset(T, columns, index_cols,
-                                     group_cols, group_values,
-                                     group_chunk)
-                yield ds.assign_attrs(zip(group_cols, group_values))
+            with pt.taql(query) as gq:
+                # For each group
+                for i in range(0, gq.nrows()):
+                    # Obtain this group's row ids and indexing columns
+                    # Need reversed since last column is lexsort's
+                    # primary sort key
+                    key, rows = gq.getvarcol("__tablerow__", i, 1).popitem()
+                    group_indices = tuple(gq.getvarcol("GROUP_%s" % c, i, 1)
+                                          .pop(key)[0]
+                                          for c in reversed(index_cols))
 
-        # No partioning case
+                    # Resort row id by indexing columns,
+                    # eliminating the extra dimension introduced by getvarcol
+                    group_rows = rows[0][np.lexsort(group_indices)]
+
+                    # Get the singleton group values
+                    group_values = tuple(gq.getvarcol(c, i, 1).pop(key)[0]
+                                         for c in group_cols)
+
+                    # Use the last chunk if there aren't enough
+                    try:
+                        group_chunks = chunks[i]
+                    except IndexError:
+                        group_chunks = chunks[-1]
+
+                    ds = xds_from_table_impl(table_name, T, table_schema,
+                                             dsk, table_key,
+                                             columns.difference(group_cols),
+                                             group_rows, group_chunks)
+
+                    yield ds.assign_attrs(zip(group_cols, group_values))
+
+        # No grouping case
         else:
-            yield _create_dataset(T, columns, index_cols, chunks=chunks[0])
+            query = ("SELECT ROWID() as __tablerow__ "
+                     "FROM $T %s" % orderby_clause(index_cols))
+
+            with pt.taql(query) as gq:
+                yield xds_from_table_impl(table_name, T, table_schema,
+                                          dsk, table_key,
+                                          columns.difference(group_cols),
+                                          gq.getcol("__tablerow__"),
+                                          chunks[0])
 
 
-def xds_from_ms(ms, columns=None, index_cols=None, part_cols=None,
+def xds_from_ms(ms, columns=None, index_cols=None, group_cols=None,
                 chunks=None):
     """
     Generator yielding a series of xarray datasets representing
@@ -614,8 +681,8 @@ def xds_from_ms(ms, columns=None, index_cols=None, part_cols=None,
     index_cols  : tuple or list, optional
         Sequence of indexing columns.
         Defaults to :code:`%(index)s`
-    part_cols  : tuple or list, optional
-        Sequence of partioning columns.
+    group_cols  : tuple or list, optional
+        Sequence of grouping columns.
         Defaults to :code:`%(parts)s`
     chunks : list of dicts or dict, optional
         Dictionaries of dimension chunks.
@@ -623,7 +690,7 @@ def xds_from_ms(ms, columns=None, index_cols=None, part_cols=None,
     Yields
     ------
     :class:`xarray.Dataset`
-        xarray datasets for each partition
+        xarray datasets for each group
     """
 
     if index_cols is None:
@@ -633,15 +700,15 @@ def xds_from_ms(ms, columns=None, index_cols=None, part_cols=None,
     elif not isinstance(index_cols, tuple):
         index_cols = (index_cols,)
 
-    if part_cols is None:
-        part_cols = _DEFAULT_PARTITION_COLUMNS
-    elif isinstance(part_cols, list):
-        part_cols = tuple(part_cols)
-    elif not isinstance(part_cols, tuple):
-        part_cols = (part_cols,)
+    if group_cols is None:
+        group_cols = _DEFAULT_GROUP_COLUMNS
+    elif isinstance(group_cols, list):
+        group_cols = tuple(group_cols)
+    elif not isinstance(group_cols, tuple):
+        group_cols = (group_cols,)
 
     for ds in xds_from_table(ms, columns=columns,
-                             index_cols=index_cols, part_cols=part_cols,
+                             index_cols=index_cols, group_cols=group_cols,
                              table_schema="MS", chunks=chunks):
         yield ds
 
@@ -652,6 +719,6 @@ def xds_from_ms(ms, columns=None, index_cols=None, part_cols=None,
 try:
     xds_from_ms.__doc__ %= {
         'index': _DEFAULT_INDEX_COLUMNS,
-        'parts': _DEFAULT_PARTITION_COLUMNS}
+        'parts': _DEFAULT_GROUP_COLUMNS}
 except AttributeError:
     pass

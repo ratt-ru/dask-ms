@@ -18,24 +18,23 @@ if __name__ == "__main__":
 
     with scheduler_context(args):
         # Create a dataset representing the entire antenna table
-        ant_table =  '::'.join((args.ms, 'ANTENNA'))
+        ant_table = '::'.join((args.ms, 'ANTENNA'))
 
         for ant_ds in xds_from_table(ant_table):
             print(ant_ds)
-            print(dask.compute(ant_ds.NAME.data, ant_ds.POSITION.data, ant_ds.DISH_DIAMETER.data))
-
+            print(dask.compute(ant_ds.NAME.data,
+                               ant_ds.POSITION.data, ant_ds.DISH_DIAMETER.data))
 
         # Create datasets representing each row of the spw table
-        spw_table =  '::'.join((args.ms, 'SPECTRAL_WINDOW'))
+        spw_table = '::'.join((args.ms, 'SPECTRAL_WINDOW'))
 
         for spw_ds in xds_from_table(spw_table, part_cols="__row__"):
             print(spw_ds)
             print(spw_ds.NUM_CHAN.values)
             print(spw_ds.CHAN_FREQ.values)
 
-
         # Create datasets from a partioning of the MS
-        datasets = list(xds_from_ms(args.ms, chunks={'row':args.chunks}))
+        datasets = list(xds_from_ms(args.ms, chunks={'row': args.chunks}))
 
         for ds in datasets:
             print(ds)
@@ -47,6 +46,3 @@ if __name__ == "__main__":
 
             # Profile
             prof.visualize(file_path="chunked.html")
-
-
-

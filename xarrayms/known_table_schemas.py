@@ -7,6 +7,10 @@ dtype's are also a possibility here, but valueType
 seems to be present in the Column Description.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import attr
 
 ColumnSchema = attr.make_class("ColumnSchema", ["dims"])

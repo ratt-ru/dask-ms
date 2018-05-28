@@ -1,6 +1,7 @@
 import logging
 from contextlib import contextmanager
 
+
 @contextmanager
 def scheduler_context(args):
     """ Set the scheduler to use, based on the script arguments """
@@ -41,9 +42,9 @@ def scheduler_context(args):
             dask.set_options(get=client.get)
             client.restart()
             sched_info = {
-                "type" : "distributed",
-                "client" : client,
-                "local_cluster" : local_cluster }
+                "type": "distributed",
+                "client": client,
+                "local_cluster": local_cluster}
 
         yield
     except Exception:

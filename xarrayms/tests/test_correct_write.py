@@ -1,6 +1,6 @@
 """
 Tests that data written by xarrayms for the default
-partioning and indexing scheme matches a taql query
+grouping and indexing scheme matches a taql query
 and getcol via pyrap.tables.
 
 Currently needs a Measurement Set to run.
@@ -20,12 +20,24 @@ import xarray as xr
 
 from xarrayms import xds_from_ms, xds_to_table
 
+from xarrayms.xarray_ms import (_DEFAULT_GROUP_COLUMNS,
+                                _DEFAULT_INDEX_COLUMNS)
+
 logging.basicConfig(format="%(levelname)s - %(message)s", level=logging.WARN)
+
+
+def _split_column_str(col_str):
+    cols = [c.strip().upper() for c in col_str.split(",")]
+    return [c for c in cols if c]
 
 
 def create_parser():
     p = argparse.ArgumentParser()
     p.add_argument("ms")
+    p.add_argument("-gc", "--group-columns", type=_split_column_str,
+                   default=",".join(_DEFAULT_GROUP_COLUMNS))
+    p.add_argument("-ic", "--index-columns", type=_split_column_str,
+                   default=",".join(_DEFAULT_INDEX_COLUMNS))
     # STATE_ID is relatively innocuous
     p.add_argument("-c", "--column", default="STATE_ID")
 
@@ -35,22 +47,26 @@ def create_parser():
 args = create_parser().parse_args()
 
 with pt.table(args.ms) as table:
-    for ds in xds_from_ms(args.ms, columns=[args.column]):
-        data_desc_id = ds.attrs['DATA_DESC_ID']
-        field_id = ds.attrs['FIELD_ID']
-        row_chunks = ds.chunks["row"]
+    index_cols = args.index_columns
+    group_cols = args.group_columns
+
+    for ds in xds_from_ms(args.ms, columns=[args.column],
+                          group_cols=group_cols,
+                          index_cols=index_cols):
 
         xrcol = getattr(ds, args.column)
 
-        # Compute original, then save it as a dask array
-        original = da.from_array(xrcol.data.compute(), chunks=row_chunks)
+        # Persist original as in memory dask array
+        original = xrcol.data.persist()
 
         try:
             # Write flipped arange to the table
-            arange = da.arange(xrcol.size, chunks=row_chunks)
+            arange = da.arange(xrcol.size, chunks=np.product(original.chunks))
             arange = da.flip(arange, 0)
+            arange = da.reshape(arange, xrcol.shape)
 
-            nds = ds.assign(**{args.column: xr.DataArray(arange, dims="row")})
+            new_xda = xr.DataArray(arange, dims=xrcol.dims)
+            nds = ds.assign(**{args.column: new_xda})
             write = xds_to_table(nds, args.ms, args.column).compute()
 
             # Check that we get the right thing back.
@@ -58,8 +74,8 @@ with pt.table(args.ms) as table:
             assert np.all(arange.compute() == xrcol.data.compute())
         finally:
             # Write original data back to the table
-            nds = ds.assign(
-                **{args.column: xr.DataArray(original, dims="row")})
+            orig_xda = xr.DataArray(original, dims=xrcol.dims)
+            nds = ds.assign(**{args.column: orig_xda})
             write = xds_to_table(nds, args.ms, args.column).compute()
 
-            assert np.all(original.compute() == ds.STATE_ID.data.compute())
+            assert np.all(original.compute() == xrcol.data.compute())

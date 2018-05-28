@@ -27,13 +27,15 @@ try:
 except ImportError:
     from mock import Mock as MagicMock
 
+
 class Mock(MagicMock):
     @classmethod
     def __getattr__(cls, name):
-            obj = MagicMock()
-            obj.__name__ = "name"
-            obj.__doc__ = "doc"
-            return obj
+        obj = MagicMock()
+        obj.__name__ = "name"
+        obj.__doc__ = "doc"
+        return obj
+
 
 MOCK_MODULES = ['dask', 'dask.array', 'numpy',
                 'pyrap', 'pyrap.tables', 'xarray']
@@ -51,8 +53,8 @@ import xarrayms
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.viewcode',
-                'sphinx.ext.intersphinx', 'sphinx.ext.extlinks',
-                'numpydoc']
+              'sphinx.ext.intersphinx', 'sphinx.ext.extlinks',
+              'numpydoc']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
