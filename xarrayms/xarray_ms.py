@@ -84,11 +84,12 @@ def short_table_name(table_name):
     return os.path.split(table_name.rstrip(os.sep))[1]
 
 
-def _get_row_runs(rows, row_chunks):
+def _get_row_runs(rows, chunks):
     row_runs = []
     start_row = 0
+    nruns = 0
 
-    for chunk, chunk_size in enumerate(row_chunks[0]):
+    for chunk, chunk_size in enumerate(chunks[0]):
         end_row = start_row + chunk_size
         chunk_rows = rows[start_row:end_row]
 
@@ -100,10 +101,17 @@ def _get_row_runs(rows, row_chunks):
         start_and_len[:, 0] = chunk_rows[idx[:-1]]
         start_and_len[:, 1] = np.diff(idx)
         row_runs.append(start_and_len)
+
         start_row = end_row
+        nruns += idx.size - 1
 
     if end_row != rows.size:
         raise ValueError("Chunk sum didn't match the number of rows")
+
+    if 100.0*len(chunks[0])/nruns < 33.0:
+        log.warn("Grouping and ordering strategy has produced "
+                 "a fragmented MS row ordering. "
+                 "Disk access may be slow.")
 
     return row_runs
 
