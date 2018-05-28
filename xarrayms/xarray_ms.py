@@ -108,7 +108,7 @@ def _get_row_runs(rows, chunks):
     if end_row != rows.size:
         raise ValueError("Chunk sum didn't match the number of rows")
 
-    if 100.0*len(chunks[0])/nruns < 33.0:
+    if 100.0 * len(chunks[0]) / nruns < 33.0:
         log.warn("Grouping and ordering strategy has produced "
                  "a fragmented MS row ordering. "
                  "Disk access may be slow.")

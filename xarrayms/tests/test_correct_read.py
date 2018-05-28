@@ -78,6 +78,6 @@ with pt.table(args.ms) as table:
         # Select data from the relevant data from the MS
         with pt.taql("SELECT * FROM $table %s %s" % (where, order)) as Q:
             for c in cmp_cols:
-                dask_data = getattr(ds,c).data.compute()
+                dask_data = getattr(ds, c).data.compute()
                 np_data = Q.getcol(c)
                 assert np.all(dask_data == np_data)

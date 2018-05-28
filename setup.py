@@ -28,26 +28,28 @@ if not on_rtd:
         "python-casacore >= 2.2.1",
     ]
 
+
 def readme():
     with open("README.rst") as f:
         return f.read()
 
+
 setup(name='xarray-ms',
-    version="0.1.0",
-    description='xarray Datasets from CASA Tables.',
-    long_description=readme(),
-    url='http://github.com/ska-sa/xarray-ms',
-    classifiers=[
-        "Development Status :: 3 - Alpha",
-        "Intended Audience :: Developers",
-        "License :: Other/Proprietary License",
-        "Operating System :: OS Independent",
-        "Programming Language :: Python",
-        "Topic :: Software Development :: Libraries :: Python Modules",
-        "Topic :: Scientific/Engineering :: Astronomy",
-    ],
-    install_requires=install_requires,
-    author='Simon Perkins',
-    author_email='sperkins@ska.ac.za',
-    packages=find_packages(),
-    zip_safe=True)
+      version="0.1.0",
+      description='xarray Datasets from CASA Tables.',
+      long_description=readme(),
+      url='http://github.com/ska-sa/xarray-ms',
+      classifiers=[
+          "Development Status :: 3 - Alpha",
+          "Intended Audience :: Developers",
+          "License :: Other/Proprietary License",
+          "Operating System :: OS Independent",
+          "Programming Language :: Python",
+          "Topic :: Software Development :: Libraries :: Python Modules",
+          "Topic :: Scientific/Engineering :: Astronomy",
+      ],
+      install_requires=install_requires,
+      author='Simon Perkins',
+      author_email='sperkins@ska.ac.za',
+      packages=find_packages(),
+      zip_safe=True)
