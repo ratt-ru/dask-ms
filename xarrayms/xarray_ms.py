@@ -94,9 +94,9 @@ def _get_row_runs(rows, row_chunks):
         diff = np.ediff1d(chunk_rows, to_begin=-10, to_end=-10)
         idx = np.nonzero(diff != 1)[0]
         # Starting row and length of the run
-        start_and_len = np.empty((idx.size-1,2),dtype=np.int64)
-        start_and_len[:,0] = chunk_rows[idx[:-1]]
-        start_and_len[:,1] = np.diff(idx)
+        start_and_len = np.empty((idx.size - 1, 2), dtype=np.int64)
+        start_and_len[:, 0] = chunk_rows[idx[:-1]]
+        start_and_len[:, 1] = np.diff(idx)
         row_runs.append(start_and_len)
         start_row = end_row
 
@@ -104,6 +104,7 @@ def _get_row_runs(rows, row_chunks):
         raise ValueError("Chunk sum didn't match the number of rows")
 
     return row_runs
+
 
 def table_open_graph(table_name, **kwargs):
     """
@@ -135,7 +136,7 @@ def _chunk_putcols_np(table_proxy, column, runs, data):
     start = 0
 
     for run_start, run_len in runs:
-        table_proxy("putcol", column, data[start:start+run_len],
+        table_proxy("putcol", column, data[start:start + run_len],
                     startrow=run_start, nrow=run_len)
         start += run_len
 
@@ -203,7 +204,7 @@ def xds_to_table(xds, table_name, columns=None):
                              "in 'row' is currently supported. "
                              "Use 'rechunk' so that the mentioned "
                              "dimensions contain a single chunk."
-                                % (c, multiple))
+                             % (c, multiple))
 
         # Need extra chunk indices in the array keys
         # that we're retrieving
@@ -223,15 +224,18 @@ def xds_to_table(xds, table_name, columns=None):
         # Add the arrays graph to final graph
         dsk.update(dask_array.__dask_graph__())
 
-    return da.Array(dsk, name, ((1,)*out_chunk,), dtype=np.bool)
+    return da.Array(dsk, name, ((1,) * out_chunk,), dtype=np.bool)
+
 
 def _chunk_getcols_np(table_proxy, column, runs):
     return np.concatenate([table_proxy("getcol", column, rs, rl)
                            for rs, rl in runs])
 
+
 def _chunk_getcols_list(table_proxy, column, runs):
     return np.concatenate([np.asarray(table_proxy("getcol", column, rs, rl))
                            for rs, rl in runs])
+
 
 def generate_table_getcols(table_name, table_key, dsk_base,
                            column, shape, dtype,
@@ -284,8 +288,8 @@ def generate_table_getcols(table_name, table_key, dsk_base,
     # Iterate through the rows in groups of row_runs
     # For each iteration we generate one chunk
     # in the resultant dask array
-    dsk = { (name, chunk) + key_extra: (_get_fn, table_key, column, runs)
-            for chunk, runs in enumerate(row_runs) }
+    dsk = {(name, chunk) + key_extra: (_get_fn, table_key, column, runs)
+           for chunk, runs in enumerate(row_runs)}
 
     chunks = row_chunks + tuple((c,) for c in chunk_extra)
     return da.Array(merge(dsk_base, dsk), name, chunks, dtype=dtype)
@@ -329,7 +333,6 @@ def lookup_table_schema(table_name, lookup_str):
         return schemas.get(lookup_str, {})
 
     raise TypeError("Invalid table_schema type '%s'" % type(table_schema))
-
 
 
 def column_metadata(table, columns, table_schema, rows):
