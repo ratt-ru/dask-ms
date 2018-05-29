@@ -647,7 +647,10 @@ def xds_from_table(table_name, columns=None,
 
                     # Resort row id by indexing columns,
                     # eliminating the extra dimension introduced by getvarcol
-                    group_rows = rows[0][np.lexsort(group_indices)]
+                    if len(group_indices) > 0:
+                        group_rows = rows[0][np.lexsort(group_indices)]
+                    else:
+                        group_rows = rows[0]
 
                     # Get the singleton group values
                     group_values = tuple(gq.getvarcol(c, i, 1).pop(key)[0]
