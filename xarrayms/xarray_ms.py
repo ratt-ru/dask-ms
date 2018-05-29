@@ -143,12 +143,12 @@ def table_open_graph(table_name, **kwargs):
 
 
 def _chunk_putcols_np(table_proxy, column, runs, data):
-    start = 0
+    rr = 0
 
-    for run_start, run_len in runs:
-        table_proxy("putcol", column, data[start:start + run_len],
-                    startrow=run_start, nrow=run_len)
-        start += run_len
+    for rs, rl in runs:
+        table_proxy("putcol", column, data[rr:rr + rl],
+                    startrow=rs, nrow=rl)
+        rr += rl
 
     return np.full(runs.shape[0], True)
 
@@ -237,15 +237,30 @@ def xds_to_table(xds, table_name, columns=None):
     return da.Array(dsk, name, ((1,) * out_chunk,), dtype=np.bool)
 
 
-def _chunk_getcols_np(table_proxy, column, runs):
-    return np.concatenate([table_proxy("getcol", column, rs, rl)
-                           for rs, rl in runs])
+def _chunk_getcols_np(table_proxy, column, shape, dtype, runs):
+    # results shape = (sum(row_lengths),) + shape
+    result = np.empty((np.sum(runs[:,1]),) + shape, dtype=dtype)
+    rr = 0
 
+    # Get data directly into the result array
+    for rs, rl in runs:
+        table_proxy("getcolnp", column, result[rr:rr+rl], rs, rl)
+        rr += rl
 
-def _chunk_getcols_list(table_proxy, column, runs):
-    return np.concatenate([np.asarray(table_proxy("getcol", column, rs, rl))
-                           for rs, rl in runs])
+    return result
 
+def _chunk_getcols_object(table_proxy, column, shape, dtype, runs):
+    # results shape = (sum(row_lengths),) + shape
+    result = np.empty((np.sum(runs[:,1]),) + shape, dtype=dtype)
+    rr = 0
+
+    # Wrap objects (probably strings) in numpy arrays
+    for rs, rl in runs:
+        data = table_proxy("getcol", column, rs, rl)
+        result[rr:rr+rl] = np.asarray(data, dtype=dtype)
+        rr += rl
+
+    return result
 
 def generate_table_getcols(table_name, table_key, dsk_base,
                            column, shape, dtype,
@@ -293,12 +308,13 @@ def generate_table_getcols(table_name, table_key, dsk_base,
     if isinstance(dtype, np.dtype):
         _get_fn = _chunk_getcols_np
     else:
-        _get_fn = _chunk_getcols_list
+        _get_fn = _chunk_getcols_object
 
     # Iterate through the rows in groups of row_runs
     # For each iteration we generate one chunk
     # in the resultant dask array
-    dsk = {(name, chunk) + key_extra: (_get_fn, table_key, column, runs)
+    dsk = {(name, chunk) + key_extra: (_get_fn, table_key, column,
+                                        chunk_extra, dtype, runs)
            for chunk, runs in enumerate(row_runs)}
 
     chunks = row_chunks + tuple((c,) for c in chunk_extra)
