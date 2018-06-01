@@ -118,6 +118,7 @@ def _warn_on_fragmented_runs(row_runs):
                  "a fragmented MS row ordering. "
                  "Disk access may be slow.")
 
+
 def table_open_graph(table_name, **kwargs):
     """
     Generate a dask graph containing table open commands
