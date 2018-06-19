@@ -34,17 +34,17 @@ def ms(tmpdir_factory):
     """ % fn
 
     # Common grouping columns
-    field = [  0,   0,   0,   1,   1,   1,   1,   2,   2,   2]
-    ddid =  [  0,   0,   0,   0,   0,   0,   0,   1,   1,   1]
-    scan =  [  0,   1,   0,   1,   0,   1,   0,   1,   0,   1]
+    field = [0,   0,   0,   1,   1,   1,   1,   2,   2,   2]
+    ddid = [0,   0,   0,   0,   0,   0,   0,   1,   1,   1]
+    scan = [0,   1,   0,   1,   0,   1,   0,   1,   0,   1]
 
     # Common indexing columns
-    time =  [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1]
-    ant1 =  [  0,   0,   1,   1,   1,   2,   1,   0,   0,   1]
-    ant2 =  [  1,   2,   2,   3,   2,   1,   0,   1,   1,   2]
+    time = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1]
+    ant1 = [0,   0,   1,   1,   1,   2,   1,   0,   0,   1]
+    ant2 = [1,   2,   2,   3,   2,   1,   0,   1,   1,   2]
 
     # Column we'll write to
-    state = [  0,   0,   0,   0,   0,   0,   0,   0,   0,   0]
+    state = [0,   0,   0,   0,   0,   0,   0,   0,   0,   0]
 
     # Create the table
     with pt.taql(create_table_query) as ms:
@@ -58,6 +58,7 @@ def ms(tmpdir_factory):
 
     return fn
 
+
 @pytest.mark.parametrize('group_cols', [
     ["FIELD_ID", "DATA_DESC_ID"],
     ["DATA_DESC_ID"],
@@ -70,8 +71,8 @@ def test_ms_read(ms, group_cols, index_cols):
     select_cols = index_cols
 
     xds = list(xds_from_ms(ms, columns=select_cols,
-                               group_cols=group_cols,
-                               index_cols=index_cols))
+                           group_cols=group_cols,
+                           index_cols=index_cols))
 
     order = orderby_clause(index_cols)
 
@@ -84,6 +85,7 @@ def test_ms_read(ms, group_cols, index_cols):
                 np_data = Q.getcol(c)
                 dask_data = getattr(ds, c).data.compute()
                 assert np.all(np_data == dask_data)
+
 
 @pytest.mark.parametrize('group_cols', [
     ["FIELD_ID", "DATA_DESC_ID"],
@@ -102,10 +104,9 @@ def test_ms_write(ms, group_cols, index_cols):
     with pt.table(ms, readonly=False) as table:
         table.putcol("STATE", np.full(table.nrows(), 0, dtype=np.int32))
 
-
     xds = list(xds_from_ms(ms, columns=select_cols,
-                               group_cols=group_cols,
-                               index_cols=index_cols))
+                           group_cols=group_cols,
+                           index_cols=index_cols))
 
     for i, ds in enumerate(xds):
         state = np.full(ds.dims['row'], i, dtype=np.int32)
@@ -114,13 +115,10 @@ def test_ms_write(ms, group_cols, index_cols):
         ds = ds.assign(STATE=state)
         xds_to_table(ds, ms, "STATE").compute()
 
-
     xds = list(xds_from_ms(ms, columns=select_cols,
-                               group_cols=group_cols,
-                               index_cols=index_cols))
+                           group_cols=group_cols,
+                           index_cols=index_cols))
 
     # Check that state has been correctly written
     for i, ds in enumerate(xds):
         assert np.all(ds.STATE.data.compute() == i)
-
-
