@@ -103,17 +103,20 @@ def _get_row_runs(rows, chunks):
         row_runs.append(start_and_len)
 
         start_row = end_row
-        nruns += idx.size - 1
 
     if end_row != rows.size:
         raise ValueError("Chunk sum didn't match the number of rows")
 
-    if 100.0 * len(chunks[0]) / nruns < 33.0:
+    return row_runs
+
+
+def _warn_on_fragmented_runs(row_runs):
+    nruns = sum(run.shape[0] for run in row_runs)
+
+    if 100.0 * len(row_runs) / nruns < 33.0:
         log.warn("Grouping and ordering strategy has produced "
                  "a fragmented MS row ordering. "
                  "Disk access may be slow.")
-
-    return row_runs
 
 
 def table_open_graph(table_name, **kwargs):
@@ -222,6 +225,7 @@ def xds_to_table(xds, table_name, columns=None):
 
         # Get row runs for the row chunks
         row_runs = _get_row_runs(rows, chunks)
+        _warn_on_fragmented_runs(row_runs)
 
         for chunk, row_run in enumerate(row_runs):
             # graph key for the array chunk that we'll write
@@ -238,8 +242,10 @@ def xds_to_table(xds, table_name, columns=None):
 
 
 def _chunk_getcols_np(table_proxy, column, shape, dtype, runs):
-    # results shape = (sum(row_lengths),) + shape
-    result = np.empty((np.sum(runs[:, 1]),) + shape, dtype=dtype)
+    nruns = runs.shape[0]
+    nrows = np.sum(runs[:, 1])
+
+    result = np.empty((nrows,) + shape, dtype=dtype)
     rr = 0
 
     # Get data directly into the result array
@@ -460,6 +466,7 @@ def xds_from_table_impl(table_name, table, table_schema,
 
     # Get row runs for each chunk
     row_runs = _get_row_runs(rows, row_chunks)
+    _warn_on_fragmented_runs(row_runs)
 
     # Insert arrays into dataset in sorted order
     data_arrays = collections.OrderedDict()
@@ -643,16 +650,17 @@ def xds_from_table(table_name, columns=None,
                     # Need reversed since last column is lexsort's
                     # primary sort key
                     key, rows = gq.getvarcol("__tablerow__", i, 1).popitem()
+                    # getvarcol introduces an extra dim
+                    rows = rows[0]
                     group_indices = tuple(gq.getvarcol("GROUP_%s" % c, i, 1)
                                           .pop(key)[0]
                                           for c in reversed(index_cols))
 
                     # Resort row id by indexing columns,
-                    # eliminating the extra dimension introduced by getvarcol
                     if len(group_indices) > 0:
-                        group_rows = rows[0][np.lexsort(group_indices)]
+                        group_rows = rows[np.lexsort(group_indices)]
                     else:
-                        group_rows = rows[0]
+                        group_rows = rows
 
                     # Get the singleton group values
                     group_values = tuple(gq.getvarcol(c, i, 1).pop(key)[0]
