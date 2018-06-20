@@ -1,3 +1,8 @@
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+import shutil
 import os
 
 import dask.array as da
@@ -28,7 +33,7 @@ def ms(tmpdir_factory):
     ANTENNA2 I4,
     DATA_DESC_ID I4,
     SCAN_NUMBER I4,
-    STATE I4,
+    STATE_ID I4,
     TIME R8]
     LIMIT 10
     """ % fn
@@ -54,7 +59,7 @@ def ms(tmpdir_factory):
         ms.putcol("ANTENNA1", ant1)
         ms.putcol("ANTENNA2", ant2)
         ms.putcol("SCAN_NUMBER", scan)
-        ms.putcol("STATE", state)
+        ms.putcol("STATE_ID", state)
 
     return fn
 
@@ -96,13 +101,13 @@ def test_ms_read(ms, group_cols, index_cols):
     ["TIME", "ANTENNA1", "ANTENNA2"],
     ["ANTENNA1", "ANTENNA2", "TIME"]])
 def test_ms_write(ms, group_cols, index_cols):
-    select_cols = ["STATE"]
+    select_cols = ["STATE_ID"]
 
     order = orderby_clause(index_cols)
 
     # Zero everything to be sure
     with pt.table(ms, readonly=False) as table:
-        table.putcol("STATE", np.full(table.nrows(), 0, dtype=np.int32))
+        table.putcol("STATE_ID", np.full(table.nrows(), 0, dtype=np.int32))
 
     xds = list(xds_from_ms(ms, columns=select_cols,
                            group_cols=group_cols,
@@ -112,8 +117,8 @@ def test_ms_write(ms, group_cols, index_cols):
         state = np.full(ds.dims['row'], i, dtype=np.int32)
         state = da.from_array(state, chunks=ds.chunks['row'])
         state = xr.DataArray(state, dims=['row'])
-        ds = ds.assign(STATE=state)
-        xds_to_table(ds, ms, "STATE").compute()
+        ds = ds.assign(STATE_ID=state)
+        xds_to_table(ds, ms, "STATE_ID").compute()
 
     xds = list(xds_from_ms(ms, columns=select_cols,
                            group_cols=group_cols,
@@ -121,4 +126,4 @@ def test_ms_write(ms, group_cols, index_cols):
 
     # Check that state has been correctly written
     for i, ds in enumerate(xds):
-        assert np.all(ds.STATE.data.compute() == i)
+        assert np.all(ds.STATE_ID.data.compute() == i)
