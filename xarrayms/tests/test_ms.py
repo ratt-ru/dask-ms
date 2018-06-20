@@ -23,7 +23,7 @@ from xarrayms.xarray_ms import (_DEFAULT_GROUP_COLUMNS,
 
 @pytest.fixture(scope="session")
 def ms(tmpdir_factory):
-    msdir = tmpdir_factory.mktemp("msdir")
+    msdir = tmpdir_factory.mktemp("msdir", numbered=False)
     fn = os.path.join(str(msdir), "test.ms")
 
     create_table_query = """
@@ -61,8 +61,10 @@ def ms(tmpdir_factory):
         ms.putcol("SCAN_NUMBER", scan)
         ms.putcol("STATE_ID", state)
 
-    return fn
+    yield fn
 
+    # Remove the temporary directory
+    shutil.rmtree(str(msdir))
 
 @pytest.mark.parametrize('group_cols', [
     ["FIELD_ID", "DATA_DESC_ID"],
