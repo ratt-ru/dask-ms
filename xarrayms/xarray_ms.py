@@ -84,14 +84,23 @@ def short_table_name(table_name):
     return os.path.split(table_name.rstrip(os.sep))[1]
 
 
-def _get_row_runs(rows, chunks):
+def _get_row_runs(rows, chunks, sort=False):
     row_runs = []
+    resorts = []
     start_row = 0
     nruns = 0
 
     for chunk, chunk_size in enumerate(chunks[0]):
         end_row = start_row + chunk_size
         chunk_rows = rows[start_row:end_row]
+
+        # If we should sort
+        if sort is True:
+            sorted_chunk_rows = np.sort(chunk_rows)
+            argsort = np.searchsorted(sorted_chunk_rows, chunk_rows)
+            dtype = np.min_scalar_type(argsort.size)
+            resorts.append(argsort.astype(dtype))
+            chunk_rows = sorted_chunk_rows
 
         # Split into runs of consecutive rows within this chunk
         diff = np.ediff1d(chunk_rows, to_begin=-10, to_end=-10)
@@ -107,16 +116,90 @@ def _get_row_runs(rows, chunks):
     if end_row != rows.size:
         raise ValueError("Chunk sum didn't match the number of rows")
 
+    if sort is True:
+        return row_runs, resorts
+
     return row_runs
 
+def get_row_runs(rows, chunks, min_frag_level=0.1):
+    """
+    Divides ``rows`` into chunks and computes **runs** of consecutive
+    indices within these chunks.
+    If the associated runs are highly fragmented, the rows will be
+    sorted into consecutive order to produce a more optimal disk access
+    pattern and argsort indices to reconstruct the original row ordering
+    for the chunk are provided.
 
-def _warn_on_fragmented_runs(row_runs):
-    nruns = sum(run.shape[0] for run in row_runs)
+    Parameters
+    ----------
+    rows : :class:`numpy.ndarray`
+        List of rows
+    chunks : tuple or list
+        List of row chunks
+    min_frag_level : float
+        Minimum level of accepted fragmentation
+        before strategies are attempted to improve
+        disk access patterns.
+        A value of 1.00 indicates completely unfragmented
+        access patterns, while anything less than this
+        indicates increasing fragmentation
 
-    if 100.0 * len(row_runs) / nruns < 33.0:
-        log.warn("Grouping and ordering strategy has produced "
-                 "a fragmented MS row ordering. "
-                 "Disk access may be slow.")
+    Returns
+    -------
+    list of :class:`numpy.ndarray`
+        A list of row runs with shape :code:`(runs,2)`.
+        Each entry in the list corresponds to a row chunk,
+        while ``runs`` indicates the number of runs within the chunk.
+        The first component is the first row index and the second
+        component is the number of consecutive rows following the first
+        row index.
+
+    list of :class:`numpy.ndarray` or list of Nones
+        argsort indices for the associated run
+
+        * If a lists of Nones, then the runs are considered to be unfragmented
+          and the resorts can be ignored
+        * If a list of arrays, then the runs are considered fragmented
+          and have been sorted to produce more optimal disk access patters.
+          These arrays are then the argsorts to apply on
+          the associated expanded run in order to reconstruct the original
+          row ordering in the appropriate portion of the ``rows`` array.
+    """
+    row_runs = _get_row_runs(rows, chunks)
+    row_resorts = None
+    frag_level = fragmentation_level(row_runs)
+
+    if frag_level < min_frag_level:
+        sorted_row_runs, sorted_row_resorts = _get_row_runs(rows, chunks,
+                                                            sort=True)
+        sorted_frag_level = fragmentation_level(sorted_row_runs)
+
+        if sorted_frag_level / frag_level > 2.0:
+            log.info("Employing a sorting strategy reduced "
+                     "fragmentation %.1fX (%f to %f)" % (
+                        sorted_frag_level / frag_level,
+                        frag_level, sorted_frag_level))
+            row_runs = sorted_row_runs
+            row_resorts = sorted_row_resorts
+        else:
+            log.warn("The requesting column grouping and ordering "
+                     "has produced a highly fragmented row ordering.")
+            log.warn("Strategies to mitigate fragmentation have failed "
+                     "and disk access (especially writes) may be slow.")
+            log.warn("Increasing the 'row' chunk size may ameliorate this.")
+
+    row_resorts = [None]*len(row_runs) if row_resorts is None else row_resorts
+    return row_runs, row_resorts
+
+def fragmentation_level(row_runs):
+    """
+    Parameters
+    ----------
+    row_runs : list of :class:`numpy.ndarray`
+    """
+
+    total_run_lengths = float(sum(run.shape[0] for run in row_runs))
+    return float(len(row_runs)) / total_run_lengths
 
 
 def table_open_graph(table_name, **kwargs):
@@ -145,8 +228,11 @@ def table_open_graph(table_name, **kwargs):
     return table_key, table_graph
 
 
-def _chunk_putcols_np(table_proxy, column, runs, data):
+def _chunk_putcols_np(table_proxy, column, runs, data, resort=None):
     rr = 0
+
+    if resort is not None:
+        data = data[resort]
 
     for rs, rl in runs:
         table_proxy("putcol", column, data[rr:rr + rl],
@@ -224,15 +310,15 @@ def xds_to_table(xds, table_name, columns=None):
         key_extra = (0,) * len(chunks[1:])
 
         # Get row runs for the row chunks
-        row_runs = _get_row_runs(rows, chunks)
-        _warn_on_fragmented_runs(row_runs)
+        row_runs, row_resorts = get_row_runs(rows, chunks)
 
-        for chunk, row_run in enumerate(row_runs):
+        for chunk, (row_run, row_resort) in enumerate(zip(row_runs, row_resorts)):
             # graph key for the array chunk that we'll write
             array_chunk = (dask_array.name, chunk) + key_extra
             # Add the write operation to the graph
             dsk[(name, out_chunk)] = (_chunk_putcols_np, table_key,
-                                      c, row_run, array_chunk)
+                                      c, row_run, array_chunk,
+                                      row_resort)
             out_chunk += 1
 
         # Add the arrays graph to final graph
@@ -241,24 +327,33 @@ def xds_to_table(xds, table_name, columns=None):
     return da.Array(dsk, name, ((1,) * out_chunk,), dtype=np.bool)
 
 
-def _chunk_getcols_np(table_proxy, column, shape, dtype, runs):
+def _chunk_getcols_np(table_proxy, column, shape, dtype,
+                      runs, resort=None):
+
     nruns = runs.shape[0]
     nrows = np.sum(runs[:, 1])
 
     result = np.empty((nrows,) + shape, dtype=dtype)
     rr = 0
 
-    # Get data directly into the result array
     for rs, rl in runs:
         table_proxy("getcolnp", column, result[rr:rr + rl], rs, rl)
         rr += rl
 
+    if resort is not None:
+        return result[resort]
+
     return result
 
 
-def _chunk_getcols_object(table_proxy, column, shape, dtype, runs):
-    # results shape = (sum(row_lengths),) + shape
-    result = np.empty((np.sum(runs[:, 1]),) + shape, dtype=dtype)
+def _chunk_getcols_object(table_proxy, column, shape, dtype,
+                          runs, resort=None):
+
+    nruns = runs.shape[0]
+    nrows = np.sum(runs[:, 1])
+
+    result = np.empty((nrows,) + shape, dtype=dtype)
+
     rr = 0
 
     # Wrap objects (probably strings) in numpy arrays
@@ -267,12 +362,16 @@ def _chunk_getcols_object(table_proxy, column, shape, dtype, runs):
         result[rr:rr + rl] = np.asarray(data, dtype=dtype)
         rr += rl
 
+    if resort is not None:
+        return result[resort]
+
     return result
 
 
 def generate_table_getcols(table_name, table_key, dsk_base,
                            column, shape, dtype,
-                           row_chunks, row_runs):
+                           row_runs,
+                           row_resorts=None):
     """
     Generates a :class:`dask.array.Array` representing ``column``
     in ``table_name`` and backed by a series of
@@ -293,18 +392,17 @@ def generate_table_getcols(table_name, table_key, dsk_base,
         Shape of the array
     dtype : np.dtype or object
         Data type of the array
-    row_chunks : tuple
-        Chunk strategy for the row dimension. Should look like
-        :code:`((r1,r2,...,rn),)`
     row_runs : list of :class:`numpy.ndarray`
         List of row runs for each chunk
+    row_resorts : list of :class:`numpy.ndarray` or list of None
+        List of argsort indices to apply for each row run.
+        A None entry indicates no resorting is applied.
 
     Returns
     -------
     :class:`dask.array.Arrays`
         Dask array representing the column
     """
-
     token = dask.base.tokenize(table_name, column, row_runs)
     short_name = short_table_name(table_name)
     name = '-'.join((short_name, "getcol", column.lower(), token))
@@ -322,10 +420,12 @@ def generate_table_getcols(table_name, table_key, dsk_base,
     # For each iteration we generate one chunk
     # in the resultant dask array
     dsk = {(name, chunk) + key_extra: (_get_fn, table_key, column,
-                                       chunk_extra, dtype, runs)
-           for chunk, runs in enumerate(row_runs)}
+                                       chunk_extra, dtype, runs, resort)
+                           for chunk, (runs, resort)
+                           in enumerate(zip(row_runs, row_resorts))}
 
-    chunks = row_chunks + tuple((c,) for c in chunk_extra)
+    row_chunks = tuple(run[:,1].sum() for run in row_runs)
+    chunks = (row_chunks,) + tuple((c,) for c in chunk_extra)
     return da.Array(merge(dsk_base, dsk), name, chunks, dtype=dtype)
 
 
@@ -465,8 +565,7 @@ def xds_from_table_impl(table_name, table, table_schema,
     row_chunks = da.core.normalize_chunks(chunks['row'], (rows.size,))
 
     # Get row runs for each chunk
-    row_runs = _get_row_runs(rows, row_chunks)
-    _warn_on_fragmented_runs(row_runs)
+    row_runs, row_resorts = get_row_runs(rows, row_chunks, 0.1)
 
     # Insert arrays into dataset in sorted order
     data_arrays = collections.OrderedDict()
@@ -475,7 +574,7 @@ def xds_from_table_impl(table_name, table, table_schema,
         col_dask_array = generate_table_getcols(table_name, table_key,
                                                 table_graph, column,
                                                 shape, dtype,
-                                                row_chunks, row_runs)
+                                                row_runs, row_resorts)
 
         data_arrays[column] = xr.DataArray(col_dask_array, dims=dims)
 
