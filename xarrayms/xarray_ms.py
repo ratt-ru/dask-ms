@@ -191,7 +191,7 @@ def get_row_runs(rows, chunks, min_frag_level=0.1):
             log.warn("Increasing the 'row' chunk size may ameliorate this.")
 
     if row_resorts is None:
-        row_resorts = [None] * len(row_resorts)
+        row_resorts = [None] * len(row_runs)
 
     return row_runs, row_resorts
 
