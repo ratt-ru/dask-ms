@@ -66,6 +66,7 @@ def ms(tmpdir_factory):
     # Remove the temporary directory
     shutil.rmtree(str(msdir))
 
+
 @pytest.mark.parametrize('group_cols', [
     ["FIELD_ID", "DATA_DESC_ID"],
     ["DATA_DESC_ID"],
@@ -80,7 +81,7 @@ def test_ms_read(ms, group_cols, index_cols):
     xds = list(xds_from_ms(ms, columns=select_cols,
                            group_cols=group_cols,
                            index_cols=index_cols,
-                           chunks={"row":2}))
+                           chunks={"row": 2}))
 
     order = orderby_clause(index_cols)
 
@@ -115,7 +116,7 @@ def test_ms_write(ms, group_cols, index_cols):
     xds = list(xds_from_ms(ms, columns=select_cols,
                            group_cols=group_cols,
                            index_cols=index_cols,
-                           chunks={"row":2}))
+                           chunks={"row": 2}))
 
     for i, ds in enumerate(xds):
         state = np.full(ds.dims['row'], i, dtype=np.int32)
@@ -127,7 +128,7 @@ def test_ms_write(ms, group_cols, index_cols):
     xds = list(xds_from_ms(ms, columns=select_cols,
                            group_cols=group_cols,
                            index_cols=index_cols,
-                           chunks={"row":2}))
+                           chunks={"row": 2}))
 
     # Check that state has been correctly written
     for i, ds in enumerate(xds):

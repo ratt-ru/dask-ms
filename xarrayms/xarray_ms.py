@@ -121,6 +121,7 @@ def _get_row_runs(rows, chunks, sort=False):
 
     return row_runs
 
+
 def get_row_runs(rows, chunks, min_frag_level=0.1):
     """
     Divides ``rows`` into chunks and computes **runs** of consecutive
@@ -177,8 +178,8 @@ def get_row_runs(rows, chunks, min_frag_level=0.1):
         if sorted_frag_level / frag_level > 2.0:
             log.info("Employing a sorting strategy reduced "
                      "fragmentation %.1fX (%f to %f)" % (
-                        sorted_frag_level / frag_level,
-                        frag_level, sorted_frag_level))
+                         sorted_frag_level / frag_level,
+                         frag_level, sorted_frag_level))
             row_runs = sorted_row_runs
             row_resorts = sorted_row_resorts
         else:
@@ -188,8 +189,11 @@ def get_row_runs(rows, chunks, min_frag_level=0.1):
                      "and disk access (especially writes) may be slow.")
             log.warn("Increasing the 'row' chunk size may ameliorate this.")
 
-    row_resorts = [None]*len(row_runs) if row_resorts is None else row_resorts
+    if row_resorts is None:
+        row_resorts = [None] * len(row_resorts)
+
     return row_runs, row_resorts
+
 
 def fragmentation_level(row_runs):
     """
@@ -421,10 +425,10 @@ def generate_table_getcols(table_name, table_key, dsk_base,
     # in the resultant dask array
     dsk = {(name, chunk) + key_extra: (_get_fn, table_key, column,
                                        chunk_extra, dtype, runs, resort)
-                           for chunk, (runs, resort)
-                           in enumerate(zip(row_runs, row_resorts))}
+           for chunk, (runs, resort)
+           in enumerate(zip(row_runs, row_resorts))}
 
-    row_chunks = tuple(run[:,1].sum() for run in row_runs)
+    row_chunks = tuple(run[:, 1].sum() for run in row_runs)
     chunks = (row_chunks,) + tuple((c,) for c in chunk_extra)
     return da.Array(merge(dsk_base, dsk), name, chunks, dtype=dtype)
 
