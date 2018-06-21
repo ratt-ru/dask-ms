@@ -317,13 +317,12 @@ def xds_to_table(xds, table_name, columns=None):
         # Get row runs for the row chunks
         row_runs, row_resorts = get_row_runs(rows, chunks)
 
-        for chunk, (row_run, row_resort) in enumerate(zip(row_runs, row_resorts)):
+        for chunk, (row_run, resort) in enumerate(zip(row_runs, row_resorts)):
             # graph key for the array chunk that we'll write
             array_chunk = (dask_array.name, chunk) + key_extra
             # Add the write operation to the graph
             dsk[(name, out_chunk)] = (_chunk_putcols_np, table_key,
-                                      c, row_run, array_chunk,
-                                      row_resort)
+                                      c, row_run, array_chunk, resort)
             out_chunk += 1
 
         # Add the arrays graph to final graph
