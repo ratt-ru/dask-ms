@@ -124,17 +124,18 @@ def _get_row_runs(rows, chunks, sort=False):
 
 def get_row_runs(rows, chunks, min_frag_level=0.1):
     """
-    Divides ``rows`` into chunks and computes **runs** of consecutive
-    indices within these chunks.
+    Divides ``rows`` into ``chunks`` and computes **runs** of consecutive
+    indices within each chunk.
     If the associated runs are highly fragmented, the rows will be
-    sorted into consecutive order to produce a more optimal disk access
-    pattern and argsort indices to reconstruct the original row ordering
-    for the chunk are provided.
+    sorted consecutively to attempt more optimal disk access
+    pattern. A corresponding argsort index is provided
+    to reconstruct the original row ordering of the chunk.
 
     Parameters
     ----------
     rows : :class:`numpy.ndarray`
-        List of rows
+        array of rows representing some data ordering
+        associated with the table.
     chunks : tuple or list
         List of row chunks
     min_frag_level : float
