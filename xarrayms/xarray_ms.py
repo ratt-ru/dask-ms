@@ -84,7 +84,7 @@ def short_table_name(table_name):
     return os.path.split(table_name.rstrip(os.sep))[1]
 
 
-def _get_row_runs(rows, chunks, sort=False):
+def _get_row_runs(rows, chunks, sort=False, sort_dir="read"):
     row_runs = []
     resorts = []
     start_row = 0
@@ -99,7 +99,20 @@ def _get_row_runs(rows, chunks, sort=False):
             sorted_chunk_rows = np.sort(chunk_rows)
             argsort = np.searchsorted(sorted_chunk_rows, chunk_rows)
             dtype = np.min_scalar_type(argsort.size)
-            resorts.append(argsort.astype(dtype))
+
+            # For an MS read the argsort goes from a consecutive
+            # to requested row ordering
+            if sort_dir == "read":
+                resorts.append(argsort)
+            # For an MS write the argsort goes from requested
+            # to consecutive row orderings
+            elif sort_dir == "write":
+                inv_argsort = np.empty_like(argsort, dtype=dtype)
+                inv_argsort[argsort] = np.arange(argsort.size, dtype=dtype)
+                resorts.append(inv_argsort)
+            else:
+                raise ValueError("Invalid operation %s" % op)
+
             chunk_rows = sorted_chunk_rows
 
         # Split into runs of consecutive rows within this chunk
@@ -122,7 +135,7 @@ def _get_row_runs(rows, chunks, sort=False):
     return row_runs
 
 
-def get_row_runs(rows, chunks, min_frag_level=0.1):
+def get_row_runs(rows, chunks, min_frag_level=0.1, sort_dir="read"):
     """
     Divides ``rows`` into ``chunks`` and computes **runs** of consecutive
     indices within each chunk.
@@ -145,6 +158,15 @@ def get_row_runs(rows, chunks, min_frag_level=0.1):
         A value of 1.00 indicates completely unfragmented
         access patterns, while anything less than this
         indicates increasing fragmentation
+    sort_dir : {"read", "write"}
+        Direction of sorting:
+
+        * If "read" the argsort's transform rows from consecutive
+          ordering to the requested row ordering.
+        * If "write" the argsort's transform rows from requested row ordering
+          to consecutive row ordering.
+
+        Defaults to "read".
 
     Returns
     -------
@@ -167,13 +189,14 @@ def get_row_runs(rows, chunks, min_frag_level=0.1):
           the associated expanded run in order to reconstruct the original
           row ordering in the appropriate portion of the ``rows`` array.
     """
-    row_runs = _get_row_runs(rows, chunks)
+    row_runs = _get_row_runs(rows, chunks, sort_dir=sort_dir)
     row_resorts = None
     frag_level = fragmentation_level(row_runs)
 
     if frag_level < min_frag_level:
         sorted_row_runs, sorted_row_resorts = _get_row_runs(rows, chunks,
-                                                            sort=True)
+                                                            sort=True,
+                                                            sort_dir=sort_dir)
         sorted_frag_level = fragmentation_level(sorted_row_runs)
 
         if sorted_frag_level / frag_level > 2.0:
@@ -190,6 +213,7 @@ def get_row_runs(rows, chunks, min_frag_level=0.1):
                      "and disk access (especially writes) may be slow.")
             log.warn("Increasing the 'row' chunk size may ameliorate this.")
 
+    # No row resorting required
     if row_resorts is None:
         row_resorts = [None] * len(row_runs)
 
@@ -315,14 +339,17 @@ def xds_to_table(xds, table_name, columns=None):
         key_extra = (0,) * len(chunks[1:])
 
         # Get row runs for the row chunks
-        row_runs, row_resorts = get_row_runs(rows, chunks)
+        row_runs, row_resorts = get_row_runs(rows, chunks,
+                                             min_frag_level=0.1,
+                                             sort_dir="write")
 
         for chunk, (row_run, resort) in enumerate(zip(row_runs, row_resorts)):
             # graph key for the array chunk that we'll write
             array_chunk = (dask_array.name, chunk) + key_extra
             # Add the write operation to the graph
             dsk[(name, out_chunk)] = (_chunk_putcols_np, table_key,
-                                      c, row_run, array_chunk, resort)
+                                      c, row_run, array_chunk,
+                                      resort)
             out_chunk += 1
 
         # Add the arrays graph to final graph
@@ -569,7 +596,9 @@ def xds_from_table_impl(table_name, table, table_schema,
     row_chunks = da.core.normalize_chunks(chunks['row'], (rows.size,))
 
     # Get row runs for each chunk
-    row_runs, row_resorts = get_row_runs(rows, row_chunks, 0.1)
+    row_runs, row_resorts = get_row_runs(rows, row_chunks,
+                                         min_frag_level=0.1,
+                                         sort_dir="read")
 
     # Insert arrays into dataset in sorted order
     data_arrays = collections.OrderedDict()

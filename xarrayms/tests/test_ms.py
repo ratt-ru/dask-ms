@@ -118,12 +118,15 @@ def test_ms_write(ms, group_cols, index_cols):
                            index_cols=index_cols,
                            chunks={"row": 2}))
 
+    written_states = []
+
+    # Write out STATE_ID
     for i, ds in enumerate(xds):
-        state = np.full(ds.dims['row'], i, dtype=np.int32)
-        state = da.from_array(state, chunks=ds.chunks['row'])
+        state = da.arange(i, i + ds.dims['row'], chunks=ds.chunks['row'])
+        written_states.append(state)
         state = xr.DataArray(state, dims=['row'])
-        ds = ds.assign(STATE_ID=state)
-        xds_to_table(ds, ms, "STATE_ID").compute()
+        nds = ds.assign(STATE_ID=state)
+        xds_to_table(nds, ms, "STATE_ID").compute()
 
     xds = list(xds_from_ms(ms, columns=select_cols,
                            group_cols=group_cols,
@@ -131,5 +134,5 @@ def test_ms_write(ms, group_cols, index_cols):
                            chunks={"row": 2}))
 
     # Check that state has been correctly written
-    for i, ds in enumerate(xds):
-        assert np.all(ds.STATE_ID.data.compute() == i)
+    for i, (ds, expected) in enumerate(zip(xds, written_states)):
+        assert np.all(ds.STATE_ID.data.compute() == expected)
