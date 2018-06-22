@@ -856,17 +856,17 @@ def xds_from_ms(ms, columns=None, index_cols=None, group_cols=None,
 
     if index_cols is None:
         index_cols = _DEFAULT_INDEX_COLUMNS
-    elif isinstance(index_cols, list):
-        index_cols = tuple(index_cols)
-    elif not isinstance(index_cols, tuple):
-        index_cols = (index_cols,)
+    elif isinstance(index_cols, tuple):
+        index_cols = list(index_cols)
+    elif not isinstance(index_cols, list):
+        index_cols = [index_cols]
 
     if group_cols is None:
         group_cols = _DEFAULT_GROUP_COLUMNS
-    elif isinstance(group_cols, list):
-        group_cols = tuple(group_cols)
-    elif not isinstance(group_cols, tuple):
-        group_cols = (group_cols,)
+    elif isinstance(group_cols, tuple):
+        group_cols = list(group_cols)
+    elif not isinstance(group_cols, list):
+        group_cols = [group_cols]
 
     for ds in xds_from_table(ms, columns=columns,
                              index_cols=index_cols, group_cols=group_cols,
