@@ -33,6 +33,7 @@ from xarrayms.known_table_schemas import registered_schemas
 _DEFAULT_GROUP_COLUMNS = ["FIELD_ID", "DATA_DESC_ID"]
 _DEFAULT_INDEX_COLUMNS = ["TIME"]
 _DEFAULT_ROWCHUNKS = 100000
+_DEFAULT_MIN_FRAG_LEVEL = 0.1
 
 log = logging.getLogger(__name__)
 
@@ -135,7 +136,7 @@ def _get_row_runs(rows, chunks, sort=False, sort_dir="read"):
     return row_runs
 
 
-def get_row_runs(rows, chunks, min_frag_level=0.1, sort_dir="read"):
+def get_row_runs(rows, chunks, min_frag_level=False, sort_dir="read"):
     """
     Divides ``rows`` into ``chunks`` and computes **runs** of consecutive
     indices within each chunk.
@@ -151,13 +152,14 @@ def get_row_runs(rows, chunks, min_frag_level=0.1, sort_dir="read"):
         associated with the table.
     chunks : tuple or list
         List of row chunks
-    min_frag_level : float
+    min_frag_level : bool or float
         Minimum level of accepted fragmentation
         before strategies are attempted to improve
         disk access patterns.
+        if ``False``, no strategies are applied.
         A value of 1.00 indicates completely unfragmented
         access patterns, while anything less than this
-        indicates increasing fragmentation
+        indicates increasing fragmentation.
     sort_dir : {"read", "write"}
         Direction of sorting:
 
@@ -189,10 +191,22 @@ def get_row_runs(rows, chunks, min_frag_level=0.1, sort_dir="read"):
           the associated expanded run in order to reconstruct the original
           row ordering in the appropriate portion of the ``rows`` array.
     """
+
     row_runs = _get_row_runs(rows, chunks, sort_dir=sort_dir)
-    row_resorts = None
+    row_resorts = [None] * len(row_runs)
     frag_level = fragmentation_level(row_runs)
 
+    if min_frag_level is False:
+        # Complain
+        if frag_level < _DEFAULT_MIN_FRAG_LEVEL:
+            log.warn("The requesting column grouping and ordering "
+                     "has produced a highly fragmented row ordering.")
+            log.warn("Consider setting 'min_frag_level' < 1.0 kwarg "
+                     "to ameliorate this problem.")
+
+        return row_runs, row_resorts
+
+    # Attempt a row resort to generate better disk access patterns
     if frag_level < min_frag_level:
         sorted_row_runs, sorted_row_resorts = _get_row_runs(rows, chunks,
                                                             sort=True,
@@ -212,10 +226,6 @@ def get_row_runs(rows, chunks, min_frag_level=0.1, sort_dir="read"):
             log.warn("Strategies to mitigate fragmentation have failed "
                      "and disk access (especially writes) may be slow.")
             log.warn("Increasing the 'row' chunk size may ameliorate this.")
-
-    # No row resorting required
-    if row_resorts is None:
-        row_resorts = [None] * len(row_runs)
 
     return row_runs, row_resorts
 
@@ -271,9 +281,6 @@ def _chunk_putcols_np(table_proxy, column, runs, data, resort=None):
     return np.full(runs.shape[0], True)
 
 
-DEFAULT_FRAGMENTATION_LEVEL = 0.1
-
-
 def xds_to_table(xds, table_name, columns=None, **kwargs):
     """
     Generates a dask array which writes the
@@ -301,7 +308,7 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
 
     table_key, dsk = table_open_graph(table_name, readonly=False)
     rows = xds.table_row.values
-    min_frag_level = kwargs.get('min_frag_level', DEFAULT_FRAGMENTATION_LEVEL)
+    min_frag_level = kwargs.get('min_frag_level', False)
 
     if columns is None:
         columns = xds.data_vars.keys()
@@ -593,7 +600,7 @@ def xds_from_table_impl(table_name, table,
     """
 
     table_schema = kwargs.get('table_schema', None)
-    min_frag_level = kwargs.get('min_frag_level', DEFAULT_FRAGMENTATION_LEVEL)
+    min_frag_level = kwargs.get('min_frag_level', False)
 
     if not isinstance(table_schema, collections.Mapping):
         table_schema = lookup_table_schema(table_name, table_schema)
