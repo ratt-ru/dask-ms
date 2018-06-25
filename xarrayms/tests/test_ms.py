@@ -174,7 +174,8 @@ def test_fragmented_ms(ms, group_cols, index_cols):
                                chunks={"row": 1e9}))
 
     # Check that mock_row_runs was called
-    assert patch_fn.called_once()
+    assert patch_fn.called_once_with(min_frag_level=min_frag_level,
+                                     sort_dir="read")
 
     order = orderby_clause(index_cols)
     written_states = []
@@ -200,7 +201,8 @@ def test_fragmented_ms(ms, group_cols, index_cols):
             xds_to_table(nds, ms, "STATE_ID",
                          min_frag_level=min_frag_level).compute()
 
-        assert patch_fn.called_once()
+        assert patch_fn.called_once_with(min_frag_level=min_frag_level,
+                                         sort_dir="write")
 
     # Check that state has been correctly written
     xds = list(xds_from_ms(ms, columns=select_cols,
@@ -236,4 +238,4 @@ def test_unfragmented_ms(ms, group_cols, index_cols):
                                min_frag_level=False,
                                chunks={"row": 1e9}))
 
-    assert patch_fn.called_once()
+        assert patch_fn.called_once_with(min_frag_level=False, sort_dir="read")
