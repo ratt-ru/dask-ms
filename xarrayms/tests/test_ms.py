@@ -155,7 +155,6 @@ def test_fragmented_ms(ms, group_cols, index_cols):
     # Unfragmented is 1.00, induce
     # fragmentation handling
     min_frag_level = 0.9999
-    side_effect_called = {'value': False}
     from xarrayms.xarray_ms import get_row_runs
     patch_target = "xarrayms.xarray_ms.get_row_runs"
 
@@ -165,10 +164,9 @@ def test_fragmented_ms(ms, group_cols, index_cols):
         # Do some checks to ensure that fragmentation was handled
         assert kwargs['min_frag_level'] == min_frag_level
         assert all(isinstance(resort, np.ndarray) for resort in row_resorts)
-        side_effect_called['value'] = True
         return row_runs, row_resorts
 
-    with patch(patch_target, side_effect=mock_row_runs):
+    with patch(patch_target, side_effect=mock_row_runs) as patch_fn:
         xds = list(xds_from_ms(ms, columns=select_cols,
                                group_cols=group_cols,
                                index_cols=index_cols,
@@ -176,7 +174,7 @@ def test_fragmented_ms(ms, group_cols, index_cols):
                                chunks={"row": 1e9}))
 
     # Check that mock_row_runs was called
-    assert side_effect_called['value'] is True
+    assert patch_fn.called_once()
 
     order = orderby_clause(index_cols)
     written_states = []
@@ -198,13 +196,11 @@ def test_fragmented_ms(ms, group_cols, index_cols):
         state = xr.DataArray(state, dims=['row'])
         nds = ds.assign(STATE_ID=state)
 
-        side_effect_called = {'value': False}
-
-        with patch(patch_target, side_effect=mock_row_runs):
+        with patch(patch_target, side_effect=mock_row_runs) as patch_fn:
             xds_to_table(nds, ms, "STATE_ID",
                          min_frag_level=min_frag_level).compute()
 
-        assert side_effect_called['value'] is True
+        assert patch_fn.called_once()
 
     # Check that state has been correctly written
     xds = list(xds_from_ms(ms, columns=select_cols,
@@ -222,7 +218,6 @@ def test_fragmented_ms(ms, group_cols, index_cols):
 @pytest.mark.parametrize('index_cols', [
     ["TIME"]])
 def test_unfragmented_ms(ms, group_cols, index_cols):
-    side_effect_called = {'value': False}
     from xarrayms.xarray_ms import get_row_runs
     patch_target = "xarrayms.xarray_ms.get_row_runs"
 
@@ -232,14 +227,13 @@ def test_unfragmented_ms(ms, group_cols, index_cols):
         # Do some checks to ensure that fragmentation was handled
         assert kwargs['min_frag_level'] is False
         assert all(resort is None for resort in row_resorts)
-        side_effect_called['value'] = True
         return row_runs, row_resorts
 
-    with patch(patch_target, side_effect=mock_row_runs):
+    with patch(patch_target, side_effect=mock_row_runs) as patch_fn:
         xds = list(xds_from_ms(ms, columns=index_cols,
                                group_cols=group_cols,
                                index_cols=index_cols,
                                min_frag_level=False,
                                chunks={"row": 1e9}))
 
-    assert side_effect_called['value'] is True
+    assert patch_fn.called_once()
