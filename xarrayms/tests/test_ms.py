@@ -176,7 +176,7 @@ def test_fragmented_ms(ms, group_cols, index_cols):
                                chunks={"row": 1e9}))
 
     # Check that mock_row_runs was called
-    assert side_effect_called['value'] == True
+    assert side_effect_called['value'] is True
 
     order = orderby_clause(index_cols)
     written_states = []
@@ -204,7 +204,7 @@ def test_fragmented_ms(ms, group_cols, index_cols):
             xds_to_table(nds, ms, "STATE_ID",
                          min_frag_level=min_frag_level).compute()
 
-        assert side_effect_called['value'] == True
+        assert side_effect_called['value'] is True
 
     # Check that state has been correctly written
     xds = list(xds_from_ms(ms, columns=select_cols,
@@ -230,7 +230,7 @@ def test_unfragmented_ms(ms, group_cols, index_cols):
         """ Calls get_row_runs and does some testing """
         row_runs, row_resorts = get_row_runs(*args, **kwargs)
         # Do some checks to ensure that fragmentation was handled
-        assert kwargs['min_frag_level'] == False
+        assert kwargs['min_frag_level'] is False
         assert all(resort is None for resort in row_resorts)
         side_effect_called['value'] = True
         return row_runs, row_resorts
