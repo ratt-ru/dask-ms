@@ -271,7 +271,10 @@ def _chunk_putcols_np(table_proxy, column, runs, data, resort=None):
     return np.full(runs.shape[0], True)
 
 
-def xds_to_table(xds, table_name, columns=None):
+DEFAULT_FRAGMENTATION_LEVEL = 0.1
+
+
+def xds_to_table(xds, table_name, columns=None, **kwargs):
     """
     Generates a dask array which writes the
     specified columns from an :class:`xarray.Dataset` into
@@ -287,6 +290,7 @@ def xds_to_table(xds, table_name, columns=None):
     columns : tuple or list, optional
         list of column names to write to the table.
         If ``None`` all columns will be written.
+    **kwargs : optional
 
     Returns
     -------
@@ -297,6 +301,7 @@ def xds_to_table(xds, table_name, columns=None):
 
     table_key, dsk = table_open_graph(table_name, readonly=False)
     rows = xds.table_row.values
+    min_frag_level = kwargs.get('min_frag_level', DEFAULT_FRAGMENTATION_LEVEL)
 
     if columns is None:
         columns = xds.data_vars.keys()
@@ -340,7 +345,7 @@ def xds_to_table(xds, table_name, columns=None):
 
         # Get row runs for the row chunks
         row_runs, row_resorts = get_row_runs(rows, chunks,
-                                             min_frag_level=0.1,
+                                             min_frag_level=min_frag_level,
                                              sort_dir="write")
 
         for chunk, (row_run, resort) in enumerate(zip(row_runs, row_resorts)):
@@ -554,9 +559,10 @@ def column_metadata(table, columns, table_schema, rows):
     return column_metadata
 
 
-def xds_from_table_impl(table_name, table, table_schema,
+def xds_from_table_impl(table_name, table,
                         table_graph, table_key,
-                        columns, rows, chunks):
+                        columns, rows, chunks,
+                        **kwargs):
     """
     Parameters
     ----------
@@ -565,8 +571,6 @@ def xds_from_table_impl(table_name, table, table_schema,
     table : :class:`casacore.tables.table`
         CASA table object, used to inspect metadata
         for creating Datasets
-    table_schema : str or dict
-        Table schema.
     table_graph : dict
         Dask graph containing ``table_key``
     table_key : tuple
@@ -579,12 +583,17 @@ def xds_from_table_impl(table_name, table, table_schema,
     chunks : dict
         The chunk size for the dimensions of the resulting
         :class:`dask.array.Array`s.
+    table_schema : str or dict
+        Table schema.
 
     Returns
     -------
     :class:`xarray.Dataset`
         xarray dataset
     """
+
+    table_schema = kwargs.get('table_schema', None)
+    min_frag_level = kwargs.get('min_frag_level', DEFAULT_FRAGMENTATION_LEVEL)
 
     if not isinstance(table_schema, collections.Mapping):
         table_schema = lookup_table_schema(table_name, table_schema)
@@ -597,7 +606,7 @@ def xds_from_table_impl(table_name, table, table_schema,
 
     # Get row runs for each chunk
     row_runs, row_resorts = get_row_runs(rows, row_chunks,
-                                         min_frag_level=0.1,
+                                         min_frag_level=min_frag_level,
                                          sort_dir="read")
 
     # Insert arrays into dataset in sorted order
@@ -618,7 +627,7 @@ def xds_from_table_impl(table_name, table, table_schema,
 
 def xds_from_table(table_name, columns=None,
                    index_cols=None, group_cols=None,
-                   table_schema=None, chunks=None):
+                   **kwargs):
     """
     Generator producing multiple :class:`xarray.Dataset` objects
     from CASA table ``table_name`` with the rows lexicographically
@@ -716,12 +725,16 @@ def xds_from_table(table_name, columns=None,
     :class:`xarray.Dataset`
         datasets for each group, each ordered by indexing columns
     """
-    if chunks is None:
+
+    try:
+        chunks = kwargs.pop('chunks')
+    except KeyError:
         chunks = [{'row': _DEFAULT_ROWCHUNKS}]
-    elif isinstance(chunks, tuple):
-        chunks = list(chunks)
-    elif isinstance(chunks, dict):
-        chunks = [chunks]
+    else:
+        if isinstance(chunks, tuple):
+            chunks = list(chunks)
+        elif isinstance(chunks, dict):
+            chunks = [chunks]
 
     if index_cols is None:
         index_cols = []
@@ -753,9 +766,9 @@ def xds_from_table(table_name, columns=None,
 
             # Generate a dataset for each row
             for r in range(rows.size):
-                ds = xds_from_table_impl(table_name, T, table_schema,
-                                         dsk, table_key, columns,
-                                         rows[r:r + 1], chunks[0])
+                ds = xds_from_table_impl(table_name, T, dsk, table_key,
+                                         columns, rows[r:r + 1], chunks[0],
+                                         **kwargs)
 
                 yield (ds.squeeze(drop=True)
                          .assign_attrs(table_row=rows[r]))
@@ -804,10 +817,10 @@ def xds_from_table(table_name, columns=None,
                     except IndexError:
                         group_chunks = chunks[-1]
 
-                    ds = xds_from_table_impl(table_name, T, table_schema,
-                                             dsk, table_key,
+                    ds = xds_from_table_impl(table_name, T, dsk, table_key,
                                              columns.difference(group_cols),
-                                             group_rows, group_chunks)
+                                             group_rows, group_chunks,
+                                             **kwargs)
 
                     yield ds.assign_attrs(zip(group_cols, group_values))
 
@@ -815,17 +828,15 @@ def xds_from_table(table_name, columns=None,
         else:
             query = ("SELECT ROWID() as __tablerow__ "
                      "FROM $T %s" % orderby_clause(index_cols))
+            rows = gq.getcol("__tablerow__")
 
             with pt.taql(query) as gq:
-                yield xds_from_table_impl(table_name, T, table_schema,
-                                          dsk, table_key,
+                yield xds_from_table_impl(table_name, T, dsk, table_key,
                                           columns.difference(group_cols),
-                                          gq.getcol("__tablerow__"),
-                                          chunks[0])
+                                          rows, chunks[0], **kwargs)
 
 
-def xds_from_ms(ms, columns=None, index_cols=None, group_cols=None,
-                chunks=None):
+def xds_from_ms(ms, columns=None, index_cols=None, group_cols=None, **kwargs):
     """
     Generator yielding a series of xarray datasets representing
     the contents a Measurement Set.
@@ -845,8 +856,7 @@ def xds_from_ms(ms, columns=None, index_cols=None, group_cols=None,
     group_cols  : tuple or list, optional
         Sequence of grouping columns.
         Defaults to :code:`%(parts)s`
-    chunks : list of dicts or dict, optional
-        Dictionaries of dimension chunks.
+    **kwargs : optional
 
     Yields
     ------
@@ -870,7 +880,7 @@ def xds_from_ms(ms, columns=None, index_cols=None, group_cols=None,
 
     for ds in xds_from_table(ms, columns=columns,
                              index_cols=index_cols, group_cols=group_cols,
-                             table_schema="MS", chunks=chunks):
+                             table_schema="MS", **kwargs):
         yield ds
 
 
