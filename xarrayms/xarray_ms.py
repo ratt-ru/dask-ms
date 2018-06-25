@@ -33,6 +33,7 @@ from xarrayms.known_table_schemas import registered_schemas
 _DEFAULT_GROUP_COLUMNS = ["FIELD_ID", "DATA_DESC_ID"]
 _DEFAULT_INDEX_COLUMNS = ["TIME"]
 _DEFAULT_ROWCHUNKS = 100000
+_DEFAULT_MIN_FRAG_LEVEL = 0.1
 
 log = logging.getLogger(__name__)
 
@@ -84,14 +85,36 @@ def short_table_name(table_name):
     return os.path.split(table_name.rstrip(os.sep))[1]
 
 
-def _get_row_runs(rows, chunks):
+def _get_row_runs(rows, chunks, sort=False, sort_dir="read"):
     row_runs = []
+    resorts = []
     start_row = 0
     nruns = 0
 
     for chunk, chunk_size in enumerate(chunks[0]):
         end_row = start_row + chunk_size
         chunk_rows = rows[start_row:end_row]
+
+        # If we should sort
+        if sort is True:
+            sorted_chunk_rows = np.sort(chunk_rows)
+            argsort = np.searchsorted(sorted_chunk_rows, chunk_rows)
+            dtype = np.min_scalar_type(argsort.size)
+
+            # For an MS read the argsort goes from a consecutive
+            # to requested row ordering
+            if sort_dir == "read":
+                resorts.append(argsort)
+            # For an MS write the argsort goes from requested
+            # to consecutive row orderings
+            elif sort_dir == "write":
+                inv_argsort = np.empty_like(argsort, dtype=dtype)
+                inv_argsort[argsort] = np.arange(argsort.size, dtype=dtype)
+                resorts.append(inv_argsort)
+            else:
+                raise ValueError("Invalid operation %s" % op)
+
+            chunk_rows = sorted_chunk_rows
 
         # Split into runs of consecutive rows within this chunk
         diff = np.ediff1d(chunk_rows, to_begin=-10, to_end=-10)
@@ -107,16 +130,115 @@ def _get_row_runs(rows, chunks):
     if end_row != rows.size:
         raise ValueError("Chunk sum didn't match the number of rows")
 
+    if sort is True:
+        return row_runs, resorts
+
     return row_runs
 
 
-def _warn_on_fragmented_runs(row_runs):
-    nruns = sum(run.shape[0] for run in row_runs)
+def get_row_runs(rows, chunks, min_frag_level=False, sort_dir="read"):
+    """
+    Divides ``rows`` into ``chunks`` and computes **runs** of consecutive
+    indices within each chunk.
+    If the associated runs are highly fragmented, the rows will be
+    sorted consecutively to attempt more optimal disk access
+    pattern. A corresponding argsort index is provided
+    to reconstruct the original row ordering of the chunk.
 
-    if 100.0 * len(row_runs) / nruns < 33.0:
-        log.warn("Grouping and ordering strategy has produced "
-                 "a fragmented MS row ordering. "
-                 "Disk access may be slow.")
+    Parameters
+    ----------
+    rows : :class:`numpy.ndarray`
+        array of rows representing some data ordering
+        associated with the table.
+    chunks : tuple or list
+        List of row chunks
+    min_frag_level : bool or float
+        Minimum level of accepted fragmentation
+        before strategies are attempted to improve
+        disk access patterns.
+        if ``False``, no strategies are applied.
+        A value of 1.00 indicates completely unfragmented
+        access patterns, while anything less than this
+        indicates increasing fragmentation.
+    sort_dir : {"read", "write"}
+        Direction of sorting:
+
+        * If "read" the argsort's transform rows from consecutive
+          ordering to the requested row ordering.
+        * If "write" the argsort's transform rows from requested row ordering
+          to consecutive row ordering.
+
+        Defaults to "read".
+
+    Returns
+    -------
+    list of :class:`numpy.ndarray`
+        A list of row runs with shape :code:`(runs,2)`.
+        Each entry in the list corresponds to a row chunk,
+        while ``runs`` indicates the number of runs within the chunk.
+        The first component is the first row index and the second
+        component is the number of consecutive rows following the first
+        row index.
+
+    list of :class:`numpy.ndarray` or list of Nones
+        argsort indices for the associated run
+
+        * If a lists of Nones, then the runs are considered to be unfragmented
+          and the resorts can be ignored
+        * If a list of arrays, then the runs are considered fragmented
+          and have been sorted to produce more optimal disk access patters.
+          These arrays are then the argsorts to apply on
+          the associated expanded run in order to reconstruct the original
+          row ordering in the appropriate portion of the ``rows`` array.
+    """
+
+    row_runs = _get_row_runs(rows, chunks, sort_dir=sort_dir)
+    row_resorts = [None] * len(row_runs)
+    frag_level = fragmentation_level(row_runs)
+
+    if min_frag_level is False:
+        # Complain
+        if frag_level < _DEFAULT_MIN_FRAG_LEVEL:
+            log.warn("The requesting column grouping and ordering "
+                     "has produced a highly fragmented row ordering.")
+            log.warn("Consider setting 'min_frag_level' < 1.0 kwarg "
+                     "to ameliorate this problem.")
+
+        return row_runs, row_resorts
+
+    # Attempt a row resort to generate better disk access patterns
+    if frag_level < min_frag_level:
+        sorted_row_runs, sorted_row_resorts = _get_row_runs(rows, chunks,
+                                                            sort=True,
+                                                            sort_dir=sort_dir)
+        sorted_frag_level = fragmentation_level(sorted_row_runs)
+
+        if sorted_frag_level / frag_level > 2.0:
+            log.info("Employing a sorting strategy reduced "
+                     "fragmentation %.1fX (%f to %f)" % (
+                         sorted_frag_level / frag_level,
+                         frag_level, sorted_frag_level))
+            row_runs = sorted_row_runs
+            row_resorts = sorted_row_resorts
+        else:
+            log.warn("The requesting column grouping and ordering "
+                     "has produced a highly fragmented row ordering.")
+            log.warn("Strategies to mitigate fragmentation have failed "
+                     "and disk access (especially writes) may be slow.")
+            log.warn("Increasing the 'row' chunk size may ameliorate this.")
+
+    return row_runs, row_resorts
+
+
+def fragmentation_level(row_runs):
+    """
+    Parameters
+    ----------
+    row_runs : list of :class:`numpy.ndarray`
+    """
+
+    total_run_lengths = float(sum(run.shape[0] for run in row_runs))
+    return float(len(row_runs)) / total_run_lengths
 
 
 def table_open_graph(table_name, **kwargs):
@@ -145,8 +267,11 @@ def table_open_graph(table_name, **kwargs):
     return table_key, table_graph
 
 
-def _chunk_putcols_np(table_proxy, column, runs, data):
+def _chunk_putcols_np(table_proxy, column, runs, data, resort=None):
     rr = 0
+
+    if resort is not None:
+        data = data[resort]
 
     for rs, rl in runs:
         table_proxy("putcol", column, data[rr:rr + rl],
@@ -156,7 +281,7 @@ def _chunk_putcols_np(table_proxy, column, runs, data):
     return np.full(runs.shape[0], True)
 
 
-def xds_to_table(xds, table_name, columns=None):
+def xds_to_table(xds, table_name, columns=None, **kwargs):
     """
     Generates a dask array which writes the
     specified columns from an :class:`xarray.Dataset` into
@@ -172,6 +297,7 @@ def xds_to_table(xds, table_name, columns=None):
     columns : tuple or list, optional
         list of column names to write to the table.
         If ``None`` all columns will be written.
+    **kwargs : optional
 
     Returns
     -------
@@ -182,6 +308,7 @@ def xds_to_table(xds, table_name, columns=None):
 
     table_key, dsk = table_open_graph(table_name, readonly=False)
     rows = xds.table_row.values
+    min_frag_level = kwargs.get('min_frag_level', False)
 
     if columns is None:
         columns = xds.data_vars.keys()
@@ -224,15 +351,17 @@ def xds_to_table(xds, table_name, columns=None):
         key_extra = (0,) * len(chunks[1:])
 
         # Get row runs for the row chunks
-        row_runs = _get_row_runs(rows, chunks)
-        _warn_on_fragmented_runs(row_runs)
+        row_runs, row_resorts = get_row_runs(rows, chunks,
+                                             min_frag_level=min_frag_level,
+                                             sort_dir="write")
 
-        for chunk, row_run in enumerate(row_runs):
+        for chunk, (row_run, resort) in enumerate(zip(row_runs, row_resorts)):
             # graph key for the array chunk that we'll write
             array_chunk = (dask_array.name, chunk) + key_extra
             # Add the write operation to the graph
             dsk[(name, out_chunk)] = (_chunk_putcols_np, table_key,
-                                      c, row_run, array_chunk)
+                                      c, row_run, array_chunk,
+                                      resort)
             out_chunk += 1
 
         # Add the arrays graph to final graph
@@ -241,24 +370,33 @@ def xds_to_table(xds, table_name, columns=None):
     return da.Array(dsk, name, ((1,) * out_chunk,), dtype=np.bool)
 
 
-def _chunk_getcols_np(table_proxy, column, shape, dtype, runs):
+def _chunk_getcols_np(table_proxy, column, shape, dtype,
+                      runs, resort=None):
+
     nruns = runs.shape[0]
     nrows = np.sum(runs[:, 1])
 
     result = np.empty((nrows,) + shape, dtype=dtype)
     rr = 0
 
-    # Get data directly into the result array
     for rs, rl in runs:
         table_proxy("getcolnp", column, result[rr:rr + rl], rs, rl)
         rr += rl
 
+    if resort is not None:
+        return result[resort]
+
     return result
 
 
-def _chunk_getcols_object(table_proxy, column, shape, dtype, runs):
-    # results shape = (sum(row_lengths),) + shape
-    result = np.empty((np.sum(runs[:, 1]),) + shape, dtype=dtype)
+def _chunk_getcols_object(table_proxy, column, shape, dtype,
+                          runs, resort=None):
+
+    nruns = runs.shape[0]
+    nrows = np.sum(runs[:, 1])
+
+    result = np.empty((nrows,) + shape, dtype=dtype)
+
     rr = 0
 
     # Wrap objects (probably strings) in numpy arrays
@@ -267,12 +405,16 @@ def _chunk_getcols_object(table_proxy, column, shape, dtype, runs):
         result[rr:rr + rl] = np.asarray(data, dtype=dtype)
         rr += rl
 
+    if resort is not None:
+        return result[resort]
+
     return result
 
 
 def generate_table_getcols(table_name, table_key, dsk_base,
                            column, shape, dtype,
-                           row_chunks, row_runs):
+                           row_runs,
+                           row_resorts=None):
     """
     Generates a :class:`dask.array.Array` representing ``column``
     in ``table_name`` and backed by a series of
@@ -293,18 +435,17 @@ def generate_table_getcols(table_name, table_key, dsk_base,
         Shape of the array
     dtype : np.dtype or object
         Data type of the array
-    row_chunks : tuple
-        Chunk strategy for the row dimension. Should look like
-        :code:`((r1,r2,...,rn),)`
     row_runs : list of :class:`numpy.ndarray`
         List of row runs for each chunk
+    row_resorts : list of :class:`numpy.ndarray` or list of None
+        List of argsort indices to apply for each row run.
+        A None entry indicates no resorting is applied.
 
     Returns
     -------
     :class:`dask.array.Arrays`
         Dask array representing the column
     """
-
     token = dask.base.tokenize(table_name, column, row_runs)
     short_name = short_table_name(table_name)
     name = '-'.join((short_name, "getcol", column.lower(), token))
@@ -322,10 +463,12 @@ def generate_table_getcols(table_name, table_key, dsk_base,
     # For each iteration we generate one chunk
     # in the resultant dask array
     dsk = {(name, chunk) + key_extra: (_get_fn, table_key, column,
-                                       chunk_extra, dtype, runs)
-           for chunk, runs in enumerate(row_runs)}
+                                       chunk_extra, dtype, runs, resort)
+           for chunk, (runs, resort)
+           in enumerate(zip(row_runs, row_resorts))}
 
-    chunks = row_chunks + tuple((c,) for c in chunk_extra)
+    row_chunks = tuple(run[:, 1].sum() for run in row_runs)
+    chunks = (row_chunks,) + tuple((c,) for c in chunk_extra)
     return da.Array(merge(dsk_base, dsk), name, chunks, dtype=dtype)
 
 
@@ -423,9 +566,10 @@ def column_metadata(table, columns, table_schema, rows):
     return column_metadata
 
 
-def xds_from_table_impl(table_name, table, table_schema,
+def xds_from_table_impl(table_name, table,
                         table_graph, table_key,
-                        columns, rows, chunks):
+                        columns, rows, chunks,
+                        **kwargs):
     """
     Parameters
     ----------
@@ -434,8 +578,6 @@ def xds_from_table_impl(table_name, table, table_schema,
     table : :class:`casacore.tables.table`
         CASA table object, used to inspect metadata
         for creating Datasets
-    table_schema : str or dict
-        Table schema.
     table_graph : dict
         Dask graph containing ``table_key``
     table_key : tuple
@@ -448,12 +590,17 @@ def xds_from_table_impl(table_name, table, table_schema,
     chunks : dict
         The chunk size for the dimensions of the resulting
         :class:`dask.array.Array`s.
+    table_schema : str or dict
+        Table schema.
 
     Returns
     -------
     :class:`xarray.Dataset`
         xarray dataset
     """
+
+    table_schema = kwargs.get('table_schema', None)
+    min_frag_level = kwargs.get('min_frag_level', False)
 
     if not isinstance(table_schema, collections.Mapping):
         table_schema = lookup_table_schema(table_name, table_schema)
@@ -465,8 +612,9 @@ def xds_from_table_impl(table_name, table, table_schema,
     row_chunks = da.core.normalize_chunks(chunks['row'], (rows.size,))
 
     # Get row runs for each chunk
-    row_runs = _get_row_runs(rows, row_chunks)
-    _warn_on_fragmented_runs(row_runs)
+    row_runs, row_resorts = get_row_runs(rows, row_chunks,
+                                         min_frag_level=min_frag_level,
+                                         sort_dir="read")
 
     # Insert arrays into dataset in sorted order
     data_arrays = collections.OrderedDict()
@@ -475,7 +623,7 @@ def xds_from_table_impl(table_name, table, table_schema,
         col_dask_array = generate_table_getcols(table_name, table_key,
                                                 table_graph, column,
                                                 shape, dtype,
-                                                row_chunks, row_runs)
+                                                row_runs, row_resorts)
 
         data_arrays[column] = xr.DataArray(col_dask_array, dims=dims)
 
@@ -486,7 +634,7 @@ def xds_from_table_impl(table_name, table, table_schema,
 
 def xds_from_table(table_name, columns=None,
                    index_cols=None, group_cols=None,
-                   table_schema=None, chunks=None):
+                   **kwargs):
     """
     Generator producing multiple :class:`xarray.Dataset` objects
     from CASA table ``table_name`` with the rows lexicographically
@@ -584,12 +732,16 @@ def xds_from_table(table_name, columns=None,
     :class:`xarray.Dataset`
         datasets for each group, each ordered by indexing columns
     """
-    if chunks is None:
+
+    try:
+        chunks = kwargs.pop('chunks')
+    except KeyError:
         chunks = [{'row': _DEFAULT_ROWCHUNKS}]
-    elif isinstance(chunks, tuple):
-        chunks = list(chunks)
-    elif isinstance(chunks, dict):
-        chunks = [chunks]
+    else:
+        if isinstance(chunks, tuple):
+            chunks = list(chunks)
+        elif isinstance(chunks, dict):
+            chunks = [chunks]
 
     if index_cols is None:
         index_cols = []
@@ -621,9 +773,9 @@ def xds_from_table(table_name, columns=None,
 
             # Generate a dataset for each row
             for r in range(rows.size):
-                ds = xds_from_table_impl(table_name, T, table_schema,
-                                         dsk, table_key, columns,
-                                         rows[r:r + 1], chunks[0])
+                ds = xds_from_table_impl(table_name, T, dsk, table_key,
+                                         columns, rows[r:r + 1], chunks[0],
+                                         **kwargs)
 
                 yield (ds.squeeze(drop=True)
                          .assign_attrs(table_row=rows[r]))
@@ -672,10 +824,10 @@ def xds_from_table(table_name, columns=None,
                     except IndexError:
                         group_chunks = chunks[-1]
 
-                    ds = xds_from_table_impl(table_name, T, table_schema,
-                                             dsk, table_key,
+                    ds = xds_from_table_impl(table_name, T, dsk, table_key,
                                              columns.difference(group_cols),
-                                             group_rows, group_chunks)
+                                             group_rows, group_chunks,
+                                             **kwargs)
 
                     yield ds.assign_attrs(zip(group_cols, group_values))
 
@@ -683,17 +835,15 @@ def xds_from_table(table_name, columns=None,
         else:
             query = ("SELECT ROWID() as __tablerow__ "
                      "FROM $T %s" % orderby_clause(index_cols))
+            rows = gq.getcol("__tablerow__")
 
             with pt.taql(query) as gq:
-                yield xds_from_table_impl(table_name, T, table_schema,
-                                          dsk, table_key,
+                yield xds_from_table_impl(table_name, T, dsk, table_key,
                                           columns.difference(group_cols),
-                                          gq.getcol("__tablerow__"),
-                                          chunks[0])
+                                          rows, chunks[0], **kwargs)
 
 
-def xds_from_ms(ms, columns=None, index_cols=None, group_cols=None,
-                chunks=None):
+def xds_from_ms(ms, columns=None, index_cols=None, group_cols=None, **kwargs):
     """
     Generator yielding a series of xarray datasets representing
     the contents a Measurement Set.
@@ -713,8 +863,7 @@ def xds_from_ms(ms, columns=None, index_cols=None, group_cols=None,
     group_cols  : tuple or list, optional
         Sequence of grouping columns.
         Defaults to :code:`%(parts)s`
-    chunks : list of dicts or dict, optional
-        Dictionaries of dimension chunks.
+    **kwargs : optional
 
     Yields
     ------
@@ -724,21 +873,21 @@ def xds_from_ms(ms, columns=None, index_cols=None, group_cols=None,
 
     if index_cols is None:
         index_cols = _DEFAULT_INDEX_COLUMNS
-    elif isinstance(index_cols, list):
-        index_cols = tuple(index_cols)
-    elif not isinstance(index_cols, tuple):
-        index_cols = (index_cols,)
+    elif isinstance(index_cols, tuple):
+        index_cols = list(index_cols)
+    elif not isinstance(index_cols, list):
+        index_cols = [index_cols]
 
     if group_cols is None:
         group_cols = _DEFAULT_GROUP_COLUMNS
-    elif isinstance(group_cols, list):
-        group_cols = tuple(group_cols)
-    elif not isinstance(group_cols, tuple):
-        group_cols = (group_cols,)
+    elif isinstance(group_cols, tuple):
+        group_cols = list(group_cols)
+    elif not isinstance(group_cols, list):
+        group_cols = [group_cols]
 
     for ds in xds_from_table(ms, columns=columns,
                              index_cols=index_cols, group_cols=group_cols,
-                             table_schema="MS", chunks=chunks):
+                             table_schema="MS", **kwargs):
         yield ds
 
 

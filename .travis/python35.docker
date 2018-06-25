@@ -1,7 +1,7 @@
 FROM kernsuite/base:3
 RUN docker-apt-install python3-pip python3-casacore
-RUN pip3 install --upgrade pip setuptools pytest
+RUN pip3 install --upgrade pip setuptools
 ADD . /code
 WORKDIR /code
 RUN pip3 install .
-RUN py.test -v
+RUN python3 setup.py test
