@@ -31,8 +31,9 @@ if not on_rtd:
 setup_requirements = ['pytest-runner', ]
 
 test_requirements = [
-        'pytest',
-        'mock']
+    'pytest',
+    'mock']
+
 
 def readme():
     with open("README.rst") as f:

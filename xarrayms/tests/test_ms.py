@@ -138,6 +138,7 @@ def test_ms_write(ms, group_cols, index_cols):
     for i, (ds, expected) in enumerate(zip(xds, written_states)):
         assert np.all(ds.STATE_ID.data.compute() == expected)
 
+
 @pytest.mark.parametrize('group_cols', [
     ["DATA_DESC_ID"]])
 @pytest.mark.parametrize('index_cols', [
@@ -154,7 +155,7 @@ def test_fragmented_ms(ms, group_cols, index_cols):
     # Unfragmented is 1.00, induce
     # fragmentation handling
     min_frag_level = 0.9999
-    side_effect_called = {'value': False }
+    side_effect_called = {'value': False}
     from xarrayms.xarray_ms import get_row_runs
     patch_target = "xarrayms.xarray_ms.get_row_runs"
 
@@ -167,13 +168,12 @@ def test_fragmented_ms(ms, group_cols, index_cols):
         side_effect_called['value'] = True
         return row_runs, row_resorts
 
-
     with patch(patch_target, side_effect=mock_row_runs):
         xds = list(xds_from_ms(ms, columns=select_cols,
-                                group_cols=group_cols,
-                                index_cols=index_cols,
-                                min_frag_level=min_frag_level,
-                                chunks={"row": 1e9}))
+                               group_cols=group_cols,
+                               index_cols=index_cols,
+                               min_frag_level=min_frag_level,
+                               chunks={"row": 1e9}))
 
     # Check that mock_row_runs was called
     assert side_effect_called['value'] == True
@@ -206,13 +206,12 @@ def test_fragmented_ms(ms, group_cols, index_cols):
 
         assert side_effect_called['value'] == True
 
-
     # Check that state has been correctly written
     xds = list(xds_from_ms(ms, columns=select_cols,
-                            group_cols=group_cols,
-                            index_cols=index_cols,
-                            min_frag_level=min_frag_level,
-                            chunks={"row": 1e9}))
+                           group_cols=group_cols,
+                           index_cols=index_cols,
+                           min_frag_level=min_frag_level,
+                           chunks={"row": 1e9}))
 
     for i, (ds, expected) in enumerate(zip(xds, written_states)):
         assert np.all(ds.STATE_ID.data.compute() == expected)
@@ -223,7 +222,7 @@ def test_fragmented_ms(ms, group_cols, index_cols):
 @pytest.mark.parametrize('index_cols', [
     ["TIME"]])
 def test_unfragmented_ms(ms, group_cols, index_cols):
-    side_effect_called = {'value': False }
+    side_effect_called = {'value': False}
     from xarrayms.xarray_ms import get_row_runs
     patch_target = "xarrayms.xarray_ms.get_row_runs"
 
@@ -236,12 +235,11 @@ def test_unfragmented_ms(ms, group_cols, index_cols):
         side_effect_called['value'] = True
         return row_runs, row_resorts
 
-
     with patch(patch_target, side_effect=mock_row_runs):
         xds = list(xds_from_ms(ms, columns=index_cols,
-                                group_cols=group_cols,
-                                index_cols=index_cols,
-                                min_frag_level=False,
-                                chunks={"row": 1e9}))
+                               group_cols=group_cols,
+                               index_cols=index_cols,
+                               min_frag_level=False,
+                               chunks={"row": 1e9}))
 
     assert side_effect_called['value'] is True
