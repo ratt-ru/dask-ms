@@ -28,6 +28,11 @@ if not on_rtd:
         "python-casacore >= 2.2.1",
     ]
 
+setup_requirements = ['pytest-runner', ]
+
+test_requirements = [
+        'pytest',
+        'mock']
 
 def readme():
     with open("README.rst") as f:
@@ -49,6 +54,8 @@ setup(name='xarray-ms',
           "Topic :: Scientific/Engineering :: Astronomy",
       ],
       install_requires=install_requires,
+      setup_requires=setup_requirements,
+      test_requires=test_requirements,
       author='Simon Perkins',
       author_email='sperkins@ska.ac.za',
       packages=find_packages(),
