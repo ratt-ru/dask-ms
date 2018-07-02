@@ -541,7 +541,7 @@ def column_metadata(table, columns, table_schema, rows):
             # Read the starting row
             row = table.getcol(c, startrow=rows[0], nrow=1)
         except Exception:
-            log.warn("Ignoring '%s' column")
+            log.warn("Unable to infer shape of '%s' column. Ignoring." % c)
         else:
             # Usually we get numpy arrays
             if isinstance(row, np.ndarray):
