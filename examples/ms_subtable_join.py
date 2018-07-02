@@ -34,7 +34,7 @@ if __name__ == "__main__":
         # partition by FIELD_ID and DATA_DESC_ID
         # and sorted by TIME
         datasets = xds_from_ms(args.ms,
-                               part_cols=("FIELD_ID", "DATA_DESC_ID"),
+                               group_cols=("FIELD_ID", "DATA_DESC_ID"),
                                index_cols="TIME")
 
         # Get the antenna dataset
@@ -45,13 +45,13 @@ if __name__ == "__main__":
         # Get datasets for DATA_DESCRIPTION, SPECTRAL_WINDOW
         # POLARIZATION and FIELD, partitioned by row
         ddid_ds = list(xds_from_table(table_name['ddid'],
-                                      part_cols="__row__"))
+                                      group_cols="__row__"))
         spwds = list(xds_from_table(table_name['spw'],
-                                    part_cols="__row__"))
+                                    group_cols="__row__"))
         pds = list(xds_from_table(table_name['pol'],
-                                  part_cols="__row__"))
+                                  group_cols="__row__"))
         field_ds = list(xds_from_table(table_name['field'],
-                                       part_cols="__row__"))
+                                       group_cols="__row__"))
 
         # For each partitioned dataset from the main MS,
         # assign additional arrays from the FIELD, SPECTRAL_WINDOW
