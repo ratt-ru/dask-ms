@@ -69,6 +69,7 @@ def ms(tmpdir_factory):
 
 
 @pytest.mark.parametrize('group_cols', [
+    [],
     ["FIELD_ID", "DATA_DESC_ID"],
     ["DATA_DESC_ID"],
     ["DATA_DESC_ID", "SCAN_NUMBER"]])
@@ -98,6 +99,7 @@ def test_ms_read(ms, group_cols, index_cols):
 
 
 @pytest.mark.parametrize('group_cols', [
+    [],
     ["FIELD_ID", "DATA_DESC_ID"],
     ["DATA_DESC_ID"],
     ["DATA_DESC_ID", "SCAN_NUMBER"]])
@@ -140,6 +142,7 @@ def test_ms_write(ms, group_cols, index_cols):
 
 
 @pytest.mark.parametrize('group_cols', [
+    [],
     ["DATA_DESC_ID"]])
 @pytest.mark.parametrize('index_cols', [
     ["TIME"]])
@@ -216,6 +219,7 @@ def test_fragmented_ms(ms, group_cols, index_cols):
 
 
 @pytest.mark.parametrize('group_cols', [
+    [],
     ["DATA_DESC_ID"]])
 @pytest.mark.parametrize('index_cols', [
     ["TIME"]])
