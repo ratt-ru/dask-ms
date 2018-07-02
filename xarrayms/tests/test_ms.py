@@ -141,6 +141,28 @@ def test_ms_write(ms, group_cols, index_cols):
         assert np.all(ds.STATE_ID.data.compute() == expected)
 
 
+@pytest.mark.parametrize('index_cols', [
+    ["ANTENNA2", "ANTENNA1", "TIME"],
+    ["TIME", "ANTENNA1", "ANTENNA2"],
+    ["ANTENNA1", "ANTENNA2", "TIME"]])
+def test_row_query(ms, index_cols):
+    xds = list(xds_from_ms(ms, columns=index_cols,
+                           group_cols="__row__",
+                           index_cols=index_cols,
+                           chunks={"row": 2}))
+
+    with pt.table(ms, readonly=False) as table:
+        # Get the expected row ordering by lexically
+        # sorting the indexing columns
+        cols = [(name, table.getcol(name)) for name in index_cols]
+        expected_rows = np.lexsort(tuple(c for n, c in reversed(cols)))
+
+        assert len(xds) == table.nrows()
+
+        for ds, expected_row in zip(xds, expected_rows):
+            assert ds.table_row == expected_row
+
+
 @pytest.mark.parametrize('group_cols', [
     [],
     ["DATA_DESC_ID"]])
