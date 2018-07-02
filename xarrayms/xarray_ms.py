@@ -835,9 +835,9 @@ def xds_from_table(table_name, columns=None,
         else:
             query = ("SELECT ROWID() as __tablerow__ "
                      "FROM $T %s" % orderby_clause(index_cols))
-            rows = gq.getcol("__tablerow__")
 
             with pt.taql(query) as gq:
+                rows = gq.getcol("__tablerow__")
                 yield xds_from_table_impl(table_name, T, dsk, table_key,
                                           columns.difference(group_cols),
                                           rows, chunks[0], **kwargs)
