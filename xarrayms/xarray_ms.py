@@ -541,7 +541,7 @@ def column_metadata(table, columns, table_schema, rows):
             # Read the starting row
             row = table.getcol(c, startrow=rows[0], nrow=1)
         except Exception:
-            log.warn("Ignoring '%s' column")
+            log.warn("Unable to infer shape of '%s' column. Ignoring." % c)
         else:
             # Usually we get numpy arrays
             if isinstance(row, np.ndarray):
@@ -835,9 +835,9 @@ def xds_from_table(table_name, columns=None,
         else:
             query = ("SELECT ROWID() as __tablerow__ "
                      "FROM $T %s" % orderby_clause(index_cols))
-            rows = gq.getcol("__tablerow__")
 
             with pt.taql(query) as gq:
+                rows = gq.getcol("__tablerow__")
                 yield xds_from_table_impl(table_name, T, dsk, table_key,
                                           columns.difference(group_cols),
                                           rows, chunks[0], **kwargs)

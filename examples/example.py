@@ -28,7 +28,7 @@ if __name__ == "__main__":
         # Create datasets representing each row of the spw table
         spw_table = '::'.join((args.ms, 'SPECTRAL_WINDOW'))
 
-        for spw_ds in xds_from_table(spw_table, part_cols="__row__"):
+        for spw_ds in xds_from_table(spw_table, group_cols="__row__"):
             print(spw_ds)
             print(spw_ds.NUM_CHAN.values)
             print(spw_ds.CHAN_FREQ.values)
