@@ -2,9 +2,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import shutil
-import os
-
 import dask.array as da
 from mock import patch
 import numpy as np
@@ -12,60 +9,10 @@ import pyrap.tables as pt
 import pytest
 import xarray as xr
 
-from xarrayms.xarray_ms import (_DEFAULT_GROUP_COLUMNS,
-                                _DEFAULT_INDEX_COLUMNS,
-                                xds_from_ms,
+from xarrayms.xarray_ms import (xds_from_ms,
                                 xds_to_table,
-                                select_clause,
                                 orderby_clause,
-                                groupby_clause,
                                 where_clause)
-
-
-@pytest.fixture(scope="session")
-def ms(tmpdir_factory):
-    msdir = tmpdir_factory.mktemp("msdir", numbered=False)
-    fn = os.path.join(str(msdir), "test.ms")
-
-    create_table_query = """
-    CREATE TABLE %s
-    [FIELD_ID I4,
-    ANTENNA1 I4,
-    ANTENNA2 I4,
-    DATA_DESC_ID I4,
-    SCAN_NUMBER I4,
-    STATE_ID I4,
-    TIME R8]
-    LIMIT 10
-    """ % fn
-
-    # Common grouping columns
-    field = [0,   0,   0,   1,   1,   1,   1,   2,   2,   2]
-    ddid = [0,   0,   0,   0,   0,   0,   0,   1,   1,   1]
-    scan = [0,   1,   0,   1,   0,   1,   0,   1,   0,   1]
-
-    # Common indexing columns
-    time = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1]
-    ant1 = [0,   0,   1,   1,   1,   2,   1,   0,   0,   1]
-    ant2 = [1,   2,   2,   3,   2,   1,   0,   1,   1,   2]
-
-    # Column we'll write to
-    state = [0,   0,   0,   0,   0,   0,   0,   0,   0,   0]
-
-    # Create the table
-    with pt.taql(create_table_query) as ms:
-        ms.putcol("TIME", time)
-        ms.putcol("FIELD_ID", field)
-        ms.putcol("DATA_DESC_ID", ddid)
-        ms.putcol("ANTENNA1", ant1)
-        ms.putcol("ANTENNA2", ant2)
-        ms.putcol("SCAN_NUMBER", scan)
-        ms.putcol("STATE_ID", state)
-
-    yield fn
-
-    # Remove the temporary directory
-    shutil.rmtree(str(msdir))
 
 
 @pytest.mark.parametrize('group_cols', [
