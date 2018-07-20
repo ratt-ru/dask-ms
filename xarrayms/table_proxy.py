@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import logging
 
+from dask.sizeof import sizeof, getsizeof
 import pyrap.tables as pt
 
 log = logging.getLogger(__name__)
@@ -74,30 +75,14 @@ class TableProxy(object):
                 self._table.unlock()
 
 
-if __name__ == "__main__":
-    import argparse
+@sizeof.register(TableProxy)
+def sizeof_table_proxy(o):
+    """
+    Size only derived from members required to recreate.
 
-    p = argparse.ArgumentParser()
-    p.add_argument("ms")
-    args = p.parse_args()
-
-    tp = TableProxy(args.ms, readonly=True)
-    tp("close")
-
-    try:
-        import cloudpickle
-        ntp = cloudpickle.loads(cloudpickle.dumps(tp))
-    except ImportError:
-        pass
-    except Exception:
-        logging.warn("cloudpickle failed", exc_info=True)
-
-    try:
-        import dill
-        ntp = dill.loads(dill.dumps(tp))
-    except ImportError:
-        pass
-    except Exception:
-        logging.warn("dill failed", exc_info=True)
-
-    print(ntp("getcol", "DATA", startrow=0, nrow=1).shape)
+    This deceives dask into thinking that the proxy is small
+    and thus easy to copy in a distributed setting.
+    """
+    return (getsizeof(o._table_name) +
+            getsizeof(o._kwargs) +
+            getsizeof(o._write_lock))
