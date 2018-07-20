@@ -37,7 +37,7 @@ class Mock(MagicMock):
         return obj
 
 
-MOCK_MODULES = ['dask', 'dask.array', 'numpy',
+MOCK_MODULES = ['dask', 'dask.array', 'dask.sizeof', 'numpy',
                 'pyrap', 'pyrap.tables', 'xarray']
 sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
