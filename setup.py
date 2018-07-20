@@ -9,7 +9,7 @@ except ImportError as e:
 
 install_requires = [
     "attrs >= 17.2.0",
-    "dask >= 0.17.1",
+    "dask >= 0.18.0",
     "six >= 1.10.0",
     "toolz >= 0.8.2",
     "xarray >= 0.10.0",
