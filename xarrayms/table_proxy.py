@@ -72,32 +72,3 @@ class TableProxy(object):
             # Release the lock
             if should_lock:
                 self._table.unlock()
-
-
-if __name__ == "__main__":
-    import argparse
-
-    p = argparse.ArgumentParser()
-    p.add_argument("ms")
-    args = p.parse_args()
-
-    tp = TableProxy(args.ms, readonly=True)
-    tp("close")
-
-    try:
-        import cloudpickle
-        ntp = cloudpickle.loads(cloudpickle.dumps(tp))
-    except ImportError:
-        pass
-    except Exception:
-        logging.warn("cloudpickle failed", exc_info=True)
-
-    try:
-        import dill
-        ntp = dill.loads(dill.dumps(tp))
-    except ImportError:
-        pass
-    except Exception:
-        logging.warn("dill failed", exc_info=True)
-
-    print(ntp("getcol", "DATA", startrow=0, nrow=1).shape)
