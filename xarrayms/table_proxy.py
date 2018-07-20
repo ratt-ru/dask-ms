@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import logging
 
+from dask.sizeof import sizeof, getsizeof
 import pyrap.tables as pt
 
 log = logging.getLogger(__name__)
@@ -72,3 +73,16 @@ class TableProxy(object):
             # Release the lock
             if should_lock:
                 self._table.unlock()
+
+
+@sizeof.register(TableProxy)
+def sizeof_table_proxy(o):
+    """
+    Size only derived from members required to recreate.
+
+    This deceives dask into thinking that the proxy is small
+    and thus easy to copy in a distributed setting.
+    """
+    return (getsizeof(o._table_name) +
+            getsizeof(o._kwargs) +
+            getsizeof(o._write_lock))

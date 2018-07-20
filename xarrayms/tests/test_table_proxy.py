@@ -7,6 +7,7 @@ try:
 except ImportError:
     import pickle
 
+from dask.sizeof import getsizeof, sizeof
 import numpy as np
 import pytest
 from xarrayms import TableProxy
@@ -33,3 +34,13 @@ def test_table_proxy_pickle(ms, table_kwargs):
 
     assert np.all(ant1 == ntp("getcol", "ANTENNA1"))
     assert np.all(ant2 == ntp("getcol", "ANTENNA2"))
+
+
+def test_table_proxy_sizeof(ms):
+    tp = TableProxy(ms, readonly=False)
+
+    size = getsizeof(tp._table_name)
+    size += getsizeof(tp._kwargs)
+    size += getsizeof(tp._write_lock)
+
+    assert sizeof(tp) == size
