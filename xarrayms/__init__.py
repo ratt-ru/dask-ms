@@ -4,7 +4,7 @@ from __future__ import print_function
 
 __author__ = """Simon Perkins"""
 __email__ = 'sperkins@ska.ac.za'
-__version__ = '0.1.1'
+__version__ = '0.1.2'
 
 
 def get_logger():

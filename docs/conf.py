@@ -184,6 +184,11 @@ texinfo_documents = [
 napoleon_numpy_docstring = True
 napoleon_google_docstring = False
 
+extlinks = {
+    'issue': ('https://github.com/ska-sa/xarray-ms/issues/%s', 'GH#'),
+    'pr': ('https://github.com/ska-sa/xarray-ms/pull/%s', 'GH#')
+}
+
 # Example configuration for intersphinx: refer to the Python standard library.
 intersphinx_mapping = {
     'dask': ('https://dask.pydata.org/en/stable', None),
