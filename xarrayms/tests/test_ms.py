@@ -34,7 +34,7 @@ def test_ms_read(ms, group_cols, index_cols):
 
     order = orderby_clause(index_cols)
 
-    with pt.table(ms, lockoptions='auto') as T: # noqa
+    with pt.table(ms, lockoptions='auto') as T:  # noqa
         for ds in xds:
             group_col_values = [getattr(ds, c) for c in group_cols]
             where = where_clause(group_cols, group_col_values)
