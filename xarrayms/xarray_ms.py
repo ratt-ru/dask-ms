@@ -241,32 +241,6 @@ def fragmentation_level(row_runs):
     return float(len(row_runs)) / total_run_lengths
 
 
-def table_open_graph(table_name, **kwargs):
-    """
-    Generate a dask graph containing table open commands
-
-    Parameters
-    ----------
-    table_name : str
-        CASA table name
-    **kwargs:
-        Keywords arguments passed to the :meth:`casacore.tables.table`
-        constructor, for e.g. :code:`readonly=False`
-
-    Returns
-    -------
-    tuple
-        Graph key associated with the opened table
-    dict
-        Dask graph containing the graph open command
-
-    """
-    token = dask.base.tokenize(table_name, kwargs)
-    table_key = ('open', short_table_name(table_name), token)
-    table_graph = {table_key: (partial(TableProxy, **kwargs), table_name)}
-    return table_key, table_graph
-
-
 def _chunk_putcols_np(table_proxy, column, runs, data, resort=None):
     rr = 0
 
@@ -306,7 +280,8 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
         datset.
     """
 
-    table_key, dsk = table_open_graph(table_name, readonly=False)
+    dsk = {}
+    table_proxy = TableProxy(table_name, readonly=False)
     rows = xds.table_row.values
     min_frag_level = kwargs.get('min_frag_level', False)
 
@@ -359,7 +334,7 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
             # graph key for the array chunk that we'll write
             array_chunk = (dask_array.name, chunk) + key_extra
             # Add the write operation to the graph
-            dsk[(name, out_chunk)] = (_chunk_putcols_np, table_key,
+            dsk[(name, out_chunk)] = (_chunk_putcols_np, table_proxy,
                                       c, row_run, array_chunk,
                                       resort)
             out_chunk += 1
@@ -373,7 +348,6 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
 def _chunk_getcols_np(table_proxy, column, shape, dtype,
                       runs, resort=None):
 
-    nruns = runs.shape[0]
     nrows = np.sum(runs[:, 1])
 
     result = np.empty((nrows,) + shape, dtype=dtype)
@@ -392,7 +366,6 @@ def _chunk_getcols_np(table_proxy, column, shape, dtype,
 def _chunk_getcols_object(table_proxy, column, shape, dtype,
                           runs, resort=None):
 
-    nruns = runs.shape[0]
     nrows = np.sum(runs[:, 1])
 
     result = np.empty((nrows,) + shape, dtype=dtype)
@@ -411,10 +384,8 @@ def _chunk_getcols_object(table_proxy, column, shape, dtype,
     return result
 
 
-def generate_table_getcols(table_name, table_key, dsk_base,
-                           column, shape, dtype,
-                           row_runs,
-                           row_resorts=None):
+def generate_table_getcols(table_name, column, shape, dtype,
+                           table_proxy, row_runs, row_resorts=None):
     """
     Generates a :class:`dask.array.Array` representing ``column``
     in ``table_name`` and backed by a series of
@@ -425,16 +396,14 @@ def generate_table_getcols(table_name, table_key, dsk_base,
     ----------
     table_name : str
         CASA table filename path
-    table_key : tuple
-        dask graph key referencing an opened table object.
-    dsk_base : dict
-        dask graph containing table object opening functionality.
     column : str
         Name of the column to generate
     shape : tuple
         Shape of the array
     dtype : np.dtype or object
         Data type of the array
+    table_proxy : :class:`TableProxy`
+        Table proxy object
     row_runs : list of :class:`numpy.ndarray`
         List of row runs for each chunk
     row_resorts : list of :class:`numpy.ndarray` or list of None
@@ -462,14 +431,14 @@ def generate_table_getcols(table_name, table_key, dsk_base,
     # Iterate through the rows in groups of row_runs
     # For each iteration we generate one chunk
     # in the resultant dask array
-    dsk = {(name, chunk) + key_extra: (_get_fn, table_key, column,
+    dsk = {(name, chunk) + key_extra: (_get_fn, table_proxy, column,
                                        chunk_extra, dtype, runs, resort)
            for chunk, (runs, resort)
            in enumerate(zip(row_runs, row_resorts))}
 
     row_chunks = tuple(run[:, 1].sum() for run in row_runs)
     chunks = (row_chunks,) + tuple((c,) for c in chunk_extra)
-    return da.Array(merge(dsk_base, dsk), name, chunks, dtype=dtype)
+    return da.Array(dsk, name, chunks, dtype=dtype)
 
 
 def lookup_table_schema(table_name, lookup_str):
@@ -567,7 +536,6 @@ def column_metadata(table, columns, table_schema, rows):
 
 
 def xds_from_table_impl(table_name, table,
-                        table_graph, table_key,
                         columns, rows, chunks,
                         **kwargs):
     """
@@ -578,10 +546,6 @@ def xds_from_table_impl(table_name, table,
     table : :class:`casacore.tables.table`
         CASA table object, used to inspect metadata
         for creating Datasets
-    table_graph : dict
-        Dask graph containing ``table_key``
-    table_key : tuple
-        Tuple referencing the table open command
     columns : tuple or list
         Columns present on the returned dataset.
     rows : np.ndarray
@@ -619,10 +583,11 @@ def xds_from_table_impl(table_name, table,
     # Insert arrays into dataset in sorted order
     data_arrays = collections.OrderedDict()
 
+    table_proxy = TableProxy(table_name)
+
     for column, (shape, dims, dtype) in col_metadata.items():
-        col_dask_array = generate_table_getcols(table_name, table_key,
-                                                table_graph, column,
-                                                shape, dtype,
+        col_dask_array = generate_table_getcols(table_name, column,
+                                                shape, dtype, table_proxy,
                                                 row_runs, row_resorts)
 
         data_arrays[column] = xr.DataArray(col_dask_array, dims=dims)
@@ -757,8 +722,6 @@ def xds_from_table(table_name, columns=None,
     elif not isinstance(group_cols, list):
         group_cols = [group_cols]
 
-    table_key, dsk = table_open_graph(table_name)
-
     with pt.table(table_name) as T:
         columns = set(T.colnames() if columns is None else columns)
 
@@ -773,8 +736,8 @@ def xds_from_table(table_name, columns=None,
 
             # Generate a dataset for each row
             for r in range(rows.size):
-                ds = xds_from_table_impl(table_name, T, dsk, table_key,
-                                         columns, rows[r:r + 1], chunks[0],
+                ds = xds_from_table_impl(table_name, T, columns,
+                                         rows[r:r + 1], chunks[0],
                                          **kwargs)
 
                 yield (ds.squeeze(drop=True)
@@ -824,7 +787,7 @@ def xds_from_table(table_name, columns=None,
                     except IndexError:
                         group_chunks = chunks[-1]
 
-                    ds = xds_from_table_impl(table_name, T, dsk, table_key,
+                    ds = xds_from_table_impl(table_name, T,
                                              columns.difference(group_cols),
                                              group_rows, group_chunks,
                                              **kwargs)
@@ -838,7 +801,7 @@ def xds_from_table(table_name, columns=None,
 
             with pt.taql(query) as gq:
                 rows = gq.getcol("__tablerow__")
-                yield xds_from_table_impl(table_name, T, dsk, table_key,
+                yield xds_from_table_impl(table_name, T,
                                           columns.difference(group_cols),
                                           rows, chunks[0], **kwargs)
 

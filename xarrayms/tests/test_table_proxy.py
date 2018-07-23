@@ -20,9 +20,6 @@ def test_table_proxy_pickle(ms, table_kwargs):
     tp = TableProxy(ms, **table_kwargs)
     ntp = pickle.loads(pickle.dumps(tp))
 
-    # Table object differs
-    assert ntp._table != tp._table
-
     # Table name match
     assert ntp._table_name == tp._table_name
     # Table creation kwargs match
@@ -42,5 +39,6 @@ def test_table_proxy_sizeof(ms):
     size = getsizeof(tp._table_name)
     size += getsizeof(tp._kwargs)
     size += getsizeof(tp._write_lock)
+    size += getsizeof(tp._lockoptions)
 
     assert sizeof(tp) == size
