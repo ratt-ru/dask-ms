@@ -65,7 +65,7 @@ class TableProxy(object):
         try:
             # Acquire a lock and call the function
             if fn_requires_lock:
-                self._table.lock(write=fn.startswith("put"))
+                self._table.lock(write=self._write_lock)
 
             return getattr(self._table, fn)(*args, **kwargs)
 
