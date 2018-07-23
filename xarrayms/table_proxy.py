@@ -38,7 +38,7 @@ class TableProxy(object):
         self._write_lock = kwargs.get('readonly', True) is False
 
         # Force table locking mode
-        lockoptions = 'auto'
+        lockoptions = 'user'
 
         try:
             userlockopt = kwargs.pop('lockoptions')
@@ -60,18 +60,18 @@ class TableProxy(object):
 
     def __call__(self, fn, *args, **kwargs):
         # Don't lock for these functions
-        should_lock = fn not in ("close", "done")
+        fn_requires_lock = fn not in ("close", "done")
 
         try:
             # Acquire a lock and call the function
-            if should_lock:
+            if fn_requires_lock:
                 self._table.lock(write=self._write_lock)
 
             return getattr(self._table, fn)(*args, **kwargs)
 
         finally:
             # Release the lock
-            if should_lock:
+            if fn_requires_lock:
                 self._table.unlock()
 
 
