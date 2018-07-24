@@ -8,7 +8,6 @@ except ImportError:
     pass
 
 import collections
-from functools import partial
 import logging
 import os
 import os.path
@@ -19,11 +18,6 @@ import numpy as np
 import pyrap.tables as pt
 from six import string_types
 from six.moves import range
-
-try:
-    from cytoolz import merge
-except ImportError:
-    from toolz import merge
 
 import xarray as xr
 
