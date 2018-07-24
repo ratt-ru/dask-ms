@@ -34,15 +34,17 @@ def test_ms_read(ms, group_cols, index_cols):
 
     order = orderby_clause(index_cols)
 
-    for ds in xds:
-        where = where_clause(group_cols, [getattr(ds, c) for c in group_cols])
-        query = "SELECT * FROM $ms %s %s" % (where, order)
+    with pt.table(ms, lockoptions='auto') as T:  # noqa
+        for ds in xds:
+            group_col_values = [getattr(ds, c) for c in group_cols]
+            where = where_clause(group_cols, group_col_values)
+            query = "SELECT * FROM $T %s %s" % (where, order)
 
-        with pt.taql(query) as Q:
-            for c in select_cols:
-                np_data = Q.getcol(c)
-                dask_data = getattr(ds, c).data.compute()
-                assert np.all(np_data == dask_data)
+            with pt.taql(query) as Q:
+                for c in select_cols:
+                    np_data = Q.getcol(c)
+                    dask_data = getattr(ds, c).data.compute()
+                    assert np.all(np_data == dask_data)
 
 
 @pytest.mark.parametrize('group_cols', [
@@ -60,7 +62,7 @@ def test_ms_write(ms, group_cols, index_cols):
     order = orderby_clause(index_cols)
 
     # Zero everything to be sure
-    with pt.table(ms, readonly=False) as table:
+    with pt.table(ms, readonly=False, lockoptions='auto') as table:
         table.putcol("STATE_ID", np.full(table.nrows(), 0, dtype=np.int32))
 
     xds = list(xds_from_ms(ms, columns=select_cols,
@@ -119,7 +121,7 @@ def test_fragmented_ms(ms, group_cols, index_cols):
     select_cols = index_cols + ["STATE_ID"]
 
     # Zero everything to be sure
-    with pt.table(ms, readonly=False) as table:
+    with pt.table(ms, readonly=False, lockoptions='auto') as table:
         table.putcol("STATE_ID", np.full(table.nrows(), 0, dtype=np.int32))
 
     # Patch the get_row_runs function to check that it is called
@@ -152,29 +154,31 @@ def test_fragmented_ms(ms, group_cols, index_cols):
     order = orderby_clause(index_cols)
     written_states = []
 
-    for i, ds in enumerate(xds):
-        where = where_clause(group_cols, [getattr(ds, c) for c in group_cols])
-        query = "SELECT * FROM $ms %s %s" % (where, order)
+    with pt.table(ms, readonly=True, lockoptions='auto') as table:
+        for i, ds in enumerate(xds):
+            group_col_values = [getattr(ds, c) for c in group_cols]
+            where = where_clause(group_cols, group_col_values)
+            query = "SELECT * FROM $table %s %s" % (where, order)
 
-        # Check that each column is correctly read
-        with pt.taql(query) as Q:
-            for c in select_cols:
-                np_data = Q.getcol(c)
-                dask_data = getattr(ds, c).data.compute()
-                assert np.all(np_data == dask_data)
+            # Check that each column is correctly read
+            with pt.taql(query) as Q:
+                for c in select_cols:
+                    np_data = Q.getcol(c)
+                    dask_data = getattr(ds, c).data.compute()
+                    assert np.all(np_data == dask_data)
 
-        # Now write some data to the STATE_ID column
-        state = da.arange(i, i + ds.dims['row'], chunks=ds.chunks['row'])
-        written_states.append(state)
-        state = xr.DataArray(state, dims=['row'])
-        nds = ds.assign(STATE_ID=state)
+            # Now write some data to the STATE_ID column
+            state = da.arange(i, i + ds.dims['row'], chunks=ds.chunks['row'])
+            written_states.append(state)
+            state = xr.DataArray(state, dims=['row'])
+            nds = ds.assign(STATE_ID=state)
 
-        with patch(patch_target, side_effect=mock_row_runs) as patch_fn:
-            xds_to_table(nds, ms, "STATE_ID",
-                         min_frag_level=min_frag_level).compute()
+            with patch(patch_target, side_effect=mock_row_runs) as patch_fn:
+                xds_to_table(nds, ms, "STATE_ID",
+                             min_frag_level=min_frag_level).compute()
 
-        assert patch_fn.called_once_with(min_frag_level=min_frag_level,
-                                         sort_dir="write")
+            assert patch_fn.called_once_with(min_frag_level=min_frag_level,
+                                             sort_dir="write")
 
     # Check that state has been correctly written
     xds = list(xds_from_ms(ms, columns=select_cols,

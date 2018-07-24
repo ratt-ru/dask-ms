@@ -5,7 +5,8 @@ from __future__ import print_function
 import logging
 
 from dask.sizeof import sizeof, getsizeof
-import pyrap.tables as pt
+from xarrayms.table_cache import TableCache
+
 
 log = logging.getLogger(__name__)
 
@@ -38,19 +39,19 @@ class TableProxy(object):
         self._write_lock = kwargs.get('readonly', True) is False
 
         # Force table locking mode
-        lockoptions = 'auto'
+        self._lockoptions = 'user'
 
+        # Remove any user supplied lockoptions
+        # warning if they were present
         try:
             userlockopt = kwargs.pop('lockoptions')
         except KeyError:
             pass
         else:
-            log.warn("lockoptions='%s' ignored by TableProxy. "
-                     "Locking is automatically handled "
-                     "in '%s' mode", userlockopt, lockoptions)
-
-        self._table = pt.table(table_name, lockoptions=lockoptions, **kwargs)
-        self._table.unlock()
+            if userlockopt != self._lockoptions:
+                log.warn("lockoptions='%s' ignored by TableProxy. "
+                         "Locking is automatically handled "
+                         "in '%s' mode", userlockopt, self._lockoptions)
 
     def __getstate__(self):
         return (self._table_name, self._kwargs)
@@ -60,29 +61,27 @@ class TableProxy(object):
 
     def __call__(self, fn, *args, **kwargs):
         # Don't lock for these functions
-        should_lock = fn not in ("close", "done")
+        fn_requires_lock = fn not in ("close", "done")
 
-        try:
-            # Acquire a lock and call the function
-            if should_lock:
-                self._table.lock(write=self._write_lock)
+        with TableCache.instance().open(self._table_name,
+                                        lockoptions=self._lockoptions,
+                                        **self._kwargs) as table:
+            try:
+                # Acquire a lock and call the function
+                if fn_requires_lock:
+                    table.lock(write=self._write_lock)
 
-            return getattr(self._table, fn)(*args, **kwargs)
-
-        finally:
-            # Release the lock
-            if should_lock:
-                self._table.unlock()
+                return getattr(table, fn)(*args, **kwargs)
+            finally:
+                # Release the lock
+                if fn_requires_lock:
+                    table.unlock()
 
 
 @sizeof.register(TableProxy)
 def sizeof_table_proxy(o):
-    """
-    Size only derived from members required to recreate.
-
-    This deceives dask into thinking that the proxy is small
-    and thus easy to copy in a distributed setting.
-    """
+    """ Correctly size the Table Proxy """
     return (getsizeof(o._table_name) +
             getsizeof(o._kwargs) +
-            getsizeof(o._write_lock))
+            getsizeof(o._write_lock) +
+            getsizeof(o._lockoptions))
