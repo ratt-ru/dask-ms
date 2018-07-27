@@ -5,6 +5,9 @@ History
 X.Y.Z (YYYY-MM-DD)
 ------------------
 
+0.1.3 (2018-07-27)
+------------------
+
 * Introduce per-process table caching (:pr:`17`)
 
 0.1.2 (2018-07-20)
