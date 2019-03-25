@@ -14,6 +14,8 @@ import os.path
 
 import dask
 import dask.array as da
+import dask.blockwise as db
+from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 import pyrap.tables as pt
 from six import string_types
@@ -339,12 +341,21 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
     return da.Array(dsk, name, ((1,) * out_chunk,), dtype=np.bool)
 
 
-def _chunk_getcols_np(table_proxy, column, shape, dtype,
-                      runs, resort=None):
+def _chunk_getcols_np(runs, resort=None,
+                      table_proxy=None, column=None,
+                      shape=None, dtype_=None):
+
+    # runs = runs[0]
+    # resort = resort[0]
+    print("runs", runs[0])
+    print("resorts", resort[0])
+    runs = runs[0]
+    resort = resort[0]
+
 
     nrows = np.sum(runs[:, 1])
 
-    result = np.empty((nrows,) + shape, dtype=dtype)
+    result = np.empty((nrows,) + shape, dtype=dtype_)
     rr = 0
 
     for rs, rl in runs:
@@ -357,8 +368,9 @@ def _chunk_getcols_np(table_proxy, column, shape, dtype,
     return result
 
 
-def _chunk_getcols_object(table_proxy, column, shape, dtype,
-                          runs, resort=None):
+def _chunk_getcols_object(runs, resort=None,
+                          table_proxy=None, column=None,
+                          shape=None, dtype_=None):
 
     nrows = np.sum(runs[:, 1])
 
@@ -369,7 +381,7 @@ def _chunk_getcols_object(table_proxy, column, shape, dtype,
     # Wrap objects (probably strings) in numpy arrays
     for rs, rl in runs:
         data = table_proxy("getcol", column, rs, rl)
-        result[rr:rr + rl] = np.asarray(data, dtype=dtype)
+        result[rr:rr + rl] = np.asarray(data, dtype=dtype_)
         rr += rl
 
     if resort is not None:
@@ -409,18 +421,45 @@ def generate_table_getcols(table_name, column, shape, dtype,
     :class:`dask.array.Arrays`
         Dask array representing the column
     """
-    token = dask.base.tokenize(table_name, column, row_runs)
+    token = dask.base.tokenize(table_name, column, row_runs, row_resorts)
     short_name = short_table_name(table_name)
     name = '-'.join((short_name, "getcol", column.lower(), token))
 
-    chunk_extra = shape[1:]
-    key_extra = (0,) * len(shape[1:])
+    schema = tuple(range(len(shape)))
+    print(row_runs, row_runs.compute())
+    print(row_resorts)
+
+
+    # chunk_extra = shape[1:]
+    # key_extra = (0,) * len(shape[1:])
 
     # infer the type of getter we should be using
     if isinstance(dtype, np.dtype):
         _get_fn = _chunk_getcols_np
     else:
         _get_fn = _chunk_getcols_object
+
+    layers = db.blockwise(_get_fn, name, schema,
+                          row_runs.name, schema[0:1],
+                          row_resorts.name, schema[0:1],
+                          table_proxy=table_proxy,
+                          column=column,
+                          shape=shape[1:],
+                          dtype_=dtype,
+                          numblocks={
+                              row_runs.name: row_runs.numblocks,
+                              row_resorts.name: row_resorts.numblocks,
+                          })
+
+    graph = HighLevelGraph.from_collections(name, layers,
+                                            (row_runs, row_resorts))
+
+    row_chunks = tuple(run[:, 1].sum() for run in row_runs.compute())
+    chunks = (row_chunks,) + tuple((d,) for d in shape[1:])
+    A = da.Array(graph, name, chunks, dtype=dtype)
+    print(A)
+    A.compute(scheduler='sync')
+    return A
 
     # Iterate through the rows in groups of row_runs
     # For each iteration we generate one chunk
@@ -573,6 +612,15 @@ def xds_from_table_impl(table_name, table,
     row_runs, row_resorts = get_row_runs(rows, row_chunks,
                                          min_frag_level=min_frag_level,
                                          sort_dir="read")
+
+    import pdb; pdb.set_trace()
+
+    row_run_name = "row-run-" + dask.base.tokenize(row_runs)
+    row_runs = da.from_array(row_runs, name=row_run_name,
+                             asarray=False, chunks=1)
+    row_resort_name = "row-resort-" + dask.base.tokenize(row_resorts)
+    row_resorts = da.from_array(row_resorts, name=row_resort_name,
+                                asarray=False, chunks=1)
 
     # Insert arrays into dataset in sorted order
     data_arrays = collections.OrderedDict()
