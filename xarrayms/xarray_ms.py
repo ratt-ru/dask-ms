@@ -693,7 +693,7 @@ def xds_from_table(table_name, columns=None,
 
         It is also possible to supply a list of strings or dicts defining
         a sequence of schemas which are combined. Later elements in the
-        list former elements override previous elements. In the following
+        list override previous elements. In the following
         example, the standard UVW MS component name scheme is overridden
         with "my-uvw".
 
