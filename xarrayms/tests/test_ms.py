@@ -254,11 +254,12 @@ def test_table_schema(ms, group_cols, index_cols):
 
     assert xds[0].DATA.dims == ("row", "my-chan", "my-corr")
 
+    table_schema = {"DATA": ("my-chan", "my-corr")}
+
     xds = list(xds_from_ms(ms, columns=["DATA"],
                            group_cols=group_cols,
                            index_cols=index_cols,
-                           table_schema=["MS",
-                                         {"DATA": ("my-chan", "my-corr")}],
+                           table_schema=["MS", table_schema],
                            chunks={"row": 1e9}))
 
     assert xds[0].DATA.dims == ("row", "my-chan", "my-corr")

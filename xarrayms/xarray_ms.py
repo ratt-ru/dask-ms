@@ -670,7 +670,7 @@ def xds_from_table(table_name, columns=None,
     group_cols : list or tuple, optional
         List of columns on which to group the CASA table.
         Defaults to :code:`()`
-    table_schema : str or dict, optional
+    table_schema : dict or str or list of dict or str, optional
         A schema dictionary defining the dimension naming scheme for
         each column in the table. For example:
 
@@ -682,14 +682,24 @@ def xds_from_table(table_name, columns=None,
         :code:`('row', 'uvw')` and :code:`('row', 'chan', 'corr')`
         respectively.
 
-        Alternatively a string can be supplied, which will be matched
+        A string can be supplied, which will be matched
         against existing default schemas. Examples here include
         ``MS``, ``ANTENNA`` and ``SPECTRAL_WINDOW``
         corresponding to ``Measurement Sets`` the ``ANTENNA`` subtable
         and the ``SPECTRAL_WINDOW`` subtable, respectively.
 
-        If ``None`` is supplied, the end of ``table_name`` will be
+        By default, the end of ``table_name`` will be
         inspected to see if it matches any default schemas.
+
+        It is also possible to supply a list of strings or dicts defining
+        a sequence of schemas which are combined. Later elements in the
+        list former elements override previous elements. In the following
+        example, the standard UVW MS component name scheme is overridden
+        with "my-uvw".
+
+        .. code-block:: python
+
+            ["MS", {"UVW": ("my-uvw",)}]
 
     chunks : list of dicts or dict, optional
         A :code:`{dim: chunk}` dictionary, specifying the chunking
