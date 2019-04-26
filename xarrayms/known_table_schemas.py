@@ -39,8 +39,8 @@ MS_SCHEMA = {
     "OBSERVATION_ID":   ColumnSchema(()),
     "STATE_ID":         ColumnSchema(()),
     "BASELINE_REF":     ColumnSchema(()),
-    "UVW":              ColumnSchema(('(u,v,w)',)),
-    "UVW2":             ColumnSchema(('(u,v,w)',)),
+    "UVW":              ColumnSchema(('uvw',)),
+    "UVW2":             ColumnSchema(('uvw',)),
     "DATA":             ColumnSchema(('chan', 'corr')),
     "FLOAT_DATA":       ColumnSchema(('chan', 'corr')),
     "VIDEO_POINT":      ColumnSchema(('corr',)),
@@ -60,14 +60,14 @@ MS_SCHEMA = {
 }
 
 ANTENNA_SCHEMA = {
-    "POSITION":         ColumnSchema(('(x,y,z)',)),
-    "OFFSET":           ColumnSchema(('(x,y,z)',)),
+    "POSITION":         ColumnSchema(('xyz',)),
+    "OFFSET":           ColumnSchema(('xyz',)),
 }
 
 FIELD_SCHEMA = {
-    "DELAY_DIR":        ColumnSchema(('dir', 'poly+1')),
-    "PHASE_DIR":        ColumnSchema(('dir', 'poly+1')),
-    "REFERENCE_DIR":    ColumnSchema(('dir', 'poly+1')),
+    "DELAY_DIR":        ColumnSchema(('field-dir', 'field-poly')),
+    "PHASE_DIR":        ColumnSchema(('field-dir', 'field-poly')),
+    "REFERENCE_DIR":    ColumnSchema(('field-dir', 'field-poly')),
 }
 
 SPECTRAL_WINDOW = {
@@ -80,7 +80,7 @@ SPECTRAL_WINDOW = {
 POLARIZATION = {
     "NUM_CORR":         ColumnSchema(()),
     "CORR_TYPE":        ColumnSchema(('corr',)),
-    "CORR_PRODUCT":     ColumnSchema(('corr', 'cp_idx')),
+    "CORR_PRODUCT":     ColumnSchema(('corr', 'corrprod_idx')),
 }
 
 
