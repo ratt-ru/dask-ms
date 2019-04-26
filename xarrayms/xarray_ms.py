@@ -22,7 +22,7 @@ from six.moves import range
 import xarray as xr
 
 from xarrayms.table_proxy import TableProxy
-from xarrayms.known_table_schemas import registered_schemas
+from xarrayms.known_table_schemas import registered_schemas, ColumnSchema
 
 _DEFAULT_GROUP_COLUMNS = ["FIELD_ID", "DATA_DESC_ID"]
 _DEFAULT_INDEX_COLUMNS = ["TIME"]
@@ -520,9 +520,16 @@ def column_metadata(table, columns, table_schema, rows):
             # Generate an xarray dimension schema
             # from supplied or inferred schemas if possible
             try:
-                extra = table_schema[c].dims
+                col_schema = table_schema[c]
             except KeyError:
                 extra = tuple('%s-%d' % (c, i) for i in range(1, len(shape)))
+            else:
+                if isinstance(col_schema, ColumnSchema):
+                    extra = col_schema.dims
+                elif isinstance(col_schema, tuple):
+                    extra = col_schema
+                else:
+                    raise ValueError("Invalid column_schema %s" % col_schema)
 
             column_metadata[c] = (shape, ("row",) + extra, dtype)
 
@@ -842,9 +849,11 @@ def xds_from_ms(ms, columns=None, index_cols=None, group_cols=None, **kwargs):
     elif not isinstance(group_cols, list):
         group_cols = [group_cols]
 
+    kwargs.setdefault("table_schema", "MS")
+
     for ds in xds_from_table(ms, columns=columns,
                              index_cols=index_cols, group_cols=group_cols,
-                             table_schema="MS", **kwargs):
+                             **kwargs):
         yield ds
 
 

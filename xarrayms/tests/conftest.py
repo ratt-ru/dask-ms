@@ -18,6 +18,7 @@ def ms(tmpdir_factory):
     DATA_DESC_ID I4,
     SCAN_NUMBER I4,
     STATE_ID I4,
+    DATA C8 [NDIM=2, SHAPE=[16, 4]],
     TIME R8]
     LIMIT 10
     """ % fn
