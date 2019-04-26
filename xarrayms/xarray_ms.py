@@ -433,6 +433,14 @@ def generate_table_getcols(table_name, column, shape, dtype,
     return da.Array(dsk, name, chunks, dtype=dtype)
 
 
+def _search_schemas(table_name, schemas):
+    """ Guess the schema from the table name """
+    for k in schemas.keys():
+        if table_name.endswith('::' + k):
+            return schemas[k]
+    return {}
+
+
 def lookup_table_schema(table_name, lookup_str):
     """
     Attempts to heuristically generate a table schema dictionary,
@@ -456,21 +464,25 @@ def lookup_table_schema(table_name, lookup_str):
         e.g. :code:`{'UVW' : ('row', 'uvw'), 'DATA': ('row', 'chan', 'corr')}
     """
     schemas = registered_schemas()
+    table_schema = {}
 
     if lookup_str is None:
-        def _search_schemas(table_name, schemas):
-            """ Guess the schema from the table name """
-            for k in schemas.keys():
-                if table_name.endswith('::' + k):
-                    return schemas[k]
-            return {}
+        lookup_str = [None]
+    elif not isinstance(lookup_str, (tuple, list)):
+        lookup_str = [lookup_str]
 
-        return _search_schemas(table_name, schemas)
-    # Get a registered table schema
-    elif isinstance(lookup_str, string_types):
-        return schemas.get(lookup_str, {})
+    for ls in lookup_str:
+        if ls is None:
+            table_schema.update(_search_schemas(table_name, schemas))
+        elif isinstance(ls, collections.Mapping):
+            table_schema.update(ls)
+        # Get a registered table schema
+        elif isinstance(ls, string_types):
+            table_schema.update(schemas.get(ls, {}))
+        else:
+            raise TypeError("Invalid lookup_str type '%s'" % type(ls))
 
-    raise TypeError("Invalid lookup_str type '%s'" % type(lookup_str))
+    return table_schema
 
 
 def column_metadata(table, columns, table_schema, rows):
@@ -565,8 +577,7 @@ def xds_from_table_impl(table_name, table,
     table_schema = kwargs.get('table_schema', None)
     min_frag_level = kwargs.get('min_frag_level', False)
 
-    if not isinstance(table_schema, collections.Mapping):
-        table_schema = lookup_table_schema(table_name, table_schema)
+    table_schema = lookup_table_schema(table_name, table_schema)
 
     # Get column metadata
     col_metadata = column_metadata(table, columns, table_schema, rows)
