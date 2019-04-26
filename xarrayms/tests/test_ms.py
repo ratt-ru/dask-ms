@@ -14,6 +14,8 @@ from xarrayms.xarray_ms import (xds_from_ms,
                                 orderby_clause,
                                 where_clause)
 
+from xarrayms.known_table_schemas import MS_SCHEMA, ColumnSchema
+
 
 @pytest.mark.parametrize('group_cols', [
     [],
@@ -58,8 +60,6 @@ def test_ms_read(ms, group_cols, index_cols):
     ["ANTENNA1", "ANTENNA2", "TIME"]])
 def test_ms_write(ms, group_cols, index_cols):
     select_cols = ["STATE_ID"]
-
-    order = orderby_clause(index_cols)
 
     # Zero everything to be sure
     with pt.table(ms, readonly=False, lockoptions='auto') as table:
@@ -209,10 +209,57 @@ def test_unfragmented_ms(ms, group_cols, index_cols):
         return row_runs, row_resorts
 
     with patch(patch_target, side_effect=mock_row_runs) as patch_fn:
-        xds = list(xds_from_ms(ms, columns=index_cols,
+        xds = list(xds_from_ms(ms, columns=index_cols,  # noqa
                                group_cols=group_cols,
                                index_cols=index_cols,
                                min_frag_level=False,
                                chunks={"row": 1e9}))
 
         assert patch_fn.called_once_with(min_frag_level=False, sort_dir="read")
+
+
+@pytest.mark.parametrize('group_cols', [
+    ["DATA_DESC_ID"]])
+@pytest.mark.parametrize('index_cols', [
+    ["TIME"]])
+def test_table_schema(ms, group_cols, index_cols):
+    # Test default MS Schema
+    xds = list(xds_from_ms(ms, columns=["DATA"],
+                           group_cols=group_cols,
+                           index_cols=index_cols,
+                           chunks={"row": 1e9}))
+
+    assert xds[0].DATA.dims == ("row", "chan", "corr")
+
+    # Test custom column schema specified by ColumnSchema objet
+    table_schema = MS_SCHEMA.copy()
+    table_schema['DATA'] = ColumnSchema(("my-chan", "my-corr"))
+
+    xds = list(xds_from_ms(ms, columns=["DATA"],
+                           group_cols=group_cols,
+                           index_cols=index_cols,
+                           table_schema=table_schema,
+                           chunks={"row": 1e9}))
+
+    assert xds[0].DATA.dims == ("row", "my-chan", "my-corr")
+
+    # Test custom column schema specified by tuple object
+    table_schema['DATA'] = ("my-chan", "my-corr")
+
+    xds = list(xds_from_ms(ms, columns=["DATA"],
+                           group_cols=group_cols,
+                           index_cols=index_cols,
+                           table_schema=table_schema,
+                           chunks={"row": 1e9}))
+
+    assert xds[0].DATA.dims == ("row", "my-chan", "my-corr")
+
+    table_schema = {"DATA": ("my-chan", "my-corr")}
+
+    xds = list(xds_from_ms(ms, columns=["DATA"],
+                           group_cols=group_cols,
+                           index_cols=index_cols,
+                           table_schema=["MS", table_schema],
+                           chunks={"row": 1e9}))
+
+    assert xds[0].DATA.dims == ("row", "my-chan", "my-corr")

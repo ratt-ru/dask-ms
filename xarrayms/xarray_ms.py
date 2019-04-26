@@ -22,7 +22,7 @@ from six.moves import range
 import xarray as xr
 
 from xarrayms.table_proxy import TableProxy
-from xarrayms.known_table_schemas import registered_schemas
+from xarrayms.known_table_schemas import registered_schemas, ColumnSchema
 
 _DEFAULT_GROUP_COLUMNS = ["FIELD_ID", "DATA_DESC_ID"]
 _DEFAULT_INDEX_COLUMNS = ["TIME"]
@@ -83,7 +83,6 @@ def _get_row_runs(rows, chunks, sort=False, sort_dir="read"):
     row_runs = []
     resorts = []
     start_row = 0
-    nruns = 0
 
     for chunk, chunk_size in enumerate(chunks[0]):
         end_row = start_row + chunk_size
@@ -106,7 +105,7 @@ def _get_row_runs(rows, chunks, sort=False, sort_dir="read"):
                 inv_argsort[argsort] = np.arange(argsort.size, dtype=dtype)
                 resorts.append(inv_argsort)
             else:
-                raise ValueError("Invalid operation %s" % op)
+                raise ValueError("Invalid operation %s" % sort_dir)
 
             chunk_rows = sorted_chunk_rows
 
@@ -298,7 +297,6 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
         dask_array = data_array.data
         dims = data_array.dims
         chunks = dask_array.chunks
-        shape = dask_array.shape
 
         if dims[0] != 'row':
             raise ValueError("xds.%s.dims[0] != 'row'" % c)
@@ -435,6 +433,14 @@ def generate_table_getcols(table_name, column, shape, dtype,
     return da.Array(dsk, name, chunks, dtype=dtype)
 
 
+def _search_schemas(table_name, schemas):
+    """ Guess the schema from the table name """
+    for k in schemas.keys():
+        if table_name.endswith('::' + k):
+            return schemas[k]
+    return {}
+
+
 def lookup_table_schema(table_name, lookup_str):
     """
     Attempts to heuristically generate a table schema dictionary,
@@ -458,21 +464,25 @@ def lookup_table_schema(table_name, lookup_str):
         e.g. :code:`{'UVW' : ('row', 'uvw'), 'DATA': ('row', 'chan', 'corr')}
     """
     schemas = registered_schemas()
+    table_schema = {}
 
     if lookup_str is None:
-        def _search_schemas(table_name, schemas):
-            """ Guess the schema from the table name """
-            for k in schemas.keys():
-                if table_name.endswith('::' + k):
-                    return schemas[k]
-            return {}
+        lookup_str = [None]
+    elif not isinstance(lookup_str, (tuple, list)):
+        lookup_str = [lookup_str]
 
-        return _search_schemas(table_name, schemas)
-    # Get a registered table schema
-    elif isinstance(lookup_str, string_types):
-        return schemas.get(lookup_str, {})
+    for ls in lookup_str:
+        if ls is None:
+            table_schema.update(_search_schemas(table_name, schemas))
+        elif isinstance(ls, collections.Mapping):
+            table_schema.update(ls)
+        # Get a registered table schema
+        elif isinstance(ls, string_types):
+            table_schema.update(schemas.get(ls, {}))
+        else:
+            raise TypeError("Invalid lookup_str type '%s'" % type(ls))
 
-    raise TypeError("Invalid table_schema type '%s'" % type(table_schema))
+    return table_schema
 
 
 def column_metadata(table, columns, table_schema, rows):
@@ -520,9 +530,16 @@ def column_metadata(table, columns, table_schema, rows):
             # Generate an xarray dimension schema
             # from supplied or inferred schemas if possible
             try:
-                extra = table_schema[c].dims
+                col_schema = table_schema[c]
             except KeyError:
                 extra = tuple('%s-%d' % (c, i) for i in range(1, len(shape)))
+            else:
+                if isinstance(col_schema, ColumnSchema):
+                    extra = col_schema.dims
+                elif isinstance(col_schema, tuple):
+                    extra = col_schema
+                else:
+                    raise ValueError("Invalid column_schema %s" % col_schema)
 
             column_metadata[c] = (shape, ("row",) + extra, dtype)
 
@@ -560,8 +577,7 @@ def xds_from_table_impl(table_name, table,
     table_schema = kwargs.get('table_schema', None)
     min_frag_level = kwargs.get('min_frag_level', False)
 
-    if not isinstance(table_schema, collections.Mapping):
-        table_schema = lookup_table_schema(table_name, table_schema)
+    table_schema = lookup_table_schema(table_name, table_schema)
 
     # Get column metadata
     col_metadata = column_metadata(table, columns, table_schema, rows)
@@ -654,7 +670,7 @@ def xds_from_table(table_name, columns=None,
     group_cols : list or tuple, optional
         List of columns on which to group the CASA table.
         Defaults to :code:`()`
-    table_schema : str or dict, optional
+    table_schema : dict or str or list of dict or str, optional
         A schema dictionary defining the dimension naming scheme for
         each column in the table. For example:
 
@@ -666,14 +682,24 @@ def xds_from_table(table_name, columns=None,
         :code:`('row', 'uvw')` and :code:`('row', 'chan', 'corr')`
         respectively.
 
-        Alternatively a string can be supplied, which will be matched
+        A string can be supplied, which will be matched
         against existing default schemas. Examples here include
         ``MS``, ``ANTENNA`` and ``SPECTRAL_WINDOW``
         corresponding to ``Measurement Sets`` the ``ANTENNA`` subtable
         and the ``SPECTRAL_WINDOW`` subtable, respectively.
 
-        If ``None`` is supplied, the end of ``table_name`` will be
+        By default, the end of ``table_name`` will be
         inspected to see if it matches any default schemas.
+
+        It is also possible to supply a list of strings or dicts defining
+        a sequence of schemas which are combined. Later elements in the
+        list override previous elements. In the following
+        example, the standard UVW MS component name scheme is overridden
+        with "my-uvw".
+
+        .. code-block:: python
+
+            ["MS", {"UVW": ("my-uvw",)}]
 
     chunks : list of dicts or dict, optional
         A :code:`{dim: chunk}` dictionary, specifying the chunking
@@ -842,9 +868,11 @@ def xds_from_ms(ms, columns=None, index_cols=None, group_cols=None, **kwargs):
     elif not isinstance(group_cols, list):
         group_cols = [group_cols]
 
+    kwargs.setdefault("table_schema", "MS")
+
     for ds in xds_from_table(ms, columns=columns,
                              index_cols=index_cols, group_cols=group_cols,
-                             table_schema="MS", **kwargs):
+                             **kwargs):
         yield ds
 
 
