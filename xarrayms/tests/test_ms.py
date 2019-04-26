@@ -233,7 +233,7 @@ def test_table_schema(ms, group_cols, index_cols):
 
     # Test custom column schema specified by ColumnSchema objet
     table_schema = MS_SCHEMA.copy()
-    table_schema['DATA'] = ColumnSchema(("my_chan", "my_corr"))
+    table_schema['DATA'] = ColumnSchema(("my-chan", "my-corr"))
 
     xds = list(xds_from_ms(ms, columns=["DATA"],
                            group_cols=group_cols,
@@ -241,10 +241,10 @@ def test_table_schema(ms, group_cols, index_cols):
                            table_schema=table_schema,
                            chunks={"row": 1e9}))
 
-    assert xds[0].DATA.dims == ("row", "my_chan", "my_corr")
+    assert xds[0].DATA.dims == ("row", "my-chan", "my-corr")
 
     # Test custom column schema specified by tuple object
-    table_schema['DATA'] = ("my_chan", "my_corr")
+    table_schema['DATA'] = ("my-chan", "my-corr")
 
     xds = list(xds_from_ms(ms, columns=["DATA"],
                            group_cols=group_cols,
@@ -252,4 +252,4 @@ def test_table_schema(ms, group_cols, index_cols):
                            table_schema=table_schema,
                            chunks={"row": 1e9}))
 
-    assert xds[0].DATA.dims == ("row", "my_chan", "my_corr")
+    assert xds[0].DATA.dims == ("row", "my-chan", "my-corr")
