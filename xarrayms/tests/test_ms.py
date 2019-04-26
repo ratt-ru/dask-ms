@@ -61,8 +61,6 @@ def test_ms_read(ms, group_cols, index_cols):
 def test_ms_write(ms, group_cols, index_cols):
     select_cols = ["STATE_ID"]
 
-    order = orderby_clause(index_cols)
-
     # Zero everything to be sure
     with pt.table(ms, readonly=False, lockoptions='auto') as table:
         table.putcol("STATE_ID", np.full(table.nrows(), 0, dtype=np.int32))
@@ -211,7 +209,7 @@ def test_unfragmented_ms(ms, group_cols, index_cols):
         return row_runs, row_resorts
 
     with patch(patch_target, side_effect=mock_row_runs) as patch_fn:
-        xds = list(xds_from_ms(ms, columns=index_cols,
+        xds = list(xds_from_ms(ms, columns=index_cols,  # noqa
                                group_cols=group_cols,
                                index_cols=index_cols,
                                min_frag_level=False,
@@ -232,7 +230,6 @@ def test_table_schema(ms, group_cols, index_cols):
                            chunks={"row": 1e9}))
 
     assert xds[0].DATA.dims == ("row", "chan", "corr")
-
 
     # Test custom column schema specified by ColumnSchema objet
     table_schema = MS_SCHEMA.copy()

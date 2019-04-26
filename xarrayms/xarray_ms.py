@@ -83,7 +83,6 @@ def _get_row_runs(rows, chunks, sort=False, sort_dir="read"):
     row_runs = []
     resorts = []
     start_row = 0
-    nruns = 0
 
     for chunk, chunk_size in enumerate(chunks[0]):
         end_row = start_row + chunk_size
@@ -106,7 +105,7 @@ def _get_row_runs(rows, chunks, sort=False, sort_dir="read"):
                 inv_argsort[argsort] = np.arange(argsort.size, dtype=dtype)
                 resorts.append(inv_argsort)
             else:
-                raise ValueError("Invalid operation %s" % op)
+                raise ValueError("Invalid operation %s" % sort_dir)
 
             chunk_rows = sorted_chunk_rows
 
@@ -298,7 +297,6 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
         dask_array = data_array.data
         dims = data_array.dims
         chunks = dask_array.chunks
-        shape = dask_array.shape
 
         if dims[0] != 'row':
             raise ValueError("xds.%s.dims[0] != 'row'" % c)
@@ -472,7 +470,7 @@ def lookup_table_schema(table_name, lookup_str):
     elif isinstance(lookup_str, string_types):
         return schemas.get(lookup_str, {})
 
-    raise TypeError("Invalid table_schema type '%s'" % type(table_schema))
+    raise TypeError("Invalid lookup_str type '%s'" % type(lookup_str))
 
 
 def column_metadata(table, columns, table_schema, rows):

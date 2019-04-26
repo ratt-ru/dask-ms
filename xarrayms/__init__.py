@@ -30,6 +30,6 @@ def get_logger():
 
 log = get_logger()
 
-from xarrayms.xarray_ms import (xds_from_table,
+from xarrayms.xarray_ms import (xds_from_table,             # noqa
                                 xds_to_table, xds_from_ms)  # noqa
 from xarrayms.table_proxy import TableProxy                 # noqa
