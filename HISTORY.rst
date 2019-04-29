@@ -5,6 +5,7 @@ History
 X.Y.Z (YYYY-MM-DD)
 ------------------
 
+* Support TAQL WHERE clause (:pr:`25`)
 * Support kwargs for pyrap.tables.table (:pr:`24`)
 * Table schema fixes (:pr:`23`)
 
