@@ -778,8 +778,13 @@ def xds_from_table(table_name, columns=None,
     elif not isinstance(group_cols, list):
         group_cols = [group_cols]
 
+    # Inspect the table
+    # Must use the same lockoptions as TableProxy otherwise
+    # we get casacore table locking issues
+    # https://github.com/ska-sa/xarray-ms/pull/25#issuecomment-487602212
     with pt.table(table_name, ack=False, lockoptions='user') as T:
         T.lock()
+
         columns = set(T.colnames() if columns is None else columns)
 
         # Handle the case where we group on each table row
@@ -867,6 +872,8 @@ def xds_from_table(table_name, columns=None,
                 yield xds_from_table_impl(table_name, T,
                                           columns.difference(group_cols),
                                           rows, chunks[0], **kwargs)
+
+        T.unlock()
 
 
 def xds_from_ms(ms, columns=None, index_cols=None, group_cols=None, **kwargs):
