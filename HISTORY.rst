@@ -5,6 +5,9 @@ History
 X.Y.Z (YYYY-MM-DD)
 ------------------
 
+* Support kwargs for pyrap.tables.table (:pr:`24`)
+* Table schema fixes (:pr:`23`)
+
 0.1.3 (2018-07-27)
 ------------------
 
