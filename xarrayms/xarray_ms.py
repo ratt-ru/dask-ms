@@ -264,7 +264,14 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
     columns : tuple or list, optional
         list of column names to write to the table.
         If ``None`` all columns will be written.
-    **kwargs : optional
+    table_kwargs : dict, optional
+        Keyword argument passed to the table constructor.
+        Defaults to None. The following disables logging of
+        table opening:
+
+        .. code-block:: python
+
+            xds_to_table("WSRT.MS", table_kwargs={'ack': False})
 
     Returns
     -------
@@ -274,9 +281,15 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
     """
 
     dsk = {}
-    table_proxy = TableProxy(table_name, readonly=False)
     rows = xds.table_row.values
     min_frag_level = kwargs.get('min_frag_level', False)
+    table_kwargs = kwargs.get('table_kwargs', {})
+
+    # Remove and complain if incorrect
+    if table_kwargs.pop('readonly', False) is True:
+        raise ValueError("'readonly=True' in xds_to_table table_kwargs")
+
+    table_proxy = TableProxy(table_name, readonly=False, **table_kwargs)
 
     if columns is None:
         columns = xds.data_vars.keys()
@@ -565,7 +578,7 @@ def xds_from_table_impl(table_name, table,
     chunks : dict
         The chunk size for the dimensions of the resulting
         :class:`dask.array.Array`s.
-    table_schema : str or dict
+    table_schema : str or dict, optional
         Table schema.
 
     Returns
@@ -576,6 +589,7 @@ def xds_from_table_impl(table_name, table,
 
     table_schema = kwargs.get('table_schema', None)
     min_frag_level = kwargs.get('min_frag_level', False)
+    table_kwargs = kwargs.get("table_kwargs", {})
 
     table_schema = lookup_table_schema(table_name, table_schema)
 
@@ -593,7 +607,11 @@ def xds_from_table_impl(table_name, table,
     # Insert arrays into dataset in sorted order
     data_arrays = collections.OrderedDict()
 
-    table_proxy = TableProxy(table_name)
+    # Remove and complain if incorrect
+    if table_kwargs.pop('readonly', True) is False:
+        raise ValueError("'readonly=False' in xds_from_table table_kwargs")
+
+    table_proxy = TableProxy(table_name, readonly=True, **table_kwargs)
 
     for column, (shape, dims, dtype) in col_metadata.items():
         col_dask_array = generate_table_getcols(table_name, column,
@@ -701,6 +719,15 @@ def xds_from_table(table_name, columns=None,
 
             ["MS", {"UVW": ("my-uvw",)}]
 
+    table_kwargs : dict, optional
+        Keyword argument passed to the table constructor.
+        Defaults to None. The following disables logging of
+        table opening:
+
+        .. code-block:: python
+
+            xds_from_table("WSRT.MS", table_kwargs={'ack': False})
+
     chunks : list of dicts or dict, optional
         A :code:`{dim: chunk}` dictionary, specifying the chunking
         strategy of each dimension in the schema.
@@ -742,7 +769,7 @@ def xds_from_table(table_name, columns=None,
     elif not isinstance(group_cols, list):
         group_cols = [group_cols]
 
-    with pt.table(table_name) as T:
+    with pt.table(table_name, ack=False) as T:
         columns = set(T.colnames() if columns is None else columns)
 
         # Handle the case where we group on each table row
