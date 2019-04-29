@@ -10,6 +10,7 @@ import pytest
 import xarray as xr
 
 from xarrayms.xarray_ms import (xds_from_ms,
+                                xds_from_table,
                                 xds_to_table,
                                 orderby_clause,
                                 where_clause)
@@ -263,3 +264,36 @@ def test_table_schema(ms, group_cols, index_cols):
                            chunks={"row": 1e9}))
 
     assert xds[0].DATA.dims == ("row", "my-chan", "my-corr")
+
+
+@pytest.mark.parametrize('group_cols', [
+    ["DATA_DESC_ID"]])
+@pytest.mark.parametrize('index_cols', [
+    ["TIME"]])
+def test_table_kwargs(ms, group_cols, index_cols):
+    # TODO(sjperkins)
+    # This really just test failure of table_kwargs,
+    # come up with some testing modification of the table
+    # object in the graph itself. lockoptions is not currently
+    # possible because we override it.
+
+    # Fail if we pass readonly=False table_kwargs
+    with pytest.raises(ValueError) as ex:
+        xds = list(xds_from_table(ms, table_kwargs={'readonly': False,
+                                                    'ack': False}))
+
+    expected = "'readonly=False' in xds_from_table table_kwargs"
+
+    assert expected in str(ex.value)
+
+    # Succeeds on normal
+    xds = list(xds_from_table(ms, table_kwargs={'ack': False}))
+
+    # Fail if we pass readonly=True table_kwargs
+    with pytest.raises(ValueError) as ex:
+        xds_to_table(xds[0], ms, "TIME",  table_kwargs={'readonly': True,
+                                                        'ack': False})
+
+    expected = "'readonly=True' in xds_to_table table_kwargs"
+
+    assert expected in str(ex.value)
