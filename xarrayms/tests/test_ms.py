@@ -297,3 +297,14 @@ def test_table_kwargs(ms, group_cols, index_cols):
     expected = "'readonly=True' in xds_to_table table_kwargs"
 
     assert expected in str(ex.value)
+
+
+@pytest.mark.parametrize('index_cols', [
+    ["TIME", "ANTENNA1", "ANTENNA2"]])
+def test_taql_where(ms, index_cols):
+    xds = list(xds_from_table(ms, taql_where="FIELD_ID >= 0 AND FIELD_ID < 2",
+                              columns=["FIELD_ID"],
+                              table_kwargs={'ack': False}))
+
+    assert len(xds) == 1
+    assert (xds[0].FIELD_ID.data.compute() == [0, 0, 0, 1, 1, 1, 1]).all()
