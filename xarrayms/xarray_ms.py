@@ -778,7 +778,8 @@ def xds_from_table(table_name, columns=None,
     elif not isinstance(group_cols, list):
         group_cols = [group_cols]
 
-    with pt.table(table_name, ack=False) as T:
+    with pt.table(table_name, ack=False, lockoptions='user') as T:
+        T.lock()
         columns = set(T.colnames() if columns is None else columns)
 
         # Handle the case where we group on each table row
