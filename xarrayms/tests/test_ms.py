@@ -308,3 +308,13 @@ def test_taql_where(ms, index_cols):
 
     assert len(xds) == 1
     assert (xds[0].FIELD_ID.data.compute() == [0, 0, 0, 1, 1, 1, 1]).all()
+
+    xds = list(xds_from_table(ms, taql_where="FIELD_ID >= 0 AND FIELD_ID < 2",
+                              group_cols=["DATA_DESC_ID", "SCAN_NUMBER"],
+                              columns=["FIELD_ID"],
+                              table_kwargs={'ack': False}))
+
+    assert len(xds) == 2
+
+    assert np.all(xds[0].FIELD_ID.data.compute() == [0, 0, 1, 1])
+    assert np.all(xds[1].FIELD_ID.data.compute() == [0, 1, 1])

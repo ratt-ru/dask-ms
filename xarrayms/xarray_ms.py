@@ -762,10 +762,7 @@ def xds_from_table(table_name, columns=None,
         elif isinstance(chunks, dict):
             chunks = [chunks]
 
-    try:
-        taql_where = "WHERE " + kwargs.pop("taql_where")
-    except KeyError:
-        taql_where = ""
+    taql_where = kwargs.pop("taql_where", "")
 
     if index_cols is None:
         index_cols = []
@@ -788,6 +785,7 @@ def xds_from_table(table_name, columns=None,
         if len(group_cols) == 1 and group_cols[0] == "__row__":
             # Get the rows giving the ordering
             orderby = orderby_clause(index_cols)
+            taql_where = "WHERE " + taql_where if taql_where else ""
             query = ("SELECT ROWID() AS __tablerow__ "
                      "FROM $T %s %s" % (orderby, taql_where)).strip()
 
@@ -815,9 +813,10 @@ def xds_from_table(table_name, columns=None,
             select = select_clause(group_cols + index_group_cols)
             groupby = groupby_clause(group_cols)
             orderby = orderby_clause(index_cols)
+            having = "HAVING " + taql_where if taql_where else ""
 
-            query = ("%s FROM $T %s %s %s" % (select, groupby, orderby,
-                                              taql_where)).strip()
+            query = ("%s FROM $T %s %s %s" % (
+                     select, groupby, having, orderby)).strip()
 
             with pt.taql(query) as gq:
                 # For each group
@@ -857,6 +856,7 @@ def xds_from_table(table_name, columns=None,
 
         # No grouping case
         else:
+            taql_where = "WHERE " + taql_where if taql_where else ""
             orderby = orderby_clause(index_cols)
             query = ("SELECT ROWID() as __tablerow__ "
                      "FROM $T %s %s" % (orderby, taql_where))
