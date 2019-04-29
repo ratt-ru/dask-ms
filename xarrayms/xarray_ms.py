@@ -728,6 +728,13 @@ def xds_from_table(table_name, columns=None,
 
             xds_from_table("WSRT.MS", table_kwargs={'ack': False})
 
+    taql_where : str, optional
+        TAQL where clause. For example, to exclude auto-correlations
+
+        .. code-block:: python
+
+            xds_from_table("WSRT.MS", taql_where="ANTENNA1 != ANTENNA2")
+
     chunks : list of dicts or dict, optional
         A :code:`{dim: chunk}` dictionary, specifying the chunking
         strategy of each dimension in the schema.
@@ -755,6 +762,8 @@ def xds_from_table(table_name, columns=None,
         elif isinstance(chunks, dict):
             chunks = [chunks]
 
+    taql_where = kwargs.pop("taql_where", "")
+
     if index_cols is None:
         index_cols = []
     elif isinstance(index_cols, tuple):
@@ -769,14 +778,22 @@ def xds_from_table(table_name, columns=None,
     elif not isinstance(group_cols, list):
         group_cols = [group_cols]
 
-    with pt.table(table_name, ack=False) as T:
+    # Inspect the table
+    # Must use the same lockoptions as TableProxy otherwise
+    # we get casacore table locking issues
+    # https://github.com/ska-sa/xarray-ms/pull/25#issuecomment-487602212
+    with pt.table(table_name, ack=False, lockoptions='user') as T:
+        T.lock()
+
         columns = set(T.colnames() if columns is None else columns)
 
         # Handle the case where we group on each table row
         if len(group_cols) == 1 and group_cols[0] == "__row__":
             # Get the rows giving the ordering
-            order = orderby_clause(index_cols)
-            query = "SELECT ROWID() AS __tablerow__ FROM $T %s" % order
+            orderby = orderby_clause(index_cols)
+            taql_where = "WHERE " + taql_where if taql_where else ""
+            query = ("SELECT ROWID() AS __tablerow__ "
+                     "FROM $T %s %s" % (orderby, taql_where)).strip()
 
             with pt.taql(query) as gq:
                 rows = gq.getcol("__tablerow__")
@@ -802,8 +819,10 @@ def xds_from_table(table_name, columns=None,
             select = select_clause(group_cols + index_group_cols)
             groupby = groupby_clause(group_cols)
             orderby = orderby_clause(index_cols)
+            having = "HAVING " + taql_where if taql_where else ""
 
-            query = "%s FROM $T %s %s" % (select, groupby, orderby)
+            query = ("%s FROM $T %s %s %s" % (
+                     select, groupby, having, orderby)).strip()
 
             with pt.taql(query) as gq:
                 # For each group
@@ -843,14 +862,18 @@ def xds_from_table(table_name, columns=None,
 
         # No grouping case
         else:
+            taql_where = "WHERE " + taql_where if taql_where else ""
+            orderby = orderby_clause(index_cols)
             query = ("SELECT ROWID() as __tablerow__ "
-                     "FROM $T %s" % orderby_clause(index_cols))
+                     "FROM $T %s %s" % (orderby, taql_where))
 
             with pt.taql(query) as gq:
                 rows = gq.getcol("__tablerow__")
                 yield xds_from_table_impl(table_name, T,
                                           columns.difference(group_cols),
                                           rows, chunks[0], **kwargs)
+
+        T.unlock()
 
 
 def xds_from_ms(ms, columns=None, index_cols=None, group_cols=None, **kwargs):
@@ -898,7 +921,8 @@ def xds_from_ms(ms, columns=None, index_cols=None, group_cols=None, **kwargs):
     kwargs.setdefault("table_schema", "MS")
 
     for ds in xds_from_table(ms, columns=columns,
-                             index_cols=index_cols, group_cols=group_cols,
+                             index_cols=index_cols,
+                             group_cols=group_cols,
                              **kwargs):
         yield ds
 

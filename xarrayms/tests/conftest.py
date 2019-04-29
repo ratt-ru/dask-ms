@@ -19,8 +19,8 @@ def ms(tmpdir_factory):
     DATA_DESC_ID I4,
     SCAN_NUMBER I4,
     STATE_ID I4,
-    DATA C8 [NDIM=2, SHAPE=[16, 4]],
-    TIME R8]
+    TIME R8,
+    DATA C8 [NDIM=2, SHAPE=[16, 4]]]
     LIMIT 10
     """ % fn
 
@@ -43,13 +43,13 @@ def ms(tmpdir_factory):
 
     # Create the table
     with pt.taql(create_table_query) as ms:
-        ms.putcol("TIME", time)
         ms.putcol("FIELD_ID", field)
         ms.putcol("DATA_DESC_ID", ddid)
         ms.putcol("ANTENNA1", ant1)
         ms.putcol("ANTENNA2", ant2)
         ms.putcol("SCAN_NUMBER", scan)
         ms.putcol("STATE_ID", state)
+        ms.putcol("TIME", time)
         ms.putcol("DATA", data)
 
     yield fn
