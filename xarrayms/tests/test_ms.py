@@ -302,6 +302,10 @@ def test_table_kwargs(ms, group_cols, index_cols):
 @pytest.mark.parametrize('index_cols', [
     ["TIME", "ANTENNA1", "ANTENNA2"]])
 def test_taql_where(ms, index_cols):
+    # three cases test here, corresponding to the
+    # if-elif-else ladder in xds_from_table
+
+    # No group_cols case
     xds = list(xds_from_table(ms, taql_where="FIELD_ID >= 0 AND FIELD_ID < 2",
                               columns=["FIELD_ID"],
                               table_kwargs={'ack': False}))
@@ -309,6 +313,7 @@ def test_taql_where(ms, index_cols):
     assert len(xds) == 1
     assert (xds[0].FIELD_ID.data.compute() == [0, 0, 0, 1, 1, 1, 1]).all()
 
+    # Group columns case
     xds = list(xds_from_table(ms, taql_where="FIELD_ID >= 0 AND FIELD_ID < 2",
                               group_cols=["DATA_DESC_ID", "SCAN_NUMBER"],
                               columns=["FIELD_ID"],
@@ -316,5 +321,28 @@ def test_taql_where(ms, index_cols):
 
     assert len(xds) == 2
 
+    # Check group id's
+    assert xds[0].DATA_DESC_ID == 0 and xds[0].SCAN_NUMBER == 0
+    assert xds[1].DATA_DESC_ID == 0 and xds[1].SCAN_NUMBER == 1
+
+    # Check field id's in each group
     assert np.all(xds[0].FIELD_ID.data.compute() == [0, 0, 1, 1])
     assert np.all(xds[1].FIELD_ID.data.compute() == [0, 1, 1])
+
+    # Group on each row
+    xds = list(xds_from_table(ms, taql_where="FIELD_ID >= 0 AND FIELD_ID < 2",
+                              group_cols=["__row__"],
+                              columns=["FIELD_ID"],
+                              table_kwargs={'ack': False}))
+
+    assert len(xds) == 7
+
+    xds = [ds.compute() for ds in xds]
+
+    assert np.all(xds[0].FIELD_ID == 0)
+    assert np.all(xds[1].FIELD_ID == 0)
+    assert np.all(xds[2].FIELD_ID == 0)
+    assert np.all(xds[3].FIELD_ID == 1)
+    assert np.all(xds[4].FIELD_ID == 1)
+    assert np.all(xds[5].FIELD_ID == 1)
+    assert np.all(xds[6].FIELD_ID == 1)
