@@ -346,3 +346,22 @@ def test_taql_where(ms, index_cols):
     assert np.all(xds[4].FIELD_ID == 1)
     assert np.all(xds[5].FIELD_ID == 1)
     assert np.all(xds[6].FIELD_ID == 1)
+
+
+def _proc_map_fn(args):
+    ms, i = args
+    xds = list(xds_from_ms(ms, columns=["STATE_ID"],
+                           group_cols=["FIELD_ID"],
+                           table_kwargs={'ack': False}))
+    xds[i].assign(STATE_ID=xds[i].STATE_ID + i)
+    write = xds_to_table(xds[i], ms, ["STATE_ID"], table_kwargs={'ack': False})
+    write.compute(scheduler='sync')
+    return True
+
+
+@pytest.mark.parametrize("nprocs", [3])
+def test_multiprocess_table(ms, nprocs):
+    from multiprocessing import Pool
+
+    pool = Pool(nprocs)
+    assert all(pool.map(_proc_map_fn, [tuple((ms, i)) for i in range(nprocs)]))
