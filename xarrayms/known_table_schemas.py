@@ -11,9 +11,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import attr
+from collections import namedtuple
 
-ColumnSchema = attr.make_class("ColumnSchema", ["dims"])
+ColumnSchema = namedtuple("ColumnSchema", ["dims"])
 
 # https://casa.nrao.edu/Memos/229.html#SECTION00061000000000000000
 MS_SCHEMA = {
