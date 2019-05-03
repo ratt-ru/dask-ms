@@ -353,7 +353,7 @@ def _proc_map_fn(args):
     xds = list(xds_from_ms(ms, columns=["STATE_ID"],
                            group_cols=["FIELD_ID"],
                            table_kwargs={'ack': False}))
-    xds[i].assign(STATE_ID=xds[i].STATE_ID + i)
+    xds[i] = xds[i].assign(STATE_ID=xds[i].STATE_ID + i)
     write = xds_to_table(xds[i], ms, ["STATE_ID"], table_kwargs={'ack': False})
     write.compute(scheduler='sync')
     return True
