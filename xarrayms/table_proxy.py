@@ -11,6 +11,9 @@ from xarrayms.table_cache import TableCache
 log = logging.getLogger(__name__)
 
 
+_LOCK_MODE = 'user'
+
+
 class TableProxy(object):
     """
     :class:`TableProxy` allows :class:`casacore.tables.table` objects
@@ -30,31 +33,29 @@ class TableProxy(object):
 
     """
 
-    def __init__(self, table_name, **kwargs):
+    def __init__(self, table_name, **table_kwargs):
+        # Set the default lockoptions
+        lockopts = table_kwargs.setdefault('lockoptions', _LOCK_MODE)
+
+        # Complain if the lock mode was non-default
+        if lockopts != _LOCK_MODE:
+            log.warn("lockoptions='%s' ignored by TableProxy. "
+                     "Locking is automatically handled "
+                     "in '%s' mode", lockopts, _LOCK_MODE)
+
+            table_kwargs["lockoptions"] = _LOCK_MODE
+
         self._table_name = table_name
-        # self._args = args
-        self._kwargs = kwargs
+        self._table_kwargs = table_kwargs
 
         # Should we request a write-lock?
-        self._write_lock = kwargs.get('readonly', True) is False
+        self._write_lock = table_kwargs.get('readonly', True) is False
 
-        # Force table locking mode
-        self._lockoptions = 'user'
-
-        # Remove any user supplied lockoptions
-        # warning if they were present
-        try:
-            userlockopt = kwargs.pop('lockoptions')
-        except KeyError:
-            pass
-        else:
-            if userlockopt != self._lockoptions:
-                log.warn("lockoptions='%s' ignored by TableProxy. "
-                         "Locking is automatically handled "
-                         "in '%s' mode", userlockopt, self._lockoptions)
+        # Compute the table key once
+        self._table_key = hash((table_name, frozenset(table_kwargs.items())))
 
     def __getstate__(self):
-        return (self._table_name, self._kwargs)
+        return (self._table_name, self._table_kwargs)
 
     def __setstate__(self, state):
         self.__init__(state[0], **state[1])
@@ -62,26 +63,17 @@ class TableProxy(object):
     def __call__(self, fn, *args, **kwargs):
         # Don't lock for these functions
         fn_requires_lock = fn not in ("close", "done")
+        lockopt = 1 + int(self._write_lock) if fn_requires_lock else 0
 
-        with TableCache.instance().open(self._table_name,
-                                        lockoptions=self._lockoptions,
-                                        **self._kwargs) as table:
-            try:
-                # Acquire a lock and call the function
-                if fn_requires_lock:
-                    table.lock(write=self._write_lock)
-
-                return getattr(table, fn)(*args, **kwargs)
-            finally:
-                # Release the lock
-                if fn_requires_lock:
-                    table.unlock()
+        with TableCache.instance().open(self._table_key, lockopt,
+                                        self._table_name,
+                                        self._table_kwargs) as table:
+            return getattr(table, fn)(*args, **kwargs)
 
 
 @sizeof.register(TableProxy)
 def sizeof_table_proxy(o):
     """ Correctly size the Table Proxy """
     return (getsizeof(o._table_name) +
-            getsizeof(o._kwargs) +
-            getsizeof(o._write_lock) +
-            getsizeof(o._lockoptions))
+            getsizeof(o._table_kwargs) +
+            getsizeof(o._write_lock))

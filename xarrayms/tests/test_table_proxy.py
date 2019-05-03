@@ -23,7 +23,7 @@ def test_table_proxy_pickle(ms, table_kwargs):
     # Table name match
     assert ntp._table_name == tp._table_name
     # Table creation kwargs match
-    assert ntp._kwargs == tp._kwargs
+    assert ntp._table_kwargs == tp._table_kwargs
 
     # Table reads match
     ant1 = tp("getcol", "ANTENNA1")
@@ -37,8 +37,7 @@ def test_table_proxy_sizeof(ms):
     tp = TableProxy(ms, readonly=False)
 
     size = getsizeof(tp._table_name)
-    size += getsizeof(tp._kwargs)
+    size += getsizeof(tp._table_kwargs)
     size += getsizeof(tp._write_lock)
-    size += getsizeof(tp._lockoptions)
 
     assert sizeof(tp) == size
