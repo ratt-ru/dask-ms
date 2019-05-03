@@ -18,8 +18,10 @@
 # relative to the documentation root, use os.path.abspath to make it
 # absolute, like shown here.
 #
+import importlib
 import os
 import sys
+
 sys.path.insert(0, os.path.abspath('..'))
 
 try:
@@ -37,9 +39,21 @@ class Mock(MagicMock):
         return obj
 
 
-MOCK_MODULES = ['dask', 'dask.array', 'dask.sizeof', 'numpy',
-                'pyrap', 'pyrap.tables', 'xarray']
-sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
+MOCK_MODULES = {}
+_MOCK_MODULES = ['dask', 'dask.array', 'dask.sizeof', 'numpy',
+                 'pyrap', 'pyrap.tables', 'xarray']
+
+# Don't mock if we can import it.
+# This allows us to build locally without
+# Mocks interfering with other imports.
+# e.g. np.__version__ getting tested by dask/scipy/astropy
+for m in _MOCK_MODULES:
+    try:
+        importlib.import_module(m)
+    except ImportError:
+        MOCK_MODULES[m] = Mock()
+
+sys.modules.update((k, v) for k, v in MOCK_MODULES.items())
 
 import sphinx_rtd_theme
 import xarrayms
