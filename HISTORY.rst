@@ -2,9 +2,10 @@
 History
 =======
 
-X.Y.Z (YYYY-MM-DD)
+0.1.4 (2019-05-03)
 ------------------
 
+* Upgrade dask version and remove attr dependency (:pr:`28`)
 * Fix user locking (:pr:`27`)
 * Support TAQL WHERE clause (:pr:`25`)
 * Support kwargs for pyrap.tables.table (:pr:`24`)
