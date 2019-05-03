@@ -19,17 +19,17 @@ class MismatchedLocks(Exception):
 
 
 class LockContext(object):
-    def __init__(self, rwlock, locktype):
-        self._rwlock = rwlock
+    def __init__(self, wrapper, locktype):
+        self._wrapper = wrapper
         self._locktype = locktype
 
     def __enter__(self):
-        self._rwlock.acquire(self._locktype)
-        return self._rwlock.table
+        self._wrapper.acquire(self._locktype)
+        return self._wrapper.table
 
     def __exit__(self, type, value, tb):
         if tb is None:
-            self._rwlock.release(self._locktype)
+            self._wrapper.release(self._locktype)
 
 
 class TableWrapper(object):
