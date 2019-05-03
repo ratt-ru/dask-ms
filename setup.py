@@ -8,16 +8,14 @@ except ImportError as e:
     raise ImportError("%s\nPlease install setuptools." % e)
 
 install_requires = [
-    "attrs >= 17.2.0",
-    "dask >= 0.18.0",
+    "dask[array] >= 1.1.0",
     "six >= 1.10.0",
-    "toolz >= 0.8.2",
     "xarray >= 0.10.0",
 ]
 
-#===================
+# ==================
 # Detect readthedocs
-#====================
+# ==================
 
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
 
