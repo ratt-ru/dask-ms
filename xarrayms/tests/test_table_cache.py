@@ -29,7 +29,7 @@ def test_table_cache(ms):
                                                 "only released two")),
 
 ])
-def test_locks(ms, lockseq):
+def test_table_wrapper_locks(ms, lockseq):
     table_wrapper = TableWrapper(ms, {'ack': False, 'readonly': False})
 
     reads = 0
@@ -72,7 +72,7 @@ def test_locks(ms, lockseq):
     assert table_wrapper.write is (writes > 0)
 
 
-def test_context_lock(ms):
+def test_table_wrapper_context_lock(ms):
     table_wrapper = TableWrapper(ms, {'ack': False})
 
     with table_wrapper.locked_table(0) as T:
