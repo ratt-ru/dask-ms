@@ -111,46 +111,26 @@ Tips
 
 To run a subset of tests::
 
-$ py.test tests.test_xarrayms
+$ py.test -vvv xarrayms/tests
 
 
 Deploying
 ---------
 
+A reminder for the maintainers on how to deploy.
+
 1. Update HISTORY.rst with the intended release number Z.Y.X and commit to git.
 
-2. Bump the version number. If your current version is Z.Y.W and
-   the new version is Z.Y.X call::
+2. Bump the version number with bump2version. This creates a new git commit,
+   as well as an annotated tag Z.Y.X for the release.
+   If your current version is Z.Y.W and the new version is Z.Y.X call::
 
-       $ python -m pip install bumpversion
-       $ bumpversion --current-version Z.Y.W --new-version Z.Y.X patch
+       $ python -m pip install bump2version
+       $ bump2version --current-version Z.Y.W --new-version Z.Y.X patch
 
-3. Create the source distribution::
+3. Push the release commit and new tag up::
 
-       $ python setup.py sdist
+       $ git push --follow-tags
 
-4. Install twine and upload the source distribution to the
-   pypi **test** server. Here, **pypitest** refers to to the
-   pypi test server setup in a ``.pypirc`` file.::
-
-        $ python -m pip install twine
-        $ python -m twine upload -r pypitest dist/xarray-Z.Y.X.tar.gz
-
-5. Test pypi install on different python versions,
-   running the test cases. ::
-
-       $ python -m virtualenv --python=pythonM.N test
-       $ source test/bin/activate
-       (test) $ pip install --index-url https://test.pypi.org/simple --extra-index-url https://pypi.org xarray-ms==Z.Y.X
-       (test) $ py.test /path/to/tests
-
-6. Upload the source distribution to the main pypi server. Here, **pypi**
-   refers to to the main pypi setup in a ``.pypirc`` file.::
-
-       $ python -m twine upload -r pypi dist/xarray-Z.Y.X.tar.gz
-
-7. Tag the release commit, push the release commits and tag to github.::
-
-       $ git tag Z.Y.X
-       $ git push
-       $ git push --tags
+4. Travis should automatically deploy the tagged release to PyPI
+   if the automated tests pass.
