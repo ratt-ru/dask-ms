@@ -39,7 +39,7 @@ def ms(tmpdir_factory):
 
     data_shape = (len(state), 16, 4)
 
-    data = np.random.random(data_shape) + np.random.random(data_shape)*1j
+    data = np.random.random(data_shape) + np.random.random(data_shape) * 1j
 
     # Create the table
     with pt.taql(create_table_query) as ms:

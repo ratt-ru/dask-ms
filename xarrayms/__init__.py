@@ -8,4 +8,3 @@ __version__ = '0.1.4'
 
 from xarrayms.xarray_ms import (xds_from_table,             # noqa
                                 xds_to_table, xds_from_ms)  # noqa
-from xarrayms.table_proxy import TableProxy                 # noqa

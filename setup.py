@@ -1,4 +1,5 @@
 import os
+import sys
 
 try:
     from setuptools import setup, find_packages
@@ -7,11 +8,17 @@ try:
 except ImportError as e:
     raise ImportError("%s\nPlease install setuptools." % e)
 
+
+PY2 = sys.version_info[0] == 2
+
 install_requires = [
     "dask[array] >= 1.1.0",
     "six >= 1.10.0",
     "xarray >= 0.10.0",
 ]
+
+if PY2:
+    install_requires.append("futures >= 3.2.0")
 
 # ==================
 # Detect readthedocs

@@ -2,16 +2,23 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from xarrayms.table_cache import TableCache, TableWrapper, MismatchedLocks
+import numpy as np
+from numpy.testing import assert_array_equal
 import pytest
 
+from xarrayms.table_executor import (TableProxy, TableWrapper, MismatchedLocks)
 
-def test_table_cache(ms):
-    key = TableCache.register(ms, {'ack': False})
 
-    with TableCache.acquire(key, 1) as table:
-        ant1 = table.getcol("ANTENNA1")  # noqa
-        ant2 = table.getcol("ANTENNA2")  # noqa
+def test_table_proxy(ms):
+    proxy = TableProxy(ms)
+    data = proxy.getcol("STATE_ID", startrow=0, nrow=10).result()
+    new_data = np.arange(data.size, 0, -1)
+    proxy.putcol("STATE_ID", new_data).result()
+
+    result = np.empty_like(data)
+    proxy.getcolnp("STATE_ID", result, startrow=0, nrow=10).result()
+
+    assert_array_equal(new_data, result)
 
 
 @pytest.mark.parametrize("lockseq", [
@@ -30,7 +37,7 @@ def test_table_cache(ms):
 
 ])
 def test_table_wrapper_locks(ms, lockseq):
-    table_wrapper = TableWrapper(ms, {'ack': False, 'readonly': False})
+    table_wrapper = TableWrapper(ms)
 
     reads = 0
     writes = 0
