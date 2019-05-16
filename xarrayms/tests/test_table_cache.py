@@ -7,7 +7,9 @@ import pytest
 
 
 def test_table_cache(ms):
-    with TableCache.instance().open(1, 1, ms, {'ack': False}) as table:
+    key = TableCache.register(ms, {'ack': False})
+
+    with TableCache.acquire(key, 1) as table:
         ant1 = table.getcol("ANTENNA1")  # noqa
         ant2 = table.getcol("ANTENNA2")  # noqa
 
@@ -68,16 +70,3 @@ def test_table_wrapper_locks(ms, lockseq):
     assert table_wrapper.writelocks == writes
     assert table_wrapper.table.haslock(table_wrapper.write) is have_locks
     assert table_wrapper.write is (writes > 0)
-
-
-def test_table_wrapper_context_lock(ms):
-    table_wrapper = TableWrapper(ms, {'ack': False})
-
-    with table_wrapper.locked_table(0) as T:
-        assert T.nrows() == 10
-
-    with table_wrapper.locked_table(1) as T:
-        assert T.nrows() == 10
-
-    with table_wrapper.locked_table(2) as T:
-        assert T.nrows() == 10

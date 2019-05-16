@@ -240,10 +240,10 @@ def _chunk_putcols_np(table_proxy, column, runs, data, resort=None):
     if resort is not None:
         data = data[resort]
 
-    for rs, rl in runs:
-        table_proxy("putcol", column, data[rr:rr + rl],
-                    startrow=rs, nrow=rl)
-        rr += rl
+    with table_proxy.write_locked() as table:
+        for rs, rl in runs:
+            table.putcol(column, data[rr:rr + rl], startrow=rs, nrow=rl)
+            rr += rl
 
     return np.full(runs.shape[0], True)
 
@@ -358,9 +358,10 @@ def _chunk_getcols_np(table_proxy, column, shape, dtype,
     result = np.empty((nrows,) + shape, dtype=dtype)
     rr = 0
 
-    for rs, rl in runs:
-        table_proxy("getcolnp", column, result[rr:rr + rl], rs, rl)
-        rr += rl
+    with table_proxy.read_locked() as table:
+        for rs, rl in runs:
+            table.getcolnp(column, result[rr:rr + rl], rs, rl)
+            rr += rl
 
     if resort is not None:
         return result[resort]
@@ -378,10 +379,11 @@ def _chunk_getcols_object(table_proxy, column, shape, dtype,
     rr = 0
 
     # Wrap objects (probably strings) in numpy arrays
-    for rs, rl in runs:
-        data = table_proxy("getcol", column, rs, rl)
-        result[rr:rr + rl] = np.asarray(data, dtype=dtype)
-        rr += rl
+    with table_proxy.read_locked() as table:
+        for rs, rl in runs:
+            data = table.getcol(column, rs, rl)
+            result[rr:rr + rl] = np.asarray(data, dtype=dtype)
+            rr += rl
 
     if resort is not None:
         return result[resort]

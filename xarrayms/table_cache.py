@@ -1,6 +1,8 @@
 import atexit
 from collections import defaultdict
 from contextlib import contextmanager
+import logging
+from pprint import pformat
 
 try:
     from dask.utils import SerializableLock as Lock
@@ -9,6 +11,8 @@ except ImportError:
 
 import pyrap.tables as pt
 
+log = logging.getLogger(__name__)
+
 NOLOCK = 0
 READLOCK = 1
 WRITELOCK = 2
@@ -16,20 +20,6 @@ WRITELOCK = 2
 
 class MismatchedLocks(Exception):
     pass
-
-
-class LockContext(object):
-    def __init__(self, wrapper, locktype):
-        self._wrapper = wrapper
-        self._locktype = locktype
-
-    def __enter__(self):
-        self._wrapper.acquire(self._locktype)
-        return self._wrapper.table
-
-    def __exit__(self, type, value, tb):
-        if tb is None:
-            self._wrapper.release(self._locktype)
 
 
 class TableWrapper(object):
@@ -49,14 +39,16 @@ class TableWrapper(object):
         self.table_name = table_name
         self.table_kwargs = table_kwargs
         self.table = pt.table(table_name, **table_kwargs)
+        self.lock = Lock()
         self.readlocks = 0
         self.writelocks = 0
         self.write = False
         self.writeable = self.table.iswritable()
         self.refcount = 0
 
-    def locked_table(self, locktype):
-        return LockContext(self, locktype)
+    def close(self):
+        if self.table is not None:
+            self.table.close()
 
     def acquire(self, locktype):
         if locktype == READLOCK:
@@ -79,8 +71,6 @@ class TableWrapper(object):
             pass
         else:
             raise ValueError("Invalid lock type %d" % locktype)
-
-        self.refcount += 1
 
     def release(self, locktype):
         if locktype == READLOCK:
@@ -118,10 +108,6 @@ class TableWrapper(object):
         else:
             raise ValueError("Invalid lock type %d" % locktype)
 
-        # TODO(sjperkins)
-        # Intelligently close tables whose refcount drops to zero
-        self.refcount -= 1
-
 
 class TableCache(object):
     __cache_lock = Lock()
@@ -144,8 +130,10 @@ class TableCache(object):
         return cls.__instance
 
     @classmethod
-    @contextmanager
-    def open(cls, key, locktype, table_name, table_kwargs):
+    def register(cls, table_name, table_kwargs):
+        # key = hash((table_name, frozenset(table_kwargs.items())))
+        key = table_name
+
         with cls.__cache_lock:
             try:
                 table_wrapper = cls.__cache[key]
@@ -153,23 +141,51 @@ class TableCache(object):
                 table_wrapper = TableWrapper(table_name, table_kwargs)
                 cls.__cache[key] = table_wrapper
 
-            # TODO(sjperkins)
-            # Clear old tables intelligently
-            if len(cls.__cache) > cls.__maxsize:
-                raise ValueError("Cache size exceeded")
+            table_wrapper.refcount += 1
 
+        if table_wrapper.table_kwargs != table_kwargs:
+            log.warn("Table kwarg mismatch\n%s\nvs\n%s" % (
+                                pformat(table_kwargs),
+                                pformat(table_wrapper.table_kwargs)))
+
+        return key
+
+    @classmethod
+    def deregister(cls, key):
+        with cls.__cache_lock:
+            try:
+                table_wrapper = cls.__cache[key]
+            except KeyError:
+                return
+
+            if table_wrapper.refcount == 1:
+                table_wrapper.close()
+                del cls.__cache[key]
+
+    @classmethod
+    @contextmanager
+    def acquire(cls, key, locktype):
+        with cls.__cache_lock:
+            try:
+                table_wrapper = cls.__cache[key]
+            except KeyError:
+                raise KeyError("No key '%s' registered in table cache" % key)
+
+        with table_wrapper.lock:
             table_wrapper.acquire(locktype)
 
-        try:
-            yield table_wrapper.table
-        finally:
-            with cls.__cache_lock:
+            try:
+                yield table_wrapper.table
+            finally:
                 table_wrapper.release(locktype)
 
     @classmethod
     def clear(cls):
         with cls.__cache_lock:
+            for k, table_wrapper in cls.__cache.items():
+                table_wrapper.close()
+
             cls.__cache.clear()
 
 
-atexit.register(lambda: TableCache.instance().clear())
+atexit.register(TableCache.clear)

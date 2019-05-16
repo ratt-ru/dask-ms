@@ -14,8 +14,8 @@ from xarrayms import TableProxy
 
 
 @pytest.mark.parametrize("table_kwargs", [
-    {'readonly': True},
-    {'readonly': False}])
+    {'readonly': True, 'ack': False},
+    {'readonly': False, 'ack': False}])
 def test_table_proxy_pickle(ms, table_kwargs):
     tp = TableProxy(ms, **table_kwargs)
     ntp = pickle.loads(pickle.dumps(tp))
@@ -26,18 +26,20 @@ def test_table_proxy_pickle(ms, table_kwargs):
     assert ntp._table_kwargs == tp._table_kwargs
 
     # Table reads match
-    ant1 = tp("getcol", "ANTENNA1")
-    ant2 = tp("getcol", "ANTENNA2")
+    with tp.read_locked() as table:
+        ant1 = table.getcol("ANTENNA1")
+        ant2 = table.getcol("ANTENNA2")
 
-    assert np.all(ant1 == ntp("getcol", "ANTENNA1"))
-    assert np.all(ant2 == ntp("getcol", "ANTENNA2"))
+    with ntp.read_locked() as new_table:
+        assert np.all(ant1 == new_table.getcol("ANTENNA1"))
+        assert np.all(ant2 == new_table.getcol("ANTENNA2"))
 
 
 def test_table_proxy_sizeof(ms):
-    tp = TableProxy(ms, readonly=False)
+    tp = TableProxy(ms, readonly=False, ack=False)
 
     size = getsizeof(tp._table_name)
     size += getsizeof(tp._table_kwargs)
-    size += getsizeof(tp._write_lock)
+    size += getsizeof(tp._table_key)
 
     assert sizeof(tp) == size
