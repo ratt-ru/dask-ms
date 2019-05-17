@@ -23,6 +23,7 @@ from six.moves import range
 import xarray as xr
 
 from xarrayms.table_executor import TableProxy
+from xarrayms.distributed_support import secede, rejoin
 from xarrayms.known_table_schemas import registered_schemas, ColumnSchema
 
 _DEFAULT_GROUP_COLUMNS = ["FIELD_ID", "DATA_DESC_ID"]
@@ -249,8 +250,13 @@ def _chunk_putcols_np(table_proxy, column, runs, data, resort=None):
         futures.append(future)
         rr += rl
 
-    for f in cf.as_completed(futures):
-        f.result()
+    # Secede while we wait for MS I/O to complete
+    try:
+        secede(adjust=True)
+        for f in cf.as_completed(futures):
+            f.result()
+    finally:
+        rejoin()
 
     return np.full(runs.shape[0], True)
 
@@ -358,8 +364,13 @@ def _chunk_getcols_np(table_proxy, column, shape, dtype,
         futures.append(future)
         rr += rl
 
-    for f in cf.as_completed(futures):
-        f.result()
+    # Secede while we wait for MS I/O to complete
+    try:
+        secede(adjust=True)
+        for f in cf.as_completed(futures):
+            f.result()
+    finally:
+        rejoin()
 
     if resort is not None:
         return result[resort]
@@ -381,9 +392,14 @@ def _chunk_getcols_object(table_proxy, column, shape, dtype,
 
     rr = 0
 
-    for (rs, rl), future in zip(runs, futures):
-        result[rr:rr + rl] = np.asarray(future.result(), dtype=dtype)
-        rr += rl
+    # Secede while we wait for MS I/O to complete
+    try:
+        secede(adjust=True)
+        for (rs, rl), future in zip(runs, futures):
+            result[rr:rr + rl] = np.asarray(future.result(), dtype=dtype)
+            rr += rl
+    finally:
+        rejoin()
 
     if resort is not None:
         return result[resort]
