@@ -5,6 +5,8 @@ import numpy as np
 import pyrap.tables as pt
 import pytest
 
+from xarrayms.table_executor import TableExecutor
+
 
 @pytest.fixture(scope="session")
 def ms(tmpdir_factory):
@@ -53,6 +55,8 @@ def ms(tmpdir_factory):
         ms.putcol("DATA", data)
 
     yield fn
+
+    TableExecutor.close(wait=True)
 
     # Remove the temporary directory
     shutil.rmtree(str(msdir))
