@@ -11,6 +11,11 @@ except ImportError as e:
 
 PY2 = sys.version_info[0] == 2
 
+extras_require = {
+    'testing': ['pytest', 'pytest-runner']
+}
+
+
 install_requires = [
     "dask[array] >= 1.1.0",
     "six >= 1.10.0",
@@ -33,12 +38,6 @@ if not on_rtd:
         "python-casacore >= 2.2.1",
     ]
 
-setup_requirements = ['pytest-runner', ]
-
-test_requirements = [
-    'pytest',
-    'mock']
-
 
 def readme():
     with open("README.rst") as f:
@@ -59,9 +58,8 @@ setup(name='xarray-ms',
           "Topic :: Software Development :: Libraries :: Python Modules",
           "Topic :: Scientific/Engineering :: Astronomy",
       ],
+      extras_require=extras_require,
       install_requires=install_requires,
-      setup_requires=setup_requirements,
-      tests_require=test_requirements,
       author='Simon Perkins',
       author_email='sperkins@ska.ac.za',
       packages=find_packages(),
