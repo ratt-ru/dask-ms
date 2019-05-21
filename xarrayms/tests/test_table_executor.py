@@ -2,11 +2,16 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
+import shutil
+
 import numpy as np
 from numpy.testing import assert_array_equal
+import pyrap.tables as pt
 import pytest
 
-from xarrayms.table_executor import (TableProxy, TableWrapper, MismatchedLocks)
+from xarrayms.table_executor import (TableExecutor, TableProxy,
+                                     TableWrapper, MismatchedLocks)
 
 
 def test_table_proxy(ms):
@@ -19,6 +24,95 @@ def test_table_proxy(ms):
     proxy.getcolnp("STATE_ID", result, startrow=0, nrow=10).result()
 
     assert_array_equal(new_data, result)
+
+
+def test_table_executor_with_proxies(tmpdir, ms):
+    from xarrayms.table_executor import _thread_local
+
+    # Clear any state in the TableExecutor
+    TableExecutor.close(wait=True)
+
+    ms2 = os.path.join(str(tmpdir), os.path.split(ms)[1])
+    shutil.copytree(ms, ms2)
+
+    with pt.table(ms, ack=False) as T:
+        time = T.getcol("TIME")
+
+    proxy_one = TableProxy(ms)
+    proxy_two = TableProxy(ms2)
+    proxy_three = TableProxy(ms)
+
+    # Extract executors from the cache
+    cache = TableExecutor._TableExecutor__cache
+    refcounts = TableExecutor._TableExecutor__refcounts
+    ex1 = cache[ms]
+    ex2 = cache[ms2]
+
+    # table name should be in thread local, but not the wrapper
+    assert ex1.submit(getattr, _thread_local, "table_name").result() == ms
+    assert ex1.submit(getattr, _thread_local, "wrapper", None).result() is None
+    # 2 references to ms
+    assert refcounts[ms] == 2
+
+    assert ex2.submit(getattr, _thread_local, "table_name").result() == ms2
+    assert ex2.submit(getattr, _thread_local, "wrapper", None).result() is None
+    # 1 reference to ms
+    assert refcounts[ms2] == 1
+    assert sorted(cache.keys()) == sorted([ms, ms2])
+
+    # Request data, check that it's valid and
+    # check that the wrapper has been created
+    assert_array_equal(proxy_one.getcol("TIME").result(), time)
+    assert_array_equal(proxy_two.getcol("TIME").result(), time)
+    res = ex1.submit(getattr, _thread_local, "wrapper", None).result()
+    assert res is not None
+    res = ex2.submit(getattr, _thread_local, "wrapper", None).result()
+    assert res is not None
+
+    # Close the first proxy, there should be one reference to  ms now
+    proxy_one.close()
+    assert refcounts[ms] == 1
+    assert sorted(cache.keys()) == sorted([ms, ms2])
+
+    # Wrapper still exists on the first executor
+    assert ex1.submit(getattr, _thread_local, "table_name").result() == ms
+    res = ex1.submit(getattr, _thread_local, "wrapper", None).result()
+    assert res is not None
+
+    # Close the third proxy, there should be no references to ms now
+    proxy_three.close()
+
+    # Wrapper still exists on the second executor
+    assert ex2.submit(getattr, _thread_local, "table_name").result() == ms2
+    res = ex2.submit(getattr, _thread_local, "wrapper", None).result()
+    assert res is not None
+
+    assert ms not in refcounts
+    assert sorted(cache.keys()) == [ms2]
+
+    # Executor has been shutdown
+    match_str = "cannot schedule new futures after shutdown"
+    with pytest.raises(RuntimeError, match=match_str):
+        ex1.submit(lambda: True).result()
+
+    # Close the last proxy, there should be nothing left
+    proxy_two.close()
+    assert ms2 not in refcounts
+    assert len(cache) == 0
+
+    with pytest.raises(RuntimeError, match=match_str):
+        ex2.submit(lambda: True).result()
+
+    # Re-create
+    proxy_one = TableProxy(ms)
+    proxy_two = TableProxy(ms2)
+    proxy_three = TableProxy(ms)
+
+    assert sorted(cache.keys()) == sorted([ms, ms2])
+
+    TableExecutor.close(wait=True)
+
+    assert len(cache) == 0
 
 
 @pytest.mark.parametrize("lockseq", [
