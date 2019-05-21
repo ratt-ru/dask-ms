@@ -1,11 +1,8 @@
-import shutil
 import os
 
 import numpy as np
 import pyrap.tables as pt
 import pytest
-
-from xarrayms.table_executor import TableExecutor
 
 
 @pytest.fixture(scope="session")
