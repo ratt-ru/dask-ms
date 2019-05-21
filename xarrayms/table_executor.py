@@ -233,8 +233,8 @@ class TableExecutor(object):
     def close(cls, wait=False):
         """ Closes the pool and associated table cache """
         with cls.__cache_lock:
-            for name, executor in cls.__cache.items():
-                executor.submit(_table_close)
+            for table_name, executor in cls.__cache.items():
+                executor.submit(_table_close, table_name)
                 executor.shutdown(wait=wait)
 
             cls.__cache.clear()

@@ -64,10 +64,10 @@ def test_table_executor_with_proxies(tmpdir, ms):
     # check that the wrapper has been created
     assert_array_equal(proxy_one.getcol("TIME").result(), time)
     assert_array_equal(proxy_two.getcol("TIME").result(), time)
-    res = ex1.submit(getattr, _thread_local, "wrapper", None).result()
-    assert res is not None
-    res = ex2.submit(getattr, _thread_local, "wrapper", None).result()
-    assert res is not None
+    tab1 = ex1.submit(getattr, _thread_local, "wrapper", None).result()
+    assert tab1 is not None
+    tab2 = ex2.submit(getattr, _thread_local, "wrapper", None).result()
+    assert tab2 is not None
 
     # Close the first proxy, there should be one reference to  ms now
     proxy_one.close()
@@ -111,8 +111,12 @@ def test_table_executor_with_proxies(tmpdir, ms):
     assert sorted(cache.keys()) == sorted([ms, ms2])
 
     TableExecutor.close(wait=True)
-
     assert len(cache) == 0
+
+    # Table's should be closed but force close before
+    # the temporary directory disappears
+    tab1.table.close()
+    tab2.table.close()
 
 
 @pytest.mark.parametrize("lockseq", [
