@@ -55,4 +55,5 @@ def ms(tmp_path_factory):
 
     # Remove the temporary directory
     # except it causes issues with casacore files on py3
+    # https://github.com/ska-sa/xarray-ms/issues/32
     # shutil.rmtree(str(msdir))
