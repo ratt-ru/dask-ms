@@ -195,8 +195,6 @@ class TableExecutor(object):
         except KeyError:
             return False
 
-        print("Deregister queue size", cls.__pool._work_queue.qsize())
-
         if wrapper.refcount == 1:
             del cls.__cache[table_name]
             wrapper.close()
