@@ -345,13 +345,18 @@ def _proc_map_fn(args):
 @pytest.mark.slow
 @pytest.mark.parametrize("nprocs", [3])
 def test_multiprocess_table(ms, nprocs):
+    from multiprocessing import Pool
+
     # Shutdown any threadpools prior to forking
     TableExecutor.close(wait=True)
 
-    from multiprocessing import Pool
-
     pool = Pool(nprocs)
-    assert all(pool.map(_proc_map_fn, [tuple((ms, i)) for i in range(nprocs)]))
+
+    try:
+        args = [tuple((ms, i)) for i in range(nprocs)]
+        assert all(pool.map(_proc_map_fn, args))
+    finally:
+        pool.close()
 
 
 @pytest.mark.parametrize('group_cols', [
