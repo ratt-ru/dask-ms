@@ -12,7 +12,7 @@ except ImportError as e:
 PY2 = sys.version_info[0] == 2
 
 extras_require = {
-    'testing': ['pytest', 'pytest-runner']
+    'testing': ['pytest', 'pytest-runner', 'mock']
 }
 
 
