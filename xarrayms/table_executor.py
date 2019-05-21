@@ -299,19 +299,19 @@ class TableProxy(object):
                              self.table_name)
 
     def close(self):
-        """
-        Returns a future indicating that the TableProxy is no longer
-        interested in this table
-        """
+        """ Closes this TableProxy's link to the CASA table """
         if TableExecutor.deregister(self.table_name).result() is False:
             raise ValueError("Table '%s' deregistration failed" %
                              self.table_name)
 
     def getcol(self, *args, **kwargs):
+        """ Proxies :meth:`pyrap.tables.table.getcol` """
         return TableExecutor.getcol(self.table_name, *args, **kwargs)
 
     def getcolnp(self, *args, **kwargs):
+        """ Proxies :meth:`pyrap.tables.table.getcolnp` """
         return TableExecutor.getcolnp(self.table_name, *args, **kwargs)
 
     def putcol(self, *args, **kwargs):
+        """ Proxies :meth:`pyrap.tables.table.putcol` """
         return TableExecutor.putcol(self.table_name, *args, **kwargs)
