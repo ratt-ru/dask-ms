@@ -9,8 +9,8 @@ from xarrayms.table_executor import TableExecutor
 
 
 @pytest.fixture(scope="session")
-def ms(tmpdir_factory):
-    msdir = tmpdir_factory.mktemp("msdir", numbered=False)
+def ms(tmp_path_factory):
+    msdir = tmp_path_factory.mktemp("msdir", numbered=False)
     fn = os.path.join(str(msdir), "test.ms")
 
     create_table_query = """
@@ -56,7 +56,6 @@ def ms(tmpdir_factory):
 
     yield fn
 
-    TableExecutor.close(wait=True)
-
     # Remove the temporary directory
-    shutil.rmtree(str(msdir))
+    # except it causes issues with casacore files on py3
+    # shutil.rmtree(str(msdir))
