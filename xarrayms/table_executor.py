@@ -133,7 +133,7 @@ def _table_close(table_name):
     else:
         try:
             wrapper.close()
-        except Exception as e:
+        except Exception:
             log.exception("Error closing table")
 
         del _thread_local.wrapper
