@@ -2,10 +2,10 @@
 History
 =======
 
-0.1.5 (YYYY-MM-DD)
+0.1.5 (2019-05-21)
 ------------------
 
-* Fix user locking (:pr:`31`)
+* Restrict all CASA table access to a single thread per table (:pr:`31`)
 
 0.1.4 (2019-05-03)
 ------------------
