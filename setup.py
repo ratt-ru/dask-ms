@@ -1,4 +1,5 @@
 import os
+import sys
 
 try:
     from setuptools import setup, find_packages
@@ -7,11 +8,22 @@ try:
 except ImportError as e:
     raise ImportError("%s\nPlease install setuptools." % e)
 
+
+PY2 = sys.version_info[0] == 2
+
+extras_require = {
+    'testing': ['pytest', 'pytest-runner', 'mock']
+}
+
+
 install_requires = [
     "dask[array] >= 1.1.0",
     "six >= 1.10.0",
     "xarray >= 0.10.0",
 ]
+
+if PY2:
+    install_requires.append("futures >= 3.2.0")
 
 # ==================
 # Detect readthedocs
@@ -25,12 +37,6 @@ if not on_rtd:
         "numpy >= 1.14.0",
         "python-casacore >= 2.2.1",
     ]
-
-setup_requirements = ['pytest-runner', ]
-
-test_requirements = [
-    'pytest',
-    'mock']
 
 
 def readme():
@@ -52,9 +58,8 @@ setup(name='xarray-ms',
           "Topic :: Software Development :: Libraries :: Python Modules",
           "Topic :: Scientific/Engineering :: Astronomy",
       ],
+      extras_require=extras_require,
       install_requires=install_requires,
-      setup_requires=setup_requirements,
-      tests_require=test_requirements,
       author='Simon Perkins',
       author_email='sperkins@ska.ac.za',
       packages=find_packages(),

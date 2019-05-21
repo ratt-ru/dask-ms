@@ -1,4 +1,3 @@
-import shutil
 import os
 
 import numpy as np
@@ -7,8 +6,8 @@ import pytest
 
 
 @pytest.fixture(scope="session")
-def ms(tmpdir_factory):
-    msdir = tmpdir_factory.mktemp("msdir", numbered=False)
+def ms(tmp_path_factory):
+    msdir = tmp_path_factory.mktemp("msdir", numbered=False)
     fn = os.path.join(str(msdir), "test.ms")
 
     create_table_query = """
@@ -39,7 +38,7 @@ def ms(tmpdir_factory):
 
     data_shape = (len(state), 16, 4)
 
-    data = np.random.random(data_shape) + np.random.random(data_shape)*1j
+    data = np.random.random(data_shape) + np.random.random(data_shape) * 1j
 
     # Create the table
     with pt.taql(create_table_query) as ms:
@@ -55,4 +54,6 @@ def ms(tmpdir_factory):
     yield fn
 
     # Remove the temporary directory
-    shutil.rmtree(str(msdir))
+    # except it causes issues with casacore files on py3
+    # https://github.com/ska-sa/xarray-ms/issues/32
+    # shutil.rmtree(str(msdir))

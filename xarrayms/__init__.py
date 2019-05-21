@@ -6,6 +6,7 @@ __author__ = """Simon Perkins"""
 __email__ = 'sperkins@ska.ac.za'
 __version__ = '0.1.4'
 
-from xarrayms.xarray_ms import (xds_from_table,             # noqa
-                                xds_to_table, xds_from_ms)  # noqa
-from xarrayms.table_proxy import TableProxy                 # noqa
+from xarrayms.xarray_ms import (xds_from_table,  # noqa
+                                xds_to_table,    # noqa
+                                xds_from_ms,     # noqa
+                                TableProxy)      # noqa

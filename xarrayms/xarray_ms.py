@@ -12,6 +12,7 @@ import logging
 import os
 import os.path
 
+import concurrent.futures as cf
 import dask
 import dask.array as da
 import numpy as np
@@ -21,7 +22,7 @@ from six.moves import range
 
 import xarray as xr
 
-from xarrayms.table_proxy import TableProxy
+from xarrayms.table_executor import TableProxy
 from xarrayms.known_table_schemas import registered_schemas, ColumnSchema
 
 _DEFAULT_GROUP_COLUMNS = ["FIELD_ID", "DATA_DESC_ID"]
@@ -240,10 +241,16 @@ def _chunk_putcols_np(table_proxy, column, runs, data, resort=None):
     if resort is not None:
         data = data[resort]
 
+    futures = []
+
     for rs, rl in runs:
-        table_proxy("putcol", column, data[rr:rr + rl],
-                    startrow=rs, nrow=rl)
+        future = table_proxy.putcol(column, data[rr:rr + rl],
+                                    startrow=rs, nrow=rl)
+        futures.append(future)
         rr += rl
+
+    for f in cf.as_completed(futures):
+        f.result()
 
     return np.full(runs.shape[0], True)
 
@@ -264,14 +271,6 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
     columns : tuple or list, optional
         list of column names to write to the table.
         If ``None`` all columns will be written.
-    table_kwargs : dict, optional
-        Keyword argument passed to the table constructor.
-        Defaults to None. The following disables logging of
-        table opening:
-
-        .. code-block:: python
-
-            xds_to_table("WSRT.MS", table_kwargs={'ack': False})
 
     Returns
     -------
@@ -283,13 +282,8 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
     dsk = {}
     rows = xds.table_row.values
     min_frag_level = kwargs.get('min_frag_level', False)
-    table_kwargs = kwargs.get('table_kwargs', {})
 
-    # Remove and complain if incorrect
-    if table_kwargs.pop('readonly', False) is True:
-        raise ValueError("'readonly=True' in xds_to_table table_kwargs")
-
-    table_proxy = TableProxy(table_name, readonly=False, **table_kwargs)
+    table_proxy = TableProxy(table_name)
 
     if columns is None:
         columns = xds.data_vars.keys()
@@ -357,10 +351,15 @@ def _chunk_getcols_np(table_proxy, column, shape, dtype,
 
     result = np.empty((nrows,) + shape, dtype=dtype)
     rr = 0
+    futures = []
 
     for rs, rl in runs:
-        table_proxy("getcolnp", column, result[rr:rr + rl], rs, rl)
+        future = table_proxy.getcolnp(column, result[rr:rr + rl], rs, rl)
+        futures.append(future)
         rr += rl
+
+    for f in cf.as_completed(futures):
+        f.result()
 
     if resort is not None:
         return result[resort]
@@ -370,17 +369,20 @@ def _chunk_getcols_np(table_proxy, column, shape, dtype,
 
 def _chunk_getcols_object(table_proxy, column, shape, dtype,
                           runs, resort=None):
-
     nrows = np.sum(runs[:, 1])
 
     result = np.empty((nrows,) + shape, dtype=dtype)
-
-    rr = 0
+    futures = []
 
     # Wrap objects (probably strings) in numpy arrays
     for rs, rl in runs:
-        data = table_proxy("getcol", column, rs, rl)
-        result[rr:rr + rl] = np.asarray(data, dtype=dtype)
+        future = table_proxy.getcol(column, rs, rl)
+        futures.append(future)
+
+    rr = 0
+
+    for (rs, rl), future in zip(runs, futures):
+        result[rr:rr + rl] = np.asarray(future.result(), dtype=dtype)
         rr += rl
 
     if resort is not None:
@@ -559,7 +561,7 @@ def column_metadata(table, columns, table_schema, rows):
     return column_metadata
 
 
-def xds_from_table_impl(table_name, table,
+def xds_from_table_impl(table_name, table, table_proxy,
                         columns, rows, chunks,
                         **kwargs):
     """
@@ -570,6 +572,8 @@ def xds_from_table_impl(table_name, table,
     table : :class:`casacore.tables.table`
         CASA table object, used to inspect metadata
         for creating Datasets
+    table_proxy : :class:`xarrayms.table_proxy.TableProxy`
+        Table proxy associated with `table`.
     columns : tuple or list
         Columns present on the returned dataset.
     rows : np.ndarray
@@ -589,7 +593,6 @@ def xds_from_table_impl(table_name, table,
 
     table_schema = kwargs.get('table_schema', None)
     min_frag_level = kwargs.get('min_frag_level', False)
-    table_kwargs = kwargs.get("table_kwargs", {})
 
     table_schema = lookup_table_schema(table_name, table_schema)
 
@@ -606,12 +609,6 @@ def xds_from_table_impl(table_name, table,
 
     # Insert arrays into dataset in sorted order
     data_arrays = collections.OrderedDict()
-
-    # Remove and complain if incorrect
-    if table_kwargs.pop('readonly', True) is False:
-        raise ValueError("'readonly=False' in xds_from_table table_kwargs")
-
-    table_proxy = TableProxy(table_name, readonly=True, **table_kwargs)
 
     for column, (shape, dims, dtype) in col_metadata.items():
         col_dask_array = generate_table_getcols(table_name, column,
@@ -719,15 +716,6 @@ def xds_from_table(table_name, columns=None,
 
             ["MS", {"UVW": ("my-uvw",)}]
 
-    table_kwargs : dict, optional
-        Keyword argument passed to the table constructor.
-        Defaults to None. The following disables logging of
-        table opening:
-
-        .. code-block:: python
-
-            xds_from_table("WSRT.MS", table_kwargs={'ack': False})
-
     taql_where : str, optional
         TAQL where clause. For example, to exclude auto-correlations
 
@@ -746,9 +734,9 @@ def xds_from_table(table_name, columns=None,
           extended over the remaining groups if there
           are insufficient elements.
 
-    Yields
-    ------
-    :class:`xarray.Dataset`
+    Returns
+    -------
+    list of :class:`xarray.Dataset`
         datasets for each group, each ordered by indexing columns
     """
 
@@ -778,13 +766,11 @@ def xds_from_table(table_name, columns=None,
     elif not isinstance(group_cols, list):
         group_cols = [group_cols]
 
-    # Inspect the table
-    # Must use the same lockoptions as TableProxy otherwise
-    # we get casacore table locking issues
-    # https://github.com/ska-sa/xarray-ms/pull/25#issuecomment-487602212
-    with pt.table(table_name, ack=False, lockoptions='user') as T:
-        T.lock()
+    table_proxy = TableProxy(table_name)
 
+    datasets = []
+
+    with pt.table(table_name, readonly=True, ack=False) as T:
         columns = set(T.colnames() if columns is None else columns)
 
         # Handle the case where we group on each table row
@@ -800,12 +786,12 @@ def xds_from_table(table_name, columns=None,
 
             # Generate a dataset for each row
             for r in range(rows.size):
-                ds = xds_from_table_impl(table_name, T, columns,
-                                         rows[r:r + 1], chunks[0],
+                ds = xds_from_table_impl(table_name, T, table_proxy,
+                                         columns, rows[r:r + 1], chunks[0],
                                          **kwargs)
 
-                yield (ds.squeeze(drop=True)
-                         .assign_attrs(table_row=rows[r]))
+                datasets.append(ds.squeeze(drop=True)
+                                .assign_attrs(table_row=rows[r]))
 
         # Otherwise group by given columns
         elif len(group_cols) > 0:
@@ -853,12 +839,13 @@ def xds_from_table(table_name, columns=None,
                     except IndexError:
                         group_chunks = chunks[-1]
 
-                    ds = xds_from_table_impl(table_name, T,
+                    ds = xds_from_table_impl(table_name, T, table_proxy,
                                              columns.difference(group_cols),
                                              group_rows, group_chunks,
                                              **kwargs)
 
-                    yield ds.assign_attrs(zip(group_cols, group_values))
+                    datasets.append(ds.assign_attrs(zip(group_cols,
+                                                        group_values)))
 
         # No grouping case
         else:
@@ -869,11 +856,12 @@ def xds_from_table(table_name, columns=None,
 
             with pt.taql(query) as gq:
                 rows = gq.getcol("__tablerow__")
-                yield xds_from_table_impl(table_name, T,
-                                          columns.difference(group_cols),
-                                          rows, chunks[0], **kwargs)
+                ds = xds_from_table_impl(table_name, T, table_proxy,
+                                         columns.difference(group_cols),
+                                         rows, chunks[0], **kwargs)
+                datasets.append(ds)
 
-        T.unlock()
+    return datasets
 
 
 def xds_from_ms(ms, columns=None, index_cols=None, group_cols=None, **kwargs):
@@ -898,9 +886,9 @@ def xds_from_ms(ms, columns=None, index_cols=None, group_cols=None, **kwargs):
         Defaults to :code:`%(parts)s`
     **kwargs : optional
 
-    Yields
-    ------
-    :class:`xarray.Dataset`
+    Returns
+    -------
+    list of :class:`xarray.Dataset`
         xarray datasets for each group
     """
 
@@ -920,11 +908,10 @@ def xds_from_ms(ms, columns=None, index_cols=None, group_cols=None, **kwargs):
 
     kwargs.setdefault("table_schema", "MS")
 
-    for ds in xds_from_table(ms, columns=columns,
-                             index_cols=index_cols,
-                             group_cols=group_cols,
-                             **kwargs):
-        yield ds
+    return xds_from_table(ms, columns=columns,
+                          index_cols=index_cols,
+                          group_cols=group_cols,
+                          **kwargs)
 
 
 # Set docstring variables in try/except

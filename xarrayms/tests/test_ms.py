@@ -16,28 +16,39 @@ from xarrayms.xarray_ms import (xds_from_ms,
                                 where_clause)
 
 from xarrayms.known_table_schemas import MS_SCHEMA, ColumnSchema
+from xarrayms.table_executor import TableExecutor
+
+
+def group_cols_str(group_cols):
+    return "group_cols=%s" % group_cols
+
+
+def index_cols_str(index_cols):
+    return "index_cols=%s" % index_cols
 
 
 @pytest.mark.parametrize('group_cols', [
     [],
     ["FIELD_ID", "DATA_DESC_ID"],
     ["DATA_DESC_ID"],
-    ["DATA_DESC_ID", "SCAN_NUMBER"]])
+    ["DATA_DESC_ID", "SCAN_NUMBER"]],
+    ids=group_cols_str)
 @pytest.mark.parametrize('index_cols', [
     ["ANTENNA2", "ANTENNA1", "TIME"],
     ["TIME", "ANTENNA1", "ANTENNA2"],
-    ["ANTENNA1", "ANTENNA2", "TIME"]])
+    ["ANTENNA1", "ANTENNA2", "TIME"]],
+    ids=index_cols_str)
 def test_ms_read(ms, group_cols, index_cols):
     select_cols = index_cols
 
-    xds = list(xds_from_ms(ms, columns=select_cols,
-                           group_cols=group_cols,
-                           index_cols=index_cols,
-                           chunks={"row": 2}))
+    xds = xds_from_ms(ms, columns=select_cols,
+                      group_cols=group_cols,
+                      index_cols=index_cols,
+                      chunks={"row": 2})
 
     order = orderby_clause(index_cols)
 
-    with pt.table(ms, lockoptions='auto') as T:  # noqa
+    with pt.table(ms, lockoptions='auto', ack=False) as T:  # noqa
         for ds in xds:
             group_col_values = [getattr(ds, c) for c in group_cols]
             where = where_clause(group_cols, group_col_values)
@@ -54,22 +65,24 @@ def test_ms_read(ms, group_cols, index_cols):
     [],
     ["FIELD_ID", "DATA_DESC_ID"],
     ["DATA_DESC_ID"],
-    ["DATA_DESC_ID", "SCAN_NUMBER"]])
+    ["DATA_DESC_ID", "SCAN_NUMBER"]],
+    ids=group_cols_str)
 @pytest.mark.parametrize('index_cols', [
     ["ANTENNA2", "ANTENNA1", "TIME"],
     ["TIME", "ANTENNA1", "ANTENNA2"],
-    ["ANTENNA1", "ANTENNA2", "TIME"]])
+    ["ANTENNA1", "ANTENNA2", "TIME"]],
+    ids=index_cols_str)
 def test_ms_write(ms, group_cols, index_cols):
     select_cols = ["STATE_ID"]
 
     # Zero everything to be sure
-    with pt.table(ms, readonly=False, lockoptions='auto') as table:
+    with pt.table(ms, readonly=False, lockoptions='auto', ack=False) as table:
         table.putcol("STATE_ID", np.full(table.nrows(), 0, dtype=np.int32))
 
-    xds = list(xds_from_ms(ms, columns=select_cols,
-                           group_cols=group_cols,
-                           index_cols=index_cols,
-                           chunks={"row": 2}))
+    xds = xds_from_ms(ms, columns=select_cols,
+                      group_cols=group_cols,
+                      index_cols=index_cols,
+                      chunks={"row": 2})
 
     written_states = []
 
@@ -81,27 +94,28 @@ def test_ms_write(ms, group_cols, index_cols):
         nds = ds.assign(STATE_ID=state)
         xds_to_table(nds, ms, "STATE_ID").compute()
 
-    xds = list(xds_from_ms(ms, columns=select_cols,
-                           group_cols=group_cols,
-                           index_cols=index_cols,
-                           chunks={"row": 2}))
+    xds = xds_from_ms(ms, columns=select_cols,
+                      group_cols=group_cols,
+                      index_cols=index_cols,
+                      chunks={"row": 2})
 
     # Check that state has been correctly written
     for i, (ds, expected) in enumerate(zip(xds, written_states)):
-        assert np.all(ds.STATE_ID.data.compute() == expected)
+        assert np.all(ds.STATE_ID.data.compute() == expected.compute())
 
 
 @pytest.mark.parametrize('index_cols', [
     ["ANTENNA2", "ANTENNA1", "TIME"],
     ["TIME", "ANTENNA1", "ANTENNA2"],
-    ["ANTENNA1", "ANTENNA2", "TIME"]])
+    ["ANTENNA1", "ANTENNA2", "TIME"]],
+    ids=index_cols_str)
 def test_row_query(ms, index_cols):
-    xds = list(xds_from_ms(ms, columns=index_cols,
-                           group_cols="__row__",
-                           index_cols=index_cols,
-                           chunks={"row": 2}))
+    xds = xds_from_ms(ms, columns=index_cols,
+                      group_cols="__row__",
+                      index_cols=index_cols,
+                      chunks={"row": 2})
 
-    with pt.table(ms, readonly=False) as table:
+    with pt.table(ms, readonly=False, ack=False) as table:
         # Get the expected row ordering by lexically
         # sorting the indexing columns
         cols = [(name, table.getcol(name)) for name in index_cols]
@@ -115,14 +129,16 @@ def test_row_query(ms, index_cols):
 
 @pytest.mark.parametrize('group_cols', [
     [],
-    ["DATA_DESC_ID"]])
+    ["DATA_DESC_ID"]],
+    ids=group_cols_str)
 @pytest.mark.parametrize('index_cols', [
-    ["TIME"]])
+    ["TIME"]],
+    ids=index_cols_str)
 def test_fragmented_ms(ms, group_cols, index_cols):
     select_cols = index_cols + ["STATE_ID"]
 
     # Zero everything to be sure
-    with pt.table(ms, readonly=False, lockoptions='auto') as table:
+    with pt.table(ms, readonly=False, lockoptions='auto', ack=False) as table:
         table.putcol("STATE_ID", np.full(table.nrows(), 0, dtype=np.int32))
 
     # Patch the get_row_runs function to check that it is called
@@ -142,11 +158,11 @@ def test_fragmented_ms(ms, group_cols, index_cols):
         return row_runs, row_resorts
 
     with patch(patch_target, side_effect=mock_row_runs) as patch_fn:
-        xds = list(xds_from_ms(ms, columns=select_cols,
-                               group_cols=group_cols,
-                               index_cols=index_cols,
-                               min_frag_level=min_frag_level,
-                               chunks={"row": 1e9}))
+        xds = xds_from_ms(ms, columns=select_cols,
+                          group_cols=group_cols,
+                          index_cols=index_cols,
+                          min_frag_level=min_frag_level,
+                          chunks={"row": 1e9})
 
     # Check that mock_row_runs was called
     assert patch_fn.called_once_with(min_frag_level=min_frag_level,
@@ -155,7 +171,7 @@ def test_fragmented_ms(ms, group_cols, index_cols):
     order = orderby_clause(index_cols)
     written_states = []
 
-    with pt.table(ms, readonly=True, lockoptions='auto') as table:
+    with pt.table(ms, readonly=True, lockoptions='auto', ack=False) as table:
         for i, ds in enumerate(xds):
             group_col_values = [getattr(ds, c) for c in group_cols]
             where = where_clause(group_cols, group_col_values)
@@ -194,9 +210,11 @@ def test_fragmented_ms(ms, group_cols, index_cols):
 
 @pytest.mark.parametrize('group_cols', [
     [],
-    ["DATA_DESC_ID"]])
+    ["DATA_DESC_ID"]],
+    ids=group_cols_str)
 @pytest.mark.parametrize('index_cols', [
-    ["TIME"]])
+    ["TIME"]],
+    ids=index_cols_str)
 def test_unfragmented_ms(ms, group_cols, index_cols):
     from xarrayms.xarray_ms import get_row_runs
     patch_target = "xarrayms.xarray_ms.get_row_runs"
@@ -210,25 +228,27 @@ def test_unfragmented_ms(ms, group_cols, index_cols):
         return row_runs, row_resorts
 
     with patch(patch_target, side_effect=mock_row_runs) as patch_fn:
-        xds = list(xds_from_ms(ms, columns=index_cols,  # noqa
-                               group_cols=group_cols,
-                               index_cols=index_cols,
-                               min_frag_level=False,
-                               chunks={"row": 1e9}))
+        xds = xds_from_ms(ms, columns=index_cols,  # noqa
+                          group_cols=group_cols,
+                          index_cols=index_cols,
+                          min_frag_level=False,
+                          chunks={"row": 1e9})
 
         assert patch_fn.called_once_with(min_frag_level=False, sort_dir="read")
 
 
 @pytest.mark.parametrize('group_cols', [
-    ["DATA_DESC_ID"]])
+    ["DATA_DESC_ID"]],
+    ids=group_cols_str)
 @pytest.mark.parametrize('index_cols', [
-    ["TIME"]])
+    ["TIME"]],
+    ids=index_cols_str)
 def test_table_schema(ms, group_cols, index_cols):
     # Test default MS Schema
-    xds = list(xds_from_ms(ms, columns=["DATA"],
-                           group_cols=group_cols,
-                           index_cols=index_cols,
-                           chunks={"row": 1e9}))
+    xds = xds_from_ms(ms, columns=["DATA"],
+                      group_cols=group_cols,
+                      index_cols=index_cols,
+                      chunks={"row": 1e9})
 
     assert xds[0].DATA.dims == ("row", "chan", "corr")
 
@@ -236,88 +256,54 @@ def test_table_schema(ms, group_cols, index_cols):
     table_schema = MS_SCHEMA.copy()
     table_schema['DATA'] = ColumnSchema(("my-chan", "my-corr"))
 
-    xds = list(xds_from_ms(ms, columns=["DATA"],
-                           group_cols=group_cols,
-                           index_cols=index_cols,
-                           table_schema=table_schema,
-                           chunks={"row": 1e9}))
+    xds = xds_from_ms(ms, columns=["DATA"],
+                      group_cols=group_cols,
+                      index_cols=index_cols,
+                      table_schema=table_schema,
+                      chunks={"row": 1e9})
 
     assert xds[0].DATA.dims == ("row", "my-chan", "my-corr")
 
     # Test custom column schema specified by tuple object
     table_schema['DATA'] = ("my-chan", "my-corr")
 
-    xds = list(xds_from_ms(ms, columns=["DATA"],
-                           group_cols=group_cols,
-                           index_cols=index_cols,
-                           table_schema=table_schema,
-                           chunks={"row": 1e9}))
+    xds = xds_from_ms(ms, columns=["DATA"],
+                      group_cols=group_cols,
+                      index_cols=index_cols,
+                      table_schema=table_schema,
+                      chunks={"row": 1e9})
 
     assert xds[0].DATA.dims == ("row", "my-chan", "my-corr")
 
     table_schema = {"DATA": ("my-chan", "my-corr")}
 
-    xds = list(xds_from_ms(ms, columns=["DATA"],
-                           group_cols=group_cols,
-                           index_cols=index_cols,
-                           table_schema=["MS", table_schema],
-                           chunks={"row": 1e9}))
+    xds = xds_from_ms(ms, columns=["DATA"],
+                      group_cols=group_cols,
+                      index_cols=index_cols,
+                      table_schema=["MS", table_schema],
+                      chunks={"row": 1e9})
 
     assert xds[0].DATA.dims == ("row", "my-chan", "my-corr")
 
 
-@pytest.mark.parametrize('group_cols', [
-    ["DATA_DESC_ID"]])
 @pytest.mark.parametrize('index_cols', [
-    ["TIME"]])
-def test_table_kwargs(ms, group_cols, index_cols):
-    # TODO(sjperkins)
-    # This really just test failure of table_kwargs,
-    # come up with some testing modification of the table
-    # object in the graph itself. lockoptions is not currently
-    # possible because we override it.
-
-    # Fail if we pass readonly=False table_kwargs
-    with pytest.raises(ValueError) as ex:
-        xds = list(xds_from_table(ms, table_kwargs={'readonly': False,
-                                                    'ack': False}))
-
-    expected = "'readonly=False' in xds_from_table table_kwargs"
-
-    assert expected in str(ex.value)
-
-    # Succeeds on normal
-    xds = list(xds_from_table(ms, table_kwargs={'ack': False}))
-
-    # Fail if we pass readonly=True table_kwargs
-    with pytest.raises(ValueError) as ex:
-        xds_to_table(xds[0], ms, "TIME",  table_kwargs={'readonly': True,
-                                                        'ack': False})
-
-    expected = "'readonly=True' in xds_to_table table_kwargs"
-
-    assert expected in str(ex.value)
-
-
-@pytest.mark.parametrize('index_cols', [
-    ["TIME", "ANTENNA1", "ANTENNA2"]])
+    ["TIME", "ANTENNA1", "ANTENNA2"]],
+    ids=index_cols_str)
 def test_taql_where(ms, index_cols):
     # three cases test here, corresponding to the
     # if-elif-else ladder in xds_from_table
 
     # No group_cols case
-    xds = list(xds_from_table(ms, taql_where="FIELD_ID >= 0 AND FIELD_ID < 2",
-                              columns=["FIELD_ID"],
-                              table_kwargs={'ack': False}))
+    xds = xds_from_table(ms, taql_where="FIELD_ID >= 0 AND FIELD_ID < 2",
+                         columns=["FIELD_ID"])
 
     assert len(xds) == 1
     assert (xds[0].FIELD_ID.data.compute() == [0, 0, 0, 1, 1, 1, 1]).all()
 
     # Group columns case
-    xds = list(xds_from_table(ms, taql_where="FIELD_ID >= 0 AND FIELD_ID < 2",
-                              group_cols=["DATA_DESC_ID", "SCAN_NUMBER"],
-                              columns=["FIELD_ID"],
-                              table_kwargs={'ack': False}))
+    xds = xds_from_table(ms, taql_where="FIELD_ID >= 0 AND FIELD_ID < 2",
+                         group_cols=["DATA_DESC_ID", "SCAN_NUMBER"],
+                         columns=["FIELD_ID"])
 
     assert len(xds) == 2
 
@@ -330,10 +316,9 @@ def test_taql_where(ms, index_cols):
     assert np.all(xds[1].FIELD_ID.data.compute() == [0, 1, 1])
 
     # Group on each row
-    xds = list(xds_from_table(ms, taql_where="FIELD_ID >= 0 AND FIELD_ID < 2",
-                              group_cols=["__row__"],
-                              columns=["FIELD_ID"],
-                              table_kwargs={'ack': False}))
+    xds = xds_from_table(ms, taql_where="FIELD_ID >= 0 AND FIELD_ID < 2",
+                         group_cols=["__row__"],
+                         columns=["FIELD_ID"])
 
     assert len(xds) == 7
 
@@ -350,18 +335,41 @@ def test_taql_where(ms, index_cols):
 
 def _proc_map_fn(args):
     ms, i = args
-    xds = list(xds_from_ms(ms, columns=["STATE_ID"],
-                           group_cols=["FIELD_ID"],
-                           table_kwargs={'ack': False}))
+    xds = xds_from_ms(ms, columns=["STATE_ID"], group_cols=["FIELD_ID"])
     xds[i] = xds[i].assign(STATE_ID=xds[i].STATE_ID + i)
-    write = xds_to_table(xds[i], ms, ["STATE_ID"], table_kwargs={'ack': False})
+    write = xds_to_table(xds[i], ms, ["STATE_ID"])
     write.compute(scheduler='sync')
     return True
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("nprocs", [3])
 def test_multiprocess_table(ms, nprocs):
     from multiprocessing import Pool
 
+    # Shutdown any threadpools prior to forking
+    TableExecutor.close(wait=True)
+
     pool = Pool(nprocs)
-    assert all(pool.map(_proc_map_fn, [tuple((ms, i)) for i in range(nprocs)]))
+
+    try:
+        args = [tuple((ms, i)) for i in range(nprocs)]
+        assert all(pool.map(_proc_map_fn, args))
+    finally:
+        pool.close()
+
+
+@pytest.mark.parametrize('group_cols', [
+    ["FIELD_ID", "DATA_DESC_ID"],
+    ["DATA_DESC_ID", "SCAN_NUMBER"]],
+    ids=group_cols_str)
+@pytest.mark.parametrize('index_cols', [
+    ["TIME", "ANTENNA1", "ANTENNA2"]],
+    ids=index_cols_str)
+def test_multireadwrite(ms, group_cols, index_cols):
+    xds = xds_from_ms(ms, group_cols=group_cols, index_cols=index_cols)
+
+    nds = [ds.copy() for ds in xds]
+    writes = [xds_to_table(sds, ms, sds.data_vars.keys()) for sds in nds]
+
+    da.compute(writes)
