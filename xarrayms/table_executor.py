@@ -5,6 +5,7 @@ from __future__ import print_function
 import atexit
 from collections import defaultdict
 from contextlib import contextmanager
+import logging
 import threading
 
 from concurrent.futures import ThreadPoolExecutor
@@ -19,6 +20,8 @@ import pyrap.tables as pt
 NOLOCK = 0
 READLOCK = 1
 WRITELOCK = 2
+
+log = logging.getLogger(__name__)
 
 
 class MismatchedLocks(Exception):
@@ -128,7 +131,11 @@ def _table_close(table_name):
     except AttributeError:
         pass
     else:
-        wrapper.close()
+        try:
+            wrapper.close()
+        except Exception as e:
+            log.exception("Error closing table")
+
         del _thread_local.wrapper
 
     return True
