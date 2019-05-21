@@ -3,5 +3,5 @@ RUN docker-apt-install python-pip python-casacore
 RUN pip install --upgrade pip setuptools
 ADD . /code
 WORKDIR /code
-RUN pip install .
+RUN pip install .[testing]
 RUN py.test -s -vvv /code/xarrayms
