@@ -1,29 +1,20 @@
 import os
-import sys
 
 try:
     from setuptools import setup, find_packages
-    from setuptools.extension import Extension
-    from setuptools.dist import Distribution
 except ImportError as e:
     raise ImportError("%s\nPlease install setuptools." % e)
 
-
-PY2 = sys.version_info[0] == 2
-
 extras_require = {
-    'testing': ['pytest', 'pytest-runner', 'mock']
+    'testing': ['pytest', 'mock']
 }
-
 
 install_requires = [
     "dask[array] >= 1.1.0",
+    "futures >= 3.2.0; python_version < '3.0'",
     "six >= 1.10.0",
     "xarray >= 0.10.0",
 ]
-
-if PY2:
-    install_requires.append("futures >= 3.2.0")
 
 # ==================
 # Detect readthedocs
