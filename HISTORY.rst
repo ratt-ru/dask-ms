@@ -2,7 +2,7 @@
 History
 =======
 
-0.1.6 (YYYY-MM-DD)
+0.1.6 (2019-05-28)
 ------------------
 
 * Fix python version package dependencies in universal wheels (:pr:`33`)
