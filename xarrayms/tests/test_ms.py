@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -27,6 +28,10 @@ def index_cols_str(index_cols):
     return "index_cols=%s" % index_cols
 
 
+def select_cols_str(select_cols):
+    return "select_cols=%s" % select_cols
+
+
 @pytest.mark.parametrize('group_cols', [
     [],
     ["FIELD_ID", "DATA_DESC_ID"],
@@ -38,9 +43,10 @@ def index_cols_str(index_cols):
     ["TIME", "ANTENNA1", "ANTENNA2"],
     ["ANTENNA1", "ANTENNA2", "TIME"]],
     ids=index_cols_str)
-def test_ms_read(ms, group_cols, index_cols):
-    select_cols = index_cols
-
+@pytest.mark.parametrize('select_cols', [
+    ['TIME', 'ANTENNA1', 'DATA']],
+    ids=select_cols_str)
+def test_ms_read(ms, group_cols, index_cols, select_cols):
     xds = xds_from_ms(ms, columns=select_cols,
                       group_cols=group_cols,
                       index_cols=index_cols,
@@ -72,12 +78,15 @@ def test_ms_read(ms, group_cols, index_cols):
     ["TIME", "ANTENNA1", "ANTENNA2"],
     ["ANTENNA1", "ANTENNA2", "TIME"]],
     ids=index_cols_str)
-def test_ms_write(ms, group_cols, index_cols):
-    select_cols = ["STATE_ID"]
-
+@pytest.mark.parametrize('select_cols', [
+    ['DATA', 'STATE_ID']])
+def test_ms_write(ms, group_cols, index_cols, select_cols):
     # Zero everything to be sure
     with pt.table(ms, readonly=False, lockoptions='auto', ack=False) as table:
         table.putcol("STATE_ID", np.full(table.nrows(), 0, dtype=np.int32))
+        data = np.zeros_like(table.getcol("DATA"))
+        data_dtype = data.dtype
+        table.putcol("DATA", data)
 
     xds = xds_from_ms(ms, columns=select_cols,
                       group_cols=group_cols,
@@ -85,23 +94,35 @@ def test_ms_write(ms, group_cols, index_cols):
                       chunks={"row": 2})
 
     written_states = []
+    written_data = []
 
-    # Write out STATE_ID
+    # Write out STATE_ID and DATA
     for i, ds in enumerate(xds):
-        state = da.arange(i, i + ds.dims['row'], chunks=ds.chunks['row'])
-        written_states.append(state)
+        dims = ds.dims
+        chunks = ds.chunks
+        state = da.arange(i, i + dims["row"], chunks=chunks["row"])
+        written_states.append(state.astype(np.int32))
+
+        data = da.arange(i, i + dims["row"]*dims["chan"]*dims["corr"])
+        data = data.reshape(dims["row"], dims["chan"], dims["corr"])
+        data = data.rechunk((chunks["row"], chunks["chan"], chunks["corr"]))
+        written_data.append(data.astype(data_dtype))
+
         state = xr.DataArray(state, dims=['row'])
-        nds = ds.assign(STATE_ID=state)
-        xds_to_table(nds, ms, "STATE_ID").compute()
+        data = xr.DataArray(data, dims=['row', 'chan', 'corr'])
+        nds = ds.assign(STATE_ID=state, DATA=data)
+        xds_to_table(nds, ms, ["STATE_ID", "DATA"]).compute()
 
     xds = xds_from_ms(ms, columns=select_cols,
                       group_cols=group_cols,
                       index_cols=index_cols,
                       chunks={"row": 2})
 
-    # Check that state has been correctly written
-    for i, (ds, expected) in enumerate(zip(xds, written_states)):
-        assert np.all(ds.STATE_ID.data.compute() == expected.compute())
+    # Check that state and data have been correctly written
+    it = enumerate(zip(xds, written_states, written_data))
+    for i, (ds, state, data) in it:
+        assert np.all(ds.STATE_ID.data.compute() == state.compute())
+        assert np.all(ds.DATA.data.compute() == data.compute())
 
 
 @pytest.mark.parametrize('index_cols', [
@@ -154,7 +175,7 @@ def test_fragmented_ms(ms, group_cols, index_cols):
         row_runs, row_resorts = get_row_runs(*args, **kwargs)
         # Do some checks to ensure that fragmentation was handled
         assert kwargs['min_frag_level'] == min_frag_level
-        assert all(isinstance(resort, np.ndarray) for resort in row_resorts)
+        assert isinstance(row_resorts.compute(), np.ndarray)
         return row_runs, row_resorts
 
     with patch(patch_target, side_effect=mock_row_runs) as patch_fn:
@@ -221,10 +242,11 @@ def test_unfragmented_ms(ms, group_cols, index_cols):
 
     def mock_row_runs(*args, **kwargs):
         """ Calls get_row_runs and does some testing """
+        # import pdb; pdb.set_trace()
         row_runs, row_resorts = get_row_runs(*args, **kwargs)
         # Do some checks to ensure that fragmentation was handled
         assert kwargs['min_frag_level'] is False
-        assert all(resort is None for resort in row_resorts)
+        assert row_resorts.compute() is None
         return row_runs, row_resorts
 
     with patch(patch_target, side_effect=mock_row_runs) as patch_fn:
