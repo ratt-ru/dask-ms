@@ -223,13 +223,13 @@ def get_row_runs(rows, chunks, min_frag_level=False, sort_dir="read"):
             log.warn("Increasing the 'row' chunk size may ameliorate this.")
 
     # Now create dask arrays for the row
-    run_name = "row-run-" + dask.base.tokenize()
+    run_name = "row-run-" + dask.base.tokenize(row_runs)
     layers = {(run_name, i): d for i, d in enumerate(row_runs)}
     graph = HighLevelGraph.from_collections(run_name, layers, [])
     row_chunks = (tuple(run[:, 1].sum() for run in row_runs),)
     dask_row_runs = da.Array(graph, run_name, row_chunks, dtype=np.object)
 
-    resort_name = "row-resort-" + dask.base.tokenize()
+    resort_name = "row-resort-" + dask.base.tokenize(row_resorts)
     layers = {(resort_name, i): d for i, d in enumerate(row_resorts)}
     graph = HighLevelGraph.from_collections(resort_name, layers, [])
     chunks = ((1,)*len(row_resorts),)
