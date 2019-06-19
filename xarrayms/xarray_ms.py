@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -15,6 +16,7 @@ import os.path
 import concurrent.futures as cf
 import dask
 import dask.array as da
+import dask.blockwise as db
 from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 import pyrap.tables as pt
@@ -199,10 +201,8 @@ def get_row_runs(rows, chunks, min_frag_level=False, sort_dir="read"):
             log.warn("Consider setting 'min_frag_level' < 1.0 kwarg "
                      "to ameliorate this problem.")
 
-        return row_runs, row_resorts
-
     # Attempt a row resort to generate better disk access patterns
-    if frag_level < min_frag_level:
+    elif frag_level < min_frag_level:
         sorted_row_runs, sorted_row_resorts = _get_row_runs(rows, chunks,
                                                             sort=True,
                                                             sort_dir=sort_dir)
@@ -222,7 +222,20 @@ def get_row_runs(rows, chunks, min_frag_level=False, sort_dir="read"):
                      "and disk access (especially writes) may be slow.")
             log.warn("Increasing the 'row' chunk size may ameliorate this.")
 
-    return row_runs, row_resorts
+    # Now create dask arrays for the row
+    run_name = "row-run-" + dask.base.tokenize()
+    layers = {(run_name, i): d for i, d in enumerate(row_runs)}
+    graph = HighLevelGraph.from_collections(run_name, layers, [])
+    row_chunks = (tuple(run[:, 1].sum() for run in row_runs),)
+    dask_row_runs = da.Array(graph, run_name, row_chunks, dtype=np.object)
+
+    resort_name = "row-resort-" + dask.base.tokenize()
+    layers = {(resort_name, i): d for i, d in enumerate(row_resorts)}
+    graph = HighLevelGraph.from_collections(resort_name, layers, [])
+    chunks = ((1,)*len(row_resorts),)
+    dask_row_resorts = da.Array(graph, resort_name, chunks, dtype=np.object)
+
+    return dask_row_runs, dask_row_resorts
 
 
 def fragmentation_level(row_runs):
@@ -236,7 +249,7 @@ def fragmentation_level(row_runs):
     return float(len(row_runs)) / total_run_lengths
 
 
-def _chunk_putcols_np(table_proxy, column, runs, data, resort=None):
+def _chunk_putcols_np(table_proxy, column, data, runs, resort=None):
     rr = 0
 
     if resort is not None:
@@ -253,7 +266,7 @@ def _chunk_putcols_np(table_proxy, column, runs, data, resort=None):
     for f in cf.as_completed(futures):
         f.result()
 
-    return np.full(runs.shape[0], True)
+    return np.full((1,)*len(data.shape), True)
 
 
 def xds_to_table(xds, table_name, columns=None, **kwargs):
@@ -290,26 +303,19 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
     elif isinstance(columns, string_types):
         columns = [columns]
 
-    out_chunk = 0
-
     # Get the DataArrays for each column
-    col_arrays = [getattr(xds, c) for c in columns]
-    # Tokenize putcol on the dask arrays
-    token = dask.base.tokenize(table_name, col_arrays)
-    name = '-'.join((short_table_name(table_name), "putcol",
-                     str(columns), token))
+    col_arrays = [getattr(xds, column) for column in columns]
 
-    deps = []
-    layers = {}
+    writes = []
 
     # Generate the graph for each column
-    for c, data_array in zip(columns, col_arrays):
+    for column, data_array in zip(columns, col_arrays):
         dask_array = data_array.data
         dims = data_array.dims
         chunks = dask_array.chunks
 
         if dims[0] != 'row':
-            raise ValueError("xds.%s.dims[0] != 'row'" % c)
+            raise ValueError("xds.%s.dims[0] != 'row'" % column)
 
         multiple = [(dim, chunk) for dim, chunk
                     in zip(dims[1:], chunks[1:])
@@ -321,37 +327,46 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
                              "in 'row' is currently supported. "
                              "Use 'rechunk' so that the mentioned "
                              "dimensions contain a single chunk."
-                             % (c, multiple))
-
-        # Need extra chunk indices in the array keys
-        # that we're retrieving
-        key_extra = (0,) * len(chunks[1:])
+                             % (column, multiple))
 
         # Get row runs for the row chunks
         row_runs, row_resorts = get_row_runs(rows, chunks,
                                              min_frag_level=min_frag_level,
                                              sort_dir="write")
 
-        for chunk, (row_run, resort) in enumerate(zip(row_runs, row_resorts)):
-            # graph key for the array chunk that we'll write
-            array_chunk = (dask_array.name, chunk) + key_extra
-            # Add the write operation to the graph
-            layers[(name, out_chunk)] = (_chunk_putcols_np, table_proxy,
-                                         c, row_run, array_chunk,
-                                         resort)
-            out_chunk += 1
+        # Integer dimension schema. 'row' == 0
+        schema = tuple(range(len(dask_array.shape)))
+
+        # Tokenize putcol on the dask arrays
+        token = dask.base.tokenize(table_name, column)
+        name = '-'.join((short_table_name(table_name), "putcol",
+                         column, token))
+
+        layers = db.blockwise(_chunk_putcols_np, name, schema,
+                              table_proxy, None,
+                              column, None,
+                              dask_array.name, schema,
+                              row_runs.name, schema[0:1],
+                              row_resorts.name, schema[0:1],
+                              numblocks={
+                                dask_array.name: dask_array.numblocks,
+                                row_runs.name: row_runs.numblocks,
+                                row_resorts.name: row_resorts.numblocks
+                              })
+
+        deps = [dask_array, row_runs, row_resorts]
+        graph = HighLevelGraph.from_collections(name, layers, deps)
+        chunks = tuple(tuple(1 for c in dc) for dc in dask_array.chunks)
+        write_array = da.Array(graph, name, chunks, dtype=np.bool)
 
         # Add the arrays graph to dependencies
-        deps.append(dask_array)
+        writes.append(write_array)
 
-    # Construct high level graph
-    graph = HighLevelGraph.from_collections(name, layers, deps)
-    return da.Array(graph, name, ((1,) * out_chunk,), dtype=np.bool)
+    return da.concatenate([w.ravel() for w in writes])
 
 
 def _chunk_getcols_np(table_proxy, column, shape, dtype,
                       runs, resort=None):
-
     nrows = np.sum(runs[:, 1])
 
     result = np.empty((nrows,) + shape, dtype=dtype)
@@ -427,12 +442,12 @@ def generate_table_getcols(table_name, column, shape, dtype,
     :class:`dask.array.Arrays`
         Dask array representing the column
     """
-    token = dask.base.tokenize(table_name, column, row_runs)
+    token = dask.base.tokenize(table_name, column, row_runs, row_resorts)
     short_name = short_table_name(table_name)
     name = '-'.join((short_name, "getcol", column.lower(), token))
 
-    chunk_extra = shape[1:]
-    key_extra = (0,) * len(shape[1:])
+    # Integer dimension schema. 'row' == 0
+    schema = tuple(range(len(shape)))
 
     # infer the type of getter we should be using
     if isinstance(dtype, np.dtype):
@@ -440,18 +455,23 @@ def generate_table_getcols(table_name, column, shape, dtype,
     else:
         _get_fn = _chunk_getcols_object
 
-    # Iterate through the rows in groups of row_runs
-    # For each iteration we generate one chunk
-    # in the resultant dask array
-    layers = {(name, chunk) + key_extra: (_get_fn, table_proxy, column,
-                                          chunk_extra, dtype, runs, resort)
-              for chunk, (runs, resort)
-              in enumerate(zip(row_runs, row_resorts))}
+    layers = db.blockwise(_get_fn, name, schema,
+                          table_proxy, None,
+                          column, None,
+                          shape[1:], None,
+                          dtype, None,
+                          row_runs.name, schema[0:1],
+                          row_resorts.name, schema[0:1],
+                          new_axes={i+1: s for i, s in enumerate(shape[1:])},
+                          numblocks={
+                              row_runs.name: row_runs.numblocks,
+                              row_resorts.name: row_resorts.numblocks,
+                          })
 
-    graph = HighLevelGraph.from_collections(name, layers, [])
+    graph = HighLevelGraph.from_collections(name, layers,
+                                            (row_runs, row_resorts))
 
-    row_chunks = tuple(run[:, 1].sum() for run in row_runs)
-    chunks = (row_chunks,) + tuple((c,) for c in chunk_extra)
+    chunks = row_runs.chunks + tuple((d,) for d in shape[1:])
     return da.Array(graph, name, chunks, dtype=dtype)
 
 
@@ -620,7 +640,8 @@ def xds_from_table_impl(table_name, table, table_proxy,
     for column, (shape, dims, dtype) in col_metadata.items():
         col_dask_array = generate_table_getcols(table_name, column,
                                                 shape, dtype, table_proxy,
-                                                row_runs, row_resorts)
+                                                row_runs,
+                                                row_resorts)
 
         data_arrays[column] = xr.DataArray(col_dask_array, dims=dims)
 
