@@ -96,7 +96,7 @@ def test_ms_write(ms, group_cols, index_cols, select_cols):
     written_states = []
     written_data = []
 
-    # Write out STATE_ID
+    # Write out STATE_ID and DATA
     for i, ds in enumerate(xds):
         dims = ds.dims
         chunks = ds.chunks
@@ -118,7 +118,7 @@ def test_ms_write(ms, group_cols, index_cols, select_cols):
                       index_cols=index_cols,
                       chunks={"row": 2})
 
-    # Check that state has been correctly written
+    # Check that state and data have been correctly written
     it = enumerate(zip(xds, written_states, written_data))
     for i, (ds, state, data) in it:
         assert np.all(ds.STATE_ID.data.compute() == state.compute())
