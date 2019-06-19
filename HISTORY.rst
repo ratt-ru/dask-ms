@@ -2,7 +2,7 @@
 History
 =======
 
-0.1.7 (YYY-MM-DD)
+0.1.7 (2019-06-19)
 ------------------
 
 * Use dask HighLevelGraphs (:pr:`34`)
