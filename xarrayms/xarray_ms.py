@@ -15,6 +15,7 @@ import os.path
 import concurrent.futures as cf
 import dask
 import dask.array as da
+from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 import pyrap.tables as pt
 from six import string_types
@@ -279,7 +280,6 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
         datset.
     """
 
-    dsk = {}
     rows = xds.table_row.values
     min_frag_level = kwargs.get('min_frag_level', False)
 
@@ -298,6 +298,9 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
     token = dask.base.tokenize(table_name, col_arrays)
     name = '-'.join((short_table_name(table_name), "putcol",
                      str(columns), token))
+
+    deps = []
+    layers = {}
 
     # Generate the graph for each column
     for c, data_array in zip(columns, col_arrays):
@@ -333,15 +336,17 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
             # graph key for the array chunk that we'll write
             array_chunk = (dask_array.name, chunk) + key_extra
             # Add the write operation to the graph
-            dsk[(name, out_chunk)] = (_chunk_putcols_np, table_proxy,
-                                      c, row_run, array_chunk,
-                                      resort)
+            layers[(name, out_chunk)] = (_chunk_putcols_np, table_proxy,
+                                         c, row_run, array_chunk,
+                                         resort)
             out_chunk += 1
 
-        # Add the arrays graph to final graph
-        dsk.update(dask_array.__dask_graph__())
+        # Add the arrays graph to dependencies
+        deps.append(dask_array)
 
-    return da.Array(dsk, name, ((1,) * out_chunk,), dtype=np.bool)
+    # Construct high level graph
+    graph = HighLevelGraph.from_collections(name, layers, deps)
+    return da.Array(graph, name, ((1,) * out_chunk,), dtype=np.bool)
 
 
 def _chunk_getcols_np(table_proxy, column, shape, dtype,
@@ -438,14 +443,16 @@ def generate_table_getcols(table_name, column, shape, dtype,
     # Iterate through the rows in groups of row_runs
     # For each iteration we generate one chunk
     # in the resultant dask array
-    dsk = {(name, chunk) + key_extra: (_get_fn, table_proxy, column,
-                                       chunk_extra, dtype, runs, resort)
-           for chunk, (runs, resort)
-           in enumerate(zip(row_runs, row_resorts))}
+    layers = {(name, chunk) + key_extra: (_get_fn, table_proxy, column,
+                                          chunk_extra, dtype, runs, resort)
+              for chunk, (runs, resort)
+              in enumerate(zip(row_runs, row_resorts))}
+
+    graph = HighLevelGraph.from_collections(name, layers, [])
 
     row_chunks = tuple(run[:, 1].sum() for run in row_runs)
     chunks = (row_chunks,) + tuple((c,) for c in chunk_extra)
-    return da.Array(dsk, name, chunks, dtype=dtype)
+    return da.Array(graph, name, chunks, dtype=dtype)
 
 
 def _search_schemas(table_name, schemas):
