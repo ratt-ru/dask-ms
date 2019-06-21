@@ -3,6 +3,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import dask
 import dask.array as da
 from mock import patch
 import numpy as np
@@ -95,6 +96,7 @@ def test_ms_write(ms, group_cols, index_cols, select_cols):
 
     written_states = []
     written_data = []
+    writes = []
 
     # Write out STATE_ID and DATA
     for i, ds in enumerate(xds):
@@ -111,7 +113,11 @@ def test_ms_write(ms, group_cols, index_cols, select_cols):
         state = xr.DataArray(state, dims=['row'])
         data = xr.DataArray(data, dims=['row', 'chan', 'corr'])
         nds = ds.assign(STATE_ID=state, DATA=data)
-        xds_to_table(nds, ms, ["STATE_ID", "DATA"]).compute()
+        write = xds_to_table(nds, ms, ["STATE_ID", "DATA"])
+        writes.append(write)
+
+    # Do all writes in parallel
+    dask.compute(writes)
 
     xds = xds_from_ms(ms, columns=select_cols,
                       group_cols=group_cols,
