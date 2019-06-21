@@ -36,7 +36,7 @@ def readme():
 
 
 setup(name='xarray-ms',
-      version='0.1.8',
+      version='0.1.9',
       description='xarray Datasets from CASA Tables.',
       long_description=readme(),
       url='http://github.com/ska-sa/xarray-ms',
