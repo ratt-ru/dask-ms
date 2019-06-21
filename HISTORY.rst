@@ -4,6 +4,7 @@ History
 
 0.1.9 (2019-06-21)
 ------------------
+
 * Fix bug in generating unique tokens for table write operations (:pr:`36`)
 
 0.1.8 (2019-06-19)
