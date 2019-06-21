@@ -338,7 +338,7 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
         schema = tuple(range(len(dask_array.shape)))
 
         # Tokenize putcol on the dask arrays
-        token = dask.base.tokenize(table_name, column)
+        token = dask.base.tokenize(table_name, column, dask_array)
         name = '-'.join((short_table_name(table_name), "putcol",
                          column, token))
 
