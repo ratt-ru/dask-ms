@@ -32,6 +32,9 @@ def _dm_spec(coldesc, tile_mem_limit=4*1024*1024):
     # ntilerows is the dim that will change least quickly
     rev_shape = list(reversed(coldesc["shape"]))
 
+    if None in rev_shape:
+        return {}
+
     ntilerows = 1
     np_dtype = MS_TO_NP_TYPE_MAP[coldesc["valueType"].upper()]
     nbytes = np.dtype(np_dtype).itemsize

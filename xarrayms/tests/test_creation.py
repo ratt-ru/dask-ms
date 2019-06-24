@@ -3,18 +3,21 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from operator import mul
 import os
 
 from xarrayms.creation import empty_ms
 
 import numpy as np
+from numpy.testing import assert_array_almost_equal
 import pyrap.tables as pt
 import pytest
+from six.moves import reduce
 
 
 @pytest.mark.parametrize("nrow", [10])
-@pytest.mark.parametrize("nchan", [16])
-@pytest.mark.parametrize("ncorr", [1, 4])
+@pytest.mark.parametrize("nchan", [16, None])
+@pytest.mark.parametrize("ncorr", [1, 4, None])
 @pytest.mark.parametrize("add_imaging_cols", [True, False])
 def test_empty_ms(nrow, nchan, ncorr, add_imaging_cols, tmpdir):
 
@@ -23,16 +26,9 @@ def test_empty_ms(nrow, nchan, ncorr, add_imaging_cols, tmpdir):
     imaging_cols = set(["MODEL_DATA", "CORRECTED_DATA", "IMAGING_WEIGHT"])
 
     with pt.table(ms, readonly=False, ack=False) as T:
-        # Add rows, get data, put data
-        T.addrows(nrow)
-        data = T.getcol("DATA")
-        assert data.shape == (nrow, nchan, ncorr)
-        T.putcol("DATA", np.zeros_like(data))
-
         table_cols = set(T.colnames())
 
         if imaging_cols is True:
-            assert T.getcol("MODEL_DATA").shape == (nrow, nchan, ncorr)
             assert imaging_cols in table_cols
         else:
             assert imaging_cols not in table_cols
@@ -67,4 +63,17 @@ def test_empty_ms(nrow, nchan, ncorr, add_imaging_cols, tmpdir):
             assert dminfo['ImagingWeight']['COLUMNS'][0] == "IMAGING_WEIGHT"
             assert dminfo['ModelData']['COLUMNS'][0] == "MODEL_DATA"
             assert dminfo['CorrectedData']['COLUMNS'][0] == "CORRECTED_DATA"
+
+        # Add rows, get data, put data
+        T.addrows(nrow)
+        print(T.getvarcol("DATA", startrow=0, nrow=1).popitem()[1].shape)
+        shape = (nrow, nchan, ncorr)
+        data = np.arange(reduce(mul, shape, 1), dtype=np.complex64)
+        data = data.reshape(shape)
+        dict_data = {'r%05d' % i: d[None, :, :] for i, d in enumerate(data)}
+        from pprint import pprint
+        pprint({k: v.shape for k, v in dict_data.items()})
+        T.putvarcol("DATA", dict_data, startrow=0, nrow=nrow)
+        new_data = T.getcol("DATA")
+        assert_array_almost_equal(new_data, data)
 
