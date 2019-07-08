@@ -3,7 +3,7 @@ History
 =======
 
 0.10.0 (YYYY-MM-DD)
-----------------------------
+-------------------
 
 * Replace deprecated logging.warn with logging.warning (:pr:`37`)
 
