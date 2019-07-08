@@ -2,6 +2,11 @@
 History
 =======
 
+0.10.0 (YYYY-MM-DD)
+----------------------------
+
+* Replace deprecated logging.warn with logging.warning (:pr:`37`)
+
 0.1.9 (2019-06-21)
 ------------------
 
