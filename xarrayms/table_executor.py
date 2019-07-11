@@ -322,3 +322,6 @@ class TableProxy(object):
     def putcol(self, *args, **kwargs):
         """ Proxies :meth:`pyrap.tables.table.putcol` """
         return TableExecutor.putcol(self.table_name, *args, **kwargs)
+
+    def __reduce__(self):
+        return (TableProxy, (self.table_name,))
