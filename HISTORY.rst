@@ -6,6 +6,8 @@ History
 -------------------
 
 * Make TableProxy pickleable (:pr:`39`)
+* Replace deprecated logging.warn with logging.warning (:pr:`37`)
+
 
 0.1.9 (2019-06-21)
 ------------------

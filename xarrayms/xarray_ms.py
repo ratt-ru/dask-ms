@@ -196,10 +196,10 @@ def get_row_runs(rows, chunks, min_frag_level=False, sort_dir="read"):
     if min_frag_level is False:
         # Complain
         if frag_level < _DEFAULT_MIN_FRAG_LEVEL:
-            log.warn("The requesting column grouping and ordering "
-                     "has produced a highly fragmented row ordering.")
-            log.warn("Consider setting 'min_frag_level' < 1.0 kwarg "
-                     "to ameliorate this problem.")
+            log.warning("The requesting column grouping and ordering "
+                        "has produced a highly fragmented row ordering.")
+            log.warning("Consider setting 'min_frag_level' < 1.0 kwarg "
+                        "to ameliorate this problem.")
 
     # Attempt a row resort to generate better disk access patterns
     elif frag_level < min_frag_level:
@@ -216,11 +216,11 @@ def get_row_runs(rows, chunks, min_frag_level=False, sort_dir="read"):
             row_runs = sorted_row_runs
             row_resorts = sorted_row_resorts
         else:
-            log.warn("The requesting column grouping and ordering "
-                     "has produced a highly fragmented row ordering.")
-            log.warn("Strategies to mitigate fragmentation have failed "
-                     "and disk access (especially writes) may be slow.")
-            log.warn("Increasing the 'row' chunk size may ameliorate this.")
+            log.warning("The requesting column grouping and ordering "
+                        "has produced a highly fragmented row ordering.")
+            log.warning("Strategies to mitigate fragmentation have failed "
+                        "and disk access (especially writes) may be slow.")
+            log.warning("Increasing the 'row' chunk size may ameliorate this.")
 
     # Now create dask arrays for the row
     run_name = "row-run-" + dask.base.tokenize(row_runs)
@@ -232,7 +232,7 @@ def get_row_runs(rows, chunks, min_frag_level=False, sort_dir="read"):
     resort_name = "row-resort-" + dask.base.tokenize(row_resorts)
     layers = {(resort_name, i): d for i, d in enumerate(row_resorts)}
     graph = HighLevelGraph.from_collections(resort_name, layers, [])
-    chunks = ((1,)*len(row_resorts),)
+    chunks = ((1,) * len(row_resorts),)
     dask_row_resorts = da.Array(graph, resort_name, chunks, dtype=np.object)
 
     return dask_row_runs, dask_row_resorts
@@ -266,7 +266,7 @@ def _chunk_putcols_np(table_proxy, column, data, runs, resort=None):
     for f in cf.as_completed(futures):
         f.result()
 
-    return np.full((1,)*len(data.shape), True)
+    return np.full((1,) * len(data.shape), True)
 
 
 def xds_to_table(xds, table_name, columns=None, **kwargs):
@@ -349,9 +349,9 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
                               row_runs.name, schema[0:1],
                               row_resorts.name, schema[0:1],
                               numblocks={
-                                dask_array.name: dask_array.numblocks,
-                                row_runs.name: row_runs.numblocks,
-                                row_resorts.name: row_resorts.numblocks
+                                  dask_array.name: dask_array.numblocks,
+                                  row_runs.name: row_runs.numblocks,
+                                  row_resorts.name: row_resorts.numblocks
                               })
 
         deps = [dask_array, row_runs, row_resorts]
@@ -462,7 +462,7 @@ def generate_table_getcols(table_name, column, shape, dtype,
                           dtype, None,
                           row_runs.name, schema[0:1],
                           row_resorts.name, schema[0:1],
-                          new_axes={i+1: s for i, s in enumerate(shape[1:])},
+                          new_axes={i + 1: s for i, s in enumerate(shape[1:])},
                           numblocks={
                               row_runs.name: row_runs.numblocks,
                               row_resorts.name: row_resorts.numblocks,
@@ -556,7 +556,7 @@ def column_metadata(table, columns, table_schema, rows):
             # Read the starting row
             row = table.getcol(c, startrow=rows[0], nrow=1)
         except Exception:
-            log.warn("Unable to infer shape of '%s' column. Ignoring." % c)
+            log.warning("Unable to infer shape of '%s' column. Ignoring." % c)
         else:
             # Usually we get numpy arrays
             if isinstance(row, np.ndarray):
