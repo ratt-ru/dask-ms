@@ -5,6 +5,7 @@ History
 0.1.10 (YYYY-MM-DD)
 -------------------
 
+* Correctly promote singleton column arguments (:pr:`40`)
 * Make TableProxy pickleable (:pr:`39`)
 * Replace deprecated logging.warn with logging.warning (:pr:`37`)
 
