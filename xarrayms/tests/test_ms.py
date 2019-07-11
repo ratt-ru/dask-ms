@@ -401,3 +401,12 @@ def test_multireadwrite(ms, group_cols, index_cols):
     writes = [xds_to_table(sds, ms, sds.data_vars.keys()) for sds in nds]
 
     da.compute(writes)
+
+
+def test_column_promotion(ms):
+    """ Test singleton columns promoted to lists """
+    xds = xds_from_ms(ms, group_cols="SCAN_NUMBER", columns=("DATA"))
+
+    for ds in xds:
+        assert "DATA" in ds
+        assert list(ds.attrs.keys()) == ["SCAN_NUMBER"]
