@@ -83,6 +83,17 @@ def short_table_name(table_name):
     return os.path.split(table_name.rstrip(os.sep))[1]
 
 
+def _promote_columns(columns, default):
+    if columns is None:
+        return default
+    elif isinstance(columns, tuple):
+        return list(columns)
+    elif isinstance(columns, list):
+        return columns
+    else:
+        return [columns]
+
+
 def _get_row_runs(rows, chunks, sort=False, sort_dir="read"):
     row_runs = []
     resorts = []
@@ -780,19 +791,9 @@ def xds_from_table(table_name, columns=None,
 
     taql_where = kwargs.pop("taql_where", "")
 
-    if index_cols is None:
-        index_cols = []
-    elif isinstance(index_cols, tuple):
-        index_cols = list(index_cols)
-    elif not isinstance(group_cols, list):
-        index_cols = [index_cols]
-
-    if group_cols is None:
-        group_cols = []
-    elif isinstance(group_cols, tuple):
-        group_cols = list(group_cols)
-    elif not isinstance(group_cols, list):
-        group_cols = [group_cols]
+    columns = _promote_columns(columns, None)
+    index_cols = _promote_columns(index_cols, [])
+    group_cols = _promote_columns(group_cols, [])
 
     table_proxy = TableProxy(table_name)
 
@@ -920,19 +921,9 @@ def xds_from_ms(ms, columns=None, index_cols=None, group_cols=None, **kwargs):
         xarray datasets for each group
     """
 
-    if index_cols is None:
-        index_cols = _DEFAULT_INDEX_COLUMNS
-    elif isinstance(index_cols, tuple):
-        index_cols = list(index_cols)
-    elif not isinstance(index_cols, list):
-        index_cols = [index_cols]
-
-    if group_cols is None:
-        group_cols = _DEFAULT_GROUP_COLUMNS
-    elif isinstance(group_cols, tuple):
-        group_cols = list(group_cols)
-    elif not isinstance(group_cols, list):
-        group_cols = [group_cols]
+    columns = _promote_columns(columns, None)
+    index_cols = _promote_columns(index_cols, _DEFAULT_INDEX_COLUMNS)
+    group_cols = _promote_columns(group_cols, _DEFAULT_GROUP_COLUMNS)
 
     kwargs.setdefault("table_schema", "MS")
 
