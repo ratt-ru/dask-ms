@@ -13,7 +13,25 @@ except ImportError:
 import pyrap.tables as pt
 import pytest
 
-from xarrayms.table_proxy import TableProxy
+from xarrayms.table_proxy import TableProxy, Executor
+
+
+def test_executor():
+    ex = Executor()
+    ex2 = Executor()
+
+    assert ex is ex2
+
+    ex3 = pickle.loads(pickle.dumps(ex))
+
+    assert ex3 is ex
+
+    assert ex.submit(lambda x: x*2, 4).result() == 8
+    ex.shutdown(wait=True)
+    ex3.shutdown(wait=False)
+
+    with pytest.raises(RuntimeError):
+        ex2.submit(lambda x: x*2, 4).result()
 
 
 def test_table_proxy(ms):

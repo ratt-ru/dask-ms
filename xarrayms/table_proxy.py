@@ -16,37 +16,45 @@ import pyrap.tables as pt
 log = logging.getLogger(__name__)
 
 
-class ExecutorSingleton(object):
-    _ex_lock = Lock()
-    _ex_instance = None
-    _ex_del_ref = None
+_executor_cache = weakref.WeakValueDictionary()
+_executor_lock = Lock()
 
-    @classmethod
-    def instance(cls):
-        # Double-locking
-        if cls._ex_instance is None:
-            with cls._ex_lock:
-                if cls._ex_instance is None:
-                    cls._ex_instance = ex = cf.ThreadPoolExecutor(1)
 
-                    def _callback(ref):
-                        try:
-                            ex.shutdown(wait=True)
-                        except Exception:
-                            log.exception("Error closing executor "
-                                          "in weakref callback")
-                        else:
-                            print("Shutdown executor")
+class ExecutorMetaClass(type):
+    def __call__(cls, *args, **kwargs):
+        with _executor_lock:
+            try:
+                return _executor_cache["key"]
+            except KeyError:
+                instance = type.__call__(cls, *args, **kwargs)
+                _executor_cache["key"] = instance
+                return instance
 
-                    cls._ex_del_ref = weakref.ref(cls, _callback)
 
-        return cls._ex_instance
+class Executor(ExecutorMetaClass("base", (object,), {})):
+    def __init__(self, *args, **kwargs):
+        # Initialise a single thread
+        self.ex = ex = cf.ThreadPoolExecutor(1)
 
-    @classmethod
-    def close(cls):
-        if cls._ex_instance is not None:
-            with cls._ex_lock:
-                cls._ex_instance.shutdown(wait=True)
+        # http://pydev.blogspot.com/2015/01/creating-safe-cyclic-reference.html
+        def _callback(ref):
+            # to avoid cyclic references, self may
+            # not be used within this function
+            try:
+                ex.shutdown(wait=True)
+            except Exception:
+                log.exception("Error shutting down executor in _callback")
+
+        self.__del_ref = weakref.ref(self, _callback)
+
+    def submit(self, *args, **kwargs):
+        return self.ex.submit(*args, **kwargs)
+
+    def shutdown(self, *args, **kwargs):
+        return self.ex.shutdown(*args, **kwargs)
+
+    def __reduce__(self):
+        return (Executor, ())  # No args/kwargs, they're ignored in __init__
 
 
 _table_cache = weakref.WeakValueDictionary()
@@ -73,9 +81,8 @@ def _map_create_proxy(cls, factory, args, kwargs):
 
 class TableProxy(TableProxyMetaClass("base", (object,), {})):
     def __init__(self, factory, *args, **kwargs):
-        f = ExecutorSingleton.instance().submit(factory, *args, **kwargs)
-
-        self._table = table = f.result()
+        self._ex = ex = Executor()
+        self._table = table = ex.submit(factory, *args, **kwargs).result()
         self._factory = factory
         self._args = args
         self._kwargs = kwargs
@@ -85,9 +92,9 @@ class TableProxy(TableProxyMetaClass("base", (object,), {})):
             # to avoid cyclic references, self may
             # not be used within this function
             try:
-                ExecutorSingleton.instance().submit(table.close).result()
+                ex.submit(table.close).result()
             except Exception:
-                log.exception("Error closing table in weakref callback")
+                log.exception("Error closing table in _callback")
 
         self.__del_ref = weakref.ref(self, _callback)
 
@@ -97,7 +104,10 @@ class TableProxy(TableProxyMetaClass("base", (object,), {})):
                                     self._args, self._kwargs))
 
     def close(self):
-        self._table.close()
+        try:
+            self._ex.submit(self._table.close).result()
+        except Exception:
+            log.exception("Exception closing TableProxy")
 
     def __enter__(self):
         return self
@@ -105,5 +115,3 @@ class TableProxy(TableProxyMetaClass("base", (object,), {})):
     def __exit__(self, evalue, etype, etraceback):
         self.close()
 
-
-atexit.register(ExecutorSingleton.close)
