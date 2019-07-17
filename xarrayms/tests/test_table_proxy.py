@@ -30,8 +30,9 @@ def test_executor():
     ex.shutdown(wait=True)
     ex3.shutdown(wait=False)
 
+    # Executor should be shutdown at this point
     with pytest.raises(RuntimeError):
-        ex2.submit(lambda x: x*2, 4).result()
+        ex2.submit(lambda x: x*2, 4)
 
 
 def test_table_proxy(ms):
