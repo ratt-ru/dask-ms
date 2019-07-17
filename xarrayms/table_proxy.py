@@ -32,7 +32,7 @@ class ExecutorMetaClass(type):
 
 
 class Executor(ExecutorMetaClass("base", (object,), {})):
-    def __init__(self, *args, **kwargs):
+    def __init__(self):
         # Initialise a single thread
         self.ex = ex = cf.ThreadPoolExecutor(1)
 
