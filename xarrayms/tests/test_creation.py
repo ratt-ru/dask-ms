@@ -64,14 +64,27 @@ def test_empty_ms(nrow, nchan, ncorr, add_imaging_cols, tmpdir):
             assert dminfo['ModelData']['COLUMNS'][0] == "MODEL_DATA"
             assert dminfo['CorrectedData']['COLUMNS'][0] == "CORRECTED_DATA"
 
+        from pprint import pprint
+
+        data_coldesc = T.getcoldesc("DATA")
+
         # Add rows, get data, put data
         T.addrows(nrow)
-        print(T.getvarcol("DATA", startrow=0, nrow=1).popitem()[1].shape)
-        shape = (nrow, nchan, ncorr)
+        data = T.getvarcol("DATA", startrow=0, nrow=1).popitem()[1]
+
+        if 'shape' not in data_coldesc:
+            # Variably shaped columns are empty
+            assert data is False
+        else:
+            # Fixed shape columns get zeroed values
+            assert data.shape == (1, nchan, ncorr)
+            assert np.all(data == 0)
+
+        # Put some data in and take some data out
+        shape = (nrow, nchan or 16, ncorr or 4)
         data = np.arange(reduce(mul, shape, 1), dtype=np.complex64)
         data = data.reshape(shape)
         dict_data = {'r%05d' % i: d[None, :, :] for i, d in enumerate(data)}
-        from pprint import pprint
         pprint({k: v.shape for k, v in dict_data.items()})
         T.putvarcol("DATA", dict_data, startrow=0, nrow=nrow)
         new_data = T.getcol("DATA")

@@ -50,7 +50,7 @@ def _dm_spec(coldesc, tile_mem_limit=4*1024*1024):
 
 def _update_col(table_desc, dm_group_spec,
                 column, manager_group,
-                options, shape, ):
+                options, shape):
     kw = {'ndim': len(shape), 'dataManagerGroup': manager_group}
 
     can_tile = None not in shape
