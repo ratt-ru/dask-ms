@@ -370,7 +370,6 @@ def _proc_map_fn(args):
     return True
 
 
-@pytest.mark.slow
 @pytest.mark.parametrize("nprocs", [3])
 def test_multiprocess_table(ms, nprocs):
     from multiprocessing import Pool
