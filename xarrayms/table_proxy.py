@@ -32,6 +32,9 @@ class TableProxyMetaClass(type):
 def proxy_delete_reference(table_proxy, ex, table):
     # http://pydev.blogspot.com/2015/01/creating-safe-cyclic-reference.html
     # To avoid cyclic references, self may not be used within _callback
+    # Something wierd was happening on kernsuite 3 that caused this to fail
+    # Upgrading to kernsuite 5 fixed things. See the following commit
+    # https://github.com/ska-sa/xarray-ms/pull/41/commits/af5126acf1646887ca59ce14680093988d32e333
     def _callback(ref):
         try:
             ex.impl.submit(table.close).result()
