@@ -17,8 +17,8 @@ from numpy.testing import assert_array_equal
 import pyrap.tables as pt
 import pytest
 
-from xarrayms.table_proxy import (TableProxy, _table_cache,
-                                  Executor, _executor_cache)
+from xarrayms.new_executor import Executor, _executor_cache
+from xarrayms.table_proxy import TableProxy, _table_cache
 
 
 def test_executor():
@@ -58,8 +58,8 @@ def test_table_proxy(ms):
     assert len(_table_cache) == 2
     assert len(_executor_cache) == 1
 
-    assert tp._table.nrows() == 10
-    assert tq._table.nrows() == 3
+    assert tp.nrows().result() == 10
+    assert tq.nrows().result() == 3
 
     del tp, tq
 
