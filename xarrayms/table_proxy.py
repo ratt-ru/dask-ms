@@ -103,6 +103,12 @@ class TableProxy(TableProxyMetaClass("base", (object,), {})):
         return (_map_create_proxy, (TableProxy, self._factory,
                                     self._args, self._kwargs))
 
+    def nrows(self):
+        return self._ex.submit(self._table.nrows)
+
+    def getcol(self, *args, **kwargs):
+        return self._ex.submit(self._table.getcol, *args, **kwargs)
+
     def close(self):
         try:
             self._ex.submit(self._table.close).result()
