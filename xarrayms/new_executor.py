@@ -53,4 +53,3 @@ class Executor(ExecutorMetaClass("base", (object,), {})):
 
     def __reduce__(self):
         return (Executor, ())
-

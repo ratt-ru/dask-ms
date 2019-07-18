@@ -9,7 +9,6 @@ try:
 except ImportError:
     import pickle
 
-import dask
 from dask.highlevelgraph import HighLevelGraph
 import dask.array as da
 import numpy as np
