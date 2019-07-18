@@ -33,13 +33,13 @@ def test_executor():
 
     assert len(_executor_cache) == 1
 
-    assert ex.submit(lambda x: x*2, 4).result() == 8
+    assert ex.impl.submit(lambda x: x*2, 4).result() == 8
     ex.shutdown(wait=True)
     ex3.shutdown(wait=False)
 
     # Executor should be shutdown at this point
     with pytest.raises(RuntimeError):
-        ex2.submit(lambda x: x*2, 4)
+        ex2.impl.submit(lambda x: x*2, 4)
 
     assert len(_executor_cache) == 1
 

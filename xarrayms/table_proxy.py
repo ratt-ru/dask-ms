@@ -34,7 +34,7 @@ def proxy_delete_reference(table_proxy, ex, table):
     # To avoid cyclic references, self may not be used within _callback
     def _callback(ref):
         try:
-            ex.submit(table.close).result()
+            ex.impl.submit(table.close).result()
         except Exception:
             log.exception("Error closing table in _callback")
 
@@ -58,13 +58,10 @@ class MismatchedLocks(Exception):
 class TableProxy(TableProxyMetaClass("base", (object,), {})):
     def __init__(self, factory, *args, **kwargs):
         self._ex = ex = Executor()
-        table = ex.submit(factory, *args, **kwargs).result()
+        table = ex.impl.submit(factory, *args, **kwargs).result()
         self._factory = factory
         self._args = args
         self._kwargs = kwargs
-
-        # Ensure tables are closed when the object is deleted
-        self._del_ref = proxy_delete_reference(self, ex, table)
 
         # Private, should be inaccessible
         self._table = table
@@ -72,6 +69,9 @@ class TableProxy(TableProxyMetaClass("base", (object,), {})):
         self._writelocks = 0
         self._write = False
         self._writeable = table.iswritable()
+
+        # Ensure tables are closed when the object is deleted
+        self._del_ref = proxy_delete_reference(self, ex, table)
 
     def __reduce__(self):
         """ Defer to _map_create_proxy to support kwarg pickling """
@@ -81,17 +81,17 @@ class TableProxy(TableProxyMetaClass("base", (object,), {})):
     def close(self):
         """" Closes the table immediately """
         try:
-            self._ex.submit(self._table.close).result()
+            self._ex.impl.submit(self._table.close).result()
         except Exception:
             log.exception("Exception closing TableProxy")
 
     def nrows(self):
         """ Proxy nrows """
-        return self._ex.submit(self._table.nrows)
+        return self._ex.impl.submit(self._table.nrows)
 
     def getcol(self, *args, **kwargs):
         """ Proxy getcol """
-        return self._ex.submit(self.__getcol_impl, args, kwargs)
+        return self._ex.impl.submit(self.__getcol_impl, args, kwargs)
 
     def __getcol_impl(self, args, kwargs):
         """ getcol implementation with readlocking """

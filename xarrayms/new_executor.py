@@ -42,14 +42,11 @@ def executor_delete_reference(ex, threadpool_executor):
 class Executor(ExecutorMetaClass("base", (object,), {})):
     def __init__(self):
         # Initialise a single thread
-        self.ex = ex = cf.ThreadPoolExecutor(1)
-        self.__del_ref = executor_delete_reference(self, ex)
-
-    def submit(self, *args, **kwargs):
-        return self.ex.submit(*args, **kwargs)
+        self.impl = impl = cf.ThreadPoolExecutor(1)
+        self.__del_ref = executor_delete_reference(self, impl)
 
     def shutdown(self, *args, **kwargs):
-        return self.ex.shutdown(*args, **kwargs)
+        return self.impl.shutdown(*args, **kwargs)
 
     def __reduce__(self):
         return (Executor, ())
