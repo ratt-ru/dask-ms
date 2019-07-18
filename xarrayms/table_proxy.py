@@ -57,8 +57,13 @@ class MismatchedLocks(Exception):
 
 class TableProxy(TableProxyMetaClass("base", (object,), {})):
     def __init__(self, factory, *args, **kwargs):
-        self._ex = ex = Executor()
+        ex = Executor()
         table = ex.impl.submit(factory, *args, **kwargs).result()
+
+        # Ensure tables are closed when the object is deleted
+        self._del_ref = proxy_delete_reference(self, ex, table)
+
+        self._ex = ex.impl
         self._factory = factory
         self._args = args
         self._kwargs = kwargs
@@ -70,9 +75,6 @@ class TableProxy(TableProxyMetaClass("base", (object,), {})):
         self._write = False
         self._writeable = table.iswritable()
 
-        # Ensure tables are closed when the object is deleted
-        self._del_ref = proxy_delete_reference(self, ex, table)
-
     def __reduce__(self):
         """ Defer to _map_create_proxy to support kwarg pickling """
         return (_map_create_proxy, (TableProxy, self._factory,
@@ -81,17 +83,17 @@ class TableProxy(TableProxyMetaClass("base", (object,), {})):
     def close(self):
         """" Closes the table immediately """
         try:
-            self._ex.impl.submit(self._table.close).result()
+            self._ex.submit(self._table.close).result()
         except Exception:
             log.exception("Exception closing TableProxy")
 
     def nrows(self):
         """ Proxy nrows """
-        return self._ex.impl.submit(self._table.nrows)
+        return self._ex.submit(self._table.nrows)
 
     def getcol(self, *args, **kwargs):
         """ Proxy getcol """
-        return self._ex.impl.submit(self.__getcol_impl, args, kwargs)
+        return self._ex.submit(self.__getcol_impl, args, kwargs)
 
     def __getcol_impl(self, args, kwargs):
         """ getcol implementation with readlocking """
