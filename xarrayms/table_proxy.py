@@ -63,15 +63,15 @@ class TableProxy(TableProxyMetaClass("base", (object,), {})):
         self._args = args
         self._kwargs = kwargs
 
-        # Ensure tables are closed when the objet is deleted
-        self.__del_ref = proxy_delete_reference(self, ex, table)
+        # Ensure tables are closed when the object is deleted
+        self._del_ref = proxy_delete_reference(self, ex, table)
 
         # Private, should be inaccessible
-        self.__table = table
-        self.__readlocks = 0
-        self.__writelocks = 0
-        self.__write = False
-        self.__writeable = table.iswritable()
+        self._table = table
+        self._readlocks = 0
+        self._writelocks = 0
+        self._write = False
+        self._writeable = table.iswritable()
 
     def __reduce__(self):
         """ Defer to _map_create_proxy to support kwarg pickling """
@@ -81,13 +81,13 @@ class TableProxy(TableProxyMetaClass("base", (object,), {})):
     def close(self):
         """" Closes the table immediately """
         try:
-            self._ex.submit(self.__table.close).result()
+            self._ex.submit(self._table.close).result()
         except Exception:
             log.exception("Exception closing TableProxy")
 
     def nrows(self):
         """ Proxy nrows """
-        return self._ex.submit(self.__table.nrows)
+        return self._ex.submit(self._table.nrows)
 
     def getcol(self, *args, **kwargs):
         """ Proxy getcol """
@@ -96,10 +96,10 @@ class TableProxy(TableProxyMetaClass("base", (object,), {})):
     def __getcol_impl(self, args, kwargs):
         """ getcol implementation with readlocking """
         try:
-            self.__acquire(READLOCK)
-            return self.__table.getcol(*args, **kwargs)
+            self._acquire(READLOCK)
+            return self._table.getcol(*args, **kwargs)
         finally:
-            self.__release(READLOCK)
+            self._release(READLOCK)
 
     def __enter__(self):
         return self
@@ -107,59 +107,59 @@ class TableProxy(TableProxyMetaClass("base", (object,), {})):
     def __exit__(self, evalue, etype, etraceback):
         self.close()
 
-    def __acquire(self, locktype):
+    def _acquire(self, locktype):
         """ Acquire a lock on the table """
         if locktype == READLOCK:
             # No locks at all, acquire readlock
-            if self.__readlocks + self.__writelocks == 0:
-                self.__table.lock(write=False)
+            if self._readlocks + self._writelocks == 0:
+                self._table.lock(write=False)
 
-            self.__readlocks += 1
+            self._readlocks += 1
         elif locktype == WRITELOCK:
-            if not self.__writeable:
+            if not self._writeable:
                 raise ValueError("Table is not writeable")
 
             # Acquire writelock if we had none previously
-            if self.__writelocks == 0:
-                self.__table.lock(write=True)
-                self.__write = True
+            if self._writelocks == 0:
+                self._table.lock(write=True)
+                self._write = True
 
-            self.__writelocks += 1
+            self._writelocks += 1
         elif locktype == NOLOCK:
             pass
         else:
             raise ValueError("Invalid lock type %d" % locktype)
 
-    def __release(self, locktype):
+    def _release(self, locktype):
         """ Release a lock on the table """
         if locktype == READLOCK:
-            self.__readlocks -= 1
+            self._readlocks -= 1
 
-            if self.__readlocks == 0:
-                if self.__writelocks > 0:
+            if self._readlocks == 0:
+                if self._writelocks > 0:
                     # Should be write-locked, check the invariant
-                    assert self.__write is True
+                    assert self._write is True
                 else:
                     # Release all locks
-                    self.__table.unlock()
-                    self.__write = False
-            elif self.__readlocks < 0:
+                    self._table.unlock()
+                    self._write = False
+            elif self._readlocks < 0:
                 raise MismatchedLocks("mismatched readlocks")
 
         elif locktype == WRITELOCK:
-            self.__writelocks -= 1
+            self._writelocks -= 1
 
-            if self.__writelocks == 0:
-                if self.__readlocks > 0:
+            if self._writelocks == 0:
+                if self._readlocks > 0:
                     # Downgrade from write to read lock if
                     # there are any remaining readlocks
-                    self.__write = False
-                    self.__table.lock(write=False)
+                    self._write = False
+                    self._table.lock(write=False)
                 else:
                     # Release all locks
-                    self.__write = False
-                    self.__table.unlock()
-            elif self.__writelocks < 0:
+                    self._write = False
+                    self._table.unlock()
+            elif self._writelocks < 0:
                 raise MismatchedLocks("mismatched writelocks")
 
         elif locktype == NOLOCK:
