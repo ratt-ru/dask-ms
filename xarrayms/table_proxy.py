@@ -4,17 +4,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import atexit
 import logging
 from threading import Lock
 import weakref
 
 import concurrent.futures as cf
-import pyrap.tables as pt
-
 
 log = logging.getLogger(__name__)
-
 
 _executor_cache = weakref.WeakValueDictionary()
 _executor_lock = Lock()
@@ -114,4 +110,3 @@ class TableProxy(TableProxyMetaClass("base", (object,), {})):
 
     def __exit__(self, evalue, etype, etraceback):
         self.close()
-

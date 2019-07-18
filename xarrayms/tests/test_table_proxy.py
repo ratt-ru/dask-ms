@@ -39,6 +39,7 @@ def test_table_proxy(ms):
     tp = TableProxy(pt.table, ms, ack=False, readonly=False)
     tq = TableProxy(pt.taql, "SELECT UNIQUE ANTENNA1 FROM '%s'" % ms)
 
+    assert tp._table.nrows() == 10
     assert tq._table.nrows() == 3
 
 
@@ -48,7 +49,7 @@ def test_table_proxy_pickling(ms):
     assert proxy is proxy2
 
 
-def test_table_proxy_pickling(ms):
+def test_taql_proxy_pickling(ms):
     proxy = TableProxy(pt.taql, "SELECT UNIQUE ANTENNA1 FROM '%s'" % ms)
     proxy2 = pickle.loads(pickle.dumps(proxy))
     assert proxy is proxy2
