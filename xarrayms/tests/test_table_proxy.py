@@ -13,6 +13,7 @@ import dask
 from dask.highlevelgraph import HighLevelGraph
 import dask.array as da
 import numpy as np
+from numpy.testing import assert_array_equal
 import pyrap.tables as pt
 import pytest
 
@@ -131,9 +132,9 @@ def test_proxy_dask_embedding(ms):
     assert len(_executor_cache) == 1
 
     a1 = ant1.compute()
-    assert isinstance(a1, np.ndarray)
-    assert a1.shape == (10,)
-    assert a1.dtype == np.int32
+
+    with pt.table(ms, readonly=False, ack=False) as T:
+        assert_array_equal(a1, T.getcol("ANTENNA1"))
 
     # Delete the graph
     del ant1
