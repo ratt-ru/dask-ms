@@ -9,18 +9,19 @@ from threading import Lock
 import weakref
 
 from xarrayms.new_executor import Executor
+from xarrayms.utils import with_metaclass
 
 log = logging.getLogger(__name__)
 
 _table_cache = weakref.WeakValueDictionary()
 _table_lock = Lock()
 
-
+# CASA Table Locking Modes
 NOLOCK = 0
 READLOCK = 1
 WRITELOCK = 2
 
-
+# List of CASA Table methods to proxy and the appropriate locking mode
 _proxied_methods = [("nrows", NOLOCK),
                     ("getcol", READLOCK),
                     ("getvarcol", READLOCK),
@@ -29,8 +30,19 @@ _proxied_methods = [("nrows", NOLOCK),
 
 
 def proxied_method_factory(method, locktype):
-    """ Proxy pyrap.tables.table.method calls """
+    """
+    Proxy pyrap.tables.table.method calls.
+
+    Creates a private implementation function which performs
+    the call locked according to to ``locktype``.
+
+    The private implementation is accessed by a public ``method``
+    which submits a call to the implementation
+    on a concurrent.futures.ThreadPoolExecutor.
+    """
+
     def _impl(self, args, kwargs):
+        """ Calls method on the table, acquiring the appropriate lock """
         self._acquire(locktype)
 
         try:
@@ -39,6 +51,10 @@ def proxied_method_factory(method, locktype):
             self._release(locktype)
 
     def public_method(self, *args, **kwargs):
+        """
+        Submits _impl(args, kwargs) to the executor
+        and returns a Future
+        """
         return self._ex.submit(_impl, self, args, kwargs)
 
     return public_method
@@ -101,7 +117,8 @@ class MismatchedLocks(Exception):
     pass
 
 
-class TableProxy(TableProxyMetaClass("base", (object,), {})):
+@with_metaclass(TableProxyMetaClass)
+class TableProxy(object):
     def __init__(self, factory, *args, **kwargs):
         ex = Executor()
         table = ex.impl.submit(factory, *args, **kwargs).result()
