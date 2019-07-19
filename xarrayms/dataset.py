@@ -65,7 +65,7 @@ def _gen_getcols(ms, select_cols, group_cols, groups, first_rows, orders):
     table_proxy = TableProxy(pt.table, ms, readonly=True, ack=False)
 
     dataset = {}
-    group_ids = zip(*groups)
+    group_ids = list(zip(*groups))
 
     assert len(group_ids) == len(orders)
 
