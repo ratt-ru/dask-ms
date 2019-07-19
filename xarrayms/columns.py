@@ -76,8 +76,13 @@ def column_metadata(table_proxy, column, exemplar_row=0):
     """
     coldesc = table_proxy.getcoldesc(column).result()
     dtype = infer_dtype(column, coldesc)
-    option = coldesc['option']
     ndim = coldesc.get('ndim', 0)
+
+    try:
+        option = coldesc['option']
+    except KeyError:
+        raise ValueError("Column '%s' has no option "
+                         "in the column descriptor" % column)
 
     # FixedShape
     if option & 4:
