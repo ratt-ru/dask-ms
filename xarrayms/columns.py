@@ -77,6 +77,7 @@ def column_metadata(table_proxy, column, exemplar_row=0):
     coldesc = table_proxy.getcoldesc(column).result()
     dtype = infer_dtype(column, coldesc)
     option = coldesc['option']
+    ndim = coldesc.get('ndim', 0)
 
     # FixedShape
     if option & 4:
@@ -86,6 +87,9 @@ def column_metadata(table_proxy, column, exemplar_row=0):
             raise ValueError("'%s' column descriptor option '%d' specifies "
                              "a FixedShape but no 'shape' attribute was found "
                              "in the column descriptor" % (column, option))
+    # This seems to imply no other dimensions beyond row
+    elif ndim == 0:
+        shape = ()
     # Variably shaped...
     else:
         try:
@@ -112,15 +116,9 @@ def column_metadata(table_proxy, column, exemplar_row=0):
         else:
             raise TypeError("Unhandled exemplar type '%s'" % type(exemplar))
 
-        # Double check the number of dimensions
-        try:
-            ndim = coldesc['ndim']
-        except KeyError:
-            pass
-        else:
-            if not len(shape) - 1 == ndim:
-                raise ValueError("'ndim=%d' in column descriptor doesn't "
-                                 "match shape of exemplar=%d" %
-                                 (ndim, len(shape) - 1))
+        if len(shape) - 1 != ndim:
+            raise ValueError("'ndim=%d' in column descriptor doesn't "
+                             "match shape of exemplar=%d" %
+                             (ndim, len(shape) - 1))
 
     return shape, dtype
