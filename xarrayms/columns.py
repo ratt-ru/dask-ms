@@ -98,13 +98,19 @@ def column_metadata(table_proxy, column, exemplar_row=0):
 
             raise (ve, None, sys.exc_info()[2])
 
-        shape = exemplar.shape[1:]
+        if isinstance(exemplar, np.ndarray):
+            shape = exemplar.shape[1:]
 
-        # Double-check the dtype
-        if dtype != exemplar.dtype:
-            raise TypeError("Inferred dtype '%s' does not match "
-                            "the exemplar dtype '%s'" %
-                            (dtype, exemplar.dtype))
+            # Double-check the dtype
+            if dtype != exemplar.dtype:
+                raise TypeError("Inferred dtype '%s' does not match "
+                                "the exemplar dtype '%s'" %
+                                (dtype, exemplar.dtype))
+        elif isinstance(exemplar, list):
+            shape = (len(exemplar),)
+            assert dtype == object
+        else:
+            raise TypeError("Unhandled exemplar type '%s'" % type(exemplar))
 
         # Double check the number of dimensions
         try:
