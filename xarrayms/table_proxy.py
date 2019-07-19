@@ -29,6 +29,7 @@ _proxied_methods = [("nrows", NOLOCK),
 
 
 def proxied_method_factory(method, locktype):
+    """ Proxy pyrap.tables.table.method calls """
     def _impl(self, args, kwargs):
         self._acquire(locktype)
 
@@ -50,7 +51,7 @@ via a concurrent.futures.ThreadPoolExecutor
 Returns
 -------
 future : concurrent.futures.Future
-    Future
+    Future containing the result of the call
 """)
 
 
