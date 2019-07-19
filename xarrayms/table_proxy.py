@@ -16,7 +16,54 @@ _table_cache = weakref.WeakValueDictionary()
 _table_lock = Lock()
 
 
+NOLOCK = 0
+READLOCK = 1
+WRITELOCK = 2
+
+
+_proxied_methods = [("nrows", NOLOCK),
+                    ("getcol", READLOCK),
+                    ("getvarcol", READLOCK),
+                    ("putcol", WRITELOCK),
+                    ("putvarcol", WRITELOCK)]
+
+
+def proxied_method_factory(method, locktype):
+    def _impl(self, args, kwargs):
+        self._acquire(locktype)
+
+        try:
+            return getattr(self._table, method)(*args, **kwargs)
+        finally:
+            self._release(locktype)
+
+    def public_method(self, *args, **kwargs):
+        return self._ex.submit(_impl, self, args, kwargs)
+
+    return public_method
+
+
+_PROXY_DOCSTRING = ("""
+Proxies calls to pyrap.tables.table.%s
+via a concurrent.futures.ThreadPoolExecutor
+
+Returns
+-------
+future : concurrent.futures.Future
+    Future
+""")
+
+
 class TableProxyMetaClass(type):
+    def __new__(cls, name, bases, dct):
+        for method, locktype in _proxied_methods:
+            proxy_method = proxied_method_factory(method, locktype)
+            proxy_method.__name__ = method
+            proxy_method.__doc__ = _PROXY_DOCSTRING
+            dct[method] = proxy_method
+
+        return type.__new__(cls, name, bases, dct)
+
     def __call__(cls, *args, **kwargs):
         key = (cls,) + args + (frozenset(kwargs.items()),)
 
@@ -47,11 +94,6 @@ def proxy_delete_reference(table_proxy, ex, table):
 def _map_create_proxy(cls, factory, args, kwargs):
     """ Support pickling of kwargs in TableProxy.__reduce__ """
     return cls(factory, *args, **kwargs)
-
-
-NOLOCK = 0
-READLOCK = 1
-WRITELOCK = 2
 
 
 class MismatchedLocks(Exception):
@@ -89,22 +131,6 @@ class TableProxy(TableProxyMetaClass("base", (object,), {})):
             self._ex.submit(self._table.close).result()
         except Exception:
             log.exception("Exception closing TableProxy")
-
-    def nrows(self):
-        """ Proxy nrows """
-        return self._ex.submit(self._table.nrows)
-
-    def getcol(self, *args, **kwargs):
-        """ Proxy getcol """
-        return self._ex.submit(self.__getcol_impl, args, kwargs)
-
-    def __getcol_impl(self, args, kwargs):
-        """ getcol implementation with readlocking """
-        try:
-            self._acquire(READLOCK)
-            return self._table.getcol(*args, **kwargs)
-        finally:
-            self._release(READLOCK)
 
     def __enter__(self):
         return self
