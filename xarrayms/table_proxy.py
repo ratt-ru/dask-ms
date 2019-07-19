@@ -24,11 +24,22 @@ READLOCK = 1
 WRITELOCK = 2
 
 # List of CASA Table methods to proxy and the appropriate locking mode
-_proxied_methods = [("nrows", NOLOCK),
-                    ("getcol", READLOCK),
-                    ("getvarcol", READLOCK),
-                    ("putcol", WRITELOCK),
-                    ("putvarcol", WRITELOCK)]
+_proxied_methods = [
+    # Queries
+    ("nrows", NOLOCK),
+    ("colnames", NOLOCK),
+    ("getcoldesc", NOLOCK),
+    ("getdminfo", NOLOCK),
+    # Reads
+    ("getcol", READLOCK),
+    ("getcolnp", READLOCK),
+    ("getvarcol", READLOCK),
+    ("getcellslice", READLOCK),
+    # Writes
+    ("putcol", WRITELOCK),
+    ("putcolnp", WRITELOCK),
+    ("putvarcol", WRITELOCK),
+    ("putcellslice", WRITELOCK)]
 
 
 def proxied_method_factory(method, locktype):

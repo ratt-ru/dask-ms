@@ -20,18 +20,7 @@ from xarrayms.xarray_ms import (xds_from_ms,
 
 from xarrayms.known_table_schemas import MS_SCHEMA, ColumnSchema
 from xarrayms.table_executor import TableExecutor
-
-
-def group_cols_str(group_cols):
-    return "group_cols=%s" % group_cols
-
-
-def index_cols_str(index_cols):
-    return "index_cols=%s" % index_cols
-
-
-def select_cols_str(select_cols):
-    return "select_cols=%s" % select_cols
+from xarrayms.utils import group_cols_str, index_cols_str, select_cols_str
 
 
 @pytest.mark.parametrize('group_cols', [
