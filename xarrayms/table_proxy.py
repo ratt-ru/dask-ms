@@ -8,6 +8,8 @@ import logging
 from threading import Lock
 import weakref
 
+from dask.base import normalize_token
+
 from xarrayms.new_executor import Executor
 from xarrayms.utils import with_metaclass
 
@@ -120,6 +122,11 @@ class MismatchedLocks(Exception):
 @with_metaclass(TableProxyMetaClass)
 class TableProxy(object):
     def __init__(self, factory, *args, **kwargs):
+        # Save the arguments as keys for pickling and tokenising
+        self._factory = factory
+        self._args = args
+        self._kwargs = kwargs
+
         ex = Executor()
         table = ex.impl.submit(factory, *args, **kwargs).result()
 
@@ -127,9 +134,6 @@ class TableProxy(object):
         self._del_ref = proxy_delete_reference(self, ex, table)
 
         self._ex = ex.impl
-        self._factory = factory
-        self._args = args
-        self._kwargs = kwargs
 
         # Private, should be inaccessible
         self._table = table
@@ -215,3 +219,9 @@ class TableProxy(object):
             pass
         else:
             raise ValueError("Invalid lock type %d" % locktype)
+
+
+@normalize_token.register(TableProxy)
+def _normalize_table_proxy_tokens(tp):
+    """ Generate tokens based on TableProxy arguments """
+    return (tp._factory, tp._args, tp._kwargs)

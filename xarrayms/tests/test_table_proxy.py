@@ -11,6 +11,7 @@ try:
 except ImportError:
     import pickle
 
+from dask.base import tokenize
 from dask.highlevelgraph import HighLevelGraph
 import dask.array as da
 import numpy as np
@@ -64,6 +65,9 @@ def test_table_proxy(ms):
     assert tp.nrows().result() == 10
     assert tq.nrows().result() == 3
 
+    # Different tokens
+    assert tokenize(tp) != tokenize(tq)
+
     del tp, tq
     gc.collect()
 
@@ -79,7 +83,9 @@ def test_table_proxy_pickling(ms):
     assert len(_table_cache) == 1
     assert len(_executor_cache) == 1
 
+    # Same object and tokens
     assert proxy is proxy2
+    assert tokenize(proxy) == tokenize(proxy2)
 
     del proxy, proxy2
     gc.collect()
@@ -97,6 +103,7 @@ def test_taql_proxy_pickling(ms):
     assert len(_executor_cache) == 1
 
     assert proxy is proxy2
+    assert tokenize(proxy) == tokenize(proxy2)
 
     del proxy, proxy2
     gc.collect()
