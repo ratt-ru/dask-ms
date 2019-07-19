@@ -4,9 +4,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import logging
-
-from concurrent.futures import as_completed
 import dask
 import dask.array as da
 from dask.highlevelgraph import HighLevelGraph

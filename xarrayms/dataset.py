@@ -51,7 +51,7 @@ def _object_getter(row_orders, table_proxy, column, shape, dtype):
 
     rr = 0
 
-    for (rs, rl), future in zip(runs, futures):
+    for (rs, rl), future in zip(row_runs, futures):
         result[rr:rr + rl] = np.asarray(future.result(), dtype=dtype)
         rr += rl
 
@@ -63,7 +63,6 @@ def _object_getter(row_orders, table_proxy, column, shape, dtype):
 
 def _gen_getcols(ms, select_cols, group_cols, groups, first_rows, orders):
     table_proxy = TableProxy(pt.table, ms, readonly=True, ack=False)
-    getcol = table_proxy.getcol
 
     dataset = {}
     group_ids = zip(*groups)
@@ -102,10 +101,8 @@ def dataset(ms, select_cols, group_cols, index_cols, chunks):
     orders = row_ordering(order_taql, group_cols, index_cols, row_chunks)
 
     groups = [order_taql.getcol(g).result() for g in group_cols]
-    nrows = order_taql.getcol("__tablerows__").result()
     first_rows = order_taql.getcol("__firstrow__").result()
     assert len(orders) == len(first_rows)
 
     return _gen_getcols(ms, select_cols, group_cols,
                         groups, first_rows, orders)
-

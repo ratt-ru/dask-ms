@@ -8,9 +8,7 @@ import dask
 import pytest
 
 from xarrayms.dataset import dataset
-from xarrayms.ordering import group_ordering_taql, row_ordering
-from xarrayms.utils import (group_cols_str, index_cols_str,
-                            select_cols_str, assert_liveness)
+from xarrayms.utils import group_cols_str, index_cols_str, assert_liveness
 
 
 @pytest.mark.parametrize("group_cols", [
@@ -24,7 +22,8 @@ def test_dataset(ms, group_cols, index_cols, chunks):
     ds = dataset(ms, None, group_cols, index_cols, chunks)
     assert_liveness(2, 1)
 
-    reified_ds = dask.compute(ds)
+    reified_ds = dask.compute(ds)[0]
+    assert len(reified_ds) == 6
 
     del ds
     assert_liveness(0, 0)

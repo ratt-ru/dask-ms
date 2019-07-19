@@ -4,13 +4,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import dask
 from numpy.testing import assert_array_equal
 import pytest
 
 from xarrayms.ordering import group_ordering_taql, row_ordering
-from xarrayms.utils import (group_cols_str, index_cols_str,
-                            select_cols_str, assert_liveness)
+from xarrayms.utils import group_cols_str, index_cols_str, assert_liveness
 
 
 @pytest.mark.parametrize("group_cols", [
