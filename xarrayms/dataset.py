@@ -8,7 +8,7 @@ import dask.array as da
 import numpy as np
 import pyrap.tables as pt
 
-from xarrayms.columns import column_metadata
+from xarrayms.columns import column_metadata, ColumnMetadataError
 from xarrayms.ordering import group_ordering_taql, row_ordering
 from xarrayms.table_proxy import TableProxy
 
@@ -78,7 +78,12 @@ def _gen_getcols(ms, select_cols, group_cols, groups, first_rows, orders):
         group_ds = dataset.setdefault(group_id, {})
 
         for column in select_cols:
-            shape, dtype = column_metadata(table_proxy, column)
+            try:
+                shape, dtype = column_metadata(table_proxy, column)
+            except ColumnMetadataError:
+                log.warn("Ignoring column: '%s'", column, exc_info=True)
+                continue
+
             _get = (_object_getter if dtype == np.object else _ndarray_getter)
 
             group_ds[column] = da.blockwise(_get, ("row",),

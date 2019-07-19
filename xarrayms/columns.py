@@ -42,6 +42,10 @@ def infer_dtype(column, coldesc):
                          "%s" % (value_type, pformat(_TABLE_TO_PY_TABLE)))
 
 
+class ColumnMetadataError(Exception):
+    pass
+
+
 def column_metadata(table_proxy, column, exemplar_row=0):
     """
     Infers column configuration the following:
@@ -73,6 +77,12 @@ def column_metadata(table_proxy, column, exemplar_row=0):
         Shape of column (excluding the row dimension)
     dtype : :class:`numpy.dtype`
         Column data type (numpy)
+
+
+    Raises
+    ------
+    ColumnMetadataError
+        Raised if inferring metadata failed.
     """
     coldesc = table_proxy.getcoldesc(column).result()
     dtype = infer_dtype(column, coldesc)
@@ -81,29 +91,30 @@ def column_metadata(table_proxy, column, exemplar_row=0):
     try:
         option = coldesc['option']
     except KeyError:
-        raise ValueError("Column '%s' has no option "
-                         "in the column descriptor" % column)
+        raise ColumnMetadataError("Column '%s' has no option "
+                                  "in the column descriptor" % column)
 
+    # This seems to imply no other dimensions beyond row
+    if ndim == 0:
+        shape = ()
     # FixedShape
-    if option & 4:
+    elif option & 4:
         try:
             shape = tuple(coldesc['shape'])
         except KeyError:
-            raise ValueError("'%s' column descriptor option '%d' specifies "
-                             "a FixedShape but no 'shape' attribute was found "
-                             "in the column descriptor" % (column, option))
-    # This seems to imply no other dimensions beyond row
-    elif ndim == 0:
-        shape = ()
+            raise ColumnMetadataError("'%s' column descriptor option '%d' "
+                                      "specifies a FixedShape but no 'shape' "
+                                      "attribute was found in the "
+                                      "column descriptor" % (column, option))
     # Variably shaped...
     else:
         try:
             # Get an exemplar row and infer the shape
             exemplar = table_proxy.getcol(column, exemplar_row, 1).result()
         except BaseException as e:
-            ve = ValueError("Couldn't determine shape of "
-                            "column '%s' because '%s'"
-                            % (column, e))
+            ve = ColumnMetadataError("Unable to infer shape of "
+                                     "column '%s' due to:\n'%s'"
+                                     % (column, e))
 
             raise (ve, None, sys.exc_info()[2])
 
@@ -112,18 +123,19 @@ def column_metadata(table_proxy, column, exemplar_row=0):
 
             # Double-check the dtype
             if dtype != exemplar.dtype:
-                raise TypeError("Inferred dtype '%s' does not match "
-                                "the exemplar dtype '%s'" %
-                                (dtype, exemplar.dtype))
+                raise ColumnMetadataError("Inferred dtype '%s' does not match "
+                                          "the exemplar dtype '%s'" %
+                                          (dtype, exemplar.dtype))
         elif isinstance(exemplar, list):
             shape = (len(exemplar),)
             assert dtype == object
         else:
-            raise TypeError("Unhandled exemplar type '%s'" % type(exemplar))
+            raise ColumnMetadataError("Unhandled exemplar "
+                                      "type '%s'" % type(exemplar))
 
         if len(shape) - 1 != ndim:
-            raise ValueError("'ndim=%d' in column descriptor doesn't "
-                             "match shape of exemplar=%d" %
-                             (ndim, len(shape) - 1))
+            raise ColumnMetadataError("'ndim=%d' in column descriptor doesn't "
+                                      "match shape of exemplar=%d" %
+                                      (ndim, len(shape) - 1))
 
     return shape, dtype
