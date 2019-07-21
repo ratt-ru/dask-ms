@@ -4,6 +4,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import gc
+
 
 def group_cols_str(group_cols):
     return "group_cols=%s" % group_cols
@@ -17,19 +19,40 @@ def select_cols_str(select_cols):
     return "select_cols=%s" % select_cols
 
 
-def assert_liveness(table_proxies, executors):
+def assert_liveness(table_proxies, executors, collect=True):
     """
-    Asserts that the correct number of TableProxy
+    Asserts that the given number of TableProxy
     and Executor objects are alive.
     """
-    import gc
     from xarrayms.table_proxy import _table_cache
     from xarrayms.new_executor import _executor_cache
 
-    gc.collect()
+    if collect:
+        gc.collect()
 
-    assert len(_table_cache) == table_proxies
-    assert len(_executor_cache) == executors
+    if table_proxies is not None and len(_table_cache) != table_proxies:
+        lines = ["len(_table_cache)[%d] != %d" %
+                 (len(_table_cache), table_proxies)]
+        for i, v in enumerate(_table_cache.values()):
+            lines.append("%d: %s is referred to by "
+                         "the following objects" % (i, v))
+
+            for r in gc.get_referrers(v):
+                lines.append("\t%s" % str(r))
+
+        raise ValueError("\n".join(lines))
+
+    if executors is not None and len(_executor_cache) != executors:
+        lines = ["len(_executor_cache)[%d] != %d" %
+                 (len(_executor_cache), executors)]
+        for i, v in enumerate(_executor_cache.values()):
+            lines.append("%d: %s is referred to by "
+                         "the following objects" % (i, v))
+
+            for r in gc.get_referrers(v):
+                lines.append("\t%s" % str(r))
+
+        raise ValueError("\n".join(lines))
 
 
 # https://www.zopatista.com/python/2014/03/14/cross-python-metaclasses/

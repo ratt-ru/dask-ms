@@ -22,6 +22,7 @@ import pytest
 from xarrayms.new_executor import Executor, _executor_cache
 from xarrayms.table_proxy import (TableProxy, _table_cache,
                                   MismatchedLocks, READLOCK, WRITELOCK, NOLOCK)
+from xarrayms.utils import assert_liveness
 
 
 def test_executor():
@@ -59,8 +60,7 @@ def test_table_proxy(ms):
     tp = TableProxy(pt.table, ms, ack=False, readonly=False)
     tq = TableProxy(pt.taql, "SELECT UNIQUE ANTENNA1 FROM '%s'" % ms)
 
-    assert len(_table_cache) == 2
-    assert len(_executor_cache) == 1
+    assert_liveness(2, 1)
 
     assert tp.nrows().result() == 10
     assert tq.nrows().result() == 3
@@ -71,8 +71,7 @@ def test_table_proxy(ms):
     del tp, tq
     gc.collect()
 
-    assert len(_table_cache) == 0
-    assert len(_executor_cache) == 0
+    assert_liveness(0, 0)
 
 
 def test_table_proxy_pickling(ms):
@@ -80,8 +79,7 @@ def test_table_proxy_pickling(ms):
     proxy = TableProxy(pt.table, ms, ack=False, readonly=False)
     proxy2 = pickle.loads(pickle.dumps(proxy))
 
-    assert len(_table_cache) == 1
-    assert len(_executor_cache) == 1
+    assert_liveness(1, 1)
 
     # Same object and tokens
     assert proxy is proxy2
@@ -90,8 +88,7 @@ def test_table_proxy_pickling(ms):
     del proxy, proxy2
     gc.collect()
 
-    assert len(_table_cache) == 0
-    assert len(_executor_cache) == 0
+    assert_liveness(0, 0)
 
 
 def test_taql_proxy_pickling(ms):
@@ -99,17 +96,48 @@ def test_taql_proxy_pickling(ms):
     proxy = TableProxy(pt.taql, "SELECT UNIQUE ANTENNA1 FROM '%s'" % ms)
     proxy2 = pickle.loads(pickle.dumps(proxy))
 
-    assert len(_table_cache) == 1
-    assert len(_executor_cache) == 1
+    assert_liveness(1, 1)
 
     assert proxy is proxy2
     assert tokenize(proxy) == tokenize(proxy2)
 
     del proxy, proxy2
-    gc.collect()
+    assert_liveness(0, 0)
 
-    assert len(_table_cache) == 0
-    assert len(_executor_cache) == 0
+
+def _taql_factory(query, style='Python', tables=[]):
+    """ Calls pt.taql, converting TableProxy's in tables to pyrap tables """
+    tables = [t._table if isinstance(t, TableProxy) else t for t in tables]
+    return pt.taql(query, style=style, tables=tables)
+
+
+@pytest.mark.parametrize("reverse", [True, False])
+def test_embedding_table_proxy_in_taql(ms, reverse):
+    """ Test using a TableProxy to create a TAQL TableProxy """
+    proxy = TableProxy(pt.table, ms, ack=False, readonly=True)
+    query = "SELECT UNIQUE ANTENNA1 FROM $1"
+    taql_proxy = TableProxy(_taql_factory, query, tables=[proxy])
+    assert_array_equal(taql_proxy.getcol("ANTENNA1").result(), [0, 1, 2])
+
+    # TAQL and original table
+    assert_liveness(2, 1)
+
+    if reverse:
+        del proxy
+        # TAQL still references original table
+        assert_liveness(2, 1)
+
+        # Remove TAQL now results in everything clearing up
+        del taql_proxy
+        assert_liveness(0, 0)
+    else:
+        # Removing TAQL should leave original table
+        del taql_proxy
+        assert_liveness(1, 1)
+
+        # Removing proxy removes the last
+        del proxy
+        assert_liveness(0, 0)
 
 
 def test_proxy_dask_embedding(ms):
@@ -141,8 +169,7 @@ def test_proxy_dask_embedding(ms):
     ant1 = _ant1_factory(ms)
 
     # Proxy and executor's are embedded in the graph
-    assert len(_table_cache) == 1
-    assert len(_executor_cache) == 1
+    assert_liveness(1, 1)
 
     a1 = ant1.compute()
 
@@ -151,11 +178,9 @@ def test_proxy_dask_embedding(ms):
 
     # Delete the graph
     del ant1
-    gc.collect()
 
     # Cache's are now clear
-    assert len(_table_cache) == 0
-    assert len(_executor_cache) == 0
+    assert_liveness(0, 0)
 
 
 @pytest.mark.parametrize("lockseq", [

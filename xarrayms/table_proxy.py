@@ -42,6 +42,17 @@ _proxied_methods = [
     ("putcellslice", WRITELOCK)]
 
 
+_PROXY_DOCSTRING = ("""
+Proxies calls to pyrap.tables.table.%s
+via a concurrent.futures.ThreadPoolExecutor
+
+Returns
+-------
+future : concurrent.futures.Future
+    Future containing the result of the call
+""")
+
+
 def proxied_method_factory(method, locktype):
     """
     Proxy pyrap.tables.table.method calls.
@@ -70,18 +81,20 @@ def proxied_method_factory(method, locktype):
         """
         return self._ex.submit(_impl, self, args, kwargs)
 
+    public_method.__name__ = method
+    public_method.__doc__ = _PROXY_DOCSTRING % method
+
     return public_method
 
 
-_PROXY_DOCSTRING = ("""
-Proxies calls to pyrap.tables.table.%s
-via a concurrent.futures.ThreadPoolExecutor
-
-Returns
--------
-future : concurrent.futures.Future
-    Future containing the result of the call
-""")
+def _hasher(args):
+    """ Recursively hash data structures -- handles list and dicts """
+    if isinstance(args, (tuple, list, set)):
+        return hash(tuple(_hasher(v) for v in args))
+    elif isinstance(args, dict):
+        return hash(tuple((k, _hasher(v)) for k, v in sorted(args.items())))
+    else:
+        return hash(args)
 
 
 class TableProxyMetaClass(type):
@@ -95,7 +108,7 @@ class TableProxyMetaClass(type):
         return type.__new__(cls, name, bases, dct)
 
     def __call__(cls, *args, **kwargs):
-        key = (cls,) + args + (frozenset(kwargs.items()),)
+        key = _hasher((cls,) + args + (kwargs,))
 
         with _table_lock:
             try:
@@ -108,7 +121,7 @@ class TableProxyMetaClass(type):
 
 def proxy_delete_reference(table_proxy, ex, table):
     # http://pydev.blogspot.com/2015/01/creating-safe-cyclic-reference.html
-    # To avoid cyclic references, self may not be used within _callback
+    # To avoid cyclic references, table_proxy may not be used within _callback
     # Something wierd was happening on kernsuite 3 that caused this to fail
     # Upgrading to kernsuite 5 fixed things. See the following commit
     # https://github.com/ska-sa/xarray-ms/pull/41/commits/af5126acf1646887ca59ce14680093988d32e333
@@ -230,6 +243,15 @@ class TableProxy(object):
             pass
         else:
             raise ValueError("Invalid lock type %d" % locktype)
+
+    def __repr__(self):
+        return "TableProxy(%s, %s, %s)" % (
+                    self._factory.__name__,
+                    ",".join(str(s) for s in self._args),
+                    ",".join("%s=%s" % (str(k), str(v))
+                             for k, v in self._kwargs.items()))
+
+    __str__ = __repr__
 
 
 @normalize_token.register(TableProxy)
