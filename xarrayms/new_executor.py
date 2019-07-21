@@ -10,6 +10,8 @@ import weakref
 
 import concurrent.futures as cf
 
+from xarrayms.utils import with_metaclass
+
 log = logging.getLogger(__name__)
 
 _executor_cache = weakref.WeakValueDictionary()
@@ -39,7 +41,8 @@ def executor_delete_reference(ex, threadpool_executor):
     return weakref.ref(ex, _callback)
 
 
-class Executor(ExecutorMetaClass("base", (object,), {})):
+@with_metaclass(ExecutorMetaClass)
+class Executor(object):
     def __init__(self):
         # Initialise a single thread
         self.impl = impl = cf.ThreadPoolExecutor(1)
