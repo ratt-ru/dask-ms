@@ -17,50 +17,46 @@ from xarrayms.table_proxy import TableProxy
 log = logging.getLogger(__name__)
 
 
-def _ndarray_getter(row_orders, table_proxy, column, shape, dtype):
-    """ Get numpy array data """
+def getter_wrapper(row_orders, io_fn, table_proxy, column, shape, dtype):
+    """
+    Wrapper around ``io_fn`` which should run I/O operations
+    within the table_proxy's associated executor
+    """
     row_runs, resort = row_orders
-    nrows = np.sum(row_runs[:, 1])
-    result = np.empty((nrows,) + shape, dtype=dtype)
-    getcolnp = table_proxy.getcolnp
-    rr = 0
 
-    futures = []
+    # (nrows,) + shape
+    result = np.empty((np.sum(row_runs[:, 1]),) + shape, dtype=dtype)
 
-    for rs, rl in row_runs:
-        futures.append(getcolnp(column, result[rr:rr + rl], rs, rl))
-        rr += rl
+    result = table_proxy._ex.submit(io_fn, row_runs, table_proxy,
+                                    column, result, dtype).result()
 
-    for f in futures:
-        f.result()
-
+    # Resort result if necessary
     if resort is not None:
         return result[resort]
 
     return result
 
 
-def _object_getter(row_orders, table_proxy, column, shape, dtype):
-    """ Get object list data """
-    row_runs, resort = row_orders
-    nrows = np.sum(row_runs[:, 1])
-    result = np.empty((nrows,) + shape, dtype=dtype)
-    getcol = table_proxy.getcol
+def ndarray_getter(row_runs, table_proxy, column, result, dtype):
+    """ Get numpy array data """
+    getcolnp = table_proxy._table.getcolnp
     rr = 0
-
-    futures = []
 
     for rs, rl in row_runs:
-        futures.append(getcol(column, rs, rl))
-
-    rr = 0
-
-    for (rs, rl), future in zip(row_runs, futures):
-        result[rr:rr + rl] = np.asarray(future.result(), dtype=dtype)
+        getcolnp(column, result[rr:rr + rl], rs, rl)
         rr += rl
 
-    if resort is not None:
-        return result[resort]
+    return result
+
+
+def object_getter(row_runs, table_proxy, column, result, dtype):
+    """ Get object list data """
+    getcol = table_proxy._table.getcol
+    rr = 0
+
+    for rs, rl in row_runs:
+        result[rr:rr + rl] = np.asarray(getcol(column, rs, rl), dtype=dtype)
+        rr += rl
 
     return result
 
@@ -88,10 +84,12 @@ def _gen_getcols(ms, select_cols, group_cols, groups, first_rows, orders):
                 log.warning("Ignoring column: '%s'", column, exc_info=True)
                 continue
 
-            _get = (_object_getter if dtype == np.object else _ndarray_getter)
+            _get = (object_getter if dtype == np.object
+                    else ndarray_getter)
 
-            group_ds[column] = da.blockwise(_get, ("row",),
+            group_ds[column] = da.blockwise(getter_wrapper, ("row",),
                                             row_order, ("row",),
+                                            _get, None,
                                             table_proxy, None,
                                             column, None,
                                             shape, None,
