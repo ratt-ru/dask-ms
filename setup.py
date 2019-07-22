@@ -6,7 +6,7 @@ except ImportError as e:
     raise ImportError("%s\nPlease install setuptools." % e)
 
 extras_require = {
-    'testing': ['pytest', 'mock']
+    'testing': ['mock', 'pytest', 'pytest-flake8']
 }
 
 install_requires = [
