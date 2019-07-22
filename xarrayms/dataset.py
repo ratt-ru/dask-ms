@@ -85,7 +85,7 @@ def _gen_getcols(ms, select_cols, group_cols, groups, first_rows, orders):
             try:
                 shape, dtype = column_metadata(table_proxy, column)
             except ColumnMetadataError:
-                log.warn("Ignoring column: '%s'", column, exc_info=True)
+                log.warning("Ignoring column: '%s'", column, exc_info=True)
                 continue
 
             _get = (_object_getter if dtype == np.object else _ndarray_getter)
