@@ -4,6 +4,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import logging
+
 import dask.array as da
 import numpy as np
 import pyrap.tables as pt
@@ -11,6 +13,8 @@ import pyrap.tables as pt
 from xarrayms.columns import column_metadata, ColumnMetadataError
 from xarrayms.ordering import group_ordering_taql, row_ordering
 from xarrayms.table_proxy import TableProxy
+
+log = logging.getLogger(__name__)
 
 
 def _ndarray_getter(row_orders, table_proxy, column, shape, dtype):
