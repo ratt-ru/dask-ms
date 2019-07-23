@@ -19,11 +19,12 @@ from xarrayms.utils import group_cols_str, index_cols_str, assert_liveness
     ids=index_cols_str)
 @pytest.mark.parametrize("chunks", [{"rows": 2}])
 def test_dataset(ms, group_cols, index_cols, chunks):
-    ds = dataset(ms, None, group_cols, index_cols, chunks)
+    datasets = dataset(ms, None, group_cols, index_cols, chunks)
     assert_liveness(2, 1)
 
-    reified_ds = dask.compute(ds)[0]
-    assert len(reified_ds) == 6
+    for ds in datasets:
+        dask.compute(ds.variables)
 
     del ds
+    del datasets
     assert_liveness(0, 0)

@@ -5,8 +5,11 @@ from __future__ import division
 from __future__ import print_function
 
 import logging
+import os
 
+import dask
 import dask.array as da
+from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 import pyrap.tables as pt
 
@@ -15,6 +18,49 @@ from xarrayms.ordering import group_ordering_taql, row_ordering
 from xarrayms.table_proxy import TableProxy
 
 log = logging.getLogger(__name__)
+
+
+def short_table_name(table_name):
+    """
+    Returns the last part
+
+    Parameters
+    ----------
+    table_name : str
+        CASA table path
+
+    Returns
+    -------
+    str
+        Shortened path
+
+    """
+    return os.path.split(table_name.rstrip(os.sep))[1]
+
+
+class Dataset(object):
+    def __init__(self, data_vars=None, attrs=None):
+        self._data_vars = data_vars or {}
+        self._attrs = attrs or {}
+
+    @property
+    def attrs(self):
+        return self._attrs
+
+    @property
+    def variables(self):
+        return self._data_vars
+
+    def __getattr__(self, name):
+        try:
+            return self._data_vars[name]
+        except KeyError:
+            pass
+
+        try:
+            return self._attrs[name]
+        except KeyError:
+            raise ValueError("Invalid Attribute %s" % name)
 
 
 def getter_wrapper(row_orders, io_fn, table_proxy, column, shape, dtype):
@@ -27,6 +73,7 @@ def getter_wrapper(row_orders, io_fn, table_proxy, column, shape, dtype):
     # (nrows,) + shape
     result = np.empty((np.sum(row_runs[:, 1]),) + shape, dtype=dtype)
 
+    # Submit table I/O on executor
     result = table_proxy._ex.submit(io_fn, row_runs, table_proxy,
                                     column, result, dtype).result()
 
@@ -61,10 +108,10 @@ def object_getter(row_runs, table_proxy, column, result, dtype):
     return result
 
 
-def _gen_getcols(ms, select_cols, group_cols, groups, first_rows, orders):
+def _group_datasets(ms, select_cols, group_cols, groups, first_rows, orders):
     table_proxy = TableProxy(pt.table, ms, readonly=True, ack=False)
 
-    dataset = {}
+    datasets = []
     group_ids = list(zip(*groups))
 
     assert len(group_ids) == len(orders)
@@ -75,7 +122,7 @@ def _gen_getcols(ms, select_cols, group_cols, groups, first_rows, orders):
     it = enumerate(zip(group_ids, first_rows, orders))
 
     for g, (group_id, first_row, row_order) in it:
-        group_ds = dataset.setdefault(group_id, {})
+        group_vars = {}
 
         for column in select_cols:
             try:
@@ -84,19 +131,26 @@ def _gen_getcols(ms, select_cols, group_cols, groups, first_rows, orders):
                 log.warning("Ignoring column: '%s'", column, exc_info=True)
                 continue
 
-            _get = (object_getter if dtype == np.object
-                    else ndarray_getter)
+            _get = object_getter if dtype == np.object else ndarray_getter
 
-            group_ds[column] = da.blockwise(getter_wrapper, ("row",),
-                                            row_order, ("row",),
-                                            _get, None,
-                                            table_proxy, None,
-                                            column, None,
-                                            shape, None,
-                                            dtype, None,
-                                            dtype=dtype)
+            name = "%s-[%s]-%s-" % (short_table_name(ms),
+                                    ",".join(str(gid) for gid in group_id),
+                                    column)
 
-    return dataset
+            group_vars[column] = da.blockwise(getter_wrapper, ("row",),
+                                              row_order, ("row",),
+                                              _get, None,
+                                              table_proxy, None,
+                                              column, None,
+                                              shape, None,
+                                              dtype, None,
+                                              name=name,
+                                              dtype=dtype)
+
+        attrs = dict(zip(group_cols, group_id))
+        datasets.append(Dataset(data_vars=group_vars, attrs=attrs))
+
+    return datasets
 
 
 _DEFAULT_ROW_CHUNKS = 10000
@@ -111,5 +165,5 @@ def dataset(ms, select_cols, group_cols, index_cols, chunks):
     first_rows = order_taql.getcol("__firstrow__").result()
     assert len(orders) == len(first_rows)
 
-    return _gen_getcols(ms, select_cols, group_cols,
-                        groups, first_rows, orders)
+    return _group_datasets(ms, select_cols, group_cols,
+                           groups, first_rows, orders)
