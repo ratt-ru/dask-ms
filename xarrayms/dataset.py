@@ -7,9 +7,7 @@ from __future__ import print_function
 import logging
 import os
 
-import dask
 import dask.array as da
-from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 import pyrap.tables as pt
 
@@ -121,8 +119,8 @@ def _group_datasets(ms, select_cols, group_cols, groups, first_rows, orders):
 
     it = enumerate(zip(group_ids, first_rows, orders))
 
-    for g, (group_id, first_row, row_order) in it:
-        group_vars = {}
+    for g, (group_id, first_row, (sorted_rows, row_order)) in it:
+        group_vars = {"ROWID": sorted_rows}
 
         for column in select_cols:
             try:

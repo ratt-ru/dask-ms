@@ -76,8 +76,12 @@ def _group_ordering_array(taql_proxy, index_cols, group,
     """
     Returns
     -------
-    order : :class:`dask.array.Array`
-        ordering array, chunked on ``group_row_chunks``
+    sorted_rows : :class:`dask.array.Array`
+        Sorted table rows chunked on ``group_row_chunks``.
+    row_runs : :class:`dask.array.Array`.
+        Array containing (row_run, resort) tuples.
+        Should not be directly computed.
+        Chunked on ``group_row_chunks``.
     """
     token = dask.base.tokenize(taql_proxy, group, group_nrows)
     name = 'group-rows-' + token
@@ -90,8 +94,9 @@ def _group_ordering_array(taql_proxy, index_cols, group,
     shape = (group_nrows,)
     group_row_chunks = da.core.normalize_chunks(group_row_chunks, shape=shape)
     group_rows = group_rows.rechunk(group_row_chunks)
+    row_runs = group_rows.map_blocks(_gen_row_runs, dtype=np.object)
 
-    return group_rows.map_blocks(_gen_row_runs, dtype=np.object)
+    return group_rows, row_runs
 
 
 def group_ordering_taql(ms, group_cols, index_cols):
