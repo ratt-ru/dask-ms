@@ -71,8 +71,8 @@ def _sorted_group_rows(taql_proxy, group, index_cols):
     return rows[np.lexsort([c.result() for c in sort_columns])]
 
 
-def _group_ordering_array(taql_proxy, index_cols, group,
-                          group_nrows, group_row_chunks):
+def _group_ordering_arrays(taql_proxy, index_cols, group,
+                           group_nrows, group_row_chunks):
     """
     Returns
     -------
@@ -115,7 +115,7 @@ def group_ordering_taql(ms, group_cols, index_cols):
 def row_ordering(group_order_taql, group_cols, index_cols, row_chunks):
     nrows = group_order_taql.getcol("__tablerows__").result()
 
-    return [_group_ordering_array(group_order_taql,
-                                  index_cols, g, nrow,
-                                  row_chunks)
+    return [_group_ordering_arrays(group_order_taql,
+                                   index_cols, g, nrow,
+                                   row_chunks)
             for g, nrow in enumerate(nrows)]
