@@ -31,7 +31,7 @@ class ExecutorMetaClass(type):
 
 def executor_delete_reference(ex, threadpool_executor):
     # http://pydev.blogspot.com/2015/01/creating-safe-cyclic-reference.html
-    # To avoid cyclic references, self may not be used within _callback
+    # To avoid cyclic references, ex may not be used within _callback
     def _callback(ref):
         try:
             threadpool_executor.shutdown(wait=True)
