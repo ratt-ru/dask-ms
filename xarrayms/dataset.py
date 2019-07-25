@@ -14,26 +14,9 @@ import pyrap.tables as pt
 from xarrayms.columns import column_metadata, ColumnMetadataError
 from xarrayms.ordering import group_ordering_taql, row_ordering, _gen_row_runs
 from xarrayms.table_proxy import TableProxy, READLOCK, WRITELOCK
+from xarrayms.utils import short_table_name
 
 log = logging.getLogger(__name__)
-
-
-def short_table_name(table_name):
-    """
-    Returns the last part
-
-    Parameters
-    ----------
-    table_name : str
-        CASA table path
-
-    Returns
-    -------
-    str
-        Shortened path
-
-    """
-    return os.path.split(table_name.rstrip(os.sep))[1]
 
 
 class Dataset(object):

@@ -4,7 +4,25 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import gc
+import os
+
+
+def short_table_name(table_name):
+    """
+    Returns the last part
+
+    Parameters
+    ----------
+    table_name : str
+        CASA table path
+
+    Returns
+    -------
+    str
+        Shortened path
+
+    """
+    return os.path.split(table_name.rstrip(os.sep))[1]
 
 
 def group_cols_str(group_cols):
@@ -26,6 +44,7 @@ def assert_liveness(table_proxies, executors, collect=True):
     """
     from xarrayms.table_proxy import _table_cache
     from xarrayms.new_executor import _executor_cache
+    import gc
 
     if collect:
         gc.collect()
