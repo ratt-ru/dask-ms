@@ -30,7 +30,8 @@ def test_ordering(ms, group_cols, index_cols):
 
     assert_array_equal(first_rows, [0, 1, 3, 4, 7, 8])
 
-    rowids = dask.compute([o[0] for o in orders])[0]
+    rowid_arrays = tuple(o[0] for o in orders)
+    rowids = dask.compute(rowid_arrays)[0]
 
     assert_array_equal(rowids[0], [2, 0])
     assert_array_equal(rowids[1], [1])
@@ -39,5 +40,5 @@ def test_ordering(ms, group_cols, index_cols):
     assert_array_equal(rowids[4], [9, 7])
     assert_array_equal(rowids[5], [8])
 
-    del group_taql, orders, first_rows
+    del first_rows, orders, rowid_arrays, group_taql
     assert_liveness(0, 0)
