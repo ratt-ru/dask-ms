@@ -5,10 +5,9 @@ from __future__ import division
 from __future__ import print_function
 
 import dask
-import numpy as np
 import pytest
 
-from xarrayms.dataset import dataset, write_columns
+from xarrayms.dataset import dataset
 from xarrayms.utils import (select_cols_str,
                             group_cols_str,
                             index_cols_str,
@@ -22,7 +21,8 @@ from xarrayms.utils import (select_cols_str,
     ["TIME", "ANTENNA1", "ANTENNA2"]],
     ids=index_cols_str)
 @pytest.mark.parametrize("select_cols", [
-    ["TIME", "DATA"]])
+    ["TIME", "DATA"]],
+    ids=select_cols_str)
 @pytest.mark.parametrize("chunks", [{"rows": 2}])
 def test_dataset(ms, select_cols, group_cols, index_cols, chunks):
     datasets = dataset(ms, select_cols, group_cols, index_cols, chunks)
