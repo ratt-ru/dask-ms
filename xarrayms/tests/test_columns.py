@@ -35,16 +35,19 @@ def test_missing_valuetype():
         infer_dtype('col', {})
 
 
-@pytest.mark.parametrize("column, shape, dtype", [
-    ("DATA", (16, 4), np.complex128),
-    ("TIME", (), np.float64),
-    ("ANTENNA1", (), np.int32)])
-def test_column_metadata(ms, column, shape, dtype):
+@pytest.mark.parametrize("column, dims, shape, dtype", [
+    ("DATA", ("chan", "corr"), (16, 4), np.complex128),
+    ("TIME", (), (), np.float64),
+    ("ANTENNA1", (), (), np.int32)])
+def test_column_metadata(ms, column, dims, shape, dtype):
     table_proxy = TableProxy(pt.table, ms, readonly=True, ack=False)
     assert_liveness(1, 1)
 
-    ishape, idtype = column_metadata(table_proxy, column)
+    table_schema = {'DATA': {'dask': {'dims': dims}}}
+
+    ishape, idims, idtype = column_metadata(table_proxy, table_schema, column)
     assert ishape == shape
+    assert idims == dims
     assert idtype == dtype
 
     del table_proxy
