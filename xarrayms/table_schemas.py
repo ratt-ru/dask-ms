@@ -116,9 +116,9 @@ _ALL_SCHEMAS = {
 _ALL_SCHEMAS.update(_SUBTABLE_SCHEMAS)
 
 
-def _table_prefix_search(table_name):
+def _table_suffix_search(table_name):
     """ Guess the schema from the table name """
-    if table_name.upper().endswith(".MS"):
+    if table_name[-3:].upper().endswith(".MS"):
         return MS_SCHEMA
 
     for k, schema in _SUBTABLE_SCHEMAS.items():
@@ -151,7 +151,7 @@ def lookup_table_schema(table_name, lookup_str):
         :code:`{column: {'dask': {...}, 'casa': {...}}}`.
     """
     if lookup_str is None:
-        return _table_prefix_search(short_table_name(table_name))
+        return _table_suffix_search(short_table_name(table_name))
 
     if not isinstance(lookup_str, (tuple, list)):
         lookup_str = [lookup_str]
