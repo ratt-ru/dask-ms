@@ -12,8 +12,8 @@ import numpy as np
 import pyrap.tables as pt
 
 from xarrayms.columns import column_metadata, ColumnMetadataError
-from xarrayms.ordering import group_ordering_taql, row_ordering
-from xarrayms.table_proxy import TableProxy
+from xarrayms.ordering import group_ordering_taql, row_ordering, _gen_row_runs
+from xarrayms.table_proxy import TableProxy, READLOCK, WRITELOCK
 
 log = logging.getLogger(__name__)
 
@@ -87,9 +87,14 @@ def ndarray_getter(row_runs, table_proxy, column, result, dtype):
     getcolnp = table_proxy._table.getcolnp
     rr = 0
 
-    for rs, rl in row_runs:
-        getcolnp(column, result[rr:rr + rl], rs, rl)
-        rr += rl
+    table_proxy._acquire(READLOCK)
+
+    try:
+        for rs, rl in row_runs:
+            getcolnp(column, result[rr:rr + rl], rs, rl)
+            rr += rl
+    finally:
+        table_proxy._release(READLOCK)
 
     return result
 
@@ -99,15 +104,56 @@ def object_getter(row_runs, table_proxy, column, result, dtype):
     getcol = table_proxy._table.getcol
     rr = 0
 
-    for rs, rl in row_runs:
-        result[rr:rr + rl] = np.asarray(getcol(column, rs, rl), dtype=dtype)
-        rr += rl
+    table_proxy._acquire(READLOCK)
+
+    try:
+        for rs, rl in row_runs:
+            result[rr:rr + rl] = np.asarray(getcol(column, rs, rl),
+                                            dtype=dtype)
+            rr += rl
+    finally:
+        table_proxy._release(READLOCK)
 
     return result
 
 
+def putter_wrapper(row_orders, table_proxy, column, data):
+    """
+    Wrapper which should run I/O operations within
+    the table_proxy's associated executor
+    """
+    row_runs, resort = row_orders
+
+    if resort is not None:
+        data = data[resort]
+
+    table_proxy._ex.submit(array_putter, row_runs, table_proxy,
+                           column, data).result()
+
+    return np.full((1,) * len(data.shape), True)
+
+
+def array_putter(row_runs, table_proxy, column, data):
+    """ Put data into the table """
+    putcol = table_proxy._table.putcol
+    rr = 0
+
+    table_proxy._acquire(WRITELOCK)
+
+    try:
+        for rs, rl in row_runs:
+            putcol(column, data[rr:rr + rl], startrow=rs, nrow=rl)
+            rr += rl
+
+    finally:
+        table_proxy._acquire(WRITELOCK)
+
+    return data
+
+
 def _group_datasets(ms, select_cols, group_cols, groups, first_rows, orders):
-    table_proxy = TableProxy(pt.table, ms, readonly=True, ack=False)
+    table_proxy = TableProxy(pt.table, ms, ack=False,
+                             readonly=True, lockoptions='user')
 
     datasets = []
     group_ids = list(zip(*groups))
@@ -149,6 +195,30 @@ def _group_datasets(ms, select_cols, group_cols, groups, first_rows, orders):
         datasets.append(Dataset(data_vars=group_vars, attrs=attrs))
 
     return datasets
+
+
+def write_columns(ms, dataset, columns):
+    table_proxy = TableProxy(pt.table, ms, ack=False,
+                             readonly=False, lockoptions='user')
+    writes = []
+
+    rowids = dataset.ROWID
+    row_order = rowids.map_blocks(_gen_row_runs, dtype=np.object)
+
+    for column_name in columns:
+        column_array = getattr(dataset, column_name)
+
+        column_write = da.blockwise(putter_wrapper, ("row",),
+                                    row_order, ("row",),
+                                    table_proxy, None,
+                                    column_name, None,
+                                    column_array, ("row",),
+                                    name="write-" + column_name + "-",
+                                    dtype=np.bool)
+
+        writes.append(column_write.ravel())
+
+    return da.concatenate(writes)
 
 
 _DEFAULT_ROW_CHUNKS = 10000

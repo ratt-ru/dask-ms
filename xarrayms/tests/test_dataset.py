@@ -5,9 +5,10 @@ from __future__ import division
 from __future__ import print_function
 
 import dask
+import numpy as np
 import pytest
 
-from xarrayms.dataset import dataset
+from xarrayms.dataset import dataset, write_columns
 from xarrayms.utils import group_cols_str, index_cols_str, assert_liveness
 
 
