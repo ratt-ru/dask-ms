@@ -14,6 +14,7 @@ import pyrap.tables as pt
 from xarrayms.columns import column_metadata, ColumnMetadataError
 from xarrayms.ordering import group_ordering_taql, row_ordering, _gen_row_runs
 from xarrayms.table_proxy import TableProxy, READLOCK, WRITELOCK
+from xarrayms.table_schemas import lookup_table_schema
 from xarrayms.utils import short_table_name
 
 log = logging.getLogger(__name__)
@@ -138,6 +139,7 @@ def _group_datasets(ms, select_cols, group_cols, groups, first_rows, orders):
     table_proxy = TableProxy(pt.table, ms, ack=False,
                              readonly=True, lockoptions='user')
 
+    table_schema = lookup_table_schema(ms, None)
     datasets = []
     group_ids = list(zip(*groups))
 
@@ -153,10 +155,14 @@ def _group_datasets(ms, select_cols, group_cols, groups, first_rows, orders):
 
         for column in select_cols:
             try:
-                shape, dtype = column_metadata(table_proxy, column)
+                shape, dims, dtype = column_metadata(table_proxy,
+                                                     table_schema,
+                                                     column)
             except ColumnMetadataError:
                 log.warning("Ignoring column: '%s'", column, exc_info=True)
                 continue
+
+            assert len(dims) == len(shape), (dims, shape)
 
             _get = object_getter if dtype == np.object else ndarray_getter
 
@@ -164,7 +170,7 @@ def _group_datasets(ms, select_cols, group_cols, groups, first_rows, orders):
                                     ",".join(str(gid) for gid in group_id),
                                     column)
 
-            group_vars[column] = da.blockwise(getter_wrapper, ("row",),
+            group_vars[column] = da.blockwise(getter_wrapper, ("row",) + dims,
                                               row_order, ("row",),
                                               _get, None,
                                               table_proxy, None,
@@ -172,6 +178,7 @@ def _group_datasets(ms, select_cols, group_cols, groups, first_rows, orders):
                                               shape, None,
                                               dtype, None,
                                               name=name,
+                                              new_axes=dict(zip(dims, shape)),
                                               dtype=dtype)
 
         attrs = dict(zip(group_cols, group_id))

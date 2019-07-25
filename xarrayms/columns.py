@@ -46,7 +46,7 @@ class ColumnMetadataError(Exception):
     pass
 
 
-def column_metadata(table_proxy, column, exemplar_row=0):
+def column_metadata(table_proxy, table_schema, column, exemplar_row=0):
     """
     Infers column configuration the following:
 
@@ -64,6 +64,8 @@ def column_metadata(table_proxy, column, exemplar_row=0):
     ----------
     table_proxy : string
         CASA Table path
+    table_schema : dict
+        Table schema
     column : string
         Table column
     exemplar_row : int, optional
@@ -75,6 +77,8 @@ def column_metadata(table_proxy, column, exemplar_row=0):
     -------
     shape : tuple
         Shape of column (excluding the row dimension)
+    dims : tuple
+        Dask dimension schema.
     dtype : :class:`numpy.dtype`
         Column data type (numpy)
 
@@ -138,4 +142,19 @@ def column_metadata(table_proxy, column, exemplar_row=0):
                                       "match shape of exemplar=%d" %
                                       (ndim, len(shape) - 1))
 
-    return shape, dtype
+    try:
+        column_schema = table_schema[column]
+    except KeyError:
+        dims = ()
+    else:
+        try:
+            dask_schema = column_schema['dask']
+        except KeyError:
+            dims = ()
+        else:
+            try:
+                dims = dask_schema['dims']
+            except KeyError:
+                dims = ()
+
+    return shape, dims, dtype
