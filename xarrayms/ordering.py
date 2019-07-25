@@ -101,13 +101,16 @@ def _group_ordering_arrays(taql_proxy, index_cols, group,
 
 def group_ordering_taql(ms, group_cols, index_cols):
     index_group_cols = ["GAGGR(%s) as GROUP_%s" % (c, c) for c in index_cols]
+    # Group Row ID's
     index_group_cols.append("GROWID() AS __tablerow__")
+    # Number of rows in the group
     index_group_cols.append("GCOUNT() as __tablerows__")
+    # The first row of the group
     index_group_cols.append("GROWID()[0] as __firstrow__")
 
     groupby = groupby_clause(group_cols)
     select = select_clause(group_cols + index_group_cols)
-    query = "%s FROM '%s' %s" % (select, ms, groupby)
+    query = "%s\nFROM\n\t'%s'\n%s" % (select, ms, groupby)
 
     return TableProxy(pt.taql, query)
 
