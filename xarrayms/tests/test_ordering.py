@@ -4,6 +4,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import dask
 from numpy.testing import assert_array_equal
 import pytest
 
@@ -25,16 +26,18 @@ def test_ordering(ms, group_cols, index_cols):
     first_rows = group_taql.getcol("__firstrow__").result()
     assert_liveness(1, 1)
 
+    assert len(first_rows) == len(orders) == 6
+
     assert_array_equal(first_rows, [0, 1, 3, 4, 7, 8])
 
-    assert len(orders) == 6
+    rowids = dask.compute([o[0] for o in orders])[0]
 
-    assert orders[0][0].chunks == ((2,),)
-    assert orders[1][0].chunks == ((1,),)
-    assert orders[2][0].chunks == ((2,),)
-    assert orders[3][0].chunks == ((2,),)
-    assert orders[4][0].chunks == ((2,),)
-    assert orders[5][0].chunks == ((1,),)
+    assert_array_equal(rowids[0], [2, 0])
+    assert_array_equal(rowids[1], [1])
+    assert_array_equal(rowids[2], [5, 3])
+    assert_array_equal(rowids[3], [6, 4])
+    assert_array_equal(rowids[4], [9, 7])
+    assert_array_equal(rowids[5], [8])
 
     del group_taql, orders, first_rows
     assert_liveness(0, 0)
