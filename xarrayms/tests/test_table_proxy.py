@@ -4,8 +4,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import gc
-
 try:
     import cPickle as pickle
 except ImportError:
@@ -49,7 +47,6 @@ def test_executor():
 
     # Force collection
     del ex, ex2, ex3
-    gc.collect()
 
     # Check that callbacks
     assert len(_executor_cache) == 0
@@ -69,7 +66,6 @@ def test_table_proxy(ms):
     assert tokenize(tp) != tokenize(tq)
 
     del tp, tq
-    gc.collect()
 
     assert_liveness(0, 0)
 
@@ -86,7 +82,6 @@ def test_table_proxy_pickling(ms):
     assert tokenize(proxy) == tokenize(proxy2)
 
     del proxy, proxy2
-    gc.collect()
 
     assert_liveness(0, 0)
 
