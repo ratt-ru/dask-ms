@@ -5,6 +5,7 @@ from __future__ import division
 from __future__ import print_function
 
 import dask
+import dask.array as da
 from numpy.testing import assert_array_equal
 import pytest
 
@@ -41,4 +42,33 @@ def test_ordering(ms, group_cols, index_cols):
     assert_array_equal(rowids[5], [8])
 
     del first_rows, orders, rowid_arrays, group_taql
+    assert_liveness(0, 0)
+
+
+@pytest.mark.parametrize("index_cols", [
+    ["TIME", "ANTENNA1", "ANTENNA2"]],
+    ids=index_cols_str)
+@pytest.mark.parametrize("row_chunks", [
+    2,
+    (2, 3, 4, 1),
+    (5, 3, 2)],
+    ids=lambda c: 'row_chunks=%s' % (c,))
+def test_row_ordering(ms, index_cols, row_chunks):
+    group_taql = group_ordering_taql(ms, [], index_cols)
+    assert_liveness(1, 1)
+    orders = row_ordering(group_taql, [], index_cols, row_chunks)
+    assert_liveness(1, 1)
+    first_rows = group_taql.getcol("__firstrow__").result()
+    assert_liveness(1, 1)
+
+    # Normalise chunks to match that of the output array
+    expected_chunks = da.core.normalize_chunks(row_chunks, (10,))
+
+    assert len(orders) == 1
+    assert orders[0][0].chunks == expected_chunks
+
+    rowids = dask.compute(orders[0][0])[0]
+    assert_array_equal(rowids, [9, 8, 7, 6, 5, 4, 3, 2, 1, 0])
+
+    del first_rows, orders, group_taql
     assert_liveness(0, 0)

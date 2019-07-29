@@ -400,8 +400,13 @@ def write_columns(ms, dataset, columns):
 _DEFAULT_ROW_CHUNKS = 10000
 
 
-def dataset(ms, select_cols, group_cols, index_cols, chunks):
-    row_chunks = chunks.get("row", _DEFAULT_ROW_CHUNKS)
+def dataset(ms, select_cols, group_cols, index_cols, chunks=None):
+    if chunks is None:
+        chunks = {'row': _DEFAULT_ROW_CHUNKS}
+        row_chunks = _DEFAULT_ROW_CHUNKS
+    else:
+        row_chunks = chunks.setdefault('row', _DEFAULT_ROW_CHUNKS)
+
     order_taql = group_ordering_taql(ms, group_cols, index_cols)
     orders = row_ordering(order_taql, group_cols, index_cols, row_chunks)
 
