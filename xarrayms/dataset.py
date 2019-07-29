@@ -4,6 +4,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+try:
+    from collections.abc import Mapping  # python 3.8
+except ImportError:
+    from collections import Mapping
+
 import logging
 
 import dask.array as da
@@ -19,18 +24,77 @@ from xarrayms.utils import short_table_name
 log = logging.getLogger(__name__)
 
 
+#  This class duplicates xarray's Frozen class in
+# https://github.com/pydata/xarray/blob/master/xarray/core/utils.py
+# See https://github.com/pydata/xarray/blob/master/LICENSE
+class Frozen(Mapping):
+    """
+    Wrapper around an object implementing the Mapping interface
+    to make it immutable.
+    """
+    __slots__ = "mapping"
+
+    def __init__(self, mapping):
+        self.mapping = mapping
+
+    def __getitem__(self, key):
+        return self.mapping[key]
+
+    def __iter__(self):
+        return iter(self.mapping)
+
+    def __len__(self):
+        return len(self.mapping)
+
+    def __contains__(self, key):
+        return key in self.mapping
+
+    def __repr__(self):
+        return '%s(%r)' % (type(self).__name__, self.mapping)
+
+
 class Dataset(object):
-    def __init__(self, data_vars=None, attrs=None):
-        self._data_vars = data_vars or {}
+    """
+    Poor man's xarray Dataset. It mostly exists so that xarray can
+    be an optional dependency, as it in turn depends on pandas,
+    which is a fairly heavy dependency
+    """
+    def __init__(self, data_vars_and_dims, attrs=None):
+        self._data_vars = {k: v[0] for k, v in data_vars_and_dims.items()}
+        self._dims = {k: v[1] for k, v in data_vars_and_dims.items()}
         self._attrs = attrs or {}
 
     @property
     def attrs(self):
-        return self._attrs
+        return Frozen(self._attrs)
+
+    @property
+    def dims(self):
+        return Frozen(self._dims)
+
+    @property
+    def chunks(self):
+        chunks = {}
+
+        for name, var in self._data_vars.items():
+            if not isinstance(var, da.Array):
+                continue
+
+            for dim, c in zip(self._dims[name], var.chunks):
+                if dim in chunks and c != chunks[dim]:
+                    raise ValueError("Existing chunk size %d for "
+                                     "dimension %s is inconsistent "
+                                     "with the chunk size for the "
+                                     "same dimension of array %s" %
+                                     (c, dim, name))
+
+                chunks[dim] = c
+
+        return chunks
 
     @property
     def variables(self):
-        return self._data_vars
+        return Frozen(self._data_vars)
 
     def __getattr__(self, name):
         try:
@@ -150,7 +214,7 @@ def _group_datasets(ms, select_cols, group_cols, groups, first_rows, orders):
     it = enumerate(zip(group_ids, first_rows, orders))
 
     for g, (group_id, first_row, (sorted_rows, row_order)) in it:
-        group_vars = {"ROWID": sorted_rows}
+        group_var_dims = {"ROWID": (sorted_rows, ("row",))}
 
         for column in select_cols:
             try:
@@ -169,19 +233,23 @@ def _group_datasets(ms, select_cols, group_cols, groups, first_rows, orders):
                                     ",".join(str(gid) for gid in group_id),
                                     column)
 
-            group_vars[column] = da.blockwise(getter_wrapper, ("row",) + dims,
-                                              row_order, ("row",),
-                                              _get, None,
-                                              table_proxy, None,
-                                              column, None,
-                                              shape, None,
-                                              dtype, None,
-                                              name=name,
-                                              new_axes=dict(zip(dims, shape)),
-                                              dtype=dtype)
+            full_dims = ("row",) + dims
+
+            dask_array = da.blockwise(getter_wrapper, full_dims,
+                                      row_order, ("row",),
+                                      _get, None,
+                                      table_proxy, None,
+                                      column, None,
+                                      shape, None,
+                                      dtype, None,
+                                      name=name,
+                                      new_axes=dict(zip(dims, shape)),
+                                      dtype=dtype)
+
+            group_var_dims[column] = (dask_array, full_dims)
 
         attrs = dict(zip(group_cols, group_id))
-        datasets.append(Dataset(data_vars=group_vars, attrs=attrs))
+        datasets.append(Dataset(group_var_dims, attrs=attrs))
 
     return datasets
 
