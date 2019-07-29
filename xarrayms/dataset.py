@@ -324,12 +324,17 @@ def _group_datasets(ms, select_cols, group_cols, groups, first_rows,
     for g, (group_id, first_row, (sorted_rows, row_order)) in it:
         group_var_dims = {"ROWID": (sorted_rows, ("row",))}
 
+        try:
+            group_chunks = chunks[g]   # Get group chunking strategy
+        except IndexError:
+            group_chunks = chunks[-1]  # Try re-use the last group's chunks
+
         for column in select_cols:
             try:
                 shape, dims, dim_chunks, dtype = column_metadata(column,
                                                                  table_proxy,
                                                                  table_schema,
-                                                                 chunks)
+                                                                 group_chunks)
             except ColumnMetadataError:
                 log.warning("Ignoring column: '%s'", column, exc_info=True)
                 continue
@@ -401,14 +406,16 @@ _DEFAULT_ROW_CHUNKS = 10000
 
 
 def dataset(ms, select_cols, group_cols, index_cols, chunks=None):
+    # Create or promote chunks to a list of dicts
     if chunks is None:
-        chunks = {'row': _DEFAULT_ROW_CHUNKS}
-        row_chunks = _DEFAULT_ROW_CHUNKS
-    else:
-        row_chunks = chunks.setdefault('row', _DEFAULT_ROW_CHUNKS)
+        chunks = [{'row': _DEFAULT_ROW_CHUNKS}]
+    elif isinstance(chunks, dict):
+        chunks = [chunks]
+    elif not isinstance(chunks, (tuple, list)):
+        raise TypeError("chunks must be a dict or sequence of dicts")
 
     order_taql = group_ordering_taql(ms, group_cols, index_cols)
-    orders = row_ordering(order_taql, group_cols, index_cols, row_chunks)
+    orders = row_ordering(order_taql, group_cols, index_cols, chunks)
 
     groups = [order_taql.getcol(g).result() for g in group_cols]
     first_rows = order_taql.getcol("__firstrow__").result()

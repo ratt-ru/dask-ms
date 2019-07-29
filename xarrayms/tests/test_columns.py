@@ -50,11 +50,9 @@ def test_column_metadata(ms, column, shape, chunks, table_schema, dtype):
     assert_liveness(1, 1)
 
     try:
-        col_schema = table_schema[column]
+        dims = table_schema[column]['dask']['dims']
     except KeyError:
         dims = ()
-    else:
-        dims = col_schema['dask']['dims']  # Assume we have one
 
     ishape, idims, ichunks, idtype = column_metadata(column, table_proxy,
                                                      table_schema,

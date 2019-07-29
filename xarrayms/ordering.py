@@ -115,10 +115,28 @@ def group_ordering_taql(ms, group_cols, index_cols):
     return TableProxy(pt.taql, query)
 
 
-def row_ordering(group_order_taql, group_cols, index_cols, row_chunks):
+def row_ordering(group_order_taql, group_cols, index_cols, chunks):
     nrows = group_order_taql.getcol("__tablerows__").result()
 
-    return [_group_ordering_arrays(group_order_taql,
-                                   index_cols, g, nrow,
-                                   row_chunks)
-            for g, nrow in enumerate(nrows)]
+    ordering_arrays = []
+
+    for g, nrow in enumerate(nrows):
+        try:
+            # Try use this group's chunking scheme
+            group_chunks = chunks[g]
+        except IndexError:
+            # Otherwise re-use the last group's
+            group_chunks = chunks[-1]
+
+        try:
+            # Extract row chunking scheme
+            group_row_chunks = group_chunks['row']
+        except KeyError:
+            raise ValueError("No row chunking scheme "
+                             "found in %s!" % group_chunks)
+
+        ordering_arrays.append(_group_ordering_arrays(group_order_taql,
+                                                      index_cols, g, nrow,
+                                                      group_row_chunks))
+
+    return ordering_arrays

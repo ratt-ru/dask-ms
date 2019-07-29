@@ -19,10 +19,10 @@ from xarrayms.utils import group_cols_str, index_cols_str, assert_liveness
 @pytest.mark.parametrize("index_cols", [
     ["TIME", "ANTENNA1", "ANTENNA2"]],
     ids=index_cols_str)
-def test_ordering(ms, group_cols, index_cols):
+def test_ordering_single_group(ms, group_cols, index_cols):
     group_taql = group_ordering_taql(ms, group_cols, index_cols)
     assert_liveness(1, 1)
-    orders = row_ordering(group_taql, group_cols, index_cols, 2)
+    orders = row_ordering(group_taql, group_cols, index_cols, [{'row': 2}])
     assert_liveness(1, 1)
     first_rows = group_taql.getcol("__firstrow__").result()
     assert_liveness(1, 1)
@@ -45,24 +45,27 @@ def test_ordering(ms, group_cols, index_cols):
     assert_liveness(0, 0)
 
 
+@pytest.mark.parametrize("group_cols", [
+    []],
+    ids=group_cols_str)
 @pytest.mark.parametrize("index_cols", [
     ["TIME", "ANTENNA1", "ANTENNA2"]],
     ids=index_cols_str)
-@pytest.mark.parametrize("row_chunks", [
-    2,
-    (2, 3, 4, 1),
-    (5, 3, 2)],
-    ids=lambda c: 'row_chunks=%s' % (c,))
-def test_row_ordering(ms, index_cols, row_chunks):
-    group_taql = group_ordering_taql(ms, [], index_cols)
+@pytest.mark.parametrize("chunks", [
+    {'row': 2},
+    {'row': (2, 3, 4, 1)},
+    {'row': (5, 3, 2)}],
+    ids=lambda c: 'chunks=%s' % (c,))
+def test_row_ordering_single_group(ms, group_cols, index_cols, chunks):
+    group_taql = group_ordering_taql(ms, group_cols, index_cols)
     assert_liveness(1, 1)
-    orders = row_ordering(group_taql, [], index_cols, row_chunks)
+    orders = row_ordering(group_taql, group_cols, index_cols, [chunks])
     assert_liveness(1, 1)
     first_rows = group_taql.getcol("__firstrow__").result()
     assert_liveness(1, 1)
 
     # Normalise chunks to match that of the output array
-    expected_chunks = da.core.normalize_chunks(row_chunks, (10,))
+    expected_chunks = da.core.normalize_chunks(chunks['row'], (10,))
 
     assert len(orders) == 1
     assert orders[0][0].chunks == expected_chunks
@@ -71,4 +74,51 @@ def test_row_ordering(ms, index_cols, row_chunks):
     assert_array_equal(rowids, [9, 8, 7, 6, 5, 4, 3, 2, 1, 0])
 
     del first_rows, orders, group_taql
+    assert_liveness(0, 0)
+
+
+# Grouping on DATA_DESC_ID gives us two groups
+# one with 7 rows and the other with 3
+@pytest.mark.parametrize("group_cols", [
+    ["DATA_DESC_ID"]],
+    ids=group_cols_str)
+@pytest.mark.parametrize("index_cols", [
+    ["TIME", "ANTENNA1", "ANTENNA2"]],
+    ids=index_cols_str)
+@pytest.mark.parametrize("chunks", [
+    [{'row': 2}, {'row': 2}],
+    [{'row': (3, 4)}, {'row': 3}],
+    [{'row': (2, 3, 2)}, {'row': (2, 1)}],
+    [{'row': 2}]],
+    ids=lambda c: 'chunks=%s' % (c,))
+def test_row_ordering_multiple_groups(ms, group_cols, index_cols, chunks):
+    group_taql = group_ordering_taql(ms, group_cols, index_cols)
+    assert_liveness(1, 1)
+    orders = row_ordering(group_taql, group_cols, index_cols, chunks)
+    assert_liveness(1, 1)
+    first_rows = group_taql.getcol("__firstrow__").result()
+    assert_liveness(1, 1)
+
+    # We get two groups out
+    assert len(orders) == len(first_rows) == 2
+    assert_array_equal(first_rows, [0, 7])
+
+    rowid_arrays = tuple(o[0] for o in orders)
+    rowids = dask.compute(rowid_arrays)[0]
+
+    # Check the two resulting groups
+
+    # Normalise chunks to match that of the output array
+    row_chunks = chunks[0]['row']
+    expected_chunks = da.core.normalize_chunks(row_chunks, (7,))
+    assert_array_equal(rowids[0], [6, 5, 4, 3, 2, 1, 0])
+    assert rowid_arrays[0].chunks == expected_chunks
+
+    # If chunks only supplied for the first group, re-use it's chunking
+    row_chunks = chunks[0]['row'] if len(chunks) == 1 else chunks[1]['row']
+    expected_chunks = da.core.normalize_chunks(row_chunks, (3,))
+    assert_array_equal(rowids[1], [9, 8, 7])
+    assert rowid_arrays[1].chunks == expected_chunks
+
+    del first_rows, orders, rowid_arrays, group_taql
     assert_liveness(0, 0)
