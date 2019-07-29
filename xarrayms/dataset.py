@@ -56,7 +56,7 @@ class Frozen(Mapping):
 class Dataset(object):
     """
     Poor man's xarray Dataset. It mostly exists so that xarray can
-    be an optional dependency, as it in turn depends on pandas,
+    be an optional dependency, as it in turn depends on pandas
     which is a fairly heavy dependency
     """
     def __init__(self, data_vars_and_dims, attrs=None):
