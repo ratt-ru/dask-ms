@@ -4,14 +4,21 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import sys
+
 import dask
 import dask.array as da
+from dask.array.core import normalize_chunks
 from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 import pyrap.tables as pt
 
 from xarrayms.query import select_clause, groupby_clause
 from xarrayms.table_proxy import TableProxy
+
+
+class GroupChunkingError(Exception):
+    pass
 
 
 def _gen_row_runs(rows, sort=True, sort_dir="read"):
@@ -91,8 +98,20 @@ def _group_ordering_arrays(taql_proxy, index_cols, group,
     graph = HighLevelGraph.from_collections(name, layers, [])
     group_rows = da.Array(graph, name, chunks, dtype=np.int32)
 
-    shape = (group_nrows,)
-    group_row_chunks = da.core.normalize_chunks(group_row_chunks, shape=shape)
+    try:
+        shape = (group_nrows,)
+        group_row_chunks = normalize_chunks(group_row_chunks, shape=shape)
+    except ValueError:
+        new_ex = GroupChunkingError("Unable to match chunks '%s' "
+                                    "with shape '%s' for group '%d'. "
+                                    "This can occur if too few chunk "
+                                    "dictionaries have been supplied for "
+                                    "the number of groups "
+                                    "and an earlier group's chunking strategy "
+                                    "is applied to a later one." %
+                                    (group_row_chunks), shape, group)
+        raise (GroupChunkingError, new_ex, sys.exc_info()[2])
+
     group_rows = group_rows.rechunk(group_row_chunks)
     row_runs = group_rows.map_blocks(_gen_row_runs, dtype=np.object)
 
