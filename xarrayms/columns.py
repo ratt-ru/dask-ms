@@ -7,6 +7,7 @@ from __future__ import print_function
 from pprint import pformat
 import sys
 
+import dask.array as da
 import numpy as np
 
 # Map  column string types to numpy/python types
@@ -46,7 +47,7 @@ class ColumnMetadataError(Exception):
     pass
 
 
-def column_metadata(table_proxy, table_schema, column, exemplar_row=0):
+def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
     """
     Infers column configuration the following:
 
@@ -62,12 +63,14 @@ def column_metadata(table_proxy, table_schema, column, exemplar_row=0):
 
     Parameters
     ----------
+    column : string
+        Table column
     table_proxy : string
         CASA Table path
     table_schema : dict
         Table schema
-    column : string
-        Table column
+    chunks : dict of tuple of ints
+        :code:`{dim: chunks}` mapping
     exemplar_row : int, optional
         Table row accessed when inferring a shape and dtype
         from a getcol.
@@ -76,9 +79,12 @@ def column_metadata(table_proxy, table_schema, column, exemplar_row=0):
     Returns
     -------
     shape : tuple
-        Shape of column (excluding the row dimension)
+        Shape of column (excluding the row dimension).
+        For example :code:`(16, 4)`
     dims : tuple
-        Dask dimension schema.
+        Dask dimension schema. For example :code:`("chan", "corr")`
+    dim_chunks : list of tuples
+        Dimension chunks. For example :code:`[chan_chunks, corr_chunks]`.
     dtype : :class:`numpy.dtype`
         Column data type (numpy)
 
@@ -142,6 +148,7 @@ def column_metadata(table_proxy, table_schema, column, exemplar_row=0):
                                       "match shape of exemplar=%d" %
                                       (ndim, len(shape) - 1))
 
+    # Extract dimension schema
     try:
         column_schema = table_schema[column]
     except KeyError:
@@ -157,4 +164,16 @@ def column_metadata(table_proxy, table_schema, column, exemplar_row=0):
             except KeyError:
                 dims = ()
 
-    return shape, dims, dtype
+    dim_chunks = []
+
+    # Infer chunking for the dimension
+    for s, d in zip(shape, dims):
+        try:
+            dc = chunks[d]
+        except KeyError:
+            dim_chunks.append((s,))
+        else:
+            dc = da.core.normalize_chunks(dc, shape=(s,))
+            dim_chunks.append(dc[0])
+
+    return shape, dims, dim_chunks, dtype

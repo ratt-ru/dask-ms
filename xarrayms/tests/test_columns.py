@@ -35,19 +35,34 @@ def test_missing_valuetype():
         infer_dtype('col', {})
 
 
-@pytest.mark.parametrize("column, dims, shape, dtype", [
-    ("DATA", ("chan", "corr"), (16, 4), np.complex128),
-    ("TIME", (), (), np.float64),
-    ("ANTENNA1", (), (), np.int32)])
-def test_column_metadata(ms, column, dims, shape, dtype):
+@pytest.mark.parametrize("column, shape, dtype", [
+    ("DATA", (16, 4), np.complex128),
+    ("TIME",  (), np.float64),
+    ("ANTENNA1", (), np.int32)])
+@pytest.mark.parametrize("table_schema", [
+    {'DATA': {'dask': {'dims': ("chan", "corr")}}}
+])
+@pytest.mark.parametrize("chunks", [
+    (("chan", (12, 4)), ("corr", (1, 1, 1, 1))),
+    (("chan", (4, 4, 4, 4)), ("corr", (2, 2)))])
+def test_column_metadata(ms, column, shape, chunks, table_schema, dtype):
     table_proxy = TableProxy(pt.table, ms, readonly=True, ack=False)
     assert_liveness(1, 1)
 
-    table_schema = {'DATA': {'dask': {'dims': dims}}}
+    try:
+        col_schema = table_schema[column]
+    except KeyError:
+        dims = ()
+    else:
+        dims = col_schema['dask']['dims']  # Assume we have one
 
-    ishape, idims, idtype = column_metadata(table_proxy, table_schema, column)
+    ishape, idims, ichunks, idtype = column_metadata(column, table_proxy,
+                                                     table_schema,
+                                                     dict(chunks))
+
     assert ishape == shape
     assert idims == dims
+    assert ichunks == [c[1] for c in chunks[:len(ishape)]]
     assert idtype == dtype
 
     del table_proxy

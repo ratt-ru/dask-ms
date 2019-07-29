@@ -11,7 +11,9 @@ except ImportError:
 
 import logging
 
+import dask
 import dask.array as da
+from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 import pyrap.tables as pt
 
@@ -115,28 +117,86 @@ class Dataset(object):
             raise ValueError("Invalid Attribute %s" % name)
 
 
-def getter_wrapper(row_orders, io_fn, table_proxy, column, shape, dtype):
+def dim_extents_array(dim, chunks):
     """
-    Wrapper around ``io_fn`` which should run I/O operations
+    Produces a an array of chunk extents for a given dimension.
+
+    Parameters
+    ----------
+    dim : str
+        Name of the dimension
+    chunks : tuple of ints
+        Dimension chunks
+
+    Returns
+    -------
+    dim_extents : :class:`dask.array.Array`
+        dask array where each chunk contains a single (start, end) tuple
+        defining the start and end of the chunk. The end is inclusive
+        in the python-casacore style.
+
+        The array chunks match ``chunks`` and are innacurate, but
+        are used to define chunk sizes of final outputs.
+
+    Notes
+    -----
+    The returned array should never be computed directly, but
+    rather used to produce dataset arrays.
+    """
+
+    name = "-".join((dim, dask.base.tokenize(dim, chunks)))
+    layers = {}
+    start = 0
+
+    for i, c in enumerate(chunks):
+        layers[(name, i)] = (start, start + c - 1)  # chunk end is inclusive
+        start += c
+
+    graph = HighLevelGraph.from_collections(name, layers, [])
+    return da.Array(graph, name, chunks=(chunks,), dtype=np.object)
+
+
+def getter_wrapper(row_orders, *args):
+    """
+    Wrapper running I/O operations
     within the table_proxy's associated executor
     """
     row_runs, resort = row_orders
+    # Infer number of shape arguments
+    nshape_args = len(args) - 3
+    # Extract other arguments
+    table_proxy, column, dtype = args[nshape_args:]
 
-    # (nrows,) + shape
-    result = np.empty((np.sum(row_runs[:, 1]),) + shape, dtype=dtype)
+    # There are other dimensions beside row
+    if nshape_args > 0:
+        blc, trc = zip(*args[:nshape_args])
+        shape = tuple(t - b + 1 for b, t in zip(blc, trc))
+        result = np.empty((np.sum(row_runs[:, 1]),) + shape, dtype=dtype)
+        io_fn = (object_getcolslice if isinstance(dtype, object)
+                 else ndarray_getcolslice)
 
-    # Submit table I/O on executor
-    result = table_proxy._ex.submit(io_fn, row_runs, table_proxy,
-                                    column, result, dtype).result()
+        # Submit table I/O on executor
+        future = table_proxy._ex.submit(io_fn, row_runs, table_proxy,
+                                        column, result,
+                                        blc, trc, dtype)
+    # Row only case
+    else:
+        result = np.empty((np.sum(row_runs[:, 1]),), dtype=dtype)
+        io_fn = (object_getcol if isinstance(dtype, object)
+                 else ndarray_getcol)
+
+        # Submit table I/O on executor
+        future = table_proxy._ex.submit(io_fn, row_runs, table_proxy,
+                                        column, result, dtype)
 
     # Resort result if necessary
     if resort is not None:
-        return result[resort]
+        return future.result()[resort]
 
-    return result
+    return future.result()
 
 
-def ndarray_getter(row_runs, table_proxy, column, result, dtype):
+def ndarray_getcol(row_runs, table_proxy, column, result, dtype):
     """ Get numpy array data """
     getcolnp = table_proxy._table.getcolnp
     rr = 0
@@ -145,7 +205,7 @@ def ndarray_getter(row_runs, table_proxy, column, result, dtype):
 
     try:
         for rs, rl in row_runs:
-            getcolnp(column, result[rr:rr + rl], rs, rl)
+            getcolnp(column, result[rr:rr + rl], startrow=rs, nrow=rl)
             rr += rl
     finally:
         table_proxy._release(READLOCK)
@@ -153,7 +213,27 @@ def ndarray_getter(row_runs, table_proxy, column, result, dtype):
     return result
 
 
-def object_getter(row_runs, table_proxy, column, result, dtype):
+def ndarray_getcolslice(row_runs, table_proxy, column, result,
+                        blc, trc, dtype):
+    """ Get numpy array data """
+    getcolslicenp = table_proxy._table.getcolslicenp
+    rr = 0
+
+    table_proxy._acquire(READLOCK)
+
+    try:
+        for rs, rl in row_runs:
+            getcolslicenp(column, result[rr:rr + rl],
+                          blc=blc, trc=trc,
+                          startrow=rs, nrow=rl)
+            rr += rl
+    finally:
+        table_proxy._release(READLOCK)
+
+    return result
+
+
+def object_getcol(row_runs, table_proxy, column, result, dtype):
     """ Get object list data """
     getcol = table_proxy._table.getcol
     rr = 0
@@ -163,6 +243,26 @@ def object_getter(row_runs, table_proxy, column, result, dtype):
     try:
         for rs, rl in row_runs:
             result[rr:rr + rl] = np.asarray(getcol(column, rs, rl),
+                                            dtype=dtype)
+            rr += rl
+    finally:
+        table_proxy._release(READLOCK)
+
+    return result
+
+
+def object_getcolslice(row_runs, table_proxy, column, result,
+                       blc, trc, dtype):
+    """ Get object list data """
+    getcolslice = table_proxy._table.getcolslice
+    rr = 0
+
+    table_proxy._acquire(READLOCK)
+
+    try:
+        for rs, rl in row_runs:
+            result[rr:rr + rl] = np.asarray(getcolslice(column, blc, trc,
+                                                        startrow=rs, nrow=rl),
                                             dtype=dtype)
             rr += rl
     finally:
@@ -205,7 +305,8 @@ def array_putter(row_runs, table_proxy, column, data):
     return data
 
 
-def _group_datasets(ms, select_cols, group_cols, groups, first_rows, orders):
+def _group_datasets(ms, select_cols, group_cols, groups, first_rows,
+                    orders, chunks):
     table_proxy = TableProxy(pt.table, ms, ack=False,
                              readonly=True, lockoptions='user')
 
@@ -225,34 +326,45 @@ def _group_datasets(ms, select_cols, group_cols, groups, first_rows, orders):
 
         for column in select_cols:
             try:
-                shape, dims, dtype = column_metadata(table_proxy,
-                                                     table_schema,
-                                                     column)
+                shape, dims, dim_chunks, dtype = column_metadata(column,
+                                                                 table_proxy,
+                                                                 table_schema,
+                                                                 chunks)
             except ColumnMetadataError:
                 log.warning("Ignoring column: '%s'", column, exc_info=True)
                 continue
 
             assert len(dims) == len(shape), (dims, shape)
 
-            _get = object_getter if dtype == np.object else ndarray_getter
-
+            # Name of the dask array representing this column
             name = "%s-[%s]-%s-" % (short_table_name(ms),
                                     ",".join(str(gid) for gid in group_id),
                                     column)
 
+            # dask array dimension schema
             full_dims = ("row",) + dims
 
+            # Construct the arguments
+            args = []
+
+            # Add extent arrays
+            for d, c in zip(dims, dim_chunks):
+                args.append(dim_extents_array(d, c))
+                args.append((d,))
+
+            # Add other variables
+            args.extend([table_proxy, None,
+                         column, None,
+                         dtype, None])
+
+            # Construct the array
             dask_array = da.blockwise(getter_wrapper, full_dims,
                                       row_order, ("row",),
-                                      _get, None,
-                                      table_proxy, None,
-                                      column, None,
-                                      shape, None,
-                                      dtype, None,
+                                      *args,
                                       name=name,
-                                      new_axes=dict(zip(dims, shape)),
                                       dtype=dtype)
 
+            # Assign into variable and dimension dataset
             group_var_dims[column] = (dask_array, full_dims)
 
         attrs = dict(zip(group_cols, group_id))
@@ -298,4 +410,5 @@ def dataset(ms, select_cols, group_cols, index_cols, chunks):
     assert len(orders) == len(first_rows)
 
     return _group_datasets(ms, select_cols, group_cols,
-                           groups, first_rows, orders)
+                           groups, first_rows,
+                           orders, chunks)

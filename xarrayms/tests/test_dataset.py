@@ -5,6 +5,7 @@ from __future__ import division
 from __future__ import print_function
 
 import dask
+from dask.array.core import normalize_chunks
 import pytest
 
 from xarrayms.dataset import dataset
@@ -23,21 +24,40 @@ from xarrayms.utils import (select_cols_str,
 @pytest.mark.parametrize("select_cols", [
     ["TIME", "DATA"]],
     ids=select_cols_str)
-@pytest.mark.parametrize("chunks", [{"rows": 2}])
-def test_dataset(ms, select_cols, group_cols, index_cols, chunks):
+@pytest.mark.parametrize("shapes", [
+    {"row": 10, "chan": 16, "corr": 4}],
+    ids=lambda s: "shapes=%s" % s)
+@pytest.mark.parametrize("chunks", [
+    {"row": 2},
+    {"row": 3, "chan": 4, "corr": 1},
+    {"row": 3, "chan": (4, 4, 4, 4), "corr": (2, 2)}],
+    ids=lambda c: "chunks=%s" % c)
+def test_dataset(ms, select_cols, group_cols, index_cols, shapes, chunks):
     datasets = dataset(ms, select_cols, group_cols, index_cols, chunks)
     # (1) Read-only TableProxy
     # (2) Read-only TAQL TableProxy
     assert_liveness(2, 1)
 
+    rows = shapes['row']
+    chans = shapes['chan']
+    corrs = shapes['corr']
+
+    # Expected output chunks
+    echunks = {'row': normalize_chunks(chunks['row'],
+                                       shape=(rows,))[0],
+               'chan': normalize_chunks(chunks.get('chan', chans),
+                                        shape=(chans,))[0],
+               'corr': normalize_chunks(chunks.get('corr', corrs),
+                                        shape=(corrs,))[0]}
+
     for ds in datasets:
         res = dask.compute(dict(ds.variables))[0]
-        assert res['DATA'].shape[1:] == (16, 4)
+        assert res['DATA'].shape[1:] == (chans, corrs)
         assert 'TIME' in res
 
         chunks = dict(ds.chunks)
-        assert chunks["chan"] == (16,)
-        assert chunks["corr"] == (4,)
+        assert chunks["chan"] == echunks['chan']
+        assert chunks["corr"] == echunks['corr']
 
         assert dict(ds.dims) == {
             'ROWID': ("row",),
