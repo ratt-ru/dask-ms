@@ -60,8 +60,15 @@ class Dataset(object):
     which is a fairly heavy dependency
     """
     def __init__(self, data_vars_and_dims, attrs=None):
-        self._data_vars = {k: v[0] for k, v in data_vars_and_dims.items()}
-        self._dims = {k: v[1] for k, v in data_vars_and_dims.items()}
+        data_vars = {}
+        dims = {}
+
+        for k, v in data_vars_and_dims.items():
+            data_vars[k] = v[0]
+            dims[k] = v[1]
+
+        self._data_vars = data_vars
+        self._dims = dims
         self._attrs = attrs or {}
 
     @property
