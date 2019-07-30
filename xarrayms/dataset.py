@@ -26,7 +26,7 @@ from xarrayms.utils import short_table_name
 log = logging.getLogger(__name__)
 
 
-#  This class duplicates xarray's Frozen class in
+# This class duplicates xarray's Frozen class in
 # https://github.com/pydata/xarray/blob/master/xarray/core/utils.py
 # See https://github.com/pydata/xarray/blob/master/LICENSE
 class Frozen(Mapping):
@@ -412,7 +412,7 @@ def dataset(ms, select_cols, group_cols, index_cols, chunks=None):
     elif isinstance(chunks, dict):
         chunks = [chunks]
     elif not isinstance(chunks, (tuple, list)):
-        raise TypeError("chunks must be a dict or sequence of dicts")
+        raise TypeError("'chunks' must be a dict or sequence of dicts")
 
     order_taql = group_ordering_taql(ms, group_cols, index_cols)
     orders = row_ordering(order_taql, group_cols, index_cols, chunks)
