@@ -9,18 +9,12 @@ import pyrap.tables as pt
 import pytest
 
 from xarrayms.table_proxy import TableProxy
-from xarrayms.columns import infer_dtype, column_metadata
+from xarrayms.columns import infer_dtype, column_metadata, _TABLE_TO_PY_TABLE
 from xarrayms.utils import assert_liveness
 
 
 @pytest.mark.parametrize("casa_type, numpy_type", [
-    ('int', np.int32),
-    ('float', np.float32),
-    ('double', np.float64),
-    ('boolean', np.bool),
-    ('complex', np.complex64),
-    ('dcomplex', np.complex128),
-    ('string', object)])
+    (ct, np) for ct, np in _TABLE_TO_PY_TABLE.items()])
 def test_infer_dtype(casa_type, numpy_type):
     assert infer_dtype('col', {'valueType': casa_type}) == numpy_type
 
