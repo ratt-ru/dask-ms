@@ -63,3 +63,39 @@ def ms(tmp_path_factory):
     # except it causes issues with casacore files on py3
     # https://github.com/ska-sa/xarray-ms/issues/32
     # shutil.rmtree(str(msdir))
+
+
+@pytest.fixture(scope='session')
+def spw_chan_freqs():
+    return (np.linspace(.856e9, 2*.856e9, 8),
+            np.linspace(.856e9, 2*.856e9, 16),
+            np.linspace(.856e9, 2*.856e9, 32))
+
+
+@pytest.fixture(scope='session')
+def spw_table(tmp_path_factory, spw_chan_freqs):
+    """ Simulate a SPECTRAL_WINDOW table with two spectral windows """
+    spw_dir = tmp_path_factory.mktemp("spw_dir", numbered=False)
+    fn = os.path.join(str(spw_dir), "test.ms::SPECTRAL_WINDOW")
+
+    create_table_query = """
+    CREATE TABLE %s
+    [NUM_CHAN I4,
+     CHAN_FREQ R8 [NDIM=1]]
+    LIMIT %d
+    """ % (fn, len(spw_chan_freqs))
+
+    with pt.taql(create_table_query) as spw:
+        spw.putvarcol("NUM_CHAN", {"r%d" % i: s.shape[0]
+                                   for i, s
+                                   in enumerate(spw_chan_freqs)})
+        spw.putvarcol("CHAN_FREQ", {"r%d" % i: s[None, :]
+                                    for i, s
+                                    in enumerate(spw_chan_freqs)})
+
+    yield fn
+
+    # Remove the temporary directory
+    # except it causes issues with casacore files on py3
+    # https://github.com/ska-sa/xarray-ms/issues/32
+    # shutil.rmtree(str(spw_dir))

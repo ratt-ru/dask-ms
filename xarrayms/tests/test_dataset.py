@@ -127,57 +127,18 @@ def test_dataset_writes(ms, select_cols,
         T.putcol("STATE_ID", state_id)
 
 
-@pytest.fixture(scope='module')
-def spw_chans_1():
-    return np.linspace(.856e9, 2*.856e9, 8)
-
-
-@pytest.fixture(scope='module')
-def spw_chans_2():
-    return np.linspace(.856e9, 2*.856e9, 16)
-
-
-@pytest.fixture(scope='module')
-def spw_table(tmp_path_factory, spw_chans_1, spw_chans_2):
-    """ Simulate a SPECTRAL_WINDOW table with two spectral windows """
-    spw_dir = tmp_path_factory.mktemp("spw_dir", numbered=False)
-    fn = os.path.join(str(spw_dir), "test.ms::SPECTRAL_WINDOW")
-
-    create_table_query = """
-    CREATE TABLE %s
-    [NUM_CHAN I4,
-     CHAN_WIDTH R8 [NDIM=1]]
-    LIMIT 2
-    """ % fn
-
-    with pt.taql(create_table_query) as spw:
-        spw.putvarcol("NUM_CHAN", {
-            "r1": [spw_chans_1.shape[0]],
-            "r2": [spw_chans_2.shape[0]]})
-        spw.putvarcol("CHAN_WIDTH", {
-            "r1": spw_chans_1[None, :],
-            "r2": spw_chans_2[None, :]
-        })
-
-    yield fn
-
-    # Remove the temporary directory
-    # except it causes issues with casacore files on py3
-    # https://github.com/ska-sa/xarray-ms/issues/32
-    # shutil.rmtree(str(spw_dir))
-
-
 # Even though we ask for two rows, we get single rows out
 # due to the "__row__" in group_col
 @pytest.mark.parametrize("chunks", [{"row": 2}], ids=lambda c: str(c))
-def test_row_grouping(spw_table, spw_chans_1, spw_chans_2, chunks):
+def test_row_grouping(spw_table, spw_chan_freqs, chunks):
     datasets = dataset(spw_table, [], ["__row__"], [], chunks)
 
     assert_liveness(2, 1)
 
-    assert len(datasets) == 2
-    assert_array_equal(datasets[0].CHAN_WIDTH, spw_chans_1)
-    assert_array_equal(datasets[1].CHAN_WIDTH, spw_chans_2)
+    assert len(datasets) == len(spw_chan_freqs)
+
+    for i, chan_freq in enumerate(spw_chan_freqs):
+        assert_array_equal(datasets[i].CHAN_FREQ, chan_freq)
 
     del datasets
     assert_liveness(0, 0)
