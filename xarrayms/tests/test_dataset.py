@@ -4,11 +4,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
-
 import dask
 from dask.array.core import normalize_chunks
-import numpy as np
 from numpy.testing import assert_array_equal
 import pyrap.tables as pt
 import pytest
