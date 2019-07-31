@@ -63,8 +63,7 @@ def _sorted_rows(taql_proxy, startrow, nrow):
 
 
 def ordering_taql(ms, index_cols):
-    select = select_clause(["ROWID() as __tablerow__",
-                            "0 as __firstrow__"])
+    select = select_clause(["ROWID() as __tablerow__"])
     orderby = orderby_clause(index_cols)
     query = "%s\nFROM\n\t'%s'\n%s" % (select, ms, orderby)
 

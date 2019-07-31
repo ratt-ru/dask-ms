@@ -62,8 +62,6 @@ def test_row_ordering_no_group(ms, index_cols, chunks):
     assert_liveness(1, 1)
     orders = row_ordering(order_taql, index_cols, chunks)
     assert_liveness(1, 1)
-    first_rows = order_taql.getcol("__firstrow__").result()
-    assert_liveness(1, 1)
 
     # Normalise chunks to match that of the output array
     expected_chunks = da.core.normalize_chunks(chunks['row'], (10,))
@@ -72,9 +70,8 @@ def test_row_ordering_no_group(ms, index_cols, chunks):
 
     rowids = dask.compute(orders[0])[0]
     assert_array_equal(rowids, [9, 8, 7, 6, 5, 4, 3, 2, 1, 0])
-    assert_array_equal(first_rows, 0)
 
-    del first_rows, orders, order_taql
+    del orders, order_taql
     assert_liveness(0, 0)
 
 
