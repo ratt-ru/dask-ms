@@ -113,7 +113,7 @@ def spw_table(tmp_path_factory, spw_chans_1, spw_chans_2):
 
 
 # Even though we ask for two rows, we get single rows out
-# due to the single __row__ in group_col
+# due to the "__row__" in group_col
 @pytest.mark.parametrize("chunks", [{"row": 2}], ids=lambda c: str(c))
 def test_row_grouping(spw_table, spw_chans_1, spw_chans_2, chunks):
     datasets = dataset(spw_table, [], ["__row__"], [], chunks)
