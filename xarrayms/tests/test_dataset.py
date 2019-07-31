@@ -17,7 +17,8 @@ from xarrayms.utils import (select_cols_str,
 
 @pytest.mark.parametrize("group_cols", [
     ["FIELD_ID", "SCAN_NUMBER"],
-    []],
+    [],
+    ["__row__"]],
     ids=group_cols_str)
 @pytest.mark.parametrize("index_cols", [
     ["TIME", "ANTENNA1", "ANTENNA2"]],
@@ -44,9 +45,7 @@ def test_dataset(ms, select_cols, group_cols, index_cols, shapes, chunks):
     corrs = shapes['corr']
 
     # Expected output chunks
-    echunks = {'row': normalize_chunks(chunks['row'],
-                                       shape=(rows,))[0],
-               'chan': normalize_chunks(chunks.get('chan', chans),
+    echunks = {'chan': normalize_chunks(chunks.get('chan', chans),
                                         shape=(chans,))[0],
                'corr': normalize_chunks(chunks.get('corr', corrs),
                                         shape=(corrs,))[0]}

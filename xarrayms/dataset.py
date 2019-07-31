@@ -391,7 +391,7 @@ class DatasetFactory(object):
                                               orders, self.chunks[0],
                                               short_table_name(self.ms))
 
-        return [Dataset(variables)]
+        return Dataset(variables)
 
     def _group_datasets(self, groups, first_rows, orders):
         table_proxy = self._table_proxy()
@@ -440,10 +440,23 @@ class DatasetFactory(object):
         if len(self.group_cols) == 0:
             order_taql = ordering_taql(self.ms, self.index_cols)
             orders = row_ordering(order_taql, self.index_cols, self.chunks[0])
-            return self._single_dataset(orders)
-        # Grouping by row
+            return [self._single_dataset(orders)]
+        # Group by row
         elif len(self.group_cols) == 1 and self.group_cols[0] == "__row__":
-            raise NotImplementedError("Grouping by __row__ not implemented")
+            order_taql = ordering_taql(self.ms, self.index_cols)
+            sorted_rows, row_runs = row_ordering(order_taql,
+                                                 self.index_cols,
+                                                 # chunk ordering on each row
+                                                 dict(self.chunks[0], row=1))
+
+            # Produce a dataset for each chunk (block),
+            # each containing a single row
+            nrows = sorted_rows.shape[0]
+            row_blocks = sorted_rows.blocks
+            run_blocks = row_runs.blocks
+
+            return [self._single_dataset((row_blocks[r], run_blocks[r]))
+                    for r in range(nrows)]
         # Grouping column case
         else:
             order_taql = group_ordering_taql(self.ms, self.group_cols,
