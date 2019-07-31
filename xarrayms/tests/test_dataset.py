@@ -16,7 +16,8 @@ from xarrayms.utils import (select_cols_str,
 
 
 @pytest.mark.parametrize("group_cols", [
-    ["FIELD_ID", "SCAN_NUMBER"]],
+    ["FIELD_ID", "SCAN_NUMBER"],
+    []],
     ids=group_cols_str)
 @pytest.mark.parametrize("index_cols", [
     ["TIME", "ANTENNA1", "ANTENNA2"]],

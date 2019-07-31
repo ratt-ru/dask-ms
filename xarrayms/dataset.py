@@ -18,12 +18,16 @@ import numpy as np
 import pyrap.tables as pt
 
 from xarrayms.columns import column_metadata, ColumnMetadataError
-from xarrayms.ordering import group_ordering_taql, row_ordering, _gen_row_runs
+from xarrayms.ordering import (ordering_taql, row_ordering,
+                               group_ordering_taql, group_row_ordering,
+                               _gen_row_runs)
 from xarrayms.table_proxy import TableProxy, READLOCK, WRITELOCK
 from xarrayms.table_schemas import lookup_table_schema
 from xarrayms.utils import short_table_name
 
 log = logging.getLogger(__name__)
+
+_DEFAULT_ROW_CHUNKS = 10000
 
 
 # This class duplicates xarray's Frozen class in
@@ -305,77 +309,158 @@ def array_putter(row_runs, table_proxy, column, data):
     return data
 
 
-def _group_datasets(ms, select_cols, group_cols, groups, first_rows,
-                    orders, chunks):
-    table_proxy = TableProxy(pt.table, ms, ack=False,
-                             readonly=True, lockoptions='user')
+def _dataset_variable_factory(table_proxy, table_schema, select_cols,
+                              first_row, orders, chunks, array_prefix):
+    sorted_rows, row_order = orders
+    dataset_vars = {"ROWID": (sorted_rows, ("row",))}
 
-    table_schema = lookup_table_schema(ms, None)
-    datasets = []
-    group_ids = list(zip(*groups))
-
-    assert len(group_ids) == len(orders)
-
-    if not select_cols:
-        select_cols = set(table_proxy.colnames().result()) - set(group_cols)
-
-    it = enumerate(zip(group_ids, first_rows, orders))
-
-    for g, (group_id, first_row, (sorted_rows, row_order)) in it:
-        group_var_dims = {"ROWID": (sorted_rows, ("row",))}
-
+    for column in select_cols:
         try:
-            group_chunks = chunks[g]   # Get group chunking strategy
-        except IndexError:
-            group_chunks = chunks[-1]  # Try re-use the last group's chunks
+            shape, dims, dim_chunks, dtype = column_metadata(column,
+                                                             table_proxy,
+                                                             table_schema,
+                                                             chunks)
+        except ColumnMetadataError:
+            log.warning("Ignoring column: '%s'", column, exc_info=True)
+            continue
 
-        for column in select_cols:
+        assert len(dims) == len(shape), (dims, shape)
+
+        # Name of the dask array representing this column
+        name = "-".join((array_prefix, column))
+
+        # dask array dimension schema
+        full_dims = ("row",) + dims
+
+        # Construct the arguments
+        args = []
+
+        # Add extent arrays
+        for d, c in zip(dims, dim_chunks):
+            args.append(dim_extents_array(d, c))
+            args.append((d,))
+
+        # Add other variables
+        args.extend([table_proxy, None,
+                     column, None,
+                     dtype, None])
+
+        # Construct the array
+        dask_array = da.blockwise(getter_wrapper, full_dims,
+                                  row_order, ("row",),
+                                  *args,
+                                  name=name,
+                                  dtype=dtype)
+
+        # Assign into variable and dimension dataset
+        dataset_vars[column] = (dask_array, full_dims)
+
+    return dataset_vars
+
+
+class DatasetFactory(object):
+    def __init__(self, ms, select_cols, group_cols, index_cols, chunks=None):
+        # Create or promote chunks to a list of dicts
+        if chunks is None:
+            chunks = [{'row': _DEFAULT_ROW_CHUNKS}]
+        elif isinstance(chunks, dict):
+            chunks = [chunks]
+        elif not isinstance(chunks, (tuple, list)):
+            raise TypeError("'chunks' must be a dict or sequence of dicts")
+
+        self.ms = ms
+        self.select_cols = [] if select_cols is None else select_cols
+        self.group_cols = [] if group_cols is None else group_cols
+        self.index_cols = [] if index_cols is None else index_cols
+        self.chunks = chunks
+
+    def _table_proxy(self):
+        return TableProxy(pt.table, self.ms, ack=False,
+                          readonly=True, lockoptions='user')
+
+    def _table_schema(self):
+        return lookup_table_schema(self.ms, None)
+
+    def _single_dataset(self, orders):
+        table_proxy = self._table_proxy()
+        table_schema = self._table_schema()
+        select_cols = set(self.select_cols or table_proxy.colnames().result())
+
+        variables = _dataset_variable_factory(table_proxy, table_schema,
+                                              select_cols, 0,
+                                              orders, self.chunks[0],
+                                              short_table_name(self.ms))
+
+        return [Dataset(variables)]
+
+    def _group_datasets(self, groups, first_rows, orders):
+        table_proxy = self._table_proxy()
+        table_schema = self._table_schema()
+
+        datasets = []
+        group_ids = list(zip(*groups))
+
+        assert len(group_ids) == len(orders)
+
+        # Select columns, excluding grouping columns
+        select_cols = set(self.select_cols or table_proxy.colnames().result())
+        select_cols -= set(self.group_cols)
+
+        # Create a dataset for each group
+        it = enumerate(zip(group_ids, first_rows, orders))
+
+        for g, (group_id, first_row, order) in it:
+            # Extract group chunks
             try:
-                shape, dims, dim_chunks, dtype = column_metadata(column,
-                                                                 table_proxy,
-                                                                 table_schema,
-                                                                 group_chunks)
-            except ColumnMetadataError:
-                log.warning("Ignoring column: '%s'", column, exc_info=True)
-                continue
+                group_chunks = self.chunks[g]   # Get group chunking strategy
+            except IndexError:
+                group_chunks = self.chunks[-1]  # Re-use last group's chunks
 
-            assert len(dims) == len(shape), (dims, shape)
+            # Prefix d
+            gid_str = ",".join(str(gid) for gid in group_id)
+            array_prefix = "%s-[%s]" % (short_table_name(self.ms), gid_str)
 
-            # Name of the dask array representing this column
-            name = "%s-[%s]-%s-" % (short_table_name(ms),
-                                    ",".join(str(gid) for gid in group_id),
-                                    column)
+            # Create dataset variables
+            group_var_dims = _dataset_variable_factory(table_proxy,
+                                                       table_schema,
+                                                       self.select_cols,
+                                                       first_row,
+                                                       order, group_chunks,
+                                                       array_prefix)
 
-            # dask array dimension schema
-            full_dims = ("row",) + dims
+            # Assign values for the dataset's grouping columns
+            # as attributes
+            attrs = dict(zip(self.group_cols, group_id))
+            datasets.append(Dataset(group_var_dims, attrs=attrs))
 
-            # Construct the arguments
-            args = []
+        return datasets
 
-            # Add extent arrays
-            for d, c in zip(dims, dim_chunks):
-                args.append(dim_extents_array(d, c))
-                args.append((d,))
+    def datasets(self):
+        # No grouping case
+        if len(self.group_cols) == 0:
+            order_taql = ordering_taql(self.ms, self.index_cols)
+            orders = row_ordering(order_taql, self.index_cols, self.chunks[0])
+            return self._single_dataset(orders)
+        # Grouping by row
+        elif len(self.group_cols) == 1 and self.group_cols[0] == "__row__":
+            raise NotImplementedError("Grouping by __row__ not implemented")
+        # Grouping column case
+        else:
+            order_taql = group_ordering_taql(self.ms, self.group_cols,
+                                             self.index_cols)
+            orders = group_row_ordering(order_taql, self.group_cols,
+                                        self.index_cols, self.chunks)
 
-            # Add other variables
-            args.extend([table_proxy, None,
-                         column, None,
-                         dtype, None])
+            groups = [order_taql.getcol(g).result() for g in self.group_cols]
+            first_rows = order_taql.getcol("__firstrow__").result()
+            assert len(orders) == len(first_rows)
 
-            # Construct the array
-            dask_array = da.blockwise(getter_wrapper, full_dims,
-                                      row_order, ("row",),
-                                      *args,
-                                      name=name,
-                                      dtype=dtype)
+            return self._group_datasets(groups, first_rows, orders)
 
-            # Assign into variable and dimension dataset
-            group_var_dims[column] = (dask_array, full_dims)
 
-        attrs = dict(zip(group_cols, group_id))
-        datasets.append(Dataset(group_var_dims, attrs=attrs))
-
-    return datasets
+def dataset(ms, select_cols, group_cols, index_cols, chunks=None):
+    return DatasetFactory(ms, select_cols, group_cols,
+                          index_cols, chunks).datasets()
 
 
 def write_columns(ms, dataset, columns):
@@ -400,27 +485,3 @@ def write_columns(ms, dataset, columns):
         writes.append(column_write.ravel())
 
     return da.concatenate(writes)
-
-
-_DEFAULT_ROW_CHUNKS = 10000
-
-
-def dataset(ms, select_cols, group_cols, index_cols, chunks=None):
-    # Create or promote chunks to a list of dicts
-    if chunks is None:
-        chunks = [{'row': _DEFAULT_ROW_CHUNKS}]
-    elif isinstance(chunks, dict):
-        chunks = [chunks]
-    elif not isinstance(chunks, (tuple, list)):
-        raise TypeError("'chunks' must be a dict or sequence of dicts")
-
-    order_taql = group_ordering_taql(ms, group_cols, index_cols)
-    orders = row_ordering(order_taql, group_cols, index_cols, chunks)
-
-    groups = [order_taql.getcol(g).result() for g in group_cols]
-    first_rows = order_taql.getcol("__firstrow__").result()
-    assert len(orders) == len(first_rows)
-
-    return _group_datasets(ms, select_cols, group_cols,
-                           groups, first_rows,
-                           orders, chunks)

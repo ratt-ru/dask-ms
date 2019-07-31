@@ -147,7 +147,6 @@ def _group_ordering_arrays(taql_proxy, index_cols, group,
                                     "is applied to a later one." %
                                     (str(e), group_row_chunks, shape, group))
         raise (new_ex, None, sys.exc_info()[2])
-        raise new_ex from e
 
     group_rows = group_rows.rechunk(group_row_chunks)
     row_runs = group_rows.map_blocks(_gen_row_runs, dtype=np.object)
@@ -159,8 +158,6 @@ def group_ordering_taql(ms, group_cols, index_cols):
     if len(group_cols) == 0:
         raise ValueError("group_ordering_taql requires "
                          "len(group_cols) > 0")
-    elif len(group_cols) == 1 and group_cols[0] == "__row__":
-        pass
     else:
         index_group_cols = ["GAGGR(%s) as GROUP_%s" % (c, c)
                             for c in index_cols]
@@ -175,7 +172,9 @@ def group_ordering_taql(ms, group_cols, index_cols):
         select = select_clause(group_cols + index_group_cols)
         query = "%s\nFROM\n\t'%s'\n%s" % (select, ms, groupby)
 
-    return TableProxy(pt.taql, query)
+        return TableProxy(pt.taql, query)
+
+    raise RuntimeError("Invalid condition in group_ordering_taql")
 
 
 def group_row_ordering(group_order_taql, group_cols, index_cols, chunks):
