@@ -304,7 +304,7 @@ def array_putter(row_runs, table_proxy, column, data):
             rr += rl
 
     finally:
-        table_proxy._acquire(WRITELOCK)
+        table_proxy._release(WRITELOCK)
 
     return data
 
