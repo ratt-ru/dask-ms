@@ -109,6 +109,11 @@ class Dataset(object):
     def variables(self):
         return Frozen(self._data_vars)
 
+    def assign(self, **kwargs):
+        return Dataset(dict({k: (var, self._dims[k]) for k, var
+                             in self._data_vars.items()}, **kwargs),
+                       attrs=self._attrs)
+
     def __getattr__(self, name):
         try:
             return self._data_vars[name]
@@ -273,40 +278,6 @@ def object_getcolslice(row_runs, table_proxy, column, result,
         table_proxy._release(READLOCK)
 
     return result
-
-
-def putter_wrapper(row_orders, table_proxy, column, data):
-    """
-    Wrapper which should run I/O operations within
-    the table_proxy's associated executor
-    """
-    row_runs, resort = row_orders
-
-    if resort is not None:
-        data = data[resort]
-
-    table_proxy._ex.submit(array_putter, row_runs, table_proxy,
-                           column, data).result()
-
-    return np.full((1,) * len(data.shape), True)
-
-
-def array_putter(row_runs, table_proxy, column, data):
-    """ Put data into the table """
-    putcol = table_proxy._table.putcol
-    rr = 0
-
-    table_proxy._acquire(WRITELOCK)
-
-    try:
-        for rs, rl in row_runs:
-            putcol(column, data[rr:rr + rl], startrow=rs, nrow=rl)
-            rr += rl
-
-    finally:
-        table_proxy._release(WRITELOCK)
-
-    return data
 
 
 def _dataset_variable_factory(table_proxy, table_schema, select_cols,
@@ -480,13 +451,45 @@ def dataset(ms, columns, group_cols, index_cols, chunks=None):
                           index_cols, chunks).datasets()
 
 
+def putter_wrapper(row_orders, table_proxy, column, data):
+    """
+    Wrapper which should run I/O operations within
+    the table_proxy's associated executor
+    """
+    row_runs, resort = row_orders
+
+    if resort is not None:
+        data = data[resort]
+
+    table_proxy._ex.submit(array_putter, row_runs, table_proxy,
+                           column, data).result()
+
+    return np.full((1,) * len(data.shape), True)
+
+
+def array_putter(row_runs, table_proxy, column, data):
+    """ Put data into the table """
+    putcol = table_proxy._table.putcol
+    rr = 0
+
+    table_proxy._acquire(WRITELOCK)
+
+    try:
+        for rs, rl in row_runs:
+            putcol(column, data[rr:rr + rl], startrow=rs, nrow=rl)
+            rr += rl
+
+    finally:
+        table_proxy._release(WRITELOCK)
+
+    return data
+
+
 def write_columns(ms, dataset, columns):
     table_proxy = TableProxy(pt.table, ms, ack=False,
                              readonly=False, lockoptions='user')
     writes = []
-
-    rowids = dataset.ROWID
-    row_order = rowids.map_blocks(_gen_row_runs, dtype=np.object)
+    row_order = dataset.ROWID.map_blocks(_gen_row_runs, dtype=np.object)
 
     for column_name in columns:
         try:
@@ -500,7 +503,6 @@ def write_columns(ms, dataset, columns):
                                     table_proxy, None,
                                     column_name, None,
                                     column_array, ("row",),
-                                    name="write-" + column_name + "-",
                                     dtype=np.bool)
 
         writes.append(column_write.ravel())
