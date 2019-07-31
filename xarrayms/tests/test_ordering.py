@@ -22,7 +22,7 @@ from xarrayms.utils import group_cols_str, index_cols_str, assert_liveness
 @pytest.mark.parametrize("index_cols", [
     ["TIME", "ANTENNA1", "ANTENNA2"]],
     ids=index_cols_str)
-def test_ordering_single_group(ms, group_cols, index_cols):
+def test_ordering_multiple_groups(ms, group_cols, index_cols):
     group_taql = group_ordering_taql(ms, group_cols, index_cols)
     assert_liveness(1, 1)
     orders = group_row_ordering(group_taql, group_cols,
