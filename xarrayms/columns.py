@@ -143,10 +143,10 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
             raise ColumnMetadataError("Unhandled exemplar "
                                       "type '%s'" % type(exemplar))
 
-        if len(shape) - 1 != ndim:
+        if len(shape) != ndim:
             raise ColumnMetadataError("'ndim=%d' in column descriptor doesn't "
-                                      "match shape of exemplar=%d" %
-                                      (ndim, len(shape) - 1))
+                                      "match shape of exemplar=%s" %
+                                      (ndim, shape))
 
     # Extract dimension schema
     try:

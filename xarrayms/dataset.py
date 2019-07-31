@@ -310,8 +310,9 @@ def array_putter(row_runs, table_proxy, column, data):
 
 
 def _dataset_variable_factory(table_proxy, table_schema, select_cols,
-                              first_row, orders, chunks, array_prefix):
-    sorted_rows, row_order = orders
+                              exemplar_row, orders, chunks, array_prefix,
+                              squeeze_rows=False):
+    sorted_rows, row_runs = orders
     dataset_vars = {"ROWID": (sorted_rows, ("row",))}
 
     for column in select_cols:
@@ -319,7 +320,8 @@ def _dataset_variable_factory(table_proxy, table_schema, select_cols,
             shape, dims, dim_chunks, dtype = column_metadata(column,
                                                              table_proxy,
                                                              table_schema,
-                                                             chunks)
+                                                             chunks,
+                                                             exemplar_row)
         except ColumnMetadataError:
             log.warning("Ignoring column: '%s'", column, exc_info=True)
             continue
@@ -329,11 +331,8 @@ def _dataset_variable_factory(table_proxy, table_schema, select_cols,
         # Name of the dask array representing this column
         name = "-".join((array_prefix, column))
 
-        # dask array dimension schema
         full_dims = ("row",) + dims
-
-        # Construct the arguments
-        args = []
+        args = [row_runs, ("row",)]
 
         # Add extent arrays
         for d, c in zip(dims, dim_chunks):
@@ -347,10 +346,13 @@ def _dataset_variable_factory(table_proxy, table_schema, select_cols,
 
         # Construct the array
         dask_array = da.blockwise(getter_wrapper, full_dims,
-                                  row_order, ("row",),
                                   *args,
                                   name=name,
                                   dtype=dtype)
+
+        if squeeze_rows and dask_array.chunks[0] == (1,):
+            dask_array = dask_array.squeeze(0)
+            full_dims = full_dims[1:]
 
         # Assign into variable and dimension dataset
         dataset_vars[column] = (dask_array, full_dims)
@@ -369,7 +371,7 @@ class DatasetFactory(object):
             raise TypeError("'chunks' must be a dict or sequence of dicts")
 
         self.ms = ms
-        self.select_cols = [] if select_cols is None else select_cols
+        self.select_cols = select_cols
         self.group_cols = [] if group_cols is None else group_cols
         self.index_cols = [] if index_cols is None else index_cols
         self.chunks = chunks
@@ -381,19 +383,20 @@ class DatasetFactory(object):
     def _table_schema(self):
         return lookup_table_schema(self.ms, None)
 
-    def _single_dataset(self, orders):
+    def _single_dataset(self, orders, squeeze_rows=False, exemplar_row=0):
         table_proxy = self._table_proxy()
         table_schema = self._table_schema()
         select_cols = set(self.select_cols or table_proxy.colnames().result())
 
         variables = _dataset_variable_factory(table_proxy, table_schema,
-                                              select_cols, 0,
+                                              select_cols, exemplar_row,
                                               orders, self.chunks[0],
-                                              short_table_name(self.ms))
+                                              short_table_name(self.ms),
+                                              squeeze_rows=squeeze_rows)
 
         return Dataset(variables)
 
-    def _group_datasets(self, groups, first_rows, orders):
+    def _group_datasets(self, groups, exemplar_rows, orders):
         table_proxy = self._table_proxy()
         table_schema = self._table_schema()
 
@@ -407,9 +410,9 @@ class DatasetFactory(object):
         select_cols -= set(self.group_cols)
 
         # Create a dataset for each group
-        it = enumerate(zip(group_ids, first_rows, orders))
+        it = enumerate(zip(group_ids, exemplar_rows, orders))
 
-        for g, (group_id, first_row, order) in it:
+        for g, (group_id, exemplar_row, order) in it:
             # Extract group chunks
             try:
                 group_chunks = self.chunks[g]   # Get group chunking strategy
@@ -424,7 +427,7 @@ class DatasetFactory(object):
             group_var_dims = _dataset_variable_factory(table_proxy,
                                                        table_schema,
                                                        self.select_cols,
-                                                       first_row,
+                                                       exemplar_row,
                                                        order, group_chunks,
                                                        array_prefix)
 
@@ -455,7 +458,8 @@ class DatasetFactory(object):
             row_blocks = sorted_rows.blocks
             run_blocks = row_runs.blocks
 
-            return [self._single_dataset((row_blocks[r], run_blocks[r]))
+            return [self._single_dataset((row_blocks[r], run_blocks[r]),
+                                         squeeze_rows=True, exemplar_row=r)
                     for r in range(nrows)]
         # Grouping column case
         else:
@@ -465,14 +469,14 @@ class DatasetFactory(object):
                                         self.index_cols, self.chunks)
 
             groups = [order_taql.getcol(g).result() for g in self.group_cols]
-            first_rows = order_taql.getcol("__firstrow__").result()
-            assert len(orders) == len(first_rows)
+            exemplar_rows = order_taql.getcol("__firstrow__").result()
+            assert len(orders) == len(exemplar_rows)
 
-            return self._group_datasets(groups, first_rows, orders)
+            return self._group_datasets(groups, exemplar_rows, orders)
 
 
-def dataset(ms, select_cols, group_cols, index_cols, chunks=None):
-    return DatasetFactory(ms, select_cols, group_cols,
+def dataset(ms, columns, group_cols, index_cols, chunks=None):
+    return DatasetFactory(ms, columns, group_cols,
                           index_cols, chunks).datasets()
 
 

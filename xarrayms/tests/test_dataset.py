@@ -4,8 +4,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
+
 import dask
 from dask.array.core import normalize_chunks
+import numpy as np
+from numpy.testing import assert_array_equal
+import pyrap.tables as pt
 import pytest
 
 from xarrayms.dataset import dataset
@@ -17,8 +22,7 @@ from xarrayms.utils import (select_cols_str,
 
 @pytest.mark.parametrize("group_cols", [
     ["FIELD_ID", "SCAN_NUMBER"],
-    [],
-    ["__row__"]],
+    []],
     ids=group_cols_str)
 @pytest.mark.parametrize("index_cols", [
     ["TIME", "ANTENNA1", "ANTENNA2"]],
@@ -40,7 +44,6 @@ def test_dataset(ms, select_cols, group_cols, index_cols, shapes, chunks):
     # (2) Read-only TAQL TableProxy
     assert_liveness(2, 1)
 
-    rows = shapes['row']
     chans = shapes['chan']
     corrs = shapes['corr']
 
@@ -67,3 +70,54 @@ def test_dataset(ms, select_cols, group_cols, index_cols, shapes, chunks):
 
     del ds, datasets
     assert_liveness(0, 0)
+
+
+@pytest.fixture(scope='module')
+def spw_chans_1():
+    return np.linspace(.856e9, 2*.856e9, 8)
+
+
+@pytest.fixture(scope='module')
+def spw_chans_2():
+    return np.linspace(.856e9, 2*.856e9, 16)
+
+
+@pytest.fixture(scope='module')
+def spw_table(tmp_path_factory, spw_chans_1, spw_chans_2):
+    """ Simulate a SPECTRAL_WINDOW table with two spectral windows """
+    spw_dir = tmp_path_factory.mktemp("spw_dir", numbered=False)
+    fn = os.path.join(str(spw_dir), "test.ms::SPECTRAL_WINDOW")
+
+    create_table_query = """
+    CREATE TABLE %s
+    [NUM_CHAN I4,
+     CHAN_WIDTH R8 [NDIM=1]]
+    LIMIT 2
+    """ % fn
+
+    with pt.taql(create_table_query) as spw:
+        spw.putvarcol("NUM_CHAN", {
+            "r1": [spw_chans_1.shape[0]],
+            "r2": [spw_chans_2.shape[0]]})
+        spw.putvarcol("CHAN_WIDTH", {
+            "r1": spw_chans_1[None, :],
+            "r2": spw_chans_2[None, :]
+        })
+
+    yield fn
+
+    # Remove the temporary directory
+    # except it causes issues with casacore files on py3
+    # https://github.com/ska-sa/xarray-ms/issues/32
+    # shutil.rmtree(str(spw_dir))
+
+
+# Even though we ask for two rows, we get single rows out
+# due to the single __row__ in group_col
+@pytest.mark.parametrize("chunks", [{"row": 2}], ids=lambda c: str(c))
+def test_row_grouping(spw_table, spw_chans_1, spw_chans_2, chunks):
+    datasets = dataset(spw_table, [], ["__row__"], [], chunks)
+
+    assert len(datasets) == 2
+    assert_array_equal(datasets[0].CHAN_WIDTH, spw_chans_1)
+    assert_array_equal(datasets[1].CHAN_WIDTH, spw_chans_2)
