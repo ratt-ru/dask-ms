@@ -118,6 +118,11 @@ def spw_table(tmp_path_factory, spw_chans_1, spw_chans_2):
 def test_row_grouping(spw_table, spw_chans_1, spw_chans_2, chunks):
     datasets = dataset(spw_table, [], ["__row__"], [], chunks)
 
+    assert_liveness(2, 1)
+
     assert len(datasets) == 2
     assert_array_equal(datasets[0].CHAN_WIDTH, spw_chans_1)
     assert_array_equal(datasets[1].CHAN_WIDTH, spw_chans_2)
+
+    del datasets
+    assert_liveness(0, 0)
