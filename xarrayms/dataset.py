@@ -489,7 +489,11 @@ def write_columns(ms, dataset, columns):
     row_order = rowids.map_blocks(_gen_row_runs, dtype=np.object)
 
     for column_name in columns:
-        column_array = getattr(dataset, column_name)
+        try:
+            column_array = getattr(dataset, column_name)
+        except KeyError:
+            log.warning("Ignoring '%s' not present on the dataset.")
+            continue
 
         column_write = da.blockwise(putter_wrapper, ("row",),
                                     row_order, ("row",),
