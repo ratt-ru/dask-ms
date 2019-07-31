@@ -13,8 +13,8 @@ from xarrayms.columns import infer_dtype, column_metadata, _TABLE_TO_PY_TABLE
 from xarrayms.utils import assert_liveness
 
 
-@pytest.mark.parametrize("casa_type, numpy_type", [
-    (ct, np) for ct, np in _TABLE_TO_PY_TABLE.items()])
+@pytest.mark.parametrize("casa_type, numpy_type",
+                         list(_TABLE_TO_PY_TABLE.items()))
 def test_infer_dtype(casa_type, numpy_type):
     assert infer_dtype('col', {'valueType': casa_type}) == numpy_type
 
