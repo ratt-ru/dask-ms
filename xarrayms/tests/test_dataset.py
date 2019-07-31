@@ -96,6 +96,7 @@ def test_dataset_writes(ms, select_cols,
                         group_cols, index_cols,
                         shapes, chunks):
     datasets = dataset(ms, select_cols, group_cols, index_cols, chunks)
+    assert_liveness(2, 1)
 
     # Test writes
     writes = []
