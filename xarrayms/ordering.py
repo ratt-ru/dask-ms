@@ -84,7 +84,7 @@ def row_ordering(taql_proxy, index_cols, chunks):
 
     graph = HighLevelGraph.from_collections(name, layers, [])
     rows = da.Array(graph, name, chunks=chunks, dtype=np.object)
-    row_runs = rows.map_blocks(_gen_row_runs, dtype=np.object)
+    row_runs = rows.map_blocks(_gen_row_runs, sort_dir="read", dtype=np.object)
 
     return rows, row_runs
 
@@ -148,7 +148,8 @@ def _group_ordering_arrays(taql_proxy, index_cols, group,
         raise (new_ex, None, sys.exc_info()[2])
 
     group_rows = group_rows.rechunk(group_row_chunks)
-    row_runs = group_rows.map_blocks(_gen_row_runs, dtype=np.object)
+    row_runs = group_rows.map_blocks(_gen_row_runs, sort_dir="read",
+                                     dtype=np.object)
 
     return group_rows, row_runs
 

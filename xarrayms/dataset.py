@@ -365,7 +365,10 @@ class DatasetFactory(object):
                                               short_table_name(self.ms),
                                               squeeze_rows=squeeze_rows)
 
-        return Dataset(variables)
+        if squeeze_rows:
+            return Dataset(variables, attrs={"ROWID": exemplar_row})
+        else:
+            return Dataset(variables)
 
     def _group_datasets(self, groups, exemplar_rows, orders):
         table_proxy = self._table_proxy()
@@ -397,7 +400,7 @@ class DatasetFactory(object):
             # Create dataset variables
             group_var_dims = _dataset_variable_factory(table_proxy,
                                                        table_schema,
-                                                       self.select_cols,
+                                                       select_cols,
                                                        exemplar_row,
                                                        order, group_chunks,
                                                        array_prefix)
@@ -425,13 +428,12 @@ class DatasetFactory(object):
 
             # Produce a dataset for each chunk (block),
             # each containing a single row
-            nrows = sorted_rows.shape[0]
             row_blocks = sorted_rows.blocks
             run_blocks = row_runs.blocks
 
             return [self._single_dataset((row_blocks[r], run_blocks[r]),
-                                         squeeze_rows=True, exemplar_row=r)
-                    for r in range(nrows)]
+                                         squeeze_rows=True, exemplar_row=sr)
+                    for r, sr in enumerate(sorted_rows.compute())]
         # Grouping column case
         else:
             order_taql = group_ordering_taql(self.ms, self.group_cols,
@@ -482,27 +484,43 @@ def array_putter(row_runs, table_proxy, column, data):
     finally:
         table_proxy._release(WRITELOCK)
 
-    return data
-
 
 def write_columns(ms, dataset, columns):
     table_proxy = TableProxy(pt.table, ms, ack=False,
                              readonly=False, lockoptions='user')
     writes = []
-    row_order = dataset.ROWID.map_blocks(_gen_row_runs, dtype=np.object)
+    row_order = dataset.ROWID.map_blocks(_gen_row_runs, sort_dir="write",
+                                         dtype=np.object)
+    dims = dataset.dims
+    data_vars = dataset.variables
 
-    for column_name in columns:
+    for column in columns:
         try:
-            column_array = getattr(dataset, column_name)
+            column_array = data_vars[column]
         except KeyError:
             log.warning("Ignoring '%s' not present on the dataset.")
             continue
 
-        column_write = da.blockwise(putter_wrapper, ("row",),
+        try:
+            col_dims = dims[column]
+        except KeyError:
+            raise ValueError("No 'dims' found for column '%s'" % column)
+
+        for chunk in column_array.chunks[1:]:
+            if not len(chunk) == 1:
+                raise ValueError("Multiple chunks in non-row "
+                                 "dimension unsupported for writes. "
+                                 "Rechunk this data to perform a single "
+                                 "write.")
+
+        column_write = da.blockwise(putter_wrapper, col_dims,
                                     row_order, ("row",),
                                     table_proxy, None,
-                                    column_name, None,
-                                    column_array, ("row",),
+                                    column, None,
+                                    column_array, col_dims,
+                                    # All dims shrink to 1,
+                                    # a single bool is returned
+                                    adjust_chunks={d: 1 for d in col_dims},
                                     dtype=np.bool)
 
         writes.append(column_write.ravel())
