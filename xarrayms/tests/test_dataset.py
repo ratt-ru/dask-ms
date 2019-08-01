@@ -100,28 +100,33 @@ def test_dataset_writes(ms, select_cols,
 
     # Obtain original  STATE_ID
     with pt.table(ms, ack=False, readonly=True) as T:
-        state_id = T.getcol("STATE_ID")
+        original_state_id = T.getcol("STATE_ID")
 
     # Create write operations and execute them
     for i, ds in enumerate(datasets):
         new_ds = ds.assign(STATE_ID=(ds.STATE_ID + 1, ("row",)))
         writes.append(write_columns(ms, new_ds, ["STATE_ID"]))
 
-    dask.compute(writes)
+    try:
+        dask.compute(writes)
 
-    # NOTE(sjperkins)
-    # Interesting behaviour here. If these objects are not
-    # cleared up at this point, attempts to re-open the table below
-    # can fail, reproducing https://github.com/ska-sa/xarray-ms/issues/26
-    # Adding auto-locking to the table opening command seems to fix
-    # this somehow
-    del ds, new_ds, datasets, writes
-    assert_liveness(0, 0)
+        # NOTE(sjperkins)
+        # Interesting behaviour here. If these objects are not
+        # cleared up at this point, attempts to re-open the table below
+        # can fail, reproducing https://github.com/ska-sa/xarray-ms/issues/26
+        # Adding auto-locking to the table opening command seems to fix
+        # this somehow
+        del ds, new_ds, datasets, writes
+        assert_liveness(0, 0)
 
-    # Compare against expected result and restore STATE_ID
-    with pt.table(ms, ack=False, readonly=False) as T:
-        assert_array_equal(state_id + 1, T.getcol("STATE_ID"))
-        T.putcol("STATE_ID", state_id)
+    finally:
+        # Restore original state_id
+        with pt.table(ms, ack=False, readonly=False) as T:
+            state_id = T.getcol("STATE_ID")
+            T.putcol("STATE_ID", original_state_id)
+
+    # Compare against expected result
+    assert_array_equal(original_state_id + 1, state_id)
 
 
 # Even though we ask for two rows, we get single rows out
