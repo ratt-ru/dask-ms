@@ -12,6 +12,60 @@ import pytest
 
 
 @pytest.fixture(scope="session")
+def big_ms(tmp_path_factory, request):
+    msdir = tmp_path_factory.mktemp("big_ms_dir", numbered=False)
+    fn = os.path.join(str(msdir), "big.ms")
+    row = request.param
+    chan = 4096
+    corr = 4
+    ant = 7
+
+    create_table_query = """
+    CREATE TABLE {fn}
+    [FIELD_ID I4,
+    TIME R8,
+    ANTENNA1 I4,
+    ANTENNA2 I4,
+    DATA_DESC_ID I4,
+    SCAN_NUMBER I4,
+    STATE_ID I4,
+    DATA C8 [NDIM=2, SHAPE=[{chan}, {corr}]]]
+    LIMIT {row}
+    """.format(fn=fn, row=row, chan=chan, corr=corr)
+
+    rs = np.random.RandomState(42)
+
+    data = (rs.random_sample((row, chan, corr)).astype(np.float64) +
+            rs.random_sample((row, chan, corr)).astype(np.float64)*1j)
+
+    # Create the table
+    with pt.taql(create_table_query) as ms:
+        ant1, ant2 = (a.astype(np.int32) for a in np.triu_indices(ant, 1))
+        bl = ant1.shape[0]
+        ant1 = np.repeat(ant1, (row + bl - 1) // bl)
+        ant2 = np.repeat(ant1, (row + bl - 1) // bl)
+
+        zeros = np.zeros(row, np.int32)
+
+        ms.putcol("ANTENNA1", ant1[:row])
+        ms.putcol("ANTENNA2", ant2[:row])
+
+        ms.putcol("FIELD_ID", zeros)
+        ms.putcol("DATA_DESC_ID", zeros)
+        ms.putcol("SCAN_NUMBER", zeros)
+        ms.putcol("STATE_ID", zeros)
+        ms.putcol("TIME", np.linspace(0, 1.0, row, dtype=np.float64))
+        ms.putcol("DATA", data)
+
+    yield fn
+
+    # Remove the temporary directory
+    # except it causes issues with casacore files on py3
+    # https://github.com/ska-sa/xarray-ms/issues/32
+    # shutil.rmtree(str(msdir))
+
+
+@pytest.fixture(scope="session")
 def ms(tmp_path_factory):
     msdir = tmp_path_factory.mktemp("msdir", numbered=False)
     fn = os.path.join(str(msdir), "test.ms")
