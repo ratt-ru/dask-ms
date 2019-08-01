@@ -17,7 +17,7 @@ from numpy.testing import assert_array_equal
 import pyrap.tables as pt
 import pytest
 
-from xarrayms.new_executor import Executor, _executor_cache
+from xarrayms.table_executor import Executor, _executor_cache
 from xarrayms.table_proxy import (TableProxy, _table_cache,
                                   MismatchedLocks, READLOCK, WRITELOCK, NOLOCK)
 from xarrayms.utils import assert_liveness

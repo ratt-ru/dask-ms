@@ -10,7 +10,7 @@ import weakref
 
 from dask.base import normalize_token
 
-from xarrayms.new_executor import Executor
+from xarrayms.table_executor import Executor
 from xarrayms.utils import with_metaclass
 
 log = logging.getLogger(__name__)

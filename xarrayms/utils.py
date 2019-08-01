@@ -43,7 +43,7 @@ def assert_liveness(table_proxies, executors, collect=True):
     and Executor objects are alive.
     """
     from xarrayms.table_proxy import _table_cache
-    from xarrayms.new_executor import _executor_cache
+    from xarrayms.table_executor import _executor_cache
     import gc
 
     if collect:

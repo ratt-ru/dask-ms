@@ -18,8 +18,8 @@ from xarrayms.xarray_ms import (xds_from_ms,
                                 xds_to_table)
 
 
-from xarrayms.table_executor import TableExecutor
-from xarrayms.utils import group_cols_str, index_cols_str, select_cols_str
+from xarrayms.utils import (group_cols_str, index_cols_str,
+                            select_cols_str, assert_liveness)
 from xarrayms.query import orderby_clause, where_clause
 
 
@@ -321,11 +321,9 @@ def _proc_map_fn(args):
 
 @pytest.mark.parametrize("nprocs", [3])
 def test_multiprocess_table(ms, nprocs):
+    assert_liveness(0, 0)
+
     from multiprocessing import Pool
-
-    # Shutdown any threadpools prior to forking
-    TableExecutor.close(wait=True)
-
     pool = Pool(nprocs)
 
     try:
