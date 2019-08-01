@@ -149,7 +149,7 @@ def test_row_query(ms, index_cols):
             assert ds.ROWID == expected_row
 
 
-@pytest.mark.skip
+@pytest.mark.xfail(reason="Fragmentation not handled in rework, yet")
 @pytest.mark.parametrize('group_cols', [
     [],
     ["DATA_DESC_ID"]],
@@ -231,7 +231,7 @@ def test_fragmented_ms(ms, group_cols, index_cols):
         assert np.all(ds.STATE_ID.data.compute() == expected)
 
 
-@pytest.mark.skip
+@pytest.mark.xfail(reason="Fragmentation not handled in rework, yet")
 @pytest.mark.parametrize('group_cols', [
     [],
     ["DATA_DESC_ID"]],
@@ -262,7 +262,7 @@ def test_unfragmented_ms(ms, group_cols, index_cols):
         assert patch_fn.called_once_with(min_frag_level=False, sort_dir="read")
 
 
-@pytest.mark.skip
+@pytest.mark.xfail(reason="taql_where not handled in rework, yet")
 @pytest.mark.parametrize('index_cols', [
     ["TIME", "ANTENNA1", "ANTENNA2"]],
     ids=index_cols_str)
