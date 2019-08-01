@@ -137,7 +137,7 @@ def test_row_query(ms, index_cols):
                       index_cols=index_cols,
                       chunks={"row": 2})
 
-    with pt.table(ms, readonly=False, ack=False) as table:
+    with pt.table(ms, readonly=True, lockoptions='auto', ack=False) as table:
         # Get the expected row ordering by lexically
         # sorting the indexing columns
         cols = [(name, table.getcol(name)) for name in index_cols]
