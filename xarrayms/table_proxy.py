@@ -9,7 +9,7 @@ from threading import Lock
 import weakref
 
 from dask.base import normalize_token
-
+import pyrap.tables as pt
 from xarrayms.table_executor import Executor
 from xarrayms.utils import with_metaclass
 
@@ -141,6 +141,12 @@ def _map_create_proxy(cls, factory, args, kwargs):
 
 class MismatchedLocks(Exception):
     pass
+
+
+def taql_factory(query, style='Python', tables=[]):
+    """ Calls pt.taql, converting TableProxy's in tables to pyrap tables """
+    tables = [t._table if isinstance(t, TableProxy) else t for t in tables]
+    return pt.taql(query, style=style, tables=tables)
 
 
 @with_metaclass(TableProxyMetaClass)

@@ -18,7 +18,7 @@ import pyrap.tables as pt
 import pytest
 
 from xarrayms.table_executor import Executor, _executor_cache
-from xarrayms.table_proxy import (TableProxy, _table_cache,
+from xarrayms.table_proxy import (TableProxy, _table_cache, taql_factory,
                                   MismatchedLocks, READLOCK, WRITELOCK, NOLOCK)
 from xarrayms.utils import assert_liveness
 
@@ -100,18 +100,12 @@ def test_taql_proxy_pickling(ms):
     assert_liveness(0, 0)
 
 
-def _taql_factory(query, style='Python', tables=[]):
-    """ Calls pt.taql, converting TableProxy's in tables to pyrap tables """
-    tables = [t._table if isinstance(t, TableProxy) else t for t in tables]
-    return pt.taql(query, style=style, tables=tables)
-
-
 @pytest.mark.parametrize("reverse", [True, False])
 def test_embedding_table_proxy_in_taql(ms, reverse):
     """ Test using a TableProxy to create a TAQL TableProxy """
     proxy = TableProxy(pt.table, ms, ack=False, readonly=True)
     query = "SELECT UNIQUE ANTENNA1 FROM $1"
-    taql_proxy = TableProxy(_taql_factory, query, tables=[proxy])
+    taql_proxy = TableProxy(taql_factory, query, tables=[proxy])
     assert_array_equal(taql_proxy.getcol("ANTENNA1").result(), [0, 1, 2])
 
     # TAQL and original table
