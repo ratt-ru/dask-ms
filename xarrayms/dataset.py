@@ -282,7 +282,43 @@ def object_getcolslice(row_runs, table_proxy, column, result,
 
 def _dataset_variable_factory(table_proxy, table_schema, select_cols,
                               exemplar_row, orders, chunks, array_prefix,
-                              squeeze_rows=False):
+                              single_row=False):
+    """
+    Returns a dictionary of dask arrays representing
+    a series of getcols on the appropriate table.
+
+    Produces variables for inclusion in a Dataset.
+
+    Parameters
+    ----------
+    table_proxy : :class:`xarrayms.table_proxy.TableProxy`
+        Table proxy object
+    table_schema : dict
+        Table schema
+    select_cols : list of strings
+        List of columns to return
+    exemplar_row : int
+        row id used to possibly extract an exemplar array in
+        order to determine the column shape and dtype attributes
+    orders : tuple of :class:`dask.array.Array`
+        A (sorted_rows, row_runs) tuple, specifying the
+        appropriate rows to extract from the table.
+    chunks : dict
+        Chunking strategy for the dataset.
+    array_prefix : str
+        dask array string prefix
+    single_row : bool, optional
+        Defaults to False.
+        Indicates whether the columns should be grouped on single rows.
+        If `True` the single row column is squeezed (contracted)
+        out of the array.
+
+    Returns
+    -------
+    dict
+        A dictionary looking like :code:`{column: (arrays, dims)}`.
+    """
+
     sorted_rows, row_runs = orders
     dataset_vars = {"ROWID": (sorted_rows, ("row",))}
 
@@ -321,7 +357,8 @@ def _dataset_variable_factory(table_proxy, table_schema, select_cols,
                                   name=name,
                                   dtype=dtype)
 
-        if squeeze_rows and dask_array.chunks[0] == (1,):
+        # Squeeze out the single row if requested
+        if single_row:
             dask_array = dask_array.squeeze(0)
             full_dims = full_dims[1:]
 
@@ -354,7 +391,7 @@ class DatasetFactory(object):
     def _table_schema(self):
         return lookup_table_schema(self.ms, None)
 
-    def _single_dataset(self, orders, squeeze_rows=False, exemplar_row=0):
+    def _single_dataset(self, orders, single_row=False, exemplar_row=0):
         table_proxy = self._table_proxy()
         table_schema = self._table_schema()
         select_cols = set(self.select_cols or table_proxy.colnames().result())
@@ -363,9 +400,9 @@ class DatasetFactory(object):
                                               select_cols, exemplar_row,
                                               orders, self.chunks[0],
                                               short_table_name(self.ms),
-                                              squeeze_rows=squeeze_rows)
+                                              single_row=single_row)
 
-        if squeeze_rows:
+        if single_row:
             return Dataset(variables, attrs={"ROWID": exemplar_row})
         else:
             return Dataset(variables)
@@ -431,9 +468,14 @@ class DatasetFactory(object):
             row_blocks = sorted_rows.blocks
             run_blocks = row_runs.blocks
 
+            # Exemplar actually correspond to the sorted rows.
+            # We reify them here so they can be assigned on each
+            # dataset as an attribute
+            np_sorted_row = sorted_rows.compute()
+
             return [self._single_dataset((row_blocks[r], run_blocks[r]),
-                                         squeeze_rows=True, exemplar_row=sr)
-                    for r, sr in enumerate(sorted_rows.compute())]
+                                         single_row=True, exemplar_row=er)
+                    for r, er in enumerate(np_sorted_row)]
         # Grouping column case
         else:
             order_taql = group_ordering_taql(self.ms, self.group_cols,
