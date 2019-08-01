@@ -4,4 +4,5 @@ RUN pip3 install --upgrade pip setuptools
 ADD . /code
 WORKDIR /code
 RUN pip3 install .[testing]
+RUN pip3 freeze
 RUN py.test --flake8 -s -vvv /code/xarrayms
