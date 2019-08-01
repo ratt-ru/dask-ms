@@ -13,14 +13,14 @@ import pyrap.tables as pt
 import pytest
 import xarray as xr
 
+
+from xarrayms.query import orderby_clause, where_clause
+from xarrayms.utils import (group_cols_str, index_cols_str,
+                            select_cols_str, assert_liveness)
+from xarrayms.table_proxy import TableProxy, taql_factory
 from xarrayms.xarray_ms import (xds_from_ms,
                                 xds_from_table,
                                 xds_to_table)
-
-
-from xarrayms.utils import (group_cols_str, index_cols_str,
-                            select_cols_str, assert_liveness)
-from xarrayms.query import orderby_clause, where_clause
 
 
 @pytest.mark.parametrize('group_cols', [
@@ -46,19 +46,20 @@ def test_ms_read(ms, group_cols, index_cols, select_cols):
     order = orderby_clause(index_cols)
     np_column_data = []
 
-    with pt.table(ms, lockoptions='auto', ack=False) as T:  # noqa
+    with TableProxy(pt.table, ms, lockoptions='auto', ack=False) as T:
         for ds in xds:
             group_col_values = [ds.attrs[a] for a in group_cols]
             where = where_clause(group_cols, group_col_values)
-            query = "SELECT * FROM $T %s %s" % (where, order)
+            query = "SELECT * FROM $1 %s %s" % (where, order)
 
-            with pt.taql(query) as Q:
-                np_column_data.append({c: Q.getcol(c) for c in select_cols})
+            with TableProxy(taql_factory, query, tables=[T]) as Q:
+                column_data = {c: Q.getcol(c).result() for c in select_cols}
+                np_column_data.append(column_data)
 
-    for d, (ds, col_data) in enumerate(zip(xds, np_column_data)):
+    for d, (ds, column_data) in enumerate(zip(xds, np_column_data)):
         for c in select_cols:
             dask_data = ds.data_vars[c].data.compute()
-            assert_array_equal(col_data[c], dask_data)
+            assert_array_equal(column_data[c], dask_data)
 
 
 @pytest.mark.parametrize('group_cols', [
@@ -76,11 +77,13 @@ def test_ms_read(ms, group_cols, index_cols, select_cols):
     ['DATA', 'STATE_ID']])
 def test_ms_write(ms, group_cols, index_cols, select_cols):
     # Zero everything to be sure
-    with pt.table(ms, readonly=False, lockoptions='auto', ack=False) as table:
-        table.putcol("STATE_ID", np.full(table.nrows(), 0, dtype=np.int32))
-        data = np.zeros_like(table.getcol("DATA"))
+    with TableProxy(pt.table, ms, readonly=False,
+                    lockoptions='auto', ack=False) as T:
+        nrows = T.nrows().result()
+        T.putcol("STATE_ID", np.full(nrows, 0, dtype=np.int32)).result()
+        data = np.zeros_like(T.getcol("DATA").result())
         data_dtype = data.dtype
-        table.putcol("DATA", data)
+        T.putcol("DATA", data).result()
 
     xds = xds_from_ms(ms, columns=select_cols,
                       group_cols=group_cols,
