@@ -377,9 +377,6 @@ def _dataset_variable_factory(table_proxy, table_schema, select_cols,
             log.warning("Ignoring column: '%s'", column, exc_info=True)
             continue
 
-        # Name of the dask array representing this column
-        name = "-".join((array_prefix, column))
-
         full_dims = ("row",) + dims
         args = [row_runs, ("row",)]
 
@@ -392,6 +389,10 @@ def _dataset_variable_factory(table_proxy, table_schema, select_cols,
         args.extend([table_proxy, None,
                      column, None,
                      dtype, None])
+
+        # Name of the dask array representing this column
+        token = dask.base.tokenize(args)
+        name = "-".join((array_prefix, column, token))
 
         # Construct the array
         dask_array = da.blockwise(getter_wrapper, full_dims,
