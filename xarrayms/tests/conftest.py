@@ -152,3 +152,44 @@ def spw_table(tmp_path_factory, spw_chan_freqs):
     # except it causes issues with casacore files on py3
     # https://github.com/ska-sa/xarray-ms/issues/32
     # shutil.rmtree(str(spw_dir))
+
+
+@pytest.fixture(scope='session')
+def wsrt_antenna_positions():
+    """ Westerbork antenna positions """
+    return np.array([
+           [3828763.10544699,   442449.10566454,  5064923.00777],
+           [3828746.54957258,   442592.13950824,  5064923.00792],
+           [3828729.99081359,   442735.17696417,  5064923.00829],
+           [3828713.43109885,   442878.2118934,  5064923.00436],
+           [3828696.86994428,   443021.24917264,  5064923.00397],
+           [3828680.31391933,   443164.28596862,  5064923.00035],
+           [3828663.75159173,   443307.32138056,  5064923.00204],
+           [3828647.19342757,   443450.35604638,  5064923.0023],
+           [3828630.63486201,   443593.39226634,  5064922.99755],
+           [3828614.07606798,   443736.42941621,  5064923.],
+           [3828609.94224429,   443772.19450029,  5064922.99868],
+           [3828601.66208572,   443843.71178407,  5064922.99963],
+           [3828460.92418735,   445059.52053929,  5064922.99071],
+           [3828452.64716351,   445131.03744105,  5064922.98793]],
+        dtype=np.float64)
+
+
+@pytest.fixture(scope='session')
+def ant_table(tmp_path_factory, wsrt_antenna_positions):
+    ant_dir = tmp_path_factory.mktemp("ant_dir", numbered=False)
+    fn = os.path.join(str(ant_dir), "test.ms::ANTENNA")
+
+    create_table_query = """
+    CREATE TABLE %s
+    [POSITION R8 [NDIM=1, SHAPE=[3]],
+     NAME S]
+    LIMIT %d
+    """ % (fn, wsrt_antenna_positions.shape[0])
+
+    with pt.taql(create_table_query) as ant:
+        ant.putcol("POSITION", wsrt_antenna_positions)
+        ant.putcol("NAME", ["ANTENNA-%d" % i for i in
+                            range(wsrt_antenna_positions.shape[0])])
+
+    yield fn

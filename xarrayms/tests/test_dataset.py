@@ -151,6 +151,16 @@ def test_row_grouping(spw_table, spw_chan_freqs, chunks):
     assert_liveness(0, 0)
 
 
+def test_strings(ant_table, wsrt_antenna_positions):
+    datasets = dataset(ant_table, [], [], None)
+    assert len(datasets) == 1
+
+    names = ["ANTENNA-%d" % i for i in range(wsrt_antenna_positions.shape[0])]
+
+    assert_array_equal(datasets[0].POSITION, wsrt_antenna_positions)
+    assert_array_equal(datasets[0].NAME, names)
+
+
 def test_dataset_assign(ms):
     """ Test dataset assignment """
     datasets = dataset(ms, [], [], [])
