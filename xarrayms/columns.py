@@ -4,22 +4,40 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from collections import OrderedDict
 from pprint import pformat
 import sys
 
 import dask.array as da
 import numpy as np
 
-# Map  column string types to numpy/python types
-_TABLE_TO_PY_TABLE = {
+# Map column string types to numpy/python types
+_TABLE_TO_PY = OrderedDict({
+    'BOOL': np.bool,
+    'BOOLEAN': np.bool,
+    'UCHAR': np.uint8,
+    'BYTE': np.uint8,
+    'SMALLINT': np.int16,
+    'SHORT': np.int16,
+    'USMALLINT': np.uint16,
+    'USHORT': np.uint16,
     'INT': np.int32,
+    'INTEGER': np.int32,
+    'UINT': np.uint32,
+    'UINTEGER': np.uint32,
     'FLOAT': np.float32,
     'DOUBLE': np.float64,
-    'BOOLEAN': np.bool,
+    'FCOMPLEX': np.complex64,
     'COMPLEX': np.complex64,
     'DCOMPLEX': np.complex128,
     'STRING': object,
-}
+})
+
+
+# Map python/numpy types back to column types
+# If the column type is multiply defined, OrderedDict will
+# give us the last one in _TABLE_TO_PY
+_PY_TO_TABLE = OrderedDict((v, k) for k, v in _TABLE_TO_PY.items())
 
 
 def infer_dtype(column, coldesc):
@@ -34,13 +52,13 @@ def infer_dtype(column, coldesc):
 
     # Try conversion to numpy/python type
     try:
-        return _TABLE_TO_PY_TABLE[value_type.upper()]
+        return _TABLE_TO_PY[value_type.upper()]
     except KeyError:
         raise ValueError("No known conversion from CASA Table type '%s' "
                          "to python/numpy type. "
                          "Perhaps it needs to be added "
-                         "to _TABLE_TO_PY_TABLE?:\n"
-                         "%s" % (value_type, pformat(_TABLE_TO_PY_TABLE)))
+                         "to _TABLE_TO_PY?:\n"
+                         "%s" % (value_type, pformat(dict(_TABLE_TO_PY))))
 
 
 class ColumnMetadataError(Exception):
