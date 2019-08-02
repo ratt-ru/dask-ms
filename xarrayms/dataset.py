@@ -96,13 +96,13 @@ class Dataset(object):
     def dims(self):
         dims = {}
 
-        for k, v in self._data_vars.items():
-            for d, s in zip(v.dims, v.var.shape):
+        for k, (var_dims, var) in self._data_vars.items():
+            for d, s in zip(var_dims, var.shape):
                 if d in dims and s != dims[d]:
                     raise ValueError("Existing dimension size %d for "
-                                     "dimension %s is inconsistent "
+                                     "dimension '%s' is inconsistent "
                                      "with same dimension of array %s" %
-                                     (s, dim, k))
+                                     (s, d, k))
 
                 dims[d] = s
 
@@ -114,17 +114,17 @@ class Dataset(object):
     def chunks(self):
         chunks = {}
 
-        for k, v in self._data_vars.items():
-            if not isinstance(v.var, da.Array):
+        for k, (var_dims, var) in self._data_vars.items():
+            if not isinstance(var, da.Array):
                 continue
 
-            for dim, c in zip(v.dims, v.var.chunks):
+            for dim, c in zip(var_dims, var.chunks):
                 if dim in chunks and c != chunks[dim]:
-                    raise ValueError("Existing chunk size %d for "
-                                     "dimension %s is inconsistent "
-                                     "with the chunk size for the "
+                    raise ValueError("Existing chunking %s for "
+                                     "dimension '%s' is inconsistent "
+                                     "with chunking %s for the "
                                      "same dimension of array %s" %
-                                     (c, dim, k))
+                                     (c, dim, chunks[dim], k))
 
                 chunks[dim] = c
 

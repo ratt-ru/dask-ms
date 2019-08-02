@@ -170,3 +170,18 @@ def test_dataset_assign(ms):
     # We have to explicitly supply a dimension schema
     nds = ds.assign(ANTENNA3=(("row",), ds.ANTENNA1 + 3))
     assert_array_equal(ds.ANTENNA1 + 3, nds.ANTENNA3)
+
+    dims = ds.dims
+    chunks = ds.chunks
+
+    with pytest.raises(ValueError, match="size 9 for dimension 'row'"):
+        array = da.zeros(dims['row'] - 1, chunks['row'])
+        nds = ds.assign(ANTENNA4=(("row",),  array))
+        nds.dims
+
+    assert chunks['row'] == (10,)
+
+    with pytest.raises(ValueError, match="chunking \(4, 4, 2\) for dimension"):
+        array = da.zeros(dims['row'], chunks=4)
+        nds = ds.assign(ANTENNA4=(("row",),  array))
+        nds.chunks
