@@ -14,10 +14,11 @@ from xarrayms.dataset import dataset, write_columns
 @pytest.mark.stress
 @pytest.mark.parametrize("big_ms", [1000], indirect=True)
 @pytest.mark.parametrize("iterations", [10])
-def test_stress(big_ms, iterations):
+@pytest.mark.parametrize("chunks", [{"row": 100}])
+def test_stress(big_ms, iterations, chunks):
     datasets = dataset(big_ms, ["TIME", "DATA"],
                        ["FIELD_ID", "DATA_DESC_ID"], [],
-                       {"row": 10})
+                       chunks=chunks)
 
     assert len(datasets) == 1
     ds = datasets[0]
