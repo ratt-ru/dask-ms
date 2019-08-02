@@ -115,8 +115,10 @@ def xds_from_table(table_name, columns=None,
         each column in the table. For example:
 
         .. code-block:: python
-
-            {"UVW" : ('uvw',), DATA" : ('chan', 'corr')}
+            {
+                "UVW": {'dask': {'dims': ('uvw',)}},
+                "DATA": {'dask': {'dims': ('chan', 'corr')}},
+            }
 
         will result in the UVW and DATA arrays having dimensions
         :code:`('row', 'uvw')` and :code:`('row', 'chan', 'corr')`
@@ -139,7 +141,7 @@ def xds_from_table(table_name, columns=None,
 
         .. code-block:: python
 
-            ["MS", {"UVW": ("my-uvw",)}]
+            ["MS", {"UVW": {'dask': {'dims': ('my-uvw',)}}}]
 
     taql_where : str, optional
         TAQL where clause. For example, to exclude auto-correlations

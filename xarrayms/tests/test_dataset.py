@@ -190,3 +190,11 @@ def test_dataset_assign(ms):
 
     del datasets, ds, nds
     assert_liveness(0, 0)
+
+
+def test_dataset_table_schemas(ms):
+    """ Test that we can pass table schemas """
+    data_dims = ("mychan", "mycorr")
+    table_schema = ["MS", {"DATA": {'dask': {"dims": data_dims}}}]
+    datasets = dataset(ms, [], [], [], table_schema=table_schema)
+    assert datasets[0].variables["DATA"].dims == ("row", ) + data_dims

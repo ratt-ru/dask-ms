@@ -437,7 +437,7 @@ class DatasetFactory(object):
                           readonly=True, lockoptions='user')
 
     def _table_schema(self):
-        return lookup_table_schema(self.ms, None)
+        return lookup_table_schema(self.ms, self.table_schema)
 
     def _single_dataset(self, orders, single_row=False, exemplar_row=0):
         table_proxy = self._table_proxy()
