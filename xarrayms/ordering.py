@@ -26,6 +26,9 @@ def _gen_row_runs(rows, sort=True, sort_dir="read"):
     Generate consecutive row runs, as well as sorting index
     if ``sort`` is True.
     """
+    if len(rows) == 0:
+        raise ValueError("No rows supplied!")
+
     if sort is False:
         resort = None
     else:
