@@ -27,7 +27,7 @@ def _gen_row_runs(rows, sort=True, sort_dir="read"):
     if ``sort`` is True.
     """
     if len(rows) == 0:
-        raise ValueError("No rows supplied!")
+        return np.empty((0, 2), dtype=np.int32)
 
     if sort is False:
         resort = None

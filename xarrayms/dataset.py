@@ -209,11 +209,16 @@ def getter_wrapper(row_orders, *args):
     Wrapper running I/O operations
     within the table_proxy's associated executor
     """
-    row_runs, resort = row_orders
     # Infer number of shape arguments
     nshape_args = len(args) - 3
     # Extract other arguments
     table_proxy, column, dtype = args[nshape_args:]
+
+    # Handle dask compute_meta gracefully
+    if len(row_orders) == 0:
+        return np.empty((0,)*(nshape_args+1), dtype=dtype)
+    else:
+        row_runs, resort = row_orders
 
     # There are other dimensions beside row
     if nshape_args > 0:
