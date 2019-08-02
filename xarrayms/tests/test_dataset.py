@@ -93,22 +93,23 @@ def test_dataset_writes(ms, select_cols,
                         group_cols, index_cols,
                         shapes, chunks):
     """ Test dataset writes """
-    datasets = dataset(ms, select_cols, group_cols, index_cols, chunks)
-    assert_liveness(2, 1)
 
-    # Test writes
-    writes = []
-
-    # Obtain original  STATE_ID
-    with pt.table(ms, ack=False, readonly=True) as T:
+    # Get original STATE_ID
+    with pt.table(ms, ack=False, readonly=True, lockoptions='auto') as T:
         original_state_id = T.getcol("STATE_ID")
 
-    # Create write operations and execute them
-    for i, ds in enumerate(datasets):
-        new_ds = ds.assign(STATE_ID=ds.STATE_ID + 1)
-        writes.append(write_columns(ms, new_ds, ["STATE_ID"]))
-
     try:
+        datasets = dataset(ms, select_cols, group_cols, index_cols, chunks)
+        assert_liveness(2, 1)
+
+        # Test writes
+        writes = []
+
+        # Create write operations and execute them
+        for i, ds in enumerate(datasets):
+            new_ds = ds.assign(STATE_ID=ds.STATE_ID + 1)
+            writes.append(write_columns(ms, new_ds, ["STATE_ID"]))
+
         dask.compute(writes)
 
         # NOTE(sjperkins)
@@ -121,8 +122,8 @@ def test_dataset_writes(ms, select_cols,
         assert_liveness(0, 0)
 
     finally:
-        # Restore original state_id
-        with pt.table(ms, ack=False, readonly=False) as T:
+        # Restore original STATE_ID
+        with pt.table(ms, ack=False, readonly=False, lockoptions='auto') as T:
             state_id = T.getcol("STATE_ID")
             T.putcol("STATE_ID", original_state_id)
 
