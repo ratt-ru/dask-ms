@@ -12,7 +12,8 @@ from dask.array.core import normalize_chunks
 from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 
-from xarrayms.query import select_clause, groupby_clause, orderby_clause
+from xarrayms.query import (select_clause, groupby_clause,
+                            orderby_clause, where_clause)
 from xarrayms.table_proxy import TableProxy, taql_factory
 
 
@@ -64,10 +65,14 @@ def _sorted_rows(taql_proxy, startrow, nrow):
                              nrow=nrow).result()
 
 
-def ordering_taql(table_proxy, index_cols):
+def ordering_taql(table_proxy, index_cols, taql_where=''):
     select = select_clause(["ROWID() as __tablerow__"])
     orderby = orderby_clause(index_cols)
-    query = "%s\nFROM\n\t$1\n%s" % (select, orderby)
+
+    if taql_where != '':
+        taql_where = "WHERE\n\t%s" % taql_where
+
+    query = "%s\nFROM\n\t$1\n%s%s" % (select, orderby, taql_where)
 
     return TableProxy(taql_factory, query, tables=[table_proxy])
 
@@ -156,7 +161,7 @@ def _group_ordering_arrays(taql_proxy, index_cols, group,
     return group_rows, row_runs
 
 
-def group_ordering_taql(table_proxy, group_cols, index_cols):
+def group_ordering_taql(table_proxy, group_cols, index_cols, taql_where=''):
     if len(group_cols) == 0:
         raise ValueError("group_ordering_taql requires "
                          "len(group_cols) > 0")
@@ -172,7 +177,11 @@ def group_ordering_taql(table_proxy, group_cols, index_cols):
 
         groupby = groupby_clause(group_cols)
         select = select_clause(group_cols + index_group_cols)
-        query = "%s\nFROM\n\t$1\n%s" % (select, groupby)
+
+        if taql_where != '':
+            taql_where = "\nHAVING\n\t%s" % taql_where
+
+        query = "%s\nFROM\n\t$1\n%s%s" % (select, groupby, taql_where)
 
         return TableProxy(taql_factory, query, tables=[table_proxy])
 

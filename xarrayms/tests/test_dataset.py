@@ -38,7 +38,7 @@ from xarrayms.utils import (select_cols_str,
     ids=lambda c: "chunks=%s" % c)
 def test_dataset(ms, select_cols, group_cols, index_cols, shapes, chunks):
     """ Test dataset creation """
-    datasets = dataset(ms, select_cols, group_cols, index_cols, chunks)
+    datasets = dataset(ms, select_cols, group_cols, index_cols, chunks=chunks)
     # (1) Read-only TableProxy
     # (2) Read-only TAQL TableProxy
     assert_liveness(2, 1)
@@ -99,7 +99,8 @@ def test_dataset_writes(ms, select_cols,
         original_state_id = T.getcol("STATE_ID")
 
     try:
-        datasets = dataset(ms, select_cols, group_cols, index_cols, chunks)
+        datasets = dataset(ms, select_cols, group_cols,
+                           index_cols, chunks=chunks)
         assert_liveness(2, 1)
 
         # Test writes
@@ -136,7 +137,7 @@ def test_dataset_writes(ms, select_cols,
 @pytest.mark.parametrize("chunks", [{"row": 2}], ids=lambda c: str(c))
 def test_row_grouping(spw_table, spw_chan_freqs, chunks):
     """ Test grouping on single rows """
-    datasets = dataset(spw_table, [], ["__row__"], [], chunks)
+    datasets = dataset(spw_table, [], ["__row__"], [], chunks=chunks)
 
     assert_liveness(2, 1)
 

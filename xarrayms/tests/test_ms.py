@@ -270,7 +270,6 @@ def test_unfragmented_ms(ms, group_cols, index_cols):
         assert patch_fn.called_once_with(min_frag_level=False, sort_dir="read")
 
 
-@pytest.mark.xfail(reason="taql_where not handled in rework, yet")
 @pytest.mark.parametrize('index_cols', [
     ["TIME", "ANTENNA1", "ANTENNA2"]],
     ids=index_cols_str)
@@ -283,7 +282,7 @@ def test_taql_where(ms, index_cols):
                          columns=["FIELD_ID"])
 
     assert len(xds) == 1
-    assert (xds[0].FIELD_ID.data.compute() == [0, 0, 0, 1, 1, 1, 1]).all()
+    assert_array_equal(xds[0].FIELD_ID.data, [0, 0, 0, 1, 1, 1, 1])
 
     # Group columns case
     xds = xds_from_table(ms, taql_where="FIELD_ID >= 0 AND FIELD_ID < 2",
@@ -297,8 +296,8 @@ def test_taql_where(ms, index_cols):
     assert xds[1].DATA_DESC_ID == 0 and xds[1].SCAN_NUMBER == 1
 
     # Check field id's in each group
-    assert np.all(xds[0].FIELD_ID.data.compute() == [0, 0, 1, 1])
-    assert np.all(xds[1].FIELD_ID.data.compute() == [0, 1, 1])
+    assert_array_equal(xds[0].FIELD_ID.data, [0, 0, 1, 1])
+    assert_array_equal(xds[1].FIELD_ID.data, [0, 1, 1])
 
     # Group on each row
     xds = xds_from_table(ms, taql_where="FIELD_ID >= 0 AND FIELD_ID < 2",

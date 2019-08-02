@@ -412,11 +412,11 @@ def _dataset_variable_factory(table_proxy, table_schema, select_cols,
 
 
 class DatasetFactory(object):
-    def __init__(self, ms, select_cols, group_cols, index_cols, chunks=None):
+    def __init__(self, ms, select_cols, group_cols, index_cols, **kwargs):
+        chunks = kwargs.pop('chunks', [{'row': _DEFAULT_ROW_CHUNKS}])
+
         # Create or promote chunks to a list of dicts
-        if chunks is None:
-            chunks = [{'row': _DEFAULT_ROW_CHUNKS}]
-        elif isinstance(chunks, dict):
+        if isinstance(chunks, dict):
             chunks = [chunks]
         elif not isinstance(chunks, (tuple, list)):
             raise TypeError("'chunks' must be a dict or sequence of dicts")
@@ -426,6 +426,11 @@ class DatasetFactory(object):
         self.group_cols = [] if group_cols is None else group_cols
         self.index_cols = [] if index_cols is None else index_cols
         self.chunks = chunks
+        self.table_schema = kwargs.pop('table_schema', None)
+        self.taql_where = kwargs.pop('taql_where', '')
+
+        if len(kwargs) > 0:
+            raise ValueError("Unhandled kwargs: %s" % kwargs)
 
     def _table_proxy(self):
         return TableProxy(pt.table, self.ms, ack=False,
@@ -497,12 +502,14 @@ class DatasetFactory(object):
 
         # No grouping case
         if len(self.group_cols) == 0:
-            order_taql = ordering_taql(table_proxy, self.index_cols)
+            order_taql = ordering_taql(table_proxy, self.index_cols,
+                                       self.taql_where)
             orders = row_ordering(order_taql, self.index_cols, self.chunks[0])
             return [self._single_dataset(orders)]
         # Group by row
         elif len(self.group_cols) == 1 and self.group_cols[0] == "__row__":
-            order_taql = ordering_taql(table_proxy, self.index_cols)
+            order_taql = ordering_taql(table_proxy, self.index_cols,
+                                       self.taql_where)
             sorted_rows, row_runs = row_ordering(order_taql,
                                                  self.index_cols,
                                                  # chunk ordering on each row
@@ -524,7 +531,7 @@ class DatasetFactory(object):
         # Grouping column case
         else:
             order_taql = group_ordering_taql(table_proxy, self.group_cols,
-                                             self.index_cols)
+                                             self.index_cols, self.taql_where)
             orders = group_row_ordering(order_taql, self.group_cols,
                                         self.index_cols, self.chunks)
 
@@ -535,9 +542,9 @@ class DatasetFactory(object):
             return self._group_datasets(groups, exemplar_rows, orders)
 
 
-def dataset(ms, columns, group_cols, index_cols, chunks=None):
+def dataset(ms, columns, group_cols, index_cols, **kwargs):
     return DatasetFactory(ms, columns, group_cols,
-                          index_cols, chunks).datasets()
+                          index_cols, **kwargs).datasets()
 
 
 def putter_wrapper(row_orders, table_proxy, column, data):

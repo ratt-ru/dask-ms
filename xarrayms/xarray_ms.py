@@ -169,7 +169,8 @@ def xds_from_table(table_name, columns=None,
     group_cols = promote_columns(group_cols, [])
 
     dask_datasets = DatasetFactory(table_name, columns,
-                                   group_cols, index_cols).datasets()
+                                   group_cols, index_cols,
+                                   **kwargs).datasets()
 
     xarray_datasets = []
 
