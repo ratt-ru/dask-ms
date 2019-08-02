@@ -542,6 +542,10 @@ def putter_wrapper(row_orders, table_proxy, column, data):
     Wrapper which should run I/O operations within
     the table_proxy's associated executor
     """
+    # Handle dask's compute_meta gracefully
+    if len(row_orders) == 0:
+        return np.empty((0,)*len(data.shape), dtype=np.bool)
+
     row_runs, resort = row_orders
 
     if resort is not None:
