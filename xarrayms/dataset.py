@@ -70,6 +70,15 @@ class Dataset(object):
         dims = {}
 
         for k, v in data_vars_and_dims.items():
+            if not isinstance(v, (tuple, list)) and len(v) != 2:
+                raise ValueError("'%s' must be a (array, dims) tuple. "
+                                 "Got a '%s' instead," % (k, type(v)))
+
+            if v[0].ndim != len(v[1]):
+                raise ValueError("Dimension schema '%s' does "
+                                 "not match shape of associated array %s"
+                                 % (v[0], v[1]))
+
             data_vars[k] = v[0]
             dims[k] = v[1]
 
