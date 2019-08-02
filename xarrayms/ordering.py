@@ -12,8 +12,7 @@ from dask.array.core import normalize_chunks
 from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 
-from xarrayms.query import (select_clause, groupby_clause,
-                            orderby_clause, where_clause)
+from xarrayms.query import select_clause, groupby_clause, orderby_clause
 from xarrayms.table_proxy import TableProxy, taql_factory
 
 
