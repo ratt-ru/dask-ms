@@ -4,7 +4,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import logging
 import os
+import time
+
+log = logging.getLogger(__name__)
 
 
 def short_table_name(table_name):
@@ -72,6 +76,20 @@ def assert_liveness(table_proxies, executors, collect=True):
                 lines.append("\t%s" % str(r))
 
         raise ValueError("\n".join(lines))
+
+
+def log_call(fn):
+    def _wrapper(*args, **kwargs):
+        log.info("%s() start at %s", fn.__name__, time.clock())
+        try:
+            return fn(*args, **kwargs)
+        except Exception:
+            log.exception("%s() exception", fn.__name__)
+            raise
+        finally:
+            log.info("%s() done at %s", fn.__name__, time.clock())
+
+    return _wrapper
 
 
 # https://www.zopatista.com/python/2014/03/14/cross-python-metaclasses/
