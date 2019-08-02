@@ -37,6 +37,7 @@ from xarrayms.utils import (select_cols_str,
     {"row": 3, "chan": (4, 4, 4, 4), "corr": (2, 2)}],
     ids=lambda c: "chunks=%s" % c)
 def test_dataset(ms, select_cols, group_cols, index_cols, shapes, chunks):
+    """ Test dataset creation """
     datasets = dataset(ms, select_cols, group_cols, index_cols, chunks)
     # (1) Read-only TableProxy
     # (2) Read-only TAQL TableProxy
@@ -91,6 +92,7 @@ def test_dataset(ms, select_cols, group_cols, index_cols, shapes, chunks):
 def test_dataset_writes(ms, select_cols,
                         group_cols, index_cols,
                         shapes, chunks):
+    """ Test dataset writes """
     datasets = dataset(ms, select_cols, group_cols, index_cols, chunks)
     assert_liveness(2, 1)
 
@@ -132,6 +134,7 @@ def test_dataset_writes(ms, select_cols,
 # due to the "__row__" in group_col
 @pytest.mark.parametrize("chunks", [{"row": 2}], ids=lambda c: str(c))
 def test_row_grouping(spw_table, spw_chan_freqs, chunks):
+    """ Test grouping on single rows """
     datasets = dataset(spw_table, [], ["__row__"], [], chunks)
 
     assert_liveness(2, 1)
@@ -147,6 +150,7 @@ def test_row_grouping(spw_table, spw_chan_freqs, chunks):
 
 
 def test_dataset_assign(ms):
+    """ Test dataset assignment """
     datasets = dataset(ms, [], [], [])
 
     assert len(datasets) == 1
