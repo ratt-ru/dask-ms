@@ -342,8 +342,6 @@ def _dataset_variable_factory(table_proxy, table_schema, select_cols,
             log.warning("Ignoring column: '%s'", column, exc_info=True)
             continue
 
-        assert len(dims) == len(shape), (dims, shape)
-
         # Name of the dask array representing this column
         name = "-".join((array_prefix, column))
 

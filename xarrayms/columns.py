@@ -176,4 +176,9 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
             dc = da.core.normalize_chunks(dc, shape=(s,))
             dim_chunks.append(dc[0])
 
+    if not (len(shape) == len(dims) == len(dim_chunks)):
+        raise ValueError("The length of shape '%s' dims '%s' and "
+                         "dim_chunks '%s' do not agree." %
+                         (shape, dims, dim_chunks))
+
     return shape, dims, dim_chunks, dtype
