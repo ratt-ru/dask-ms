@@ -181,7 +181,7 @@ def test_dataset_assign(ms):
 
     assert chunks['row'] == (10,)
 
-    with pytest.raises(ValueError, match="chunking \(4, 4, 2\) for dimension"):
+    with pytest.raises(ValueError, match=r"chunking \(4, 4, 2\) for dim"):
         array = da.zeros(dims['row'], chunks=4)
         nds = ds.assign(ANTENNA4=(("row",),  array))
         nds.chunks

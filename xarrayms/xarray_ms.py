@@ -183,7 +183,6 @@ def xds_from_table(table_name, columns=None,
 
     for ds in dask_datasets:
         data_vars = collections.OrderedDict()
-        dims = ds.dims
 
         for k, v in ds.variables.items():
             data_vars[k] = xr.DataArray(v.var, dims=v.dims)

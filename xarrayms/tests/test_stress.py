@@ -25,8 +25,6 @@ def test_stress(big_ms, iterations):
     writes = []
 
     for i in range(iterations):
-        time = ds.TIME + i
-        data = ds.DATA + i
         nds = ds.assign(TIME=ds.TIME + i, DATA=ds.DATA + i)
         writes.append(write_columns(big_ms, nds, ["TIME", "DATA"]))
 
