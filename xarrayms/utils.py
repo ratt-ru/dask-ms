@@ -6,9 +6,48 @@ from __future__ import print_function
 
 import logging
 import os
+import six
 import time
 
 log = logging.getLogger(__name__)
+
+
+def promote_columns(columns, default):
+    """
+    Promotes `columns` to a list of columns.
+
+    - None returns `default`
+    - single string returns a list containing that string
+    - tuple of strings returns a list of string
+
+    Parameters
+    ----------
+    columns : str or list of str or None
+        Table columns
+    default : list of str
+        Default columns
+
+    Returns
+    -------
+    list of str
+        List of columns
+    """
+
+    if columns is None:
+        if not isinstance(default, list):
+            raise TypeError("'default' must be a list")
+
+        return default
+    elif isinstance(columns, (tuple, list)):
+        for c in columns:
+            if not isinstance(c, six.string_types):
+                raise TypeError("columns must be a list of strings")
+
+        return list(columns)
+    elif isinstance(columns, six.string_types):
+        return [columns]
+
+    raise TypeError("'columns' must be a string or a list of strings")
 
 
 def short_table_name(table_name):

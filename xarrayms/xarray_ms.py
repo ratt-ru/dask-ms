@@ -9,24 +9,12 @@ import logging
 
 import xarray as xr
 from xarrayms.dataset import DatasetFactory, Dataset, write_columns
+from xarrayms.utils import promote_columns
 
 _DEFAULT_GROUP_COLUMNS = ["FIELD_ID", "DATA_DESC_ID"]
 _DEFAULT_INDEX_COLUMNS = ["TIME"]
-_DEFAULT_ROWCHUNKS = 100000
-_DEFAULT_MIN_FRAG_LEVEL = 0.1
 
 log = logging.getLogger(__name__)
-
-
-def _promote_columns(columns, default):
-    if columns is None:
-        return default
-    elif isinstance(columns, tuple):
-        return list(columns)
-    elif isinstance(columns, list):
-        return columns
-    else:
-        return [columns]
 
 
 def xds_to_table(xds, table_name, columns=None, **kwargs):
@@ -176,9 +164,9 @@ def xds_from_table(table_name, columns=None,
     list of :class:`xarray.Dataset`
         datasets for each group, each ordered by indexing columns
     """
-    columns = _promote_columns(columns, None)
-    index_cols = _promote_columns(index_cols, _DEFAULT_INDEX_COLUMNS)
-    group_cols = _promote_columns(group_cols, _DEFAULT_GROUP_COLUMNS)
+    columns = promote_columns(columns, [])
+    index_cols = promote_columns(index_cols, [])
+    group_cols = promote_columns(group_cols, [])
 
     dask_datasets = DatasetFactory(table_name, columns,
                                    group_cols, index_cols).datasets()
@@ -224,9 +212,9 @@ def xds_from_ms(ms, columns=None, index_cols=None, group_cols=None, **kwargs):
         xarray datasets for each group
     """
 
-    columns = _promote_columns(columns, None)
-    index_cols = _promote_columns(index_cols, _DEFAULT_INDEX_COLUMNS)
-    group_cols = _promote_columns(group_cols, _DEFAULT_GROUP_COLUMNS)
+    columns = promote_columns(columns, [])
+    index_cols = promote_columns(index_cols, _DEFAULT_INDEX_COLUMNS)
+    group_cols = promote_columns(group_cols, _DEFAULT_GROUP_COLUMNS)
 
     kwargs.setdefault("table_schema", "MS")
 
