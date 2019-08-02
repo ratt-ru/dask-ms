@@ -187,9 +187,10 @@ def ant_table(tmp_path_factory, wsrt_antenna_positions):
     LIMIT %d
     """ % (fn, wsrt_antenna_positions.shape[0])
 
+    names = ["ANTENNA-%d" % i for i in range(wsrt_antenna_positions.shape[0])]
+
     with pt.taql(create_table_query) as ant:
         ant.putcol("POSITION", wsrt_antenna_positions)
-        ant.putcol("NAME", ["ANTENNA-%d" % i for i in
-                            range(wsrt_antenna_positions.shape[0])])
+        ant.putcol("NAME", names)
 
     yield fn

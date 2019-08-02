@@ -314,6 +314,10 @@ def object_getcolslice(row_runs, table_proxy, column, result,
 
     try:
         for rs, rl in row_runs:
+            # NOTE(sjperkins)
+            # Dask wants ndarrays internally, so we asarray objects
+            # the returning list of objects.
+            # See https://github.com/ska-sa/xarray-ms/issues/42
             result[rr:rr + rl] = np.asarray(getcolslice(column, blc, trc,
                                                         startrow=rs, nrow=rl),
                                             dtype=dtype)
@@ -571,6 +575,15 @@ def array_putter(row_runs, table_proxy, column, data):
     """ Put data into the table """
     putcol = table_proxy._table.putcol
     rr = 0
+
+    # NOTE(sjperkins)
+    # python-casacore wants to put lists of objects, but
+    # because dask.array handles ndarrays we're passed
+    # ndarrays of python objects (strings).
+    # Without this conversion python-casacore can segfault
+    # See https://github.com/ska-sa/xarray-ms/issues/42
+    if data.dtype == np.object:
+        data = data.tolist()
 
     table_proxy._acquire(WRITELOCK)
 

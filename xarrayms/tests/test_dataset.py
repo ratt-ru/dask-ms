@@ -152,13 +152,24 @@ def test_row_grouping(spw_table, spw_chan_freqs, chunks):
 
 
 def test_antenna_table_string_names(ant_table, wsrt_antenna_positions):
-    datasets = dataset(ant_table, [], [], None)
-    assert len(datasets) == 1
+    ds = dataset(ant_table, [], [], None)
+    assert len(ds) == 1
+    ds = ds[0]
 
     names = ["ANTENNA-%d" % i for i in range(wsrt_antenna_positions.shape[0])]
 
-    assert_array_equal(datasets[0].POSITION, wsrt_antenna_positions)
-    assert_array_equal(datasets[0].NAME, names)
+    assert_array_equal(ds.POSITION, wsrt_antenna_positions)
+    assert_array_equal(ds.NAME, names)
+
+    names = ds.NAME.compute()
+
+    # Test that writing back string ndarrays work as
+    # they must be converted from ndarrays to lists
+    # of strings internally
+    write_cols = set(ds.variables.keys()) - set(["ROWID"])
+    writes = write_columns(ant_table, ds, write_cols)
+
+    dask.compute(writes)
 
 
 def test_dataset_assign(ms):
