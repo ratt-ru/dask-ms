@@ -33,7 +33,7 @@ MS_SCHEMA = {
         'dask': {'dims': ('chan', 'corr')},
     },
     'WEIGHT': {
-        'dask': {'dims': ('corr')},
+        'dask': {'dims': ('corr',)},
     },
     'WEIGHT_SPECTRUM': {
         'dask': {'dims': ('chan', 'corr')},
