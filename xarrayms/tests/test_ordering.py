@@ -19,8 +19,9 @@ from xarrayms.utils import group_cols_str, index_cols_str, assert_liveness
 
 
 def table_proxy(ms):
-    return TableProxy(pt.table, ms, lockoptions='user',
-                      readonly=True, ack=False)
+    return TableProxy(pt.table, ms, ack=False,
+                      lockoptions='user', readonly=True)
+
 
 @pytest.mark.parametrize("group_cols", [
     ["FIELD_ID", "SCAN_NUMBER"]],
