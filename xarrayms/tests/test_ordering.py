@@ -7,14 +7,20 @@ from __future__ import print_function
 import dask
 import dask.array as da
 from numpy.testing import assert_array_equal
+import pyrap.tables as pt
 import pytest
 
+from xarrayms.table_proxy import TableProxy
 from xarrayms.ordering import (ordering_taql,
                                row_ordering,
                                group_ordering_taql,
                                group_row_ordering)
 from xarrayms.utils import group_cols_str, index_cols_str, assert_liveness
 
+
+def table_proxy(ms):
+    return TableProxy(pt.table, ms, lockoptions='user',
+                      readonly=True, ack=False)
 
 @pytest.mark.parametrize("group_cols", [
     ["FIELD_ID", "SCAN_NUMBER"]],
@@ -23,13 +29,13 @@ from xarrayms.utils import group_cols_str, index_cols_str, assert_liveness
     ["TIME", "ANTENNA1", "ANTENNA2"]],
     ids=index_cols_str)
 def test_ordering_multiple_groups(ms, group_cols, index_cols):
-    group_taql = group_ordering_taql(ms, group_cols, index_cols)
-    assert_liveness(1, 1)
+    group_taql = group_ordering_taql(table_proxy(ms), group_cols, index_cols)
+    assert_liveness(2, 1)
     orders = group_row_ordering(group_taql, group_cols,
                                 index_cols, [{'row': 2}])
-    assert_liveness(1, 1)
+    assert_liveness(2, 1)
     first_rows = group_taql.getcol("__firstrow__").result()
-    assert_liveness(1, 1)
+    assert_liveness(2, 1)
 
     assert len(first_rows) == len(orders) == 6
 
@@ -58,10 +64,10 @@ def test_ordering_multiple_groups(ms, group_cols, index_cols):
     {'row': (5, 3, 2)}],
     ids=lambda c: 'chunks=%s' % (c,))
 def test_row_ordering_no_group(ms, index_cols, chunks):
-    order_taql = ordering_taql(ms, index_cols)
-    assert_liveness(1, 1)
+    order_taql = ordering_taql(table_proxy(ms), index_cols)
+    assert_liveness(2, 1)
     orders = row_ordering(order_taql, index_cols, chunks)
-    assert_liveness(1, 1)
+    assert_liveness(2, 1)
 
     # Normalise chunks to match that of the output array
     expected_chunks = da.core.normalize_chunks(chunks['row'], (10,))
@@ -89,13 +95,14 @@ def test_row_ordering_no_group(ms, index_cols, chunks):
     [{'row': (2, 3, 2)}, {'row': (2, 1)}],
     [{'row': 2}]],
     ids=lambda c: 'chunks=%s' % (c,))
-def test_row_ordering_multiple_groups(ms, group_cols, index_cols, chunks):
-    group_taql = group_ordering_taql(ms, group_cols, index_cols)
-    assert_liveness(1, 1)
+def test_row_ordering_multiple_groups(ms, group_cols,
+                                      index_cols, chunks):
+    group_taql = group_ordering_taql(table_proxy(ms), group_cols, index_cols)
+    assert_liveness(2, 1)
     orders = group_row_ordering(group_taql, group_cols, index_cols, chunks)
-    assert_liveness(1, 1)
+    assert_liveness(2, 1)
     first_rows = group_taql.getcol("__firstrow__").result()
-    assert_liveness(1, 1)
+    assert_liveness(2, 1)
 
     # We get two groups out
     assert len(orders) == len(first_rows) == 2

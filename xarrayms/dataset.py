@@ -493,14 +493,16 @@ class DatasetFactory(object):
         return datasets
 
     def datasets(self):
+        table_proxy = self._table_proxy()
+
         # No grouping case
         if len(self.group_cols) == 0:
-            order_taql = ordering_taql(self.ms, self.index_cols)
+            order_taql = ordering_taql(table_proxy, self.index_cols)
             orders = row_ordering(order_taql, self.index_cols, self.chunks[0])
             return [self._single_dataset(orders)]
         # Group by row
         elif len(self.group_cols) == 1 and self.group_cols[0] == "__row__":
-            order_taql = ordering_taql(self.ms, self.index_cols)
+            order_taql = ordering_taql(table_proxy, self.index_cols)
             sorted_rows, row_runs = row_ordering(order_taql,
                                                  self.index_cols,
                                                  # chunk ordering on each row
@@ -521,7 +523,7 @@ class DatasetFactory(object):
                     for r, er in enumerate(np_sorted_row)]
         # Grouping column case
         else:
-            order_taql = group_ordering_taql(self.ms, self.group_cols,
+            order_taql = group_ordering_taql(table_proxy, self.group_cols,
                                              self.index_cols)
             orders = group_row_ordering(order_taql, self.group_cols,
                                         self.index_cols, self.chunks)

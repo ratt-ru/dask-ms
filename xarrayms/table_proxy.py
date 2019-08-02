@@ -157,8 +157,16 @@ class MismatchedLocks(Exception):
 
 def taql_factory(query, style='Python', tables=[]):
     """ Calls pt.taql, converting TableProxy's in tables to pyrap tables """
-    tables = [t._table if isinstance(t, TableProxy) else t for t in tables]
-    return pt.taql(query, style=style, tables=tables)
+    tabs = [t._table for t in tables]
+
+    for t in tables:
+        t._acquire(READLOCK)
+
+    try:
+        return pt.taql(query, style=style, tables=tabs)
+    finally:
+        for t in tables:
+            t._release(READLOCK)
 
 
 @with_metaclass(TableProxyMetaClass)

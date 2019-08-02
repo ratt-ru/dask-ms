@@ -56,6 +56,8 @@ def test_ms_read(ms, group_cols, index_cols, select_cols):
                 column_data = {c: Q.getcol(c).result() for c in select_cols}
                 np_column_data.append(column_data)
 
+    del T
+
     for d, (ds, column_data) in enumerate(zip(xds, np_column_data)):
         for c in select_cols:
             dask_data = ds.data_vars[c].data.compute()

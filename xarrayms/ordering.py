@@ -14,7 +14,7 @@ import numpy as np
 import pyrap.tables as pt
 
 from xarrayms.query import select_clause, groupby_clause, orderby_clause
-from xarrayms.table_proxy import TableProxy
+from xarrayms.table_proxy import TableProxy, taql_factory
 
 
 class GroupChunkingError(Exception):
@@ -65,12 +65,12 @@ def _sorted_rows(taql_proxy, startrow, nrow):
                              nrow=nrow).result()
 
 
-def ordering_taql(ms, index_cols):
+def ordering_taql(table_proxy, index_cols):
     select = select_clause(["ROWID() as __tablerow__"])
     orderby = orderby_clause(index_cols)
-    query = "%s\nFROM\n\t'%s'\n%s" % (select, ms, orderby)
+    query = "%s\nFROM\n\t$1\n%s" % (select, orderby)
 
-    return TableProxy(pt.taql, query)
+    return TableProxy(taql_factory, query, tables=[table_proxy])
 
 
 def row_ordering(taql_proxy, index_cols, chunks):
@@ -157,7 +157,7 @@ def _group_ordering_arrays(taql_proxy, index_cols, group,
     return group_rows, row_runs
 
 
-def group_ordering_taql(ms, group_cols, index_cols):
+def group_ordering_taql(table_proxy, group_cols, index_cols):
     if len(group_cols) == 0:
         raise ValueError("group_ordering_taql requires "
                          "len(group_cols) > 0")
@@ -173,9 +173,9 @@ def group_ordering_taql(ms, group_cols, index_cols):
 
         groupby = groupby_clause(group_cols)
         select = select_clause(group_cols + index_group_cols)
-        query = "%s\nFROM\n\t'%s'\n%s" % (select, ms, groupby)
+        query = "%s\nFROM\n\t$1\n%s" % (select, groupby)
 
-        return TableProxy(pt.taql, query)
+        return TableProxy(taql_factory, query, tables=[table_proxy])
 
     raise RuntimeError("Invalid condition in group_ordering_taql")
 

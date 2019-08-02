@@ -186,3 +186,6 @@ def test_dataset_assign(ms):
         array = da.zeros(dims['row'], chunks=4)
         nds = ds.assign(ANTENNA4=(("row",),  array))
         nds.chunks
+
+    del datasets, ds, nds
+    assert_liveness(0, 0)
