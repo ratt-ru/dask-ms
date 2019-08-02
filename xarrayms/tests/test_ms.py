@@ -142,16 +142,19 @@ def test_row_query(ms, index_cols):
                       index_cols=index_cols,
                       chunks={"row": 2})
 
-    with pt.table(ms, readonly=True, lockoptions='auto', ack=False) as table:
-        # Get the expected row ordering by lexically
-        # sorting the indexing columns
-        cols = [(name, table.getcol(name)) for name in index_cols]
-        expected_rows = np.lexsort(tuple(c for n, c in reversed(cols)))
+    T = TableProxy(pt.table, ms, readonly=True, lockoptions='auto', ack=False)
 
-        assert len(xds) == table.nrows()
+    # Get the expected row ordering by lexically
+    # sorting the indexing columns
+    cols = [(name, T.getcol(name).result()) for name in index_cols]
+    expected_rows = np.lexsort(tuple(c for n, c in reversed(cols)))
 
-        for ds, expected_row in zip(xds, expected_rows):
-            assert ds.ROWID == expected_row
+    assert len(xds) == T.nrows().result()
+
+    for ds, expected_row in zip(xds, expected_rows):
+        assert ds.ROWID == expected_row
+
+    del xds, T, ds
 
 
 @pytest.mark.xfail(reason="Fragmentation not handled in rework, yet")
