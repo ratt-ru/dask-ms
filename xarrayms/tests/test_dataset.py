@@ -151,7 +151,7 @@ def test_row_grouping(spw_table, spw_chan_freqs, chunks):
     assert_liveness(0, 0)
 
 
-def test_strings(ant_table, wsrt_antenna_positions):
+def test_antenna_table_string_names(ant_table, wsrt_antenna_positions):
     datasets = dataset(ant_table, [], [], None)
     assert len(datasets) == 1
 
