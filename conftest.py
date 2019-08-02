@@ -17,3 +17,5 @@ def pytest_addoption(parser):
 def pytest_configure(config):
     if not config.option.stress:
         setattr(config.option, 'markexpr', 'not stress')
+
+    config.addinivalue_line("markers", "stress: long running stress tests")
