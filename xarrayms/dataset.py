@@ -220,7 +220,7 @@ def getter_wrapper(row_orders, *args):
         blc, trc = zip(*args[:nshape_args])
         shape = tuple(t - b + 1 for b, t in zip(blc, trc))
         result = np.empty((np.sum(row_runs[:, 1]),) + shape, dtype=dtype)
-        io_fn = (object_getcolslice if isinstance(dtype, object)
+        io_fn = (object_getcolslice if np.dtype == object
                  else ndarray_getcolslice)
 
         # Submit table I/O on executor
@@ -230,7 +230,7 @@ def getter_wrapper(row_orders, *args):
     # Row only case
     else:
         result = np.empty((np.sum(row_runs[:, 1]),), dtype=dtype)
-        io_fn = (object_getcol if isinstance(dtype, object)
+        io_fn = (object_getcol if dtype == object
                  else ndarray_getcol)
 
         # Submit table I/O on executor
