@@ -5,6 +5,7 @@ from __future__ import division
 from __future__ import print_function
 
 import dask
+import dask.array as da
 from dask.array.core import normalize_chunks
 from numpy.testing import assert_array_equal
 import pyrap.tables as pt
@@ -51,21 +52,19 @@ def test_dataset(ms, select_cols, group_cols, index_cols, shapes, chunks):
                                         shape=(corrs,))[0]}
 
     for ds in datasets:
-        res = dask.compute(dict(ds.variables))[0]
+        res = dask.compute({k: v.var for k, v in ds.variables.items()})[0]
         assert res['DATA'].shape[1:] == (chans, corrs)
         assert 'STATE_ID' in res
         assert 'TIME' in res
 
-        chunks = dict(ds.chunks)
+        chunks = ds.chunks
         assert chunks["chan"] == echunks['chan']
         assert chunks["corr"] == echunks['corr']
 
-        assert dict(ds.dims) == {
-            'STATE_ID': ("row",),
-            'ROWID': ("row",),
-            'TIME': ("row",),
-            'DATA': ("row", "chan", "corr"),
-        }
+        dims = ds.dims
+        dims.pop('row')  # row changes
+        assert dims == {"chan": shapes['chan'],
+                        "corr": shapes['corr']}
 
     del ds, datasets
     assert_liveness(0, 0)
@@ -104,7 +103,7 @@ def test_dataset_writes(ms, select_cols,
 
     # Create write operations and execute them
     for i, ds in enumerate(datasets):
-        new_ds = ds.assign(STATE_ID=(ds.STATE_ID + 1, ("row",)))
+        new_ds = ds.assign(STATE_ID=ds.STATE_ID + 1)
         writes.append(write_columns(ms, new_ds, ["STATE_ID"]))
 
     try:
@@ -145,3 +144,25 @@ def test_row_grouping(spw_table, spw_chan_freqs, chunks):
 
     del datasets
     assert_liveness(0, 0)
+
+
+def test_dataset_assign(ms):
+    datasets = dataset(ms, [], [], [])
+
+    assert len(datasets) == 1
+    ds = datasets[0]
+
+    # Assign on an existing column is easier because we can
+    # infer the dimension schema from it
+    nds = ds.assign(TIME=ds.TIME + 1)
+    assert ds.DATA is nds.DATA
+    assert ds.TIME is not nds.TIME
+    assert_array_equal(nds.TIME, ds.TIME + 1)
+
+    # This doesn't work for new columns
+    with pytest.raises(ValueError, match="Couldn't find existing dimension"):
+        ds.assign(ANTENNA3=ds.ANTENNA1 + 3)
+
+    # We have to explicitly supply a dimension schema
+    nds = ds.assign(ANTENNA3=(("row",), ds.ANTENNA1 + 3))
+    assert_array_equal(ds.ANTENNA1 + 3, nds.ANTENNA3)

@@ -9,6 +9,7 @@ try:
 except ImportError:
     from collections import Mapping
 
+from collections import namedtuple
 import logging
 
 import dask
@@ -59,31 +60,32 @@ class Frozen(Mapping):
         return '%s(%r)' % (type(self).__name__, self.mapping)
 
 
+VariableEntry = namedtuple("VariableEntry", ["dims", "var"])
+
+
 class Dataset(object):
     """
     Poor man's xarray Dataset. It mostly exists so that xarray can
     be an optional dependency, as it in turn depends on pandas
     which is a fairly heavy dependency
     """
-    def __init__(self, data_vars_and_dims, attrs=None):
-        data_vars = {}
-        dims = {}
+    def __init__(self, data_vars, attrs=None):
+        self._data_vars = {}
 
-        for k, v in data_vars_and_dims.items():
-            if not isinstance(v, (tuple, list)) and len(v) != 2:
-                raise ValueError("'%s' must be a (array, dims) tuple. "
+        for k, v in data_vars.items():
+            if isinstance(v, VariableEntry):
+                pass
+            elif not isinstance(v, (tuple, list)) and len(v) != 2:
+                raise ValueError("'%s' must be a (dims, array) tuple. "
                                  "Got a '%s' instead," % (k, type(v)))
 
-            if v[0].ndim != len(v[1]):
+            if len(v[0]) != v[1].ndim:
                 raise ValueError("Dimension schema '%s' does "
                                  "not match shape of associated array %s"
                                  % (v[0], v[1]))
 
-            data_vars[k] = v[0]
-            dims[k] = v[1]
+            self._data_vars[k] = VariableEntry(v[0], v[1])
 
-        self._data_vars = data_vars
-        self._dims = dims
         self._attrs = attrs or {}
 
     @property
@@ -92,23 +94,37 @@ class Dataset(object):
 
     @property
     def dims(self):
-        return Frozen(self._dims)
+        dims = {}
+
+        for k, v in self._data_vars.items():
+            for d, s in zip(v.dims, v.var.shape):
+                if d in dims and s != dims[d]:
+                    raise ValueError("Existing dimension size %d for "
+                                     "dimension %s is inconsistent "
+                                     "with same dimension of array %s" %
+                                     (s, dim, k))
+
+                dims[d] = s
+
+        return dims
+
+    sizes = dims
 
     @property
     def chunks(self):
         chunks = {}
 
-        for name, var in self._data_vars.items():
-            if not isinstance(var, da.Array):
+        for k, v in self._data_vars.items():
+            if not isinstance(v.var, da.Array):
                 continue
 
-            for dim, c in zip(self._dims[name], var.chunks):
+            for dim, c in zip(v.dims, v.var.chunks):
                 if dim in chunks and c != chunks[dim]:
                     raise ValueError("Existing chunk size %d for "
                                      "dimension %s is inconsistent "
                                      "with the chunk size for the "
                                      "same dimension of array %s" %
-                                     (c, dim, name))
+                                     (c, dim, k))
 
                 chunks[dim] = c
 
@@ -119,13 +135,27 @@ class Dataset(object):
         return Frozen(self._data_vars)
 
     def assign(self, **kwargs):
-        return Dataset(dict({k: (var, self._dims[k]) for k, var
-                             in self._data_vars.items()}, **kwargs),
-                       attrs=self._attrs)
+        data_vars = self._data_vars.copy()
+
+        for k, v in kwargs.items():
+            if not isinstance(v, (list, tuple)):
+                try:
+                    current_var = data_vars[k]
+                except KeyError:
+                    raise ValueError("Couldn't find existing dimension schema "
+                                     "during assignment of variable '%s'. "
+                                     "Supply a full (dims, array) tuple."
+                                     % k)
+                else:
+                    data_vars[k] = (current_var.dims, v)
+            else:
+                data_vars[k] = v
+
+        return Dataset(data_vars, attrs=self._attrs)
 
     def __getattr__(self, name):
         try:
-            return self._data_vars[name]
+            return self._data_vars[name][1]
         except KeyError:
             pass
 
@@ -329,7 +359,7 @@ def _dataset_variable_factory(table_proxy, table_schema, select_cols,
     """
 
     sorted_rows, row_runs = orders
-    dataset_vars = {"ROWID": (sorted_rows, ("row",))}
+    dataset_vars = {"ROWID": (("row",), sorted_rows)}
 
     for column in select_cols:
         try:
@@ -370,7 +400,7 @@ def _dataset_variable_factory(table_proxy, table_schema, select_cols,
             full_dims = full_dims[1:]
 
         # Assign into variable and dimension dataset
-        dataset_vars[column] = (dask_array, full_dims)
+        dataset_vars[column] = (full_dims, dask_array)
 
     return dataset_vars
 
@@ -540,22 +570,18 @@ def write_columns(ms, dataset, columns):
     writes = []
     row_order = dataset.ROWID.map_blocks(_gen_row_runs, sort_dir="write",
                                          dtype=np.object)
-    dims = dataset.dims
     data_vars = dataset.variables
 
     for column in columns:
         try:
-            column_array = data_vars[column]
+            column_entry = data_vars[column]
         except KeyError:
             log.warning("Ignoring '%s' not present on the dataset.")
             continue
 
-        try:
-            col_dims = dims[column]
-        except KeyError:
-            raise ValueError("No 'dims' found for column '%s'" % column)
+        col_dims = column_entry.dims
 
-        for chunk in column_array.chunks[1:]:
+        for chunk in column_entry.var.chunks[1:]:
             if not len(chunk) == 1:
                 raise ValueError("Multiple chunks in non-row "
                                  "dimension unsupported for writes. "
@@ -566,7 +592,7 @@ def write_columns(ms, dataset, columns):
                                     row_order, ("row",),
                                     table_proxy, None,
                                     column, None,
-                                    column_array, col_dims,
+                                    column_entry.var, col_dims,
                                     # All dims shrink to 1,
                                     # a single bool is returned
                                     adjust_chunks={d: 1 for d in col_dims},

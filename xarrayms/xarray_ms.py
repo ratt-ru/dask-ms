@@ -53,8 +53,8 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
         datset.
     """
 
-    variables = {k: (v.data, v.dims) for k, v in xds.data_vars.items()}
-    ds = Dataset(variables)
+    variables = {k: (v.dims, v.data) for k, v in xds.data_vars.items()}
+    ds = Dataset(variables, attrs=xds.attrs)
 
     return write_columns(table_name, ds, columns)
 
@@ -185,8 +185,8 @@ def xds_from_table(table_name, columns=None,
         data_vars = collections.OrderedDict()
         dims = ds.dims
 
-        for array_name, var in ds.variables.items():
-            data_vars[array_name] = xr.DataArray(var, dims=dims[array_name])
+        for k, v in ds.variables.items():
+            data_vars[k] = xr.DataArray(v.var, dims=v.dims)
 
         xarray_datasets.append(xr.Dataset(data_vars, attrs=dict(ds.attrs)))
 

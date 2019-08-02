@@ -27,10 +27,7 @@ def test_stress(big_ms, iterations):
     for i in range(iterations):
         time = ds.TIME + i
         data = ds.DATA + i
-
-        nds = ds.assign(TIME=(ds.TIME + i, ("row",)),
-                        DATA=(ds.DATA + i, ("row", "chan", "corr")))
-
+        nds = ds.assign(TIME=ds.TIME + i, DATA=ds.DATA + i)
         writes.append(write_columns(big_ms, nds, ["TIME", "DATA"]))
 
     dask.compute(writes)
