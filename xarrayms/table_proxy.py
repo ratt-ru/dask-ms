@@ -119,6 +119,18 @@ class TableProxyMetaClass(type):
                 return instance
 
 
+def _close_table(table):
+    tabstr = hash(str(table))
+    log.debug("Closing %s", tabstr)
+    try:
+        table.close()
+    except Exception:
+        log.exception("Error closing %s", tabstr)
+        raise
+    finally:
+        log.debug("Finished closing %s", tabstr)
+
+
 def proxy_delete_reference(table_proxy, ex, table):
     # http://pydev.blogspot.com/2015/01/creating-safe-cyclic-reference.html
     # To avoid cyclic references, table_proxy may not be used within _callback
@@ -127,7 +139,7 @@ def proxy_delete_reference(table_proxy, ex, table):
     # https://github.com/ska-sa/xarray-ms/pull/41/commits/af5126acf1646887ca59ce14680093988d32e333
     def _callback(ref):
         try:
-            ex.impl.submit(table.close).result()
+            ex.impl.submit(_close_table, table).result()
         except Exception:
             log.exception("Error closing table in _callback")
 
@@ -177,18 +189,11 @@ class TableProxy(object):
         return (_map_create_proxy, (TableProxy, self._factory,
                                     self._args, self._kwargs))
 
-    def close(self):
-        """" Closes the table immediately """
-        try:
-            self._ex.submit(self._table.close).result()
-        except Exception:
-            log.exception("Exception closing TableProxy")
-
     def __enter__(self):
         return self
 
     def __exit__(self, evalue, etype, etraceback):
-        self.close()
+        pass
 
     def _acquire(self, locktype):
         """ Acquire a lock on the table """
