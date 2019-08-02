@@ -34,9 +34,8 @@ def big_ms(tmp_path_factory, request):
     """.format(fn=fn, row=row, chan=chan, corr=corr)
 
     rs = np.random.RandomState(42)
-
-    data = (rs.random_sample((row, chan, corr)).astype(np.float64) +
-            rs.random_sample((row, chan, corr)).astype(np.float64)*1j)
+    data_shape = (row, chan, corr)
+    data = rs.random_sample(data_shape) + rs.random_sample(data_shape)*1j
 
     # Create the table
     with pt.taql(create_table_query) as ms:
@@ -96,9 +95,9 @@ def ms(tmp_path_factory):
     # Column we'll write to
     state = [0,   0,   0,   0,   0,   0,   0,   0,   0,   0]
 
+    rs = np.random.RandomState(42)
     data_shape = (len(state), 16, 4)
-
-    data = np.random.random(data_shape) + np.random.random(data_shape) * 1j
+    data = rs.random_sample(data_shape) + rs.random_sample(data_shape)*1j
 
     # Create the table
     with pt.taql(create_table_query) as ms:
