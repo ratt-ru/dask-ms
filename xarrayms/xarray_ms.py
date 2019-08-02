@@ -176,6 +176,10 @@ def xds_from_table(table_name, columns=None,
     list of :class:`xarray.Dataset`
         datasets for each group, each ordered by indexing columns
     """
+    columns = _promote_columns(columns, None)
+    index_cols = _promote_columns(index_cols, _DEFAULT_INDEX_COLUMNS)
+    group_cols = _promote_columns(group_cols, _DEFAULT_GROUP_COLUMNS)
+
     dask_datasets = DatasetFactory(table_name, columns,
                                    group_cols, index_cols).datasets()
 
