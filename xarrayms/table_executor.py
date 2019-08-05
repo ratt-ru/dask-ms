@@ -48,5 +48,8 @@ class Executor(object):
         self.impl = impl = cf.ThreadPoolExecutor(1)
         self.__del_ref = executor_delete_reference(self, impl)
 
+    def shutdown(self, *args, **kwargs):
+        return self.impl.shutdown(*args, **kwargs)
+
     def __reduce__(self):
         return (Executor, ())
