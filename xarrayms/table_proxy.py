@@ -74,6 +74,8 @@ def proxied_method_factory(method, locktype):
         finally:
             self._release(locktype)
 
+    _impl.__name__ = method + "_impl"
+
     def public_method(self, *args, **kwargs):
         """
         Submits _impl(args, kwargs) to the executor
