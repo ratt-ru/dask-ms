@@ -26,10 +26,10 @@ WRITELOCK = 2
 # List of CASA Table methods to proxy and the appropriate locking mode
 _proxied_methods = [
     # Queries
-    ("nrows", NOLOCK),
-    ("colnames", NOLOCK),
-    ("getcoldesc", NOLOCK),
-    ("getdminfo", NOLOCK),
+    ("nrows", READLOCK),
+    ("colnames", READLOCK),
+    ("getcoldesc", READLOCK),
+    ("getdminfo", READLOCK),
     # Reads
     ("getcol", READLOCK),
     ("getcolnp", READLOCK),
@@ -100,6 +100,10 @@ def _hasher(args):
 
 
 class TableProxyMetaClass(type):
+    """
+    https://en.wikipedia.org/wiki/Multiton_pattern
+
+    """
     def __new__(cls, name, bases, dct):
         for method, locktype in _proxied_methods:
             proxy_method = proxied_method_factory(method, locktype)
@@ -121,29 +125,25 @@ class TableProxyMetaClass(type):
                 return instance
 
 
-def _close_table(table):
-    tabstr = hash(str(table))
-    log.debug("Closing %s", tabstr)
-    try:
-        table.close()
-    except Exception:
-        log.exception("Error closing %s", tabstr)
-        raise
-    finally:
-        log.debug("Finished closing %s", tabstr)
-
-
-def proxy_delete_reference(table_proxy, ex, table):
+def proxy_delete_reference(table_proxy, table):
     # http://pydev.blogspot.com/2015/01/creating-safe-cyclic-reference.html
     # To avoid cyclic references, table_proxy may not be used within _callback
-    # Something wierd was happening on kernsuite 3 that caused this to fail
-    # Upgrading to kernsuite 5 fixed things. See the following commit
-    # https://github.com/ska-sa/xarray-ms/pull/41/commits/af5126acf1646887ca59ce14680093988d32e333
     def _callback(ref):
+        # We close the table **without** using the executor due to
+        # reentrancy issues with Python queues and garbage collection
+        # https://codewithoutrules.com/2017/08/16/concurrency-python/
+        # There could be internal casacore issues here, due to accessing
+        # the table from a different thread, but test cases are passing
+        tabstr = hash(str(table))
+        log.debug("Begin closing %s", tabstr)
+
         try:
-            ex.impl.submit(_close_table, table).result()
+            table.close()
         except Exception:
-            log.exception("Error closing table in _callback")
+            log.exception("Error closing %s", tabstr)
+            raise
+        finally:
+            log.debug("Finished closing %s", tabstr)
 
     return weakref.ref(table_proxy, _callback)
 
@@ -183,8 +183,13 @@ class TableProxy(object):
         table = ex.impl.submit(factory, *args, **kwargs).result()
 
         # Ensure tables are closed when the object is deleted
-        self._del_ref = proxy_delete_reference(self, ex, table)
+        self._del_ref = proxy_delete_reference(self, table)
 
+        # Store a reference to the Executor wrapper class
+        # so that the Executor is retained while this TableProxy
+        # still lives
+        self._ex_wrapper = ex
+        # Reference to the internal ThreadPoolExecutor
         self._ex = ex.impl
 
         # Private, should be inaccessible
