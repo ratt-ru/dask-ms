@@ -211,7 +211,13 @@ class TableProxy(object):
         pass
 
     def _acquire(self, locktype):
-        """ Acquire a lock on the table """
+        """
+        Acquire a lock on the table
+
+        Notes
+        -----
+        This should **only** be called from within the associated Executor
+        """
         if locktype == READLOCK:
             # No locks at all, acquire readlock
             if self._readlocks + self._writelocks == 0:
@@ -234,7 +240,13 @@ class TableProxy(object):
             raise ValueError("Invalid lock type %d" % locktype)
 
     def _release(self, locktype):
-        """ Release a lock on the table """
+        """
+        Release a lock on the table
+
+        Notes
+        -----
+        This should **only** be called from within the associated Executor
+        """
         if locktype == READLOCK:
             self._readlocks -= 1
 
