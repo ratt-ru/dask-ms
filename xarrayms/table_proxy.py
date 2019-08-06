@@ -23,6 +23,13 @@ NOLOCK = 0
 READLOCK = 1
 WRITELOCK = 2
 
+_LOCKTYPE_STRINGS = {
+    0: 'NOLOCK',
+    1: 'READLOCK',
+    2: 'WRITELOCK'
+}
+
+
 # List of CASA Table methods to proxy and the appropriate locking mode
 _proxied_methods = [
     # Queries
@@ -66,7 +73,6 @@ def proxied_method_factory(method, locktype):
     """
 
     def _impl(self, args, kwargs):
-        """ Calls method on the table, acquiring the appropriate lock """
         self._acquire(locktype)
 
         try:
@@ -75,6 +81,8 @@ def proxied_method_factory(method, locktype):
             self._release(locktype)
 
     _impl.__name__ = method + "_impl"
+    _impl.doc = ("Calls table.%s, wrapped in a %s." %
+                 (method, _LOCKTYPE_STRINGS[locktype]))
 
     def public_method(self, *args, **kwargs):
         """
