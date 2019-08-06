@@ -210,19 +210,20 @@ def getter_wrapper(row_orders, *args):
     within the table_proxy's associated executor
     """
     # Infer number of shape arguments
-    nshape_args = len(args) - 3
+    nextent_args = len(args) - 4
     # Extract other arguments
-    table_proxy, column, dtype = args[nshape_args:]
+    table_proxy, column, col_shape, dtype = args[nextent_args:]
 
     # Handle dask compute_meta gracefully
     if len(row_orders) == 0:
-        return np.empty((0,)*(nshape_args+1), dtype=dtype)
-    else:
-        row_runs, resort = row_orders
+        return np.empty((0,)*(nextent_args+1), dtype=dtype)
 
-    # There are other dimensions beside row
-    if nshape_args > 0:
-        blc, trc = zip(*args[:nshape_args])
+    row_runs, resort = row_orders
+
+    # In this case, we've been passed dimension extent arrays
+    # that define a slice of the column and we defer to getcolslice.
+    if nextent_args > 0:
+        blc, trc = zip(*args[:nextent_args])
         shape = tuple(t - b + 1 for b, t in zip(blc, trc))
         result = np.empty((np.sum(row_runs[:, 1]),) + shape, dtype=dtype)
         io_fn = (object_getcolslice if np.dtype == object
@@ -232,9 +233,10 @@ def getter_wrapper(row_orders, *args):
         future = table_proxy._ex.submit(io_fn, row_runs, table_proxy,
                                         column, result,
                                         blc, trc, dtype)
-    # Row only case
+    # In this case, the full resolution data
+    # for each row is requested, so we defer to getcol
     else:
-        result = np.empty((np.sum(row_runs[:, 1]),), dtype=dtype)
+        result = np.empty((np.sum(row_runs[:, 1]),) + col_shape, dtype=dtype)
         io_fn = (object_getcol if dtype == object
                  else ndarray_getcol)
 
@@ -384,14 +386,24 @@ def _dataset_variable_factory(table_proxy, table_schema, select_cols,
         full_dims = ("row",) + dims
         args = [row_runs, ("row",)]
 
-        # Add extent arrays
-        for d, c in zip(dims, dim_chunks):
-            args.append(dim_extents_array(d, c))
-            args.append((d,))
+        # We only need to pass in dimension extent arrays if
+        # there is more than one chunk in any of the non-row columns.
+        # In that case, we can getcol, otherwise getcolslice is required
+        if not all(len(c) == 1 for c in dim_chunks):
+            for d, c in zip(dims, dim_chunks):
+                args.append(dim_extents_array(d, c))
+                args.append((d,))
+
+            new_axes = {}
+        else:
+            # We need to inform blockwise about the size of our
+            # new dimensions as no arrays with them are supplied
+            new_axes = {d: s for d, s in zip(dims, shape)}
 
         # Add other variables
         args.extend([table_proxy, None,
                      column, None,
+                     shape, None,
                      dtype, None])
 
         # Name of the dask array representing this column
@@ -402,6 +414,7 @@ def _dataset_variable_factory(table_proxy, table_schema, select_cols,
         dask_array = da.blockwise(getter_wrapper, full_dims,
                                   *args,
                                   name=name,
+                                  new_axes=new_axes,
                                   dtype=dtype)
 
         # Squeeze out the single row if requested
@@ -551,12 +564,19 @@ def dataset(ms, columns, group_cols, index_cols, **kwargs):
                           index_cols, **kwargs).datasets()
 
 
-def putter_wrapper(row_orders, table_proxy, column, data):
+def putter_wrapper(row_orders, *args):
     """
     Wrapper which should run I/O operations within
     the table_proxy's associated executor
     """
     # Handle dask's compute_meta gracefully
+
+    # Infer number of shape arguments
+    nextent_args = len(args) - 3
+    # Extract other arguments
+    table_proxy, column, data = args[nextent_args:]
+
+    # Handle dask compute_meta gracefully
     if len(row_orders) == 0:
         return np.empty((0,)*len(data.shape), dtype=np.bool)
 
@@ -565,13 +585,19 @@ def putter_wrapper(row_orders, table_proxy, column, data):
     if resort is not None:
         data = data[resort]
 
-    table_proxy._ex.submit(array_putter, row_runs, table_proxy,
-                           column, data).result()
+    # There are other dimensions beside row
+    if nextent_args > 0:
+        blc, trc = zip(*args[:nextent_args])
+        table_proxy._ex.submit(ndarray_putcolslice, row_runs, blc, trc,
+                               table_proxy, column, data).result()
+    else:
+        table_proxy._ex.submit(ndarray_putcol, row_runs, table_proxy,
+                               column, data).result()
 
     return np.full((1,) * len(data.shape), True)
 
 
-def array_putter(row_runs, table_proxy, column, data):
+def ndarray_putcol(row_runs, table_proxy, column, data):
     """ Put data into the table """
     putcol = table_proxy._table.putcol
     rr = 0
@@ -596,6 +622,32 @@ def array_putter(row_runs, table_proxy, column, data):
         table_proxy._release(WRITELOCK)
 
 
+def ndarray_putcolslice(row_runs, blc, trc, table_proxy, column, data):
+    """ Put data into the table """
+    putcolslice = table_proxy._table.putcolslice
+    rr = 0
+
+    # NOTE(sjperkins)
+    # python-casacore wants to put lists of objects, but
+    # because dask.array handles ndarrays we're passed
+    # ndarrays of python objects (strings).
+    # Without this conversion python-casacore can segfault
+    # See https://github.com/ska-sa/xarray-ms/issues/42
+    if data.dtype == np.object:
+        data = data.tolist()
+
+    table_proxy._acquire(WRITELOCK)
+
+    try:
+        for rs, rl in row_runs:
+            putcolslice(column, data[rr:rr + rl], blc, trc,
+                        startrow=rs, nrow=rl)
+            rr += rl
+
+    finally:
+        table_proxy._release(WRITELOCK)
+
+
 def write_columns(ms, dataset, columns):
     table_proxy = TableProxy(pt.table, ms, ack=False,
                              readonly=False, lockoptions='user')
@@ -611,23 +663,34 @@ def write_columns(ms, dataset, columns):
             log.warning("Ignoring '%s' not present on the dataset.")
             continue
 
-        col_dims = column_entry.dims
+        full_dims = column_entry.dims
+        array = column_entry.var
+        args = [row_order, ("row",)]
 
-        for chunk in column_entry.var.chunks[1:]:
-            if not len(chunk) == 1:
-                raise ValueError("Multiple chunks in non-row "
-                                 "dimension unsupported for writes. "
-                                 "Rechunk this data to perform a single "
-                                 "write.")
+        # We only need to pass in dimension extent arrays if
+        # there is more than one chunk in any of the non-row columns.
+        # In that case, we can putcol, otherwise putcolslice is required
+        if not all(len(c) == 1 for c in array.chunks[1:]):
+            # Add extent arrays
+            for d, c in zip(full_dims[1:], array.chunks[1:]):
+                args.append(dim_extents_array(d, c))
+                args.append((d,))
 
-        column_write = da.blockwise(putter_wrapper, col_dims,
-                                    row_order, ("row",),
-                                    table_proxy, None,
-                                    column, None,
-                                    column_entry.var, col_dims,
+        # Add other variables
+        args.extend([table_proxy, None,
+                     column, None,
+                     array, full_dims])
+
+        # Name of the dask array representing this column
+        token = dask.base.tokenize(args)
+        name = "-".join((short_table_name(ms), 'write', column, token))
+
+        column_write = da.blockwise(putter_wrapper, full_dims,
+                                    *args,
                                     # All dims shrink to 1,
                                     # a single bool is returned
-                                    adjust_chunks={d: 1 for d in col_dims},
+                                    adjust_chunks={d: 1 for d in full_dims},
+                                    name=name,
                                     dtype=np.bool)
 
         writes.append(column_write.ravel())

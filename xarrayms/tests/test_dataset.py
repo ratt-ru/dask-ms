@@ -94,9 +94,10 @@ def test_dataset_writes(ms, select_cols,
                         shapes, chunks):
     """ Test dataset writes """
 
-    # Get original STATE_ID
+    # Get original STATE_ID and DATA
     with pt.table(ms, ack=False, readonly=True, lockoptions='auto') as T:
         original_state_id = T.getcol("STATE_ID")
+        original_data = T.getcol("DATA")
 
     try:
         datasets = dataset(ms, select_cols, group_cols,
@@ -108,8 +109,8 @@ def test_dataset_writes(ms, select_cols,
 
         # Create write operations and execute them
         for i, ds in enumerate(datasets):
-            new_ds = ds.assign(STATE_ID=ds.STATE_ID + 1)
-            writes.append(write_columns(ms, new_ds, ["STATE_ID"]))
+            new_ds = ds.assign(STATE_ID=ds.STATE_ID + 1, DATA=ds.DATA + 1)
+            writes.append(write_columns(ms, new_ds, ["STATE_ID", "DATA"]))
 
         dask.compute(writes)
 
@@ -126,10 +127,13 @@ def test_dataset_writes(ms, select_cols,
         # Restore original STATE_ID
         with pt.table(ms, ack=False, readonly=False, lockoptions='auto') as T:
             state_id = T.getcol("STATE_ID")
+            data = T.getcol("DATA")
             T.putcol("STATE_ID", original_state_id)
+            T.putcol("DATA", original_data)
 
     # Compare against expected result
     assert_array_equal(original_state_id + 1, state_id)
+    assert_array_equal(original_data + 1, data)
 
 
 # Even though we ask for two rows, we get single rows out
