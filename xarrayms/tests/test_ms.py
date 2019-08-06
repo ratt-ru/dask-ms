@@ -328,6 +328,8 @@ def _proc_map_fn(args):
 
 @pytest.mark.parametrize("nprocs", [3])
 def test_multiprocess_table(ms, nprocs):
+    # Check here so that we don't fork threads
+    # https://rachelbythebay.com/w/2011/06/07/forked/
     assert_liveness(0, 0)
 
     from multiprocessing import Pool
