@@ -4,11 +4,21 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import gc
 import os
 
 import numpy as np
 import pyrap.tables as pt
 import pytest
+
+
+@pytest.fixture(autouse=True)
+def xms_always_gc():
+    """ Force garbage collection after each test """
+    try:
+        yield
+    finally:
+        gc.collect()
 
 
 @pytest.fixture(scope="session")
