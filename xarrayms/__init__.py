@@ -1,10 +1,16 @@
+# -*- coding: utf-8 -*-
+
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import logging
+
 __author__ = """Simon Perkins"""
 __email__ = 'sperkins@ska.ac.za'
 __version__ = '0.1.9'
+
+logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 from xarrayms.xarray_ms import (xds_from_table,  # noqa
                                 xds_to_table,    # noqa
