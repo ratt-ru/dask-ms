@@ -33,6 +33,10 @@ def executor_delete_reference(ex, threadpool_executor):
     # http://pydev.blogspot.com/2015/01/creating-safe-cyclic-reference.html
     # To avoid cyclic references, ex may not be used within _callback
     def _callback(ref):
+        # This is possibly a bad idea because the ThreadPoolExecutor
+        # puts None on queues to signal to threads that they should
+        # exit. Test cases succeed though
+        # https://codewithoutrules.com/2017/08/16/concurrency-python/
         try:
             threadpool_executor.shutdown(wait=True)
         except Exception:
