@@ -137,11 +137,6 @@ def test_ms_write(ms, group_cols, index_cols, select_cols):
     ["ANTENNA1", "ANTENNA2", "TIME"]],
     ids=index_cols_str)
 def test_row_query(ms, index_cols):
-    xds = xds_from_ms(ms, columns=index_cols,
-                      group_cols="__row__",
-                      index_cols=index_cols,
-                      chunks={"row": 2})
-
     T = TableProxy(pt.table, ms, readonly=True, lockoptions='auto', ack=False)
 
     # Get the expected row ordering by lexically
@@ -149,12 +144,17 @@ def test_row_query(ms, index_cols):
     cols = [(name, T.getcol(name).result()) for name in index_cols]
     expected_rows = np.lexsort(tuple(c for n, c in reversed(cols)))
 
-    assert len(xds) == T.nrows().result()
+    del T
+
+    xds = xds_from_ms(ms, columns=index_cols,
+                      group_cols="__row__",
+                      index_cols=index_cols,
+                      chunks={"row": 2})
 
     for ds, expected_row in zip(xds, expected_rows):
         assert ds.ROWID == expected_row
 
-    del xds, T, ds
+    del xds, ds
 
 
 @pytest.mark.xfail(reason="Fragmentation not handled in rework, yet")
