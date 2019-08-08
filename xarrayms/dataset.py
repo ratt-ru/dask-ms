@@ -23,6 +23,7 @@ from xarrayms.columns import (column_metadata, ColumnMetadataError,
 from xarrayms.ordering import (ordering_taql, row_ordering,
                                group_ordering_taql, group_row_ordering,
                                _gen_row_runs)
+from xarrayms.table import table_exists
 from xarrayms.table_proxy import TableProxy, READLOCK, WRITELOCK
 from xarrayms.table_schemas import lookup_table_schema
 from xarrayms.utils import short_table_name
@@ -435,7 +436,10 @@ def _dataset_variable_factory(table_proxy, table_schema, select_cols,
 
 
 class DatasetFactory(object):
-    def __init__(self, ms, select_cols, group_cols, index_cols, **kwargs):
+    def __init__(self, table, select_cols, group_cols, index_cols, **kwargs):
+        if not table_exists(table):
+            raise ValueError("'%s' does not appear to be a CASA Table" % table)
+
         chunks = kwargs.pop('chunks', [{'row': _DEFAULT_ROW_CHUNKS}])
 
         # Create or promote chunks to a list of dicts
@@ -444,7 +448,7 @@ class DatasetFactory(object):
         elif not isinstance(chunks, (tuple, list)):
             raise TypeError("'chunks' must be a dict or sequence of dicts")
 
-        self.ms = ms
+        self.table = table
         self.select_cols = select_cols
         self.group_cols = [] if group_cols is None else group_cols
         self.index_cols = [] if index_cols is None else index_cols
@@ -456,11 +460,11 @@ class DatasetFactory(object):
             raise ValueError("Unhandled kwargs: %s" % kwargs)
 
     def _table_proxy(self):
-        return TableProxy(pt.table, self.ms, ack=False,
+        return TableProxy(pt.table, self.table, ack=False,
                           readonly=True, lockoptions='user')
 
     def _table_schema(self):
-        return lookup_table_schema(self.ms, self.table_schema)
+        return lookup_table_schema(self.table, self.table_schema)
 
     def _single_dataset(self, orders, single_row=False, exemplar_row=0):
         table_proxy = self._table_proxy()
@@ -470,7 +474,7 @@ class DatasetFactory(object):
         variables = _dataset_variable_factory(table_proxy, table_schema,
                                               select_cols, exemplar_row,
                                               orders, self.chunks[0],
-                                              short_table_name(self.ms),
+                                              short_table_name(self.table),
                                               single_row=single_row)
 
         if single_row:
@@ -503,7 +507,7 @@ class DatasetFactory(object):
 
             # Prefix d
             gid_str = ",".join(str(gid) for gid in group_id)
-            array_prefix = "%s-[%s]" % (short_table_name(self.ms), gid_str)
+            array_prefix = "%s-[%s]" % (short_table_name(self.table), gid_str)
 
             # Create dataset variables
             group_var_dims = _dataset_variable_factory(table_proxy,
@@ -655,6 +659,9 @@ def ndarray_putcolslice(row_runs, blc, trc, table_proxy, column, data):
 
 
 def write_datasets(table, datasets, columns):
+    if not table_exists(table):
+        raise ValueError("'%s' does not appear to be a CASA table" % table)
+
     # Promote datasets to list
     if isinstance(datasets, tuple):
         datasets = list(datasets)

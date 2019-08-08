@@ -4,6 +4,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
+
 
 def table_descriptor(table):
     """
@@ -20,3 +22,7 @@ def table_descriptor(table):
             del hcdef["HCidnames"]
 
     return tabledesc
+
+
+def table_exists(table):
+    return os.path.exists(table) and os.path.isdir(table)
