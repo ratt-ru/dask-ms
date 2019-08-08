@@ -35,7 +35,9 @@ def executor_delete_reference(ex, threadpool_executor):
     def _callback(ref):
         # This is possibly a bad idea because the ThreadPoolExecutor
         # puts None on queues to signal to threads that they should
-        # exit. Test cases succeed though
+        # exit. However, if the callback is called, nothing should be
+        # referring to the executor anymore so it should be OK (TM).
+        # For more information, please reread:
         # https://codewithoutrules.com/2017/08/16/concurrency-python/
         try:
             threadpool_executor.shutdown(wait=True)
