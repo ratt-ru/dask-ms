@@ -63,7 +63,6 @@ def test_dataset(ms, select_cols, group_cols, index_cols, shapes, chunks):
             compute_dict[k] = var
 
             if k in select_cols:
-                pprint(attrs)
                 assert "__coldesc__" in attrs
 
         res = dask.compute(compute_dict)[0]
