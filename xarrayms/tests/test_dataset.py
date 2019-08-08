@@ -4,8 +4,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
-
 import dask
 import dask.array as da
 from dask.array.core import normalize_chunks
@@ -14,8 +12,7 @@ from numpy.testing import assert_array_equal
 import pyrap.tables as pt
 import pytest
 
-from xarrayms.dataset import dataset, write_datasets, Dataset
-from xarrayms.table_proxy import TableProxy
+from xarrayms.dataset import dataset, write_datasets
 from xarrayms.utils import (select_cols_str,
                             group_cols_str,
                             index_cols_str,
