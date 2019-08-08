@@ -14,7 +14,7 @@ from numpy.testing import assert_array_equal
 import pyrap.tables as pt
 import pytest
 
-from xarrayms.dataset import dataset, write_dataset, Dataset
+from xarrayms.dataset import dataset, write_datasets, Dataset
 from xarrayms.table_proxy import TableProxy
 from xarrayms.utils import (select_cols_str,
                             group_cols_str,
@@ -114,7 +114,7 @@ def test_dataset_writes(ms, select_cols,
         # Create write operations and execute them
         for i, ds in enumerate(datasets):
             new_ds = ds.assign(STATE_ID=ds.STATE_ID + 1, DATA=ds.DATA + 1)
-            writes.append(write_dataset(ms, new_ds, ["STATE_ID", "DATA"]))
+            writes.append(write_datasets(ms, new_ds, ["STATE_ID", "DATA"]))
 
         dask.compute(writes)
 
@@ -175,7 +175,7 @@ def test_antenna_table_string_names(ant_table, wsrt_antenna_positions):
     # they must be converted from ndarrays to lists
     # of strings internally
     write_cols = set(ds.variables.keys()) - set(["ROWID"])
-    writes = write_dataset(ant_table, ds, write_cols)
+    writes = write_datasets(ant_table, ds, write_cols)
 
     dask.compute(writes)
 
@@ -255,7 +255,7 @@ def test_dataset_add_column(ms, dtype):
 
     bitflag = da.zeros_like(ds.DATA, dtype=dtype)
     nds = ds.assign(BITFLAG=(("row", "chan", "corr"), bitflag))
-    writes = write_dataset(ms, nds, ["BITFLAG"])
+    writes = write_datasets(ms, nds, ["BITFLAG"])
 
     dask.compute(writes)
 
@@ -279,7 +279,7 @@ def test_dataset_add_string_column(ms):
 
     nds = ds.assign(NAMES=(("row",), names))
 
-    writes = write_dataset(ms, nds, ["NAMES"])
+    writes = write_datasets(ms, nds, ["NAMES"])
     dask.compute(writes)
 
     del datasets, ds, writes, nds

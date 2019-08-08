@@ -656,7 +656,7 @@ def ndarray_putcolslice(row_runs, blc, trc, table_proxy, column, data):
         table_proxy._release(WRITELOCK)
 
 
-def write_dataset(table, datasets, columns):
+def write_datasets(table, datasets, columns):
     # Promote datasets to list
     if isinstance(datasets, tuple):
         datasets = list(datasets)

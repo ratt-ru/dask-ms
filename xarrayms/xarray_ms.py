@@ -8,7 +8,7 @@ import collections
 import logging
 
 import xarray as xr
-from xarrayms.dataset import DatasetFactory, Dataset, write_dataset
+from xarrayms.dataset import DatasetFactory, Dataset, write_datasets
 from xarrayms.utils import promote_columns
 
 _DEFAULT_GROUP_COLUMNS = ["FIELD_ID", "DATA_DESC_ID"]
@@ -44,7 +44,7 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
     variables = {k: (v.dims, v.data) for k, v in xds.data_vars.items()}
     ds = Dataset(variables, attrs=xds.attrs)
 
-    return write_dataset(table_name, ds, columns)
+    return write_datasets(table_name, ds, columns)
 
 
 def xds_from_table(table_name, columns=None,
