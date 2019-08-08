@@ -296,31 +296,3 @@ def test_dataset_add_string_column(ms):
 
     with pt.table(ms, readonly=False, ack=False, lockoptions='auto') as T:
         assert name_list == T.getcol("NAMES")
-
-
-@pytest.mark.xfail
-@pytest.mark.parametrize("shapes", [{'row': 10, 'chan': 32}])
-def test_dataset_table_description(shapes, tmp_path):
-    row, chan = (shapes[d] for d in ('row', 'chan'))
-
-    variables = {}
-    variables["PANTS"] = (("row", "chan"),
-                          da.zeros((row, chan), dtype=np.int32, chunks=row))
-
-    strings = np.asarray(["BOB"]*row, dtype=np.object)
-    variables["FRED"] = (("row",),
-                         da.from_array(strings, chunks=row))
-
-    ds = Dataset(variables)
-
-    from pprint import pprint
-    pprint(ds.tabdesc())
-
-    filename = os.path.join(str(tmp_path), "test.table")
-
-    T = TableProxy(pt.table, filename, ds.tabdesc())
-    T.addrows(row).result()
-    T.putcol("PANTS", np.zeros((row, chan), dtype=np.int32)).result()
-    T.putcol("FRED", strings.tolist()).result()
-
-    assert T.getcol("FRED").result() == strings.tolist()
