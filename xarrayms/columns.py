@@ -209,3 +209,42 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
     attrs = {"__coldesc__": coldesc}
 
     return ColumnMetadata(shape, dims, dim_chunks, dtype, attrs)
+
+
+def dask_column_metadata(column, variable):
+    dims, var, dtype = variable
+    ndim = len(dims)
+
+    # Only consider dimensions other than row
+    if ndim > 0 and dims[0] == 'row':
+        dims = dims[1:]
+        chunks = var.chunks[1:]
+        shape = var.shape[1:]
+        ndim -= 1
+    else:
+        chunks = var.chunks
+        shape = var.shape
+
+    dtype = var.dtype.type
+    casa_type = infer_casa_type(dtype)
+
+    desc = {'_c_order': True,
+            'comment': '',
+            'dataManagerGroup': '',
+            'dataManagerType': '',
+            'keywords': {},
+            'maxlen': 0,
+            'option': 0,
+            'valueType': casa_type}
+
+    # An ndim of 0 seems to imply a scalar which is not the
+    # same thing as not having dimensions other than row
+    if ndim > 0:
+        desc['option'] = 4
+        desc['shape'] = list(shape)
+        desc['ndim'] = ndim
+
+    chunks = dict(zip(dims, chunks))
+    attrs = {"__coldesc__": {"name": column, "desc": desc}}
+
+    return ColumnMetadata(shape, dims, chunks, var.dtype, attrs)
