@@ -229,7 +229,7 @@ def dask_column_metadata(column, variable):
     casa_type = infer_casa_type(dtype)
 
     desc = {'_c_order': True,
-            'comment': '',
+            'comment': '%s column' % column,
             'dataManagerGroup': '',
             'dataManagerType': '',
             'keywords': {},

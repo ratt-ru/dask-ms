@@ -18,7 +18,8 @@ from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 import pyrap.tables as pt
 
-from xarrayms.columns import column_metadata, ColumnMetadataError
+from xarrayms.columns import (column_metadata, ColumnMetadataError,
+                              infer_casa_type, dask_column_metadata)
 from xarrayms.ordering import (ordering_taql, row_ordering,
                                group_ordering_taql, group_row_ordering,
                                _gen_row_runs)
@@ -665,37 +666,19 @@ def write_datasets(table, datasets, columns):
 
     table_columns = set(table_proxy.colnames().result())
     missing = set(columns) - table_columns
-
-    from xarrayms.columns import infer_casa_type
-    from pprint import pprint
     first_data_vars = datasets[0].variables
 
-    for m in missing:
-        (dims, var, attrs) = first_data_vars[m]
+    # Create column metadata for each missing column and
+    # add it to the table if necessary
+    if len(missing) > 0:
+        coldescs = []
 
-        dtype = var.dtype.type
-        casa_type = infer_casa_type(dtype)
-        # Dimensions other than row
-        ndim = len(dims) - 1
+        for m in missing:
+            meta = dask_column_metadata(m, first_data_vars[m])
+            coldescs.append(meta.attrs["__coldesc__"])
 
-        if ndim > 0:
-            kw = {'options': 4, 'shape': var.shape[1:]}
-        else:
-            kw = {}
-
-        default = "" if casa_type == "STRING" else dtype(0)
-        col_desc = pt.makearrcoldesc(m, default, valuetype=casa_type,
-                                     ndim=ndim, **kw)
-
-        # An ndim of 0 seems to imply a scalar which is not the
-        # same thing as not having dimensions other than row
-        if ndim == 0:
-            del col_desc['desc']['ndim']
-            del col_desc['desc']['shape']
-
-        pprint(col_desc)
-
-        table_proxy.addcols(col_desc).result()
+        table_desc = pt.maketabdesc(coldescs)
+        table_proxy.addcols(table_desc).result()
 
     table_name = short_table_name(table)
     writes = []
