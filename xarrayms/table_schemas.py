@@ -114,18 +114,19 @@ _ALL_SCHEMAS = {
 }
 
 _ALL_SCHEMAS.update(_SUBTABLE_SCHEMAS)
+_ALL_SCHEMAS["TABLE"] = {}
 
 
-def _table_suffix_search(table_name):
+def infer_table_type(table_name):
     """ Guess the schema from the table name """
     if table_name[-3:].upper().endswith(".MS"):
-        return MS_SCHEMA
+        return "MS"
 
-    for k, schema in _SUBTABLE_SCHEMAS.items():
+    for k in _SUBTABLE_SCHEMAS.keys():
         if table_name.endswith('::' + k):
-            return schema
+            return k
 
-    return {}
+    return "TABLE"
 
 
 def lookup_table_schema(table_name, lookup_str):
@@ -151,7 +152,13 @@ def lookup_table_schema(table_name, lookup_str):
         :code:`{column: {'dask': {...}, 'casa': {...}}}`.
     """
     if lookup_str is None:
-        return _table_suffix_search(short_table_name(table_name))
+        table_type = infer_table_type(short_table_name(table_name))
+
+        try:
+            return _ALL_SCHEMAS[table_type]
+        except KeyError:
+            raise ValueError("No schema registered for "
+                             "table type '%s'" % table_type)
 
     if not isinstance(lookup_str, (tuple, list)):
         lookup_str = [lookup_str]
