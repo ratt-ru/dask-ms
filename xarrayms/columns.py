@@ -7,7 +7,9 @@ from __future__ import print_function
 from collections import OrderedDict, namedtuple
 from pprint import pformat
 
+import dask
 import dask.array as da
+from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 
 # Map column string types to numpy/python types
@@ -209,3 +211,42 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
     attrs = {"__coldesc__": coldesc}
 
     return ColumnMetadata(shape, dims, dim_chunks, dtype, attrs)
+
+
+def dim_extents_array(dim, chunks):
+    """
+    Produces a an array of chunk extents for a given dimension.
+
+    Parameters
+    ----------
+    dim : str
+        Name of the dimension
+    chunks : tuple of ints
+        Dimension chunks
+
+    Returns
+    -------
+    dim_extents : :class:`dask.array.Array`
+        dask array where each chunk contains a single (start, end) tuple
+        defining the start and end of the chunk. The end is inclusive
+        in the python-casacore style.
+
+        The array chunks match ``chunks`` and are innacurate, but
+        are used to define chunk sizes of final outputs.
+
+    Notes
+    -----
+    The returned array should never be computed directly, but
+    rather used to produce dataset arrays.
+    """
+
+    name = "-".join((dim, dask.base.tokenize(dim, chunks)))
+    layers = {}
+    start = 0
+
+    for i, c in enumerate(chunks):
+        layers[(name, i)] = (start, start + c - 1)  # chunk end is inclusive
+        start += c
+
+    graph = HighLevelGraph.from_collections(name, layers, [])
+    return da.Array(graph, name, chunks=(chunks,), dtype=np.object)

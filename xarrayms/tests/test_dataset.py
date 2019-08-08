@@ -14,12 +14,11 @@ from numpy.testing import assert_array_equal
 import pyrap.tables as pt
 import pytest
 
-from xarrayms.dataset import (dataset, write_datasets, Dataset, Variable,
-                              dask_column_descriptor)
-from xarrayms.utils import (select_cols_str,
-                            group_cols_str,
-                            index_cols_str,
-                            assert_liveness)
+from xarrayms.dataset import Dataset, Variable
+from xarrayms.reads import read_datasets
+from xarrayms.writes import dask_column_descriptor, write_datasets
+from xarrayms.utils import (select_cols_str, group_cols_str,
+                            index_cols_str, assert_liveness)
 
 
 @pytest.mark.parametrize("group_cols", [
@@ -42,7 +41,8 @@ from xarrayms.utils import (select_cols_str,
     ids=lambda c: "chunks=%s" % c)
 def test_dataset(ms, select_cols, group_cols, index_cols, shapes, chunks):
     """ Test dataset creation """
-    datasets = dataset(ms, select_cols, group_cols, index_cols, chunks=chunks)
+    datasets = read_datasets(ms, select_cols, group_cols,
+                             index_cols, chunks=chunks)
     # (1) Read-only TableProxy
     # (2) Read-only TAQL TableProxy
     assert_liveness(2, 1)
@@ -113,8 +113,8 @@ def test_dataset_writes(ms, select_cols,
         original_data = T.getcol("DATA")
 
     try:
-        datasets = dataset(ms, select_cols, group_cols,
-                           index_cols, chunks=chunks)
+        datasets = read_datasets(ms, select_cols, group_cols,
+                                 index_cols, chunks=chunks)
         assert_liveness(2, 1)
 
         # Test writes
@@ -154,7 +154,7 @@ def test_dataset_writes(ms, select_cols,
 @pytest.mark.parametrize("chunks", [{"row": 2}], ids=lambda c: str(c))
 def test_row_grouping(spw_table, spw_chan_freqs, chunks):
     """ Test grouping on single rows """
-    datasets = dataset(spw_table, [], ["__row__"], [], chunks=chunks)
+    datasets = read_datasets(spw_table, [], ["__row__"], [], chunks=chunks)
 
     assert_liveness(2, 1)
 
@@ -169,7 +169,7 @@ def test_row_grouping(spw_table, spw_chan_freqs, chunks):
 
 
 def test_antenna_table_string_names(ant_table, wsrt_antenna_positions):
-    ds = dataset(ant_table, [], [], None)
+    ds = read_datasets(ant_table, [], [], None)
     assert len(ds) == 1
     ds = ds[0]
 
@@ -191,7 +191,7 @@ def test_antenna_table_string_names(ant_table, wsrt_antenna_positions):
 
 def test_dataset_assign(ms):
     """ Test dataset assignment """
-    datasets = dataset(ms, [], [], [])
+    datasets = read_datasets(ms, [], [], [])
 
     assert len(datasets) == 1
     ds = datasets[0]
@@ -234,7 +234,7 @@ def test_dataset_table_schemas(ms):
     """ Test that we can pass table schemas """
     data_dims = ("mychan", "mycorr")
     table_schema = ["MS", {"DATA": {'dask': {"dims": data_dims}}}]
-    datasets = dataset(ms, [], [], [], table_schema=table_schema)
+    datasets = read_datasets(ms, [], [], [], table_schema=table_schema)
     assert datasets[0].variables["DATA"].dims == ("row", ) + data_dims
 
 
@@ -258,7 +258,7 @@ def test_dataset_table_schemas(ms):
                  marks=pytest.mark.xfail(reason="Creates uint16 column")),
 ])
 def test_dataset_add_column(ms, dtype):
-    datasets = dataset(ms, [], [], [])
+    datasets = read_datasets(ms, [], [], [])
     assert len(datasets) == 1
     ds = datasets[0]
 
@@ -277,7 +277,7 @@ def test_dataset_add_column(ms, dtype):
 
 
 def test_dataset_add_string_column(ms):
-    datasets = dataset(ms, [], [], [])
+    datasets = read_datasets(ms, [], [], [])
     assert len(datasets) == 1
     ds = datasets[0]
     dims = ds.dims

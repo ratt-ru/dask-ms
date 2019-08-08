@@ -8,7 +8,8 @@ import dask
 import pytest
 
 
-from xarrayms.dataset import dataset, write_datasets
+from xarrayms.reads import read_datasets
+from xarrayms.writes import write_datasets
 
 
 @pytest.mark.stress
@@ -16,9 +17,9 @@ from xarrayms.dataset import dataset, write_datasets
 @pytest.mark.parametrize("iterations", [10])
 @pytest.mark.parametrize("chunks", [{"row": 100}])
 def test_stress(big_ms, iterations, chunks):
-    datasets = dataset(big_ms, ["TIME", "DATA"],
-                       ["FIELD_ID", "DATA_DESC_ID"], [],
-                       chunks=chunks)
+    datasets = read_datasets(big_ms, ["TIME", "DATA"],
+                             ["FIELD_ID", "DATA_DESC_ID"], [],
+                             chunks=chunks)
 
     assert len(datasets) == 1
     ds = datasets[0]

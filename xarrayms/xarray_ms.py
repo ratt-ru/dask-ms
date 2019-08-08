@@ -8,7 +8,9 @@ import collections
 import logging
 
 import xarray as xr
-from xarrayms.dataset import DatasetFactory, Dataset, write_datasets
+from xarrayms.dataset import Dataset
+from xarrayms.reads import DatasetFactory
+from xarrayms.writes import write_datasets
 from xarrayms.utils import promote_columns
 
 _DEFAULT_GROUP_COLUMNS = ["FIELD_ID", "DATA_DESC_ID"]
