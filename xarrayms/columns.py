@@ -78,7 +78,7 @@ class ColumnMetadataError(Exception):
 
 
 ColumnMetadata = namedtuple("ColumnMetadata",
-                            ["shape", "dims", "dim_chunks", "dtype"])
+                            ["shape", "dims", "chunks", "dtype", "attrs"])
 
 
 def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
@@ -186,7 +186,7 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
             try:
                 dims = dask_schema['dims']
             except KeyError:
-                dims = ()
+                dims = tuple("%s-%d" % (column, i) for i in range(shape))
 
     dim_chunks = []
 
@@ -205,4 +205,7 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
                                   "dim_chunks '%s' do not agree." %
                                   (shape, dims, dim_chunks))
 
-    return ColumnMetadata(shape, dims, dim_chunks, dtype)
+    # Place CASA column descriptor in attributes
+    attrs = {"__coldesc__": coldesc}
+
+    return ColumnMetadata(shape, dims, dim_chunks, dtype, attrs)

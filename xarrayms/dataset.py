@@ -382,23 +382,20 @@ def _dataset_variable_factory(table_proxy, table_schema, select_cols,
 
     for column in select_cols:
         try:
-            shape, dims, dim_chunks, dtype = column_metadata(column,
-                                                             table_proxy,
-                                                             table_schema,
-                                                             chunks,
-                                                             exemplar_row)
+            meta = column_metadata(column, table_proxy, table_schema,
+                                   chunks, exemplar_row)
         except ColumnMetadataError:
             log.warning("Ignoring column: '%s'", column, exc_info=True)
             continue
 
-        full_dims = ("row",) + dims
+        full_dims = ("row",) + meta.dims
         args = [row_runs, ("row",)]
 
         # We only need to pass in dimension extent arrays if
         # there is more than one chunk in any of the non-row columns.
         # In that case, we can getcol, otherwise getcolslice is required
-        if not all(len(c) == 1 for c in dim_chunks):
-            for d, c in zip(dims, dim_chunks):
+        if not all(len(c) == 1 for c in meta.chunks):
+            for d, c in zip(meta.dims, meta.chunks):
                 args.append(dim_extents_array(d, c))
                 args.append((d,))
 
@@ -406,13 +403,13 @@ def _dataset_variable_factory(table_proxy, table_schema, select_cols,
         else:
             # We need to inform blockwise about the size of our
             # new dimensions as no arrays with them are supplied
-            new_axes = {d: s for d, s in zip(dims, shape)}
+            new_axes = {d: s for d, s in zip(meta.dims, meta.shape)}
 
         # Add other variables
         args.extend([table_proxy, None,
                      column, None,
-                     shape, None,
-                     dtype, None])
+                     meta.shape, None,
+                     meta.dtype, None])
 
         # Name of the dask array representing this column
         token = dask.base.tokenize(args)
@@ -423,7 +420,7 @@ def _dataset_variable_factory(table_proxy, table_schema, select_cols,
                                   *args,
                                   name=name,
                                   new_axes=new_axes,
-                                  dtype=dtype)
+                                  dtype=meta.dtype)
 
         # Squeeze out the single row if requested
         if single_row:
@@ -431,7 +428,7 @@ def _dataset_variable_factory(table_proxy, table_schema, select_cols,
             full_dims = full_dims[1:]
 
         # Assign into variable and dimension dataset
-        dataset_vars[column] = (full_dims, dask_array)
+        dataset_vars[column] = (full_dims, dask_array, meta.attrs)
 
     return dataset_vars
 

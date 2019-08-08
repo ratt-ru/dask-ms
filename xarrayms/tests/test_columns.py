@@ -52,16 +52,15 @@ def test_column_metadata(ms, column, shape, chunks, table_schema, dtype):
     try:
         dims = table_schema[column]['dask']['dims']
     except KeyError:
-        dims = ()
+        dims = tuple("%s-%d" % (column, i) for i in range(1, len(shape) + 1))
 
-    ishape, idims, ichunks, idtype = column_metadata(column, table_proxy,
-                                                     table_schema,
-                                                     dict(chunks))
+    meta = column_metadata(column, table_proxy, table_schema, dict(chunks))
 
-    assert ishape == shape
-    assert idims == dims
-    assert ichunks == [c[1] for c in chunks[:len(ishape)]]
-    assert idtype == dtype
+    assert meta.shape == shape
+    assert meta.dims == dims
+    assert meta.chunks == [c[1] for c in chunks[:len(meta.shape)]]
+    assert meta.dtype == dtype
+    assert "__coldesc__" in meta.attrs
 
     del table_proxy
     assert_liveness(0, 0)
