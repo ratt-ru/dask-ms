@@ -20,7 +20,7 @@ class GroupChunkingError(Exception):
     pass
 
 
-def _gen_row_runs(rows, sort=True, sort_dir="read"):
+def row_run_factory(rows, sort=True, sort_dir="read"):
     """
     Generate consecutive row runs, as well as sorting index
     if ``sort`` is True.
@@ -90,7 +90,8 @@ def row_ordering(taql_proxy, index_cols, chunks):
 
     graph = HighLevelGraph.from_collections(name, layers, [])
     rows = da.Array(graph, name, chunks=chunks, dtype=np.object)
-    row_runs = rows.map_blocks(_gen_row_runs, sort_dir="read", dtype=np.object)
+    row_runs = rows.map_blocks(row_run_factory, sort_dir="read",
+                               dtype=np.object)
 
     return rows, row_runs
 
@@ -154,7 +155,7 @@ def _group_ordering_arrays(taql_proxy, index_cols, group,
         raise (new_ex, None, sys.exc_info()[2])
 
     group_rows = group_rows.rechunk(group_row_chunks)
-    row_runs = group_rows.map_blocks(_gen_row_runs, sort_dir="read",
+    row_runs = group_rows.map_blocks(row_run_factory, sort_dir="read",
                                      dtype=np.object)
 
     return group_rows, row_runs

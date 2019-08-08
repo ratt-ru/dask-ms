@@ -13,12 +13,10 @@ import pyrap.tables as pt
 
 from xarrayms.dataset import Variable
 from xarrayms.columns import (infer_casa_type, dim_extents_array)
-from xarrayms.ordering import _gen_row_runs
+from xarrayms.ordering import row_run_factory
 from xarrayms.table import table_exists
 from xarrayms.table_proxy import TableProxy, WRITELOCK
 from xarrayms.utils import short_table_name
-
-_DEFAULT_ROW_CHUNKS = 10000
 
 log = logging.getLogger(__name__)
 
@@ -216,7 +214,7 @@ def write_datasets(table, datasets, columns):
         except AttributeError:
             rowid = da.arange(ds.dims['row'], chunks=ds.chunks['row'])
 
-        row_order = rowid.map_blocks(_gen_row_runs, sort_dir="write",
+        row_order = rowid.map_blocks(row_run_factory, sort_dir="write",
                                      dtype=np.object)
         data_vars = ds.variables
 
