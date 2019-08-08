@@ -97,7 +97,7 @@ def test_dask_column_metadata(chunks, dtype, tmp_path):
     str_chunks = tuple(chunks[d] for d in dims)
     np_str_array = np.asarray(["BOB"] * shape[0], dtype=np.object)
     da_str_array = da.from_array(np_str_array, chunks=str_chunks)
-    str_array_var = (dims, da_str_array, {})
+    str_array_var = Variable(dims, da_str_array, {})
     meta = dask_column_metadata("NAMES", str_array_var)
     assert_array_equal(meta.shape, shape[1:])
     assert_array_equal(str_chunks[1:], da_str_array.chunks[1:])
