@@ -37,6 +37,9 @@ _proxied_methods = [
     ("colnames", READLOCK),
     ("getcoldesc", READLOCK),
     ("getdminfo", READLOCK),
+    # Modification
+    ("addrows", WRITELOCK),
+    ("addcols", WRITELOCK),
     # Reads
     ("getcol", READLOCK),
     ("getcolnp", READLOCK),
