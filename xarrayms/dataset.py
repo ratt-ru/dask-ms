@@ -19,7 +19,7 @@ import numpy as np
 import pyrap.tables as pt
 
 from xarrayms.columns import (column_metadata, ColumnMetadataError,
-                              infer_casa_type, dask_column_metadata)
+                              infer_casa_type)
 from xarrayms.ordering import (ordering_taql, row_ordering,
                                group_ordering_taql, group_row_ordering,
                                _gen_row_runs)
@@ -668,8 +668,8 @@ def _create_table(table, datasets, columns):
     coldescs = []
 
     for k, var in data_vars.items():
-        meta = dask_column_metadata(k, var)
-        coldescs.append(meta.attrs["__coldesc__"])
+        desc = dask_column_descriptor(k, var)
+        coldescs.append(desc)
 
     table_desc = pt.maketabdesc(coldescs)
 
@@ -695,13 +695,57 @@ def _updated_table(table, datasets, columns):
         coldescs = []
 
         for m in missing:
-            meta = dask_column_metadata(m, first_data_vars[m])
-            coldescs.append(meta.attrs["__coldesc__"])
+            desc = dask_column_descriptor(m, first_data_vars[m])
+            coldescs.append(desc)
 
         table_desc = pt.maketabdesc(coldescs)
         table_proxy.addcols(table_desc).result()
 
     return table_proxy
+
+
+def dask_column_descriptor(column, variable):
+    if isinstance(variable, Variable):
+        variable = [variable]
+    elif not isinstance(variable, (tuple, list)):
+        variable = [variable]
+
+    descs = []
+
+    for v in variable:
+        dims, var, _ = v
+        ndim = len(dims)
+
+        # Only consider dimensions other than row
+        if ndim > 0 and dims[0] == 'row':
+            dims = dims[1:]
+            shape = var.shape[1:]
+            ndim -= 1
+        else:
+            shape = var.shape
+
+        dtype = var.dtype.type
+        casa_type = infer_casa_type(dtype)
+
+        desc = {'_c_order': True,
+                'comment': '%s column' % column,
+                'dataManagerGroup': '',
+                'dataManagerType': '',
+                'keywords': {},
+                'maxlen': 0,
+                'option': 0,
+                'valueType': casa_type}
+
+        # An ndim of 0 seems to imply a scalar which is not the
+        # same thing as not having dimensions other than row
+        if ndim > 0:
+            desc['option'] = 4
+            desc['shape'] = list(shape)
+            desc['ndim'] = ndim
+
+        descs.append({'name': column, 'desc': desc})
+
+    return descs[0]
 
 
 def write_datasets(table, datasets, columns):

@@ -14,7 +14,8 @@ from numpy.testing import assert_array_equal
 import pyrap.tables as pt
 import pytest
 
-from xarrayms.dataset import dataset, write_datasets, Dataset, Variable
+from xarrayms.dataset import (dataset, write_datasets, Dataset, Variable,
+                              dask_column_descriptor)
 from xarrayms.utils import (select_cols_str,
                             group_cols_str,
                             index_cols_str,
@@ -296,6 +297,51 @@ def test_dataset_add_string_column(ms):
     with pt.table(ms, readonly=False, ack=False, lockoptions='auto') as T:
         assert name_list == T.getcol("NAMES")
 
+
+@pytest.mark.parametrize("chunks", [{'row': (5, 5),
+                                     'chan': (4, 4, 4, 4),
+                                     'corr': (4,)}])
+@pytest.mark.parametrize("dtype", [np.complex128, np.float32])
+def test_dask_column_descriptor(chunks, dtype, tmp_path):
+    column_meta = []
+    shapes = {k: sum(c) for k, c in chunks.items()}
+
+    # Make some visibilities
+    dims = ("row", "chan", "corr")
+    shape = tuple(shapes[d] for d in dims)
+    data_chunks = tuple(chunks[d] for d in dims)
+    data = da.random.random(shape, chunks=data_chunks).astype(dtype)
+    data_var = Variable(dims, data, {})
+    meta = dask_column_descriptor("DATA", data_var)
+    column_meta.append(meta)
+
+    # Make some string names
+    dims = ("row",)
+    shape = tuple(shapes[d] for d in dims)
+    str_chunks = tuple(chunks[d] for d in dims)
+    np_str_array = np.asarray(["BOB"] * shape[0], dtype=np.object)
+    da_str_array = da.from_array(np_str_array, chunks=str_chunks)
+    str_array_var = Variable(dims, da_str_array, {})
+    meta = dask_column_descriptor("NAMES", str_array_var)
+    column_meta.append(meta)
+
+    # Create a new table with the column metadata
+    fn = os.path.join(str(tmp_path), "test.ms")
+    tabdesc = pt.maketabdesc(column_meta)
+
+    with pt.table(fn, tabdesc, readonly=False, ack=False) as T:
+        # Add rows
+        T.addrows(shapes['row'])
+
+        str_list = np_str_array.tolist()
+
+        # Put data
+        T.putcol("DATA", data.compute())
+        T.putcol("NAMES", str_list)
+
+        # We get out what we put in
+        assert_array_equal(T.getcol("NAMES"), str_list)
+        assert_array_equal(T.getcol("DATA"), data)
 
 
 @pytest.mark.parametrize("chunks", [{'row': (5, 5),
