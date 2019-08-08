@@ -21,39 +21,6 @@ from xarrayms.utils import short_table_name
 log = logging.getLogger(__name__)
 
 
-def putter_wrapper(row_orders, *args):
-    """
-    Wrapper which should run I/O operations within
-    the table_proxy's associated executor
-    """
-    # Handle dask's compute_meta gracefully
-
-    # Infer number of shape arguments
-    nextent_args = len(args) - 3
-    # Extract other arguments
-    table_proxy, column, data = args[nextent_args:]
-
-    # Handle dask compute_meta gracefully
-    if len(row_orders) == 0:
-        return np.empty((0,)*len(data.shape), dtype=np.bool)
-
-    row_runs, resort = row_orders
-
-    if resort is not None:
-        data = data[resort]
-
-    # There are other dimensions beside row
-    if nextent_args > 0:
-        blc, trc = zip(*args[:nextent_args])
-        table_proxy._ex.submit(ndarray_putcolslice, row_runs, blc, trc,
-                               table_proxy, column, data).result()
-    else:
-        table_proxy._ex.submit(ndarray_putcol, row_runs, table_proxy,
-                               column, data).result()
-
-    return np.full((1,) * len(data.shape), True)
-
-
 def ndarray_putcol(row_runs, table_proxy, column, data):
     """ Put data into the table """
     putcol = table_proxy._table.putcol
@@ -103,6 +70,37 @@ def ndarray_putcolslice(row_runs, blc, trc, table_proxy, column, data):
 
     finally:
         table_proxy._release(WRITELOCK)
+
+
+def putter_wrapper(row_orders, *args):
+    """
+    Wrapper which should run I/O operations within
+    the table_proxy's associated executor
+    """
+    # Infer number of shape arguments
+    nextent_args = len(args) - 3
+    # Extract other arguments
+    table_proxy, column, data = args[nextent_args:]
+
+    # Handle dask compute_meta gracefully
+    if len(row_orders) == 0:
+        return np.empty((0,)*len(data.shape), dtype=np.bool)
+
+    row_runs, resort = row_orders
+
+    if resort is not None:
+        data = data[resort]
+
+    # There are other dimensions beside row
+    if nextent_args > 0:
+        blc, trc = zip(*args[:nextent_args])
+        table_proxy._ex.submit(ndarray_putcolslice, row_runs, blc, trc,
+                               table_proxy, column, data).result()
+    else:
+        table_proxy._ex.submit(ndarray_putcol, row_runs, table_proxy,
+                               column, data).result()
+
+    return np.full((1,) * len(data.shape), True)
 
 
 def _create_table(table, datasets, columns):

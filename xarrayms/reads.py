@@ -26,53 +26,6 @@ _DEFAULT_ROW_CHUNKS = 10000
 log = logging.getLogger(__name__)
 
 
-def getter_wrapper(row_orders, *args):
-    """
-    Wrapper running I/O operations
-    within the table_proxy's associated executor
-    """
-    # Infer number of shape arguments
-    nextent_args = len(args) - 4
-    # Extract other arguments
-    table_proxy, column, col_shape, dtype = args[nextent_args:]
-
-    # Handle dask compute_meta gracefully
-    if len(row_orders) == 0:
-        return np.empty((0,)*(nextent_args+1), dtype=dtype)
-
-    row_runs, resort = row_orders
-
-    # In this case, we've been passed dimension extent arrays
-    # that define a slice of the column and we defer to getcolslice.
-    if nextent_args > 0:
-        blc, trc = zip(*args[:nextent_args])
-        shape = tuple(t - b + 1 for b, t in zip(blc, trc))
-        result = np.empty((np.sum(row_runs[:, 1]),) + shape, dtype=dtype)
-        io_fn = (object_getcolslice if np.dtype == object
-                 else ndarray_getcolslice)
-
-        # Submit table I/O on executor
-        future = table_proxy._ex.submit(io_fn, row_runs, table_proxy,
-                                        column, result,
-                                        blc, trc, dtype)
-    # In this case, the full resolution data
-    # for each row is requested, so we defer to getcol
-    else:
-        result = np.empty((np.sum(row_runs[:, 1]),) + col_shape, dtype=dtype)
-        io_fn = (object_getcol if dtype == object
-                 else ndarray_getcol)
-
-        # Submit table I/O on executor
-        future = table_proxy._ex.submit(io_fn, row_runs, table_proxy,
-                                        column, result, dtype)
-
-    # Resort result if necessary
-    if resort is not None:
-        return future.result()[resort]
-
-    return future.result()
-
-
 def ndarray_getcol(row_runs, table_proxy, column, result, dtype):
     """ Get numpy array data """
     getcolnp = table_proxy._table.getcolnp
@@ -150,6 +103,53 @@ def object_getcolslice(row_runs, table_proxy, column, result,
         table_proxy._release(READLOCK)
 
     return result
+
+
+def getter_wrapper(row_orders, *args):
+    """
+    Wrapper running I/O operations
+    within the table_proxy's associated executor
+    """
+    # Infer number of shape arguments
+    nextent_args = len(args) - 4
+    # Extract other arguments
+    table_proxy, column, col_shape, dtype = args[nextent_args:]
+
+    # Handle dask compute_meta gracefully
+    if len(row_orders) == 0:
+        return np.empty((0,)*(nextent_args+1), dtype=dtype)
+
+    row_runs, resort = row_orders
+
+    # In this case, we've been passed dimension extent arrays
+    # that define a slice of the column and we defer to getcolslice.
+    if nextent_args > 0:
+        blc, trc = zip(*args[:nextent_args])
+        shape = tuple(t - b + 1 for b, t in zip(blc, trc))
+        result = np.empty((np.sum(row_runs[:, 1]),) + shape, dtype=dtype)
+        io_fn = (object_getcolslice if np.dtype == object
+                 else ndarray_getcolslice)
+
+        # Submit table I/O on executor
+        future = table_proxy._ex.submit(io_fn, row_runs, table_proxy,
+                                        column, result,
+                                        blc, trc, dtype)
+    # In this case, the full resolution data
+    # for each row is requested, so we defer to getcol
+    else:
+        result = np.empty((np.sum(row_runs[:, 1]),) + col_shape, dtype=dtype)
+        io_fn = (object_getcol if dtype == object
+                 else ndarray_getcol)
+
+        # Submit table I/O on executor
+        future = table_proxy._ex.submit(io_fn, row_runs, table_proxy,
+                                        column, result, dtype)
+
+    # Resort result if necessary
+    if resort is not None:
+        return future.result()[resort]
+
+    return future.result()
 
 
 def _dataset_variable_factory(table_proxy, table_schema, select_cols,
