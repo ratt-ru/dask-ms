@@ -4,14 +4,18 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
+
 import dask
 import dask.array as da
 from dask.array.core import normalize_chunks
+import numpy as np
 from numpy.testing import assert_array_equal
 import pyrap.tables as pt
 import pytest
 
-from xarrayms.dataset import dataset, write_columns
+from xarrayms.dataset import dataset, write_dataset, Dataset
+from xarrayms.table_proxy import TableProxy
 from xarrayms.utils import (select_cols_str,
                             group_cols_str,
                             index_cols_str,
@@ -110,7 +114,7 @@ def test_dataset_writes(ms, select_cols,
         # Create write operations and execute them
         for i, ds in enumerate(datasets):
             new_ds = ds.assign(STATE_ID=ds.STATE_ID + 1, DATA=ds.DATA + 1)
-            writes.append(write_columns(ms, new_ds, ["STATE_ID", "DATA"]))
+            writes.append(write_dataset(ms, new_ds, ["STATE_ID", "DATA"]))
 
         dask.compute(writes)
 
@@ -171,7 +175,7 @@ def test_antenna_table_string_names(ant_table, wsrt_antenna_positions):
     # they must be converted from ndarrays to lists
     # of strings internally
     write_cols = set(ds.variables.keys()) - set(["ROWID"])
-    writes = write_columns(ant_table, ds, write_cols)
+    writes = write_dataset(ant_table, ds, write_cols)
 
     dask.compute(writes)
 
@@ -223,3 +227,90 @@ def test_dataset_table_schemas(ms):
     table_schema = ["MS", {"DATA": {'dask': {"dims": data_dims}}}]
     datasets = dataset(ms, [], [], [], table_schema=table_schema)
     assert datasets[0].variables["DATA"].dims == ("row", ) + data_dims
+
+
+@pytest.mark.parametrize("dtype", [
+    np.complex64,
+    np.complex128,
+    np.float32,
+    np.float64,
+    np.int16,
+    np.int32,
+    np.uint32,
+    np.bool,
+    pytest.param(np.object,
+                 marks=pytest.mark.xfail(reason="putcol can't handle "
+                                                "lists of ints")),
+    pytest.param(np.uint16,
+                 marks=pytest.mark.xfail(reason="RuntimeError: RecordRep::"
+                                                "createDataField: unknown data"
+                                                " type 17")),
+    pytest.param(np.uint8,
+                 marks=pytest.mark.xfail(reason="Creates uint16 column")),
+])
+def test_dataset_add_column(ms, dtype):
+    datasets = dataset(ms, [], [], [])
+    assert len(datasets) == 1
+    ds = datasets[0]
+
+    bitflag = da.zeros_like(ds.DATA, dtype=dtype)
+    nds = ds.assign(BITFLAG=(("row", "chan", "corr"), bitflag))
+    writes = write_dataset(ms, nds, ["BITFLAG"])
+
+    dask.compute(writes)
+
+    del datasets, ds, writes, nds
+    assert_liveness(0, 0)
+
+    with pt.table(ms, readonly=False, ack=False, lockoptions='auto') as T:
+        bf = T.getcol("BITFLAG")
+        assert bf.dtype == dtype
+
+
+def test_dataset_add_string_column(ms):
+    datasets = dataset(ms, [], [], [])
+    assert len(datasets) == 1
+    ds = datasets[0]
+    dims = ds.dims
+
+    name_list = ["BOB"] * dims['row']
+    names = np.asarray(name_list, dtype=np.object)
+    names = da.from_array(names, chunks=ds.TIME.chunks)
+
+    nds = ds.assign(NAMES=(("row",), names))
+
+    writes = write_dataset(ms, nds, ["NAMES"])
+    dask.compute(writes)
+
+    del datasets, ds, writes, nds
+    assert_liveness(0, 0)
+
+    with pt.table(ms, readonly=False, ack=False, lockoptions='auto') as T:
+        assert name_list == T.getcol("NAMES")
+
+
+@pytest.mark.parametrize("shapes", [{'row': 10, 'chan': 32}])
+def test_dataset_table_description(shapes, tmp_path):
+    row, chan = (shapes[d] for d in ('row', 'chan'))
+
+    variables = {}
+    variables["PANTS"] = (("row", "chan"),
+                          da.zeros((row, chan), dtype=np.int32, chunks=row))
+
+    strings = np.asarray(["BOB"]*row, dtype=np.object)
+    variables["FRED"] = (("row",),
+                         da.from_array(strings, chunks=row))
+
+    ds = Dataset(variables)
+
+    from pprint import pprint
+    pprint(ds.tabdesc())
+
+    filename = os.path.join(str(tmp_path), "test.table")
+
+    T = TableProxy(pt.table, filename, ds.tabdesc())
+    T.addrows(row).result()
+    T.putcol("PANTS", np.zeros((row, chan), dtype=np.int32)).result()
+    T.putcol("FRED", strings.tolist()).result()
+
+    assert T.getcol("FRED").result() == strings.tolist()

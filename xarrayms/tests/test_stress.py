@@ -8,7 +8,7 @@ import dask
 import pytest
 
 
-from xarrayms.dataset import dataset, write_columns
+from xarrayms.dataset import dataset, write_dataset
 
 
 @pytest.mark.stress
@@ -27,6 +27,6 @@ def test_stress(big_ms, iterations, chunks):
 
     for i in range(iterations):
         nds = ds.assign(TIME=ds.TIME + i, DATA=ds.DATA + i)
-        writes.append(write_columns(big_ms, nds, ["TIME", "DATA"]))
+        writes.append(write_dataset(big_ms, nds, ["TIME", "DATA"]))
 
     dask.compute(writes)

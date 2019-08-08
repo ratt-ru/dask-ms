@@ -656,51 +656,96 @@ def ndarray_putcolslice(row_runs, blc, trc, table_proxy, column, data):
         table_proxy._release(WRITELOCK)
 
 
-def write_columns(ms, dataset, columns):
-    table_proxy = TableProxy(pt.table, ms, ack=False,
+def write_dataset(table, datasets, columns):
+    # Promote datasets to list
+    if isinstance(datasets, tuple):
+        datasets = list(datasets)
+    else:
+        datasets = [datasets]
+
+    table_proxy = TableProxy(pt.table, table, ack=False,
                              readonly=False, lockoptions='user')
+
+    table_columns = set(table_proxy.colnames().result())
+    missing = set(columns) - table_columns
+
+    from xarrayms.columns import infer_casa_type
+    from pprint import pprint
+    first_data_vars = datasets[0].variables
+
+    for m in missing:
+        (dims, var, attrs) = first_data_vars[m]
+
+        dtype = var.dtype.type
+        casa_type = infer_casa_type(dtype)
+        # Dimensions other than row
+        ndim = len(dims) - 1
+
+        if ndim > 0:
+            kw = {'options': 4, 'shape': var.shape[1:]}
+        else:
+            kw = {}
+
+        default = "" if casa_type == "STRING" else dtype(0)
+        col_desc = pt.makearrcoldesc(m, default, valuetype=casa_type,
+                                     ndim=ndim, **kw)
+
+        # An ndim of 0 seems to imply a scalar which is not the
+        # same thing as not having dimensions other than row
+        if ndim == 0:
+            del col_desc['desc']['ndim']
+            del col_desc['desc']['shape']
+
+        pprint(col_desc)
+
+        table_proxy.addcols(col_desc).result()
+
+    table_name = short_table_name(table)
     writes = []
-    row_order = dataset.ROWID.map_blocks(_gen_row_runs, sort_dir="write",
-                                         dtype=np.object)
-    data_vars = dataset.variables
 
-    for column in columns:
-        try:
-            column_entry = data_vars[column]
-        except KeyError:
-            log.warning("Ignoring '%s' not present on the dataset.")
-            continue
+    for di, ds in enumerate(datasets):
+        row_order = ds.ROWID.map_blocks(_gen_row_runs, sort_dir="write",
+                                        dtype=np.object)
+        data_vars = ds.variables
 
-        full_dims = column_entry.dims
-        array = column_entry.var
-        args = [row_order, ("row",)]
+        for column in columns:
+            try:
+                column_entry = data_vars[column]
+            except KeyError:
+                log.warning("Ignoring '%s' not present "
+                            "on dataset %d" % di)
+                continue
 
-        # We only need to pass in dimension extent arrays if
-        # there is more than one chunk in any of the non-row columns.
-        # In that case, we can putcol, otherwise putcolslice is required
-        if not all(len(c) == 1 for c in array.chunks[1:]):
-            # Add extent arrays
-            for d, c in zip(full_dims[1:], array.chunks[1:]):
-                args.append(dim_extents_array(d, c))
-                args.append((d,))
+            full_dims = column_entry.dims
+            array = column_entry.var
+            args = [row_order, ("row",)]
 
-        # Add other variables
-        args.extend([table_proxy, None,
-                     column, None,
-                     array, full_dims])
+            # We only need to pass in dimension extent arrays if
+            # there is more than one chunk in any of the non-row columns.
+            # In that case, we can putcol, otherwise putcolslice is required
+            if not all(len(c) == 1 for c in array.chunks[1:]):
+                # Add extent arrays
+                for d, c in zip(full_dims[1:], array.chunks[1:]):
+                    args.append(dim_extents_array(d, c))
+                    args.append((d,))
 
-        # Name of the dask array representing this column
-        token = dask.base.tokenize(args)
-        name = "-".join((short_table_name(ms), 'write', column, token))
+            # Add other variables
+            args.extend([table_proxy, None,
+                         column, None,
+                         array, full_dims])
 
-        column_write = da.blockwise(putter_wrapper, full_dims,
-                                    *args,
-                                    # All dims shrink to 1,
-                                    # a single bool is returned
-                                    adjust_chunks={d: 1 for d in full_dims},
-                                    name=name,
-                                    dtype=np.bool)
+            # Name of the dask array representing this column
+            token = dask.base.tokenize(di, args)
+            name = "-".join((table_name, 'write', column, token))
 
-        writes.append(column_write.ravel())
+            write_col = da.blockwise(putter_wrapper, full_dims,
+                                     *args,
+                                     # All dims shrink to 1,
+                                     # a single bool is returned
+                                     adjust_chunks={d: 1 for d in full_dims},
+                                     name=name,
+                                     dtype=np.bool)
 
-    return da.concatenate(writes)
+            writes.append(write_col.ravel())
+
+        return da.concatenate(writes)
