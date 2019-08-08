@@ -74,9 +74,9 @@ def big_ms(tmp_path_factory, request):
     # shutil.rmtree(str(msdir))
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def ms(tmp_path_factory):
-    msdir = tmp_path_factory.mktemp("msdir", numbered=False)
+    msdir = tmp_path_factory.mktemp("msdir", numbered=True)
     fn = os.path.join(str(msdir), "test.ms")
 
     create_table_query = """
@@ -128,17 +128,17 @@ def ms(tmp_path_factory):
     # shutil.rmtree(str(msdir))
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture
 def spw_chan_freqs():
     return (np.linspace(.856e9, 2*.856e9, 8),
             np.linspace(.856e9, 2*.856e9, 16),
             np.linspace(.856e9, 2*.856e9, 32))
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture
 def spw_table(tmp_path_factory, spw_chan_freqs):
     """ Simulate a SPECTRAL_WINDOW table with two spectral windows """
-    spw_dir = tmp_path_factory.mktemp("spw_dir", numbered=False)
+    spw_dir = tmp_path_factory.mktemp("spw_dir", numbered=True)
     fn = os.path.join(str(spw_dir), "test.ms::SPECTRAL_WINDOW")
 
     create_table_query = """
@@ -164,7 +164,7 @@ def spw_table(tmp_path_factory, spw_chan_freqs):
     # shutil.rmtree(str(spw_dir))
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture
 def wsrt_antenna_positions():
     """ Westerbork antenna positions """
     return np.array([
@@ -185,9 +185,9 @@ def wsrt_antenna_positions():
         dtype=np.float64)
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture
 def ant_table(tmp_path_factory, wsrt_antenna_positions):
-    ant_dir = tmp_path_factory.mktemp("ant_dir", numbered=False)
+    ant_dir = tmp_path_factory.mktemp("ant_dir", numbered=True)
     fn = os.path.join(str(ant_dir), "test.ms::ANTENNA")
 
     create_table_query = """
