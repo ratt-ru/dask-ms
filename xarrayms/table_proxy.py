@@ -218,6 +218,38 @@ class TableProxy(object):
     def __exit__(self, evalue, etype, etraceback):
         pass
 
+    def __runner(self, fn, locktype, args, kwargs):
+        self._acquire(locktype)
+
+        try:
+            return fn(self._table, *args, **kwargs)
+        finally:
+            self._release(locktype)
+
+    def submit(self, fn, locktype, *args, **kwargs):
+        """
+        Submits :code:`fn(table, *args, **kwargs)` within
+        the executor, returning a Future.
+
+        Parameters
+        ----------
+        fn : callable
+            Function with signature :code:`fn(table, *args, **kwargs)`
+        locktype : {NOLOCK, READLOCK, WRITELOCK}
+            Type of lock to acquire before and release
+            after calling `fn`
+        *args :
+            Arguments passed to `fn`
+        **kwargs :
+            Keyword arguments passed to `fn`
+
+        Result
+        ------
+        :class:`concurrent.futures.Future`
+            Future containing the result of :code:`fn(table, *args, **kwargs)`
+        """
+        return self._ex.submit(self.__runner, fn, locktype, args, kwargs)
+
     def _acquire(self, locktype):
         """
         Acquire a lock on the table
