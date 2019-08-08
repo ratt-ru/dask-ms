@@ -12,6 +12,9 @@ except ImportError:
 from collections import namedtuple
 
 import dask.array as da
+import pyrap.tables as pt
+
+from xarrayms.columns import infer_casa_type
 
 
 # This class duplicates xarray's Frozen class in

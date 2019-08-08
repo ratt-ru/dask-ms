@@ -8,18 +8,16 @@ import logging
 
 import dask
 import dask.array as da
-from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 import pyrap.tables as pt
 
 from xarrayms.columns import (column_metadata, ColumnMetadataError,
-                              infer_casa_type, dim_extents_array)
+                              dim_extents_array)
 from xarrayms.ordering import (ordering_taql, row_ordering,
-                               group_ordering_taql, group_row_ordering,
-                               _gen_row_runs)
+                               group_ordering_taql, group_row_ordering)
 from xarrayms.dataset import Dataset
 from xarrayms.table import table_exists
-from xarrayms.table_proxy import TableProxy, READLOCK, WRITELOCK
+from xarrayms.table_proxy import TableProxy, READLOCK
 from xarrayms.table_schemas import lookup_table_schema
 from xarrayms.utils import short_table_name
 
