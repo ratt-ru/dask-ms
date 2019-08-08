@@ -23,7 +23,7 @@ from xarrayms.table_schemas import (lookup_table_schema,
     ("test.ms::FIELD", FIELD_SCHEMA),
     ("test.ms::SPECTRAL_WINDOW", SPECTRAL_WINDOW),
     ("test.ms::POLARIZATION", POLARIZATION)])
-def test_table_prefix_lookup(filename, schema):
+def test_table_suffix_lookup(filename, schema):
     assert schema == lookup_table_schema(filename, None)
 
 
