@@ -15,6 +15,7 @@ import pytest
 from six.moves import reduce
 
 
+@pytest.mark.skip
 @pytest.mark.parametrize("nrow", [10])
 @pytest.mark.parametrize("nchan", [16, None])
 @pytest.mark.parametrize("ncorr", [1, 4, None])
