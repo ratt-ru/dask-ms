@@ -4,7 +4,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
 from pprint import pformat
 import sys
 
@@ -76,6 +76,10 @@ def infer_casa_type(dtype):
 
 class ColumnMetadataError(Exception):
     pass
+
+
+ColumnMetadata = namedtuple("ColumnMetadata",
+                            ["shape", "dims", "dim_chunks", "dtype"])
 
 
 def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
@@ -212,4 +216,4 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
                          "dim_chunks '%s' do not agree." %
                          (shape, dims, dim_chunks))
 
-    return shape, dims, dim_chunks, dtype
+    return ColumnMetadata(shape, dims, dim_chunks, dtype)
