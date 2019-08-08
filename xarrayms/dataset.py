@@ -74,8 +74,10 @@ class Dataset(object):
 
         for k, v in data_vars.items():
             if isinstance(v, VariableEntry):
-                pass
-            elif not isinstance(v, (tuple, list)) and len(v) not in (2, 3):
+                self._data_vars[k] = v
+                continue
+
+            if not isinstance(v, (tuple, list)) and len(v) not in (2, 3):
                 raise ValueError("'%s' must be a (dims, array) or "
                                  "(dims, array, attrs) tuple. "
                                  "Got '%s' instead," % (k, type(v)))
