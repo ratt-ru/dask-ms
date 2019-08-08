@@ -155,13 +155,12 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
     else:
         try:
             # Get an exemplar row and infer the shape
-            exemplar = table_proxy.getcol(column, exemplar_row, 1).result()
-        except BaseException as e:
-            ve = ColumnMetadataError("Unable to infer shape of "
-                                     "column '%s' due to:\n'%s'"
-                                     % (column, e))
-
-            raise (ve, None, sys.exc_info()[2])
+            exemplar = table_proxy.getcol(column, exemplar_row,
+                                          nrow=1).result()
+        except Exception as e:
+            raise ColumnMetadataError("Unable to infer shape of "
+                                      "column '%s' due to:\n'%s'"
+                                      % (column, str(e)))
 
         if isinstance(exemplar, np.ndarray):
             shape = exemplar.shape[1:]
@@ -212,8 +211,8 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
             dim_chunks.append(dc[0])
 
     if not (len(shape) == len(dims) == len(dim_chunks)):
-        raise ValueError("The length of shape '%s' dims '%s' and "
-                         "dim_chunks '%s' do not agree." %
-                         (shape, dims, dim_chunks))
+        raise ColumnMetadataError("The length of shape '%s' dims '%s' and "
+                                  "dim_chunks '%s' do not agree." %
+                                  (shape, dims, dim_chunks))
 
     return ColumnMetadata(shape, dims, dim_chunks, dtype)
