@@ -172,7 +172,7 @@ class Dataset(object):
         try:
             return self._attrs[name]
         except KeyError:
-            raise ValueError("Invalid Attribute %s" % name)
+            raise AttributeError("Invalid Attribute %s" % name)
 
 
 def dim_extents_array(dim, chunks):
@@ -658,6 +658,29 @@ def ndarray_putcolslice(row_runs, blc, trc, table_proxy, column, data):
         table_proxy._release(WRITELOCK)
 
 
+def _create_table(table, datasets, columns):
+    ds = datasets[0]
+    data_vars = ds.variables
+    dims = ds.dims
+    chunks = ds.chunks
+    row = sum(ds.dims['row'] for ds in datasets)
+
+    coldescs = []
+
+    for k, var in data_vars.items():
+        meta = dask_column_metadata(k, var)
+        coldescs.append(meta.attrs["__coldesc__"])
+
+    table_desc = pt.maketabdesc(coldescs)
+
+    table_proxy = TableProxy(pt.table, table, table_desc, ack=False,
+                             readonly=False, lockoptions='user')
+
+    table_proxy.addrows(row).result()
+
+    return table_proxy
+
+
 def _updated_table(table, datasets, columns):
     table_proxy = TableProxy(pt.table, table, ack=False,
                              readonly=False, lockoptions='user')
@@ -689,7 +712,7 @@ def write_datasets(table, datasets, columns):
         datasets = [datasets]
 
     if not table_exists(table):
-        raise ValueError("'%s' does not appear to be a CASA table" % table)
+        table_proxy = _create_table(table, datasets, columns)
     else:
         table_proxy = _updated_table(table, datasets, columns)
 
@@ -697,8 +720,13 @@ def write_datasets(table, datasets, columns):
     writes = []
 
     for di, ds in enumerate(datasets):
-        row_order = ds.ROWID.map_blocks(_gen_row_runs, sort_dir="write",
-                                        dtype=np.object)
+        try:
+            rowid = ds.ROWID
+        except AttributeError:
+            rowid = da.arange(ds.dims['row'], chunks=ds.chunks['row'])
+
+        row_order = rowid.map_blocks(_gen_row_runs, sort_dir="write",
+                                     dtype=np.object)
         data_vars = ds.variables
 
         for column in columns:

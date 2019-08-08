@@ -4,6 +4,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
+
 import dask
 import dask.array as da
 from dask.array.core import normalize_chunks
@@ -12,7 +14,7 @@ from numpy.testing import assert_array_equal
 import pyrap.tables as pt
 import pytest
 
-from xarrayms.dataset import dataset, write_datasets
+from xarrayms.dataset import dataset, write_datasets, Dataset, Variable
 from xarrayms.utils import (select_cols_str,
                             group_cols_str,
                             index_cols_str,
@@ -293,3 +295,33 @@ def test_dataset_add_string_column(ms):
 
     with pt.table(ms, readonly=False, ack=False, lockoptions='auto') as T:
         assert name_list == T.getcol("NAMES")
+
+
+
+@pytest.mark.parametrize("chunks", [{'row': (5, 5),
+                                     'chan': (4, 4, 4, 4),
+                                     'corr': (4,)}])
+@pytest.mark.parametrize("dtype", [np.complex128, np.float32])
+def test_dataset_create_table(tmp_path, chunks, dtype):
+    shapes = {k: sum(c) for k, c in chunks.items()}
+
+    # Make some visibilities
+    dims = ("row", "chan", "corr")
+    shape = tuple(shapes[d] for d in dims)
+    data_chunks = tuple(chunks[d] for d in dims)
+    data = da.random.random(shape, chunks=data_chunks).astype(dtype)
+    data_var = Variable(dims, data, {})
+
+    # Make some string names
+    dims = ("row",)
+    shape = tuple(shapes[d] for d in dims)
+    str_chunks = tuple(chunks[d] for d in dims)
+    np_str_array = np.asarray(["BOB"] * shape[0], dtype=np.object)
+    da_str_array = da.from_array(np_str_array, chunks=str_chunks)
+    str_array_var = Variable(dims, da_str_array, {})
+
+    ds = Dataset({"DATA": data_var, "NAMES": str_array_var})
+    table_name = os.path.join(str(tmp_path), 'test.table')
+    writes = write_datasets(table_name, ds, ["DATA", "NAMES"])
+
+    dask.compute(writes)
