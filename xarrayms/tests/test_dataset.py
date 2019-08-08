@@ -289,6 +289,7 @@ def test_dataset_add_string_column(ms):
         assert name_list == T.getcol("NAMES")
 
 
+@pytest.mark.xfail
 @pytest.mark.parametrize("shapes", [{'row': 10, 'chan': 32}])
 def test_dataset_table_description(shapes, tmp_path):
     row, chan = (shapes[d] for d in ('row', 'chan'))
