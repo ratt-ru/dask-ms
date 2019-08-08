@@ -83,17 +83,8 @@ ColumnMetadata = namedtuple("ColumnMetadata",
 
 def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
     """
-    Infers column configuration the following:
-
-        1. column shape
-        2. data type
-
-    Shape is determined via the following three strategies,
-    and in order of robustness:
-
-        1. If coldesc['option'] & 4 (FixedShape) is True, use coldesc['shape']
-        2. An exemplar row is read using getcol(column, exemplar_row, 1)
-           to determine shape and dtype
+    Infers column metadata for the purposes of creating dask arrays
+    that reference their contents.
 
     Parameters
     ----------
