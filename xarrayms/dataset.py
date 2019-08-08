@@ -60,7 +60,7 @@ class Frozen(Mapping):
         return '%s(%r)' % (type(self).__name__, self.mapping)
 
 
-VariableEntry = namedtuple("VariableEntry", ["dims", "var", "attrs"])
+Variable = namedtuple("Variable", ["dims", "var", "attrs"])
 
 
 class Dataset(object):
@@ -73,7 +73,7 @@ class Dataset(object):
         self._data_vars = {}
 
         for k, v in data_vars.items():
-            if isinstance(v, VariableEntry):
+            if isinstance(v, Variable):
                 self._data_vars[k] = v
                 continue
 
@@ -91,7 +91,7 @@ class Dataset(object):
                                  "not match shape of associated array %s"
                                  % (dims, var))
 
-            self._data_vars[k] = VariableEntry(dims, var, var_attrs)
+            self._data_vars[k] = Variable(dims, var, var_attrs)
 
         self._attrs = attrs or {}
 
