@@ -4,15 +4,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
-
-import dask.array as da
 import numpy as np
-from numpy.testing import assert_array_equal
 import pyrap.tables as pt
 import pytest
 
-from xarrayms.dataset import Variable
 from xarrayms.columns import (infer_dtype, _TABLE_TO_PY,
                               infer_casa_type, _PY_TO_TABLE,
                               column_metadata)

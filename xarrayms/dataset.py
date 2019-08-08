@@ -661,8 +661,6 @@ def ndarray_putcolslice(row_runs, blc, trc, table_proxy, column, data):
 def _create_table(table, datasets, columns):
     ds = datasets[0]
     data_vars = ds.variables
-    dims = ds.dims
-    chunks = ds.chunks
     row = sum(ds.dims['row'] for ds in datasets)
 
     coldescs = []
