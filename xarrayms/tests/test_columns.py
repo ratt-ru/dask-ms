@@ -74,7 +74,7 @@ def test_column_metadata(ms, column, shape, chunks, table_schema, dtype):
 @pytest.mark.parametrize("chunks", [{'row': (5, 5),
                                      'chan': (4, 4, 4, 4),
                                      'corr': (4,)}])
-@pytest.mark.parametrize("dtype", [np.complex128])
+@pytest.mark.parametrize("dtype", [np.complex128, np.float32])
 def test_dask_column_metadata(chunks, dtype, tmp_path):
     column_meta = []
     shapes = {k: sum(c) for k, c in chunks.items()}
