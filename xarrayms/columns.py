@@ -6,7 +6,6 @@ from __future__ import print_function
 
 from collections import OrderedDict, namedtuple
 from pprint import pformat
-import sys
 
 import dask.array as da
 import numpy as np

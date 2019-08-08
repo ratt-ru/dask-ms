@@ -90,4 +90,3 @@ def test_empty_ms(nrow, nchan, ncorr, add_imaging_cols, tmpdir):
         T.putvarcol("DATA", dict_data, startrow=0, nrow=nrow)
         new_data = T.getcol("DATA")
         assert_array_almost_equal(new_data, data)
-
