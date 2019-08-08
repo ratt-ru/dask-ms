@@ -658,16 +658,7 @@ def ndarray_putcolslice(row_runs, blc, trc, table_proxy, column, data):
         table_proxy._release(WRITELOCK)
 
 
-def write_datasets(table, datasets, columns):
-    if not table_exists(table):
-        raise ValueError("'%s' does not appear to be a CASA table" % table)
-
-    # Promote datasets to list
-    if isinstance(datasets, tuple):
-        datasets = list(datasets)
-    else:
-        datasets = [datasets]
-
+def _updated_table(table, datasets, columns):
     table_proxy = TableProxy(pt.table, table, ack=False,
                              readonly=False, lockoptions='user')
 
@@ -686,6 +677,21 @@ def write_datasets(table, datasets, columns):
 
         table_desc = pt.maketabdesc(coldescs)
         table_proxy.addcols(table_desc).result()
+
+    return table_proxy
+
+
+def write_datasets(table, datasets, columns):
+    # Promote datasets to list
+    if isinstance(datasets, tuple):
+        datasets = list(datasets)
+    else:
+        datasets = [datasets]
+
+    if not table_exists(table):
+        raise ValueError("'%s' does not appear to be a CASA table" % table)
+    else:
+        table_proxy = _updated_table(table, datasets, columns)
 
     table_name = short_table_name(table)
     writes = []
