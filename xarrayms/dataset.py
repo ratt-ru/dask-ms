@@ -60,7 +60,7 @@ class Frozen(Mapping):
         return '%s(%r)' % (type(self).__name__, self.mapping)
 
 
-VariableEntry = namedtuple("VariableEntry", ["dims", "var"])
+VariableEntry = namedtuple("VariableEntry", ["dims", "var", "attrs"])
 
 
 class Dataset(object):
@@ -75,16 +75,21 @@ class Dataset(object):
         for k, v in data_vars.items():
             if isinstance(v, VariableEntry):
                 pass
-            elif not isinstance(v, (tuple, list)) and len(v) != 2:
-                raise ValueError("'%s' must be a (dims, array) tuple. "
-                                 "Got a '%s' instead," % (k, type(v)))
+            elif not isinstance(v, (tuple, list)) and len(v) not in (2, 3):
+                raise ValueError("'%s' must be a (dims, array) or "
+                                 "(dims, array, attrs) tuple. "
+                                 "Got '%s' instead," % (k, type(v)))
 
-            if len(v[0]) != v[1].ndim:
+            dims = v[0]
+            var = v[1]
+            var_attrs = v[2] if len(v) > 2 else {}
+
+            if len(dims) != var.ndim:
                 raise ValueError("Dimension schema '%s' does "
                                  "not match shape of associated array %s"
-                                 % (v[0], v[1]))
+                                 % (dims, var))
 
-            self._data_vars[k] = VariableEntry(v[0], v[1])
+            self._data_vars[k] = VariableEntry(dims, var, var_attrs)
 
         self._attrs = attrs or {}
 
@@ -96,8 +101,9 @@ class Dataset(object):
     def dims(self):
         dims = {}
 
-        for k, (var_dims, var) in self._data_vars.items():
+        for k, (var_dims, var, _) in self._data_vars.items():
             for d, s in zip(var_dims, var.shape):
+
                 if d in dims and s != dims[d]:
                     raise ValueError("Existing dimension size %d for "
                                      "dimension '%s' is inconsistent "
@@ -114,7 +120,7 @@ class Dataset(object):
     def chunks(self):
         chunks = {}
 
-        for k, (var_dims, var) in self._data_vars.items():
+        for k, (var_dims, var, _) in self._data_vars.items():
             if not isinstance(var, da.Array):
                 continue
 
@@ -147,7 +153,7 @@ class Dataset(object):
                                      "Supply a full (dims, array) tuple."
                                      % k)
                 else:
-                    data_vars[k] = (current_var.dims, v)
+                    data_vars[k] = (current_var.dims, v, current_var.attrs)
             else:
                 data_vars[k] = v
 
