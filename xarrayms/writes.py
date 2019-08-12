@@ -26,15 +26,6 @@ def ndarray_putcol(row_runs, table_proxy, column, data):
     putcol = table_proxy._table.putcol
     rr = 0
 
-    # NOTE(sjperkins)
-    # python-casacore wants to put lists of objects, but
-    # because dask.array handles ndarrays we're passed
-    # ndarrays of python objects (strings).
-    # Without this conversion python-casacore can segfault
-    # See https://github.com/ska-sa/xarray-ms/issues/42
-    if data.dtype == np.object:
-        data = data.tolist()
-
     table_proxy._acquire(WRITELOCK)
 
     try:
@@ -50,15 +41,6 @@ def ndarray_putcolslice(row_runs, blc, trc, table_proxy, column, data):
     """ Put data into the table """
     putcolslice = table_proxy._table.putcolslice
     rr = 0
-
-    # NOTE(sjperkins)
-    # python-casacore wants to put lists of objects, but
-    # because dask.array handles ndarrays we're passed
-    # ndarrays of python objects (strings).
-    # Without this conversion python-casacore can segfault
-    # See https://github.com/ska-sa/xarray-ms/issues/42
-    if data.dtype == np.object:
-        data = data.tolist()
 
     table_proxy._acquire(WRITELOCK)
 
@@ -91,6 +73,18 @@ def putter_wrapper(row_orders, *args):
     if resort is not None:
         data = data[resort]
 
+    # Infer output shape before possible list conversion
+    out_shape = (1,) * len(data.shape)
+
+    # NOTE(sjperkins)
+    # python-casacore wants to put lists of objects, but
+    # because dask.array handles ndarrays we're passed
+    # ndarrays of python objects (strings).
+    # Without this conversion python-casacore can segfault
+    # See https://github.com/ska-sa/xarray-ms/issues/42
+    if data.dtype == np.object:
+        data = data.tolist()
+
     # There are other dimensions beside row
     if nextent_args > 0:
         blc, trc = zip(*args[:nextent_args])
@@ -100,7 +94,7 @@ def putter_wrapper(row_orders, *args):
         table_proxy._ex.submit(ndarray_putcol, row_runs, table_proxy,
                                column, data).result()
 
-    return np.full((1,) * len(data.shape), True)
+    return np.full(out_shape, True)
 
 
 def _create_table(table, datasets, columns):
@@ -228,7 +222,8 @@ def write_datasets(table, datasets, columns):
         except AttributeError:
             rowid = da.arange(ds.dims['row'], chunks=ds.chunks['row'])
 
-        row_order = rowid.map_blocks(row_run_factory, sort_dir="write",
+        row_order = rowid.map_blocks(row_run_factory,
+                                     sort_dir="write",
                                      dtype=np.object)
         data_vars = ds.variables
 
