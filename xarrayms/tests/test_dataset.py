@@ -59,11 +59,13 @@ def test_dataset(ms, select_cols, group_cols, index_cols, shapes, chunks):
     for ds in datasets:
         compute_dict = {}
 
-        for k, (dims, var, attrs) in ds.variables.items():
-            compute_dict[k] = var
+        for k, v in ds.variables.items():
+            compute_dict[k] = v.var
 
             if k in select_cols:
-                assert "__coldesc__" in attrs
+                assert "__coldesc__" in v.attrs
+
+            assert v.dtype == v.var.dtype
 
         res = dask.compute(compute_dict)[0]
 
@@ -80,7 +82,7 @@ def test_dataset(ms, select_cols, group_cols, index_cols, shapes, chunks):
         assert dims == {"chan": shapes['chan'],
                         "corr": shapes['corr']}
 
-    del ds, datasets, compute_dict, var
+    del ds, datasets, compute_dict, v
     assert_liveness(0, 0)
 
 

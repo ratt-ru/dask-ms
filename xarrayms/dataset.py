@@ -46,7 +46,10 @@ class Frozen(Mapping):
         return '%s(%r)' % (type(self).__name__, self.mapping)
 
 
-Variable = namedtuple("Variable", ["dims", "var", "attrs"])
+class Variable(namedtuple("_Variable", ["dims", "var", "attrs"])):
+    @property
+    def dtype(self):
+        return self.var.dtype
 
 
 class Dataset(object):
