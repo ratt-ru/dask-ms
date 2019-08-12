@@ -148,6 +148,22 @@ def _updated_table(table, datasets, columns):
 
 
 def dask_column_descriptor(column, variable):
+    """
+    Generate a CASA column descriptor from a Dataset Variable.
+
+    Parameters
+    ----------
+    column : str
+        Column name
+    variable : :class:`xarrayms.dataset.Variable`
+        Dataset variable
+
+    Returns
+    -------
+    dict
+        CASA column descriptor
+    """
+
     if isinstance(variable, Variable):
         variable = [variable]
     elif not isinstance(variable, (tuple, list)):
