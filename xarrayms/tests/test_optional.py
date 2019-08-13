@@ -57,6 +57,10 @@ def test_variable_column_dimensions(tmp_path, column, dtype):
         # The last 5 rows have the original shape
         assert T.getcol(column, startrow=5, nrow=5).shape == (5, 20, 30)
 
+        # We can even put a scalar in
+        T.putcell(column, 8, 3)
+        assert T.getcell(column, 8) == 3
+
 
 @pytest.mark.optional
 @pytest.mark.parametrize("column", ["BAZ"])
