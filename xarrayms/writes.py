@@ -101,7 +101,6 @@ def putter_wrapper(row_orders, *args):
 def _create_table(table, datasets, columns):
     ds = datasets[0]
     data_vars = ds.variables
-    row = sum(ds.dims['row'] for ds in datasets)
 
     coldescs = []
 
