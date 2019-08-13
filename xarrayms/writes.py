@@ -205,16 +205,12 @@ def update_datasets(table, datasets, columns):
     writes = []
 
     for di, ds in enumerate(datasets):
-        try:
-            rowid = ds.ROWID
-        except AttributeError:
-            rowid = da.arange(ds.dims['row'], chunks=ds.chunks['row'])
-
-        row_order = rowid.map_blocks(row_run_factory,
-                                     sort_dir="write",
-                                     dtype=np.object)
+        row_order = ds.ROWID.map_blocks(row_run_factory,
+                                        sort_dir="write",
+                                        dtype=np.object)
         data_vars = ds.variables
 
+        # Generate a dask array for each column
         for column in columns:
             try:
                 column_entry = data_vars[column]
