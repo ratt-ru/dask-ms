@@ -431,6 +431,8 @@ def create_datasets(table_name, datasets, columns):
                                      name=name,
                                      dtype=np.bool)
 
+            # Flatten the writes so that they can be simply
+            # concatenated together into a final aggregated array
             writes.append(write_col.ravel())
 
     return da.concatenate(writes)
