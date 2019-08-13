@@ -51,6 +51,14 @@ class Variable(namedtuple("_Variable", ["dims", "var", "attrs"])):
     def dtype(self):
         return self.var.dtype
 
+    @property
+    def shape(self):
+        return self.var.shape
+
+    @property
+    def ndim(self):
+        return self.var.ndim
+
 
 class Dataset(object):
     """
