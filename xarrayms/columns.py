@@ -35,10 +35,20 @@ _TABLE_TO_PY = OrderedDict({
 })
 
 
-# Map python/numpy types back to column types
-# If the column type is multiply defined, OrderedDict will
-# give us the last one in _TABLE_TO_PY
-_PY_TO_TABLE = OrderedDict((v, k) for k, v in _TABLE_TO_PY.items())
+# Map numpy/python types to column string types
+_PY_TO_TABLE = OrderedDict({
+    'bool': 'BOOLEAN',
+    'uint8': 'UCHAR',
+    'int16': 'SHORT',
+    'uint16': 'USHORT',
+    'uint32': 'UINT',
+    'int32': 'INTEGER',
+    'float32': 'FLOAT',
+    'float64': 'DOUBLE',
+    'complex64': 'COMPLEX',
+    'complex128': 'DCOMPLEX',
+    'object': 'STRING'
+    })
 
 
 def infer_dtype(column, coldesc):
