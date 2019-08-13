@@ -12,8 +12,8 @@ from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 import pyrap.tables as pt
 
-from xarrayms.dataset import Variable
-from xarrayms.columns import (infer_casa_type, dim_extents_array)
+from xarrayms.descriptors import dask_column_descriptor
+from xarrayms.columns import dim_extents_array
 from xarrayms.ordering import row_run_factory
 from xarrayms.table import table_exists
 from xarrayms.table_proxy import TableProxy, WRITELOCK
@@ -134,95 +134,6 @@ def _updated_table(table, datasets, columns):
         table_proxy.addcols(table_desc).result()
 
     return table_proxy
-
-
-def dask_column_descriptor(column, variable):
-    """
-    Generate a CASA column descriptor from a Dataset Variable.
-
-    Parameters
-    ----------
-    column : str
-        Column name
-    variable : :class:`xarrayms.dataset.Variable`
-        Dataset variable
-
-    Returns
-    -------
-    dict
-        CASA column descriptor
-    """
-
-    if isinstance(variable, Variable):
-        variable = [variable]
-    elif not isinstance(variable, (tuple, list)):
-        variable = [variable]
-
-    dtypes = set()
-    ndims = set()
-    shapes = set()
-
-    for v in variable:
-        dtypes.add(v.dtype)
-
-        if v.ndim == 0:
-            # Scalar array, ndim == 0 in numpy and CASA
-            ndims.append(0)
-        elif v.dims[0] == 'row':
-            # Row only, so ndim must be removed from the descriptor
-            # Add a marker to distinguish in case of multiple
-            # shapes
-            if len(v.dims) == 1:
-                ndims.add('row')
-            # Other dims, add dimension data, excluding the row
-            else:
-                ndims.add(v.ndim - 1)
-                shapes.add(v.shape[1:])
-        else:
-            # No row prefix, add dimension and shape
-            ndims.add(v.dim)
-            shapes.add(v.shape)
-
-    # Fail on multiple dtypes
-    if len(dtypes) > 1:
-        raise TypeError("Inconsistent data types %s found in dataset "
-                        "variables for column %s. CASA Table columns "
-                        "must have a single type" % (list(dtypes), column))
-
-    casa_type = infer_casa_type(dtypes.pop())
-
-    desc = {'_c_order': True,
-            'comment': '%s column' % column,
-            'dataManagerGroup': '',
-            'dataManagerType': '',
-            'keywords': {},
-            'maxlen': 0,
-            'option': 0,
-            'valueType': casa_type}
-
-    if len(ndims) == 0:
-        raise ValueError("No dimensionality information found")
-    elif len(ndims) == 1:
-        # Add any non-row dimension information to the descriptor
-        ndim = ndims.pop()
-
-        if ndim != 'row':
-            desc['ndim'] = ndim
-
-            # If there's only one shape, we can create a FixedShape column
-            if len(shapes) == 1:
-                shape = shapes.pop()
-                assert len(shape) == ndim
-                desc['shape'] = shape
-    else:
-        # Anything goes...
-        log.warn("Multiple dimensions %s found in dataset variables "
-                 "for column %s. You appear to be attempting something "
-                 "exotic!", list(ndims), column)
-
-        desc['ndim'] = -1
-
-    return {'name': column, 'desc': desc}
 
 
 def update_datasets(table, datasets, columns):
