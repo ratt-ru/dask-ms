@@ -346,30 +346,48 @@ def test_dask_column_descriptor(chunks, dtype, tmp_path):
         assert_array_equal(T.getcol("DATA"), data)
 
 
-@pytest.mark.parametrize("chunks", [{'row': (5, 5),
-                                     'chan': (4, 4, 4, 4),
-                                     'corr': (4,)}])
+@pytest.mark.parametrize("dataset_chunks", [
+    [{'row': (5, 3, 2), 'chan': (4, 4, 4, 4), 'corr': (4,)},
+     {'row': (4, 3, 3), 'chan': (5, 5, 3, 3), 'corr': (2, 2)}],
+])
 @pytest.mark.parametrize("dtype", [np.complex128, np.float32])
-def test_dataset_create_table(tmp_path, chunks, dtype):
-    shapes = {k: sum(c) for k, c in chunks.items()}
+def test_dataset_create_table(tmp_path, dataset_chunks, dtype):
+    datasets = []
+    names = []
+    datas = []
+    row_sum = 0
 
-    # Make some visibilities
-    dims = ("row", "chan", "corr")
-    shape = tuple(shapes[d] for d in dims)
-    data_chunks = tuple(chunks[d] for d in dims)
-    data = da.random.random(shape, chunks=data_chunks).astype(dtype)
-    data_var = Variable(dims, data, {})
+    for chunks in dataset_chunks:
+        shapes = {k: sum(c) for k, c in chunks.items()}
+        row_sum += shapes['row']
 
-    # Make some string names
-    dims = ("row",)
-    shape = tuple(shapes[d] for d in dims)
-    str_chunks = tuple(chunks[d] for d in dims)
-    np_str_array = np.asarray(["BOB"] * shape[0], dtype=np.object)
-    da_str_array = da.from_array(np_str_array, chunks=str_chunks)
-    str_array_var = Variable(dims, da_str_array, {})
+        # Make some visibilities
+        dims = ("row", "chan", "corr")
+        shape = tuple(shapes[d] for d in dims)
+        data_chunks = tuple(chunks[d] for d in dims)
+        data = da.random.random(shape, chunks=data_chunks).astype(dtype)
+        data_var = Variable(dims, data, {})
 
-    ds = Dataset({"DATA": data_var, "NAMES": str_array_var})
+        # Make some string names
+        dims = ("row",)
+        shape = tuple(shapes[d] for d in dims)
+        str_chunks = tuple(chunks[d] for d in dims)
+        np_str_array = np.asarray(["BOB"] * shape[0], dtype=np.object)
+        da_str_array = da.from_array(np_str_array, chunks=str_chunks)
+        str_array_var = Variable(dims, da_str_array, {})
+
+        datasets.append(Dataset({"DATA": data_var, "NAMES": str_array_var}))
+        datas.append(data)
+        names.extend(np_str_array.tolist())
+
+    # Write the data to a new table
     table_name = os.path.join(str(tmp_path), 'test.table')
-    writes = write_datasets(table_name, ds, ["DATA", "NAMES"])
-
+    writes = write_datasets(table_name, datasets, ["DATA", "NAMES"])
     dask.compute(writes)
+
+    # Check written data
+    with pt.table(table_name, readonly=True,
+                  lockoptions='auto', ack=False) as T:
+        assert row_sum == T.nrows()
+        assert_array_equal(T.getcol("DATA"), np.concatenate(datas))
+        assert_array_equal(T.getcol("NAMES"), names)
