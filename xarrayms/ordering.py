@@ -20,13 +20,17 @@ class GroupChunkingError(Exception):
     pass
 
 
-def row_run_factory(rows, sort=True, sort_dir="read"):
+def row_run_factory(rows, sort='auto', sort_dir="read"):
     """
     Generate consecutive row runs, as well as sorting index
     if ``sort`` is True.
     """
     if len(rows) == 0:
         return np.empty((0, 2), dtype=np.int32)
+
+    if sort == "auto":
+        # Don't sort if rows monotically increase
+        sort = False if np.all(np.diff(rows) >= 0) else True
 
     if sort is False:
         resort = None
