@@ -142,9 +142,22 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
         raise ColumnMetadataError("Column '%s' has no option "
                                   "in the column descriptor" % column)
 
-    if ndim == 0:
-        raise NotImplementedError("scalar column '%s' not "
-                                  "yet handled" % column)
+    # Each row can be any shape whatsoever
+    # NOTE(sjperkins)
+    # This is almost certainly not worth the hassle of supporting
+    if ndim == -1:
+        raise ColumnMetadataError("Unconstrained shapes in column '%s' "
+                                  "(ndim == %d) are not currently handled"
+                                  % (column, ndim))
+    # Each row is a scalar
+    # TODO(sjperkins)
+    # Probably could be handled by getCell/putCell calls,
+    # but the effort may not be worth it
+    elif ndim == 0:
+        raise ColumnMetadataError("Scalars in column '%s' "
+                                  "(ndim == %d) are not currently handled"
+                                  % (column, ndim))
+    # Only row dimensions
     elif ndim == 'row':
         shape = ()
     # FixedShape
@@ -189,19 +202,9 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
 
     # Extract dimension schema
     try:
-        column_schema = table_schema[column]
+        dims = table_schema[column]['dask']['dims']
     except KeyError:
-        dims = ()
-    else:
-        try:
-            dask_schema = column_schema['dask']
-        except KeyError:
-            dims = ()
-        else:
-            try:
-                dims = dask_schema['dims']
-            except KeyError:
-                dims = tuple("%s-%d" % (column, i) for i in range(shape))
+        dims = tuple("%s-%d" % (column, i) for i in range(1, len(shape)))
 
     dim_chunks = []
 
@@ -210,6 +213,7 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
         try:
             dc = chunks[d]
         except KeyError:
+            # No chunk for this dimension, set to the full extent
             dim_chunks.append((s,))
         else:
             dc = da.core.normalize_chunks(dc, shape=(s,))
