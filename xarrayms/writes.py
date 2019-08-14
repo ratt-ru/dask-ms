@@ -12,7 +12,7 @@ from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 import pyrap.tables as pt
 
-from xarrayms.descriptors import dask_column_descriptor
+from xarrayms.descriptors import variable_column_descriptor
 from xarrayms.columns import dim_extents_array
 from xarrayms.ordering import row_run_factory
 from xarrayms.table import table_exists
@@ -105,7 +105,7 @@ def _create_table(table, datasets, columns):
     coldescs = []
 
     for k, var in data_vars.items():
-        desc = dask_column_descriptor(k, var)
+        desc = variable_column_descriptor(k, var)
         coldescs.append(desc)
 
     table_desc = pt.maketabdesc(coldescs)
@@ -127,7 +127,7 @@ def _updated_table(table, datasets, columns):
     # add it to the table if necessary
     if len(missing) > 0:
         data_vars = datasets[0].variables
-        coldescs = [dask_column_descriptor(m, data_vars[m])
+        coldescs = [variable_column_descriptor(m, data_vars[m])
                     for m in missing]
 
         table_desc = pt.maketabdesc(coldescs)

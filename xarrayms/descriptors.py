@@ -13,15 +13,18 @@ from xarrayms.columns import infer_casa_type
 log = logging.getLogger(__name__)
 
 
-def dask_column_descriptor(column, variable):
+def variable_column_descriptor(column, variable):
     """
-    Generate a CASA column descriptor from a Dataset Variable.
+    Generate a CASA column descriptor from a Dataset Variable
+    or list of Dataset Variables.
 
     Parameters
     ----------
     column : str
         Column name
-    variable : :class:`xarrayms.dataset.Variable`
+    variable : :class:`xarrayms.dataset.Variable` or \
+       list of :class:`xarrayms.dataset.Variable`
+
         Dataset variable
 
     Returns

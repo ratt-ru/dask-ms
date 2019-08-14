@@ -16,7 +16,7 @@ import pytest
 
 from xarrayms.dataset import Dataset, Variable
 from xarrayms.reads import read_datasets
-from xarrayms.writes import dask_column_descriptor, write_datasets
+from xarrayms.writes import variable_column_descriptor, write_datasets
 from xarrayms.utils import (select_cols_str, group_cols_str,
                             index_cols_str, assert_liveness)
 
@@ -304,7 +304,7 @@ def test_dataset_add_string_column(ms):
                                      'chan': (4, 4, 4, 4),
                                      'corr': (4,)}])
 @pytest.mark.parametrize("dtype", [np.complex128, np.float32])
-def test_dask_column_descriptor(chunks, dtype, tmp_path):
+def test_variable_column_descriptor(chunks, dtype, tmp_path):
     column_meta = []
     shapes = {k: sum(c) for k, c in chunks.items()}
 
@@ -314,7 +314,7 @@ def test_dask_column_descriptor(chunks, dtype, tmp_path):
     data_chunks = tuple(chunks[d] for d in dims)
     data = da.random.random(shape, chunks=data_chunks).astype(dtype)
     data_var = Variable(dims, data, {})
-    meta = dask_column_descriptor("DATA", data_var)
+    meta = variable_column_descriptor("DATA", data_var)
     column_meta.append(meta)
 
     # Make some string names
@@ -324,7 +324,7 @@ def test_dask_column_descriptor(chunks, dtype, tmp_path):
     np_str_array = np.asarray(["BOB"] * shape[0], dtype=np.object)
     da_str_array = da.from_array(np_str_array, chunks=str_chunks)
     str_array_var = Variable(dims, da_str_array, {})
-    meta = dask_column_descriptor("NAMES", str_array_var)
+    meta = variable_column_descriptor("NAMES", str_array_var)
     column_meta.append(meta)
 
     # Create a new table with the column metadata
