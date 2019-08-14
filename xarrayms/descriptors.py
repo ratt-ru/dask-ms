@@ -202,8 +202,10 @@ def dminfo_factory(column_descs, dm_group_spec=None):
         try:
             group_obj = dm_groups[dm_group]
         except KeyError:
-            group_spec = dm_group_spec.get(dm_group, {})
-            group_obj = DataManagerGroup([column], group_spec, dm_type)
+            group_obj = DataManagerGroup([column],
+                                         dm_group_spec.get(dm_group, {}),
+                                         dm_type)
+
             dm_groups[dm_group] = group_obj
         else:
             if group_obj.type != dm_type:
