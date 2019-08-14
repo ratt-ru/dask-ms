@@ -52,6 +52,13 @@ class Variable(namedtuple("_Variable", ["dims", "var", "attrs"])):
         return self.var.dtype
 
     @property
+    def chunks(self):
+        if isinstance(self.var, da.Array):
+            return self.var.chunks
+
+        return None
+
+    @property
     def shape(self):
         return self.var.shape
 
