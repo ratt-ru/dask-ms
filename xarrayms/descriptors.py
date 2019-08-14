@@ -212,7 +212,7 @@ def dminfo_factory(column_descs, dm_group_spec=None):
                                  "Previously the type was '%s' "
                                  "in columns '%s'" %
                                  (dm_type, dm_group,
-                                  group_obj.type, columns))
+                                  group_obj.type, group_obj.columns))
 
             group_obj.columns.append(column)
 
