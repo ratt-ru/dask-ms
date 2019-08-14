@@ -12,9 +12,6 @@ except ImportError:
 from collections import namedtuple
 
 import dask.array as da
-import pyrap.tables as pt
-
-from xarrayms.columns import infer_casa_type
 
 
 # This class duplicates xarray's Frozen class in
@@ -175,30 +172,3 @@ class Dataset(object):
             return self._attrs[name]
         except KeyError:
             raise AttributeError("Invalid Attribute %s" % name)
-
-    def tabdesc(self):
-        """ Generate a pyrap table CASA table description """
-        coldescs = []
-
-        for column, (var_dims, var, attrs) in self._data_vars.items():
-            # What's the CASA Table Type?
-            casa_type = infer_casa_type(var.dtype.type)
-
-            # Dimensions other than row
-            ndim = len(var_dims) - 1
-
-            default = "" if casa_type == "STRING" else var.dtype.type(0)
-            shape = list(var.shape[1:])
-            col_desc = pt.makearrcoldesc(column, default, shape=shape,
-                                         valuetype=casa_type, ndim=ndim)
-
-            # An ndim of 0 seems to imply a scalar which is not the
-            # same thing as not having dimensions other than row
-            # Remove it
-            if ndim == 0:
-                del col_desc['desc']['ndim']
-                del col_desc['desc']['shape']
-
-            coldescs.append(col_desc)
-
-        return pt.maketabdesc(coldescs)
