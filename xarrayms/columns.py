@@ -248,7 +248,7 @@ def dim_extents_array(dim, chunks):
         defining the start and end of the chunk. The end is inclusive
         in the python-casacore style.
 
-        The array chunks match ``chunks`` and are innacurate, but
+        The array chunks match ``chunks`` and are inaccurate, but
         are used to define chunk sizes of final outputs.
 
     Notes
