@@ -133,7 +133,8 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
     """
     coldesc = table_proxy.getcoldesc(column).result()
     dtype = infer_dtype(column, coldesc)
-    ndim = coldesc.get('ndim', 0)
+    # missing ndim implies only row dimension
+    ndim = coldesc.get('ndim', 'row')
 
     try:
         option = coldesc['option']
@@ -141,8 +142,10 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
         raise ColumnMetadataError("Column '%s' has no option "
                                   "in the column descriptor" % column)
 
-    # This seems to imply no other dimensions beyond row
     if ndim == 0:
+        raise NotImplementedError("scalar column '%s' not "
+                                  "yet handled" % column)
+    elif ndim == 'row':
         shape = ()
     # FixedShape
     elif option & 4:
