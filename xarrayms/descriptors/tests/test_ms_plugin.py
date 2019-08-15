@@ -37,5 +37,10 @@ def test_ms_plugin(tmp_path, variables):
     with pt.table(filename, tab_desc, dminfo=dminfo, ack=False) as T:
         T.addrows(10)
 
+        T.putcol("FLAG_CATEGORY", np.zeros((10, 20, 30, 40), dtype=np.int32))
+
         # We got required + the extra columns we asked for
         assert set(T.colnames()) == set.union(var_names, required_cols)
+
+        # pprint(T.getdminfo())
+        # print(T.getcol("FLAG_CATEGORY"))
