@@ -4,35 +4,35 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
 
+import dask.array as da
 import numpy as np
 import pyrap.tables as pt
 import pytest
 
-from xarrayms.descriptors.plugin import Plugin
-from xarrayms.descriptors.ms import MeasurementSetPlugin
+from xarrayms.dataset import Variable
+from xarrayms.descriptors.ms_subtable import MSSubTablePlugin
 
 
-@pytest.mark.parametrize("variables", [
-    ["DATA"],
-    ["DATA", "MODEL_DATA"],
-    ["IMAGING_WEIGHT", "SIGMA_SPECTRUM"]
-], ids=lambda v: "variables=%s" % v)
-def test_ms_plugin(tmp_path, variables):
-    var_names = set(variables)
-    variables = {v: None for v in variables}
+@pytest.mark.parametrize("table", MSSubTablePlugin.SUBTABLES)
+def test_ms_subtable_plugin(tmp_path, table):
+    A = da.zeros((10, 20, 30), chunks=(2, 20, 30), dtype=np.int32)
+    variables = {"FOO": Variable(("row", "chan", "corr"), A, {})}
+    var_names = set(variables.keys())
 
-    plugin = MeasurementSetPlugin()
+    plugin = MSSubTablePlugin(table)
     default_desc = plugin.default_descriptor()
     tab_desc = plugin.descriptor(variables, default_desc)
     dminfo = plugin.dminfo(tab_desc)
 
     # These columns must always be present on an MS
-    required_cols = {k for k in pt.required_ms_desc().keys()
+    required_cols = {k for k in pt.required_ms_desc(table).keys()
                      if not k.startswith('_')}
 
-    filename = str(tmp_path / "test.ms")
+    filename = str(tmp_path / ("%s.table" % table))
+
+    from pprint import pprint
+    pprint(tab_desc)
 
     with pt.table(filename, tab_desc, dminfo=dminfo, ack=False) as T:
         T.addrows(10)

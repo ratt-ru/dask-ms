@@ -24,6 +24,10 @@ def register_descriptor_plugin(name):
 
 @six.add_metaclass(abc.ABCMeta)
 class Plugin(object):
+    @staticmethod
+    def variable_descriptor(column, variable):
+        return variable_column_descriptor(column, variable)
+
     @abc.abstractmethod
     def default_descriptor(self):
         pass
@@ -38,10 +42,6 @@ class Plugin(object):
 
 
 class DefaultPlugin(Plugin):
-    @staticmethod
-    def variable_descriptor(column, variable):
-        return variable_column_descriptor(column, variable)
-
     def default_descriptor(self):
         return {}
 
@@ -142,5 +142,5 @@ def variable_column_descriptor(column, variable):
 
         desc['ndim'] = -1
 
-    return {'name': column, 'desc': desc}
+    return desc
 

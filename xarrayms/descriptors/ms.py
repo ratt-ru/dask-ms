@@ -14,7 +14,6 @@ class MeasurementSetPlugin(Plugin):
     INDEX_COLS = ("ARRAY_ID", "DATA_DESC_ID", "FIELD_ID",
                   "OBSERVATION_ID", "PROCESSOR_ID",
                   "SCAN_NUMBER", "STATE_ID")
-    EXTRA_INDEX_COLS = ("PHASE_ID", "PULSAR_GATE_ID")
     DATA_COLS = ("DATA", "MODEL_DATA", "CORRECTED_DATA")
 
     def __init__(self):
@@ -24,25 +23,6 @@ class MeasurementSetPlugin(Plugin):
 
     def default_descriptor(self):
         desc = self.DEFAULT_MS_DESC.copy()
-
-        # Put indexing columns into an
-        # Incremental Storage Manager by default
-        for column in self.INDEX_COLS:
-            desc[column]['dataManagerGroup'] = 'IndexingGroup'
-            desc[column]['dataManagerType'] = 'IncrementalStMan'
-            desc[column]['option'] |= 1
-
-        # Extra indexing columns also go in the IndexingGroup StorageManager
-        desc.update({column: {
-            '_c_order': True,
-            'comment': ' %s Column' % column,
-            'dataManagerGroup': 'IndexingGroup',
-            'dataManagerType': 'IncrementalStMan',
-            'keywords': {},
-            'maxlen': 0,
-            'option': 0,
-            'valueType': 'INT'}
-            for column in self.EXTRA_INDEX_COLS})
 
         # Imaging DATA columns
         desc.update({column: {
@@ -97,6 +77,13 @@ class MeasurementSetPlugin(Plugin):
             desc = {k: default_desc[k] for k in self.REQUIRED_FIELDS}
         except KeyError as e:
             raise RuntimeError("'%s' not in REQUIRED_FIELDS" % str(e))
+
+        # Put indexing columns into an
+        # Incremental Storage Manager by default
+        for column in self.INDEX_COLS:
+            desc[column]['dataManagerGroup'] = 'IndexingGroup'
+            desc[column]['dataManagerType'] = 'IncrementalStMan'
+            desc[column]['option'] |= 1
 
         for k, v in variables.items():
             try:
