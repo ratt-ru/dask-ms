@@ -64,6 +64,45 @@ class Variable(namedtuple("_Variable", ["dims", "var", "attrs"])):
         return self.var.ndim
 
 
+def data_var_dims(data_vars):
+    """ Returns a {dim: size} dictionary constructed from `data_vars` """
+    dims = {}
+
+    for k, var in data_vars.items():
+        for d, s in zip(var.dims, var.shape):
+
+            if d in dims and s != dims[d]:
+                raise ValueError("Existing dimension size %d for "
+                                 "dimension '%s' is inconsistent "
+                                 "with same dimension of array %s" %
+                                 (s, d, k))
+
+            dims[d] = s
+
+    return dims
+
+
+def data_var_chunks(data_vars):
+    """ Returns a {dim: chunks} dictionary constructed from `data_vars` """
+    chunks = {}
+
+    for k, var in self._data_vars.items():
+        if not isinstance(var.var, da.Array):
+            continue
+
+        for dim, c in zip(var.dims, var.chunks):
+            if dim in chunks and c != chunks[dim]:
+                raise ValueError("Existing chunking %s for "
+                                 "dimension '%s' is inconsistent "
+                                 "with chunking %s for the "
+                                 "same dimension of array %s" %
+                                 (c, dim, chunks[dim], k))
+
+            chunks[dim] = c
+
+    return chunks
+
+
 class Dataset(object):
     """
     Poor man's xarray Dataset. It mostly exists so that xarray can
@@ -102,42 +141,13 @@ class Dataset(object):
 
     @property
     def dims(self):
-        dims = {}
-
-        for k, (var_dims, var, _) in self._data_vars.items():
-            for d, s in zip(var_dims, var.shape):
-
-                if d in dims and s != dims[d]:
-                    raise ValueError("Existing dimension size %d for "
-                                     "dimension '%s' is inconsistent "
-                                     "with same dimension of array %s" %
-                                     (s, d, k))
-
-                dims[d] = s
-
-        return dims
+        return data_var_dims(self._data_vars)
 
     sizes = dims
 
     @property
     def chunks(self):
-        chunks = {}
-
-        for k, (var_dims, var, _) in self._data_vars.items():
-            if not isinstance(var, da.Array):
-                continue
-
-            for dim, c in zip(var_dims, var.chunks):
-                if dim in chunks and c != chunks[dim]:
-                    raise ValueError("Existing chunking %s for "
-                                     "dimension '%s' is inconsistent "
-                                     "with chunking %s for the "
-                                     "same dimension of array %s" %
-                                     (c, dim, chunks[dim], k))
-
-                chunks[dim] = c
-
-        return chunks
+        return data_var_chunks
 
     @property
     def variables(self):
