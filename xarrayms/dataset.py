@@ -86,7 +86,7 @@ def data_var_chunks(data_vars):
     """ Returns a {dim: chunks} dictionary constructed from `data_vars` """
     chunks = {}
 
-    for k, var in self._data_vars.items():
+    for k, var in data_vars.items():
         if not isinstance(var.var, da.Array):
             continue
 
@@ -147,7 +147,7 @@ class Dataset(object):
 
     @property
     def chunks(self):
-        return data_var_chunks
+        return data_var_chunks(self._data_vars)
 
     @property
     def variables(self):
