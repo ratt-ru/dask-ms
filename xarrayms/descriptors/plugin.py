@@ -46,8 +46,15 @@ class DefaultPlugin(Plugin):
         return {}
 
     def descriptor(self, variables, default_desc):
-        return {k: self.variable_descriptor(k, v)
-                for k, v in variables.items()}
+        desc = {}
+
+        for k, v in variables.items():
+            try:
+                desc[k] = default_desc[k]
+            except KeyError:
+                desc[k] = self.variable_descriptor(k, v)
+
+        return desc
 
     def dminfo(self, table_desc):
         return {}
