@@ -16,6 +16,7 @@ from __future__ import print_function
 import os
 
 import numpy as np
+from numpy.testing import assert_array_equal
 import pyrap.tables as pt
 import pytest
 
@@ -208,3 +209,48 @@ def test_scalar_ndim(tmp_path, column, dtype):
 
         for r in range(10):
             assert T.getcell(column, r) == r
+
+
+@pytest.mark.optional
+@pytest.mark.parametrize("column", ["BAZ"])
+@pytest.mark.parametrize("row", [10])
+@pytest.mark.parametrize("shape", [(16, 4)])
+@pytest.mark.parametrize("dtype", [np.int32])
+def test_tiled_storage_manager(tmp_path, column, row, shape, dtype):
+
+    """ ndim set to zero implies scalars """
+    casa_type = infer_casa_type(dtype)
+
+    # Column descriptor
+    desc = {'desc': {'_c_order': True,
+                     'comment': '%s column' % column,
+                     'dataManagerGroup': 'BAZ-GROUP',
+                     'dataManagerType': 'TiledColumnStMan',
+                     'keywords': {},
+                     'maxlen': 0,
+                     'ndim': len(shape),
+                     'option': 0,
+                     'shape': shape,
+                     'valueType': casa_type},
+            'name': column}
+
+    table_desc = pt.maketabdesc([desc])
+
+    tile_shape = tuple(reversed(shape)) + (row,)
+
+    dminfo = {'*1': {
+            'NAME': 'BAZ-GROUP',
+            'TYPE': 'TiledColumnStMan',
+            'SPEC': {'DEFAULTTILESHAPE': tile_shape},
+            'COLUMNS': ['BAZ'],
+        }
+    }
+
+    fn = os.path.join(str(tmp_path), "test.table")
+
+    with pt.table(fn, table_desc, dminfo=dminfo, nrow=10, ack=False) as T:
+        dmg = T.getdminfo()['*1']
+        assert dmg['NAME'] == 'BAZ-GROUP'
+        assert_array_equal(dmg['SPEC']['DEFAULTTILESHAPE'], tile_shape)
+        assert dmg['TYPE'] == 'TiledColumnStMan'
+        assert dmg['COLUMNS'] == ['BAZ']
