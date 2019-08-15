@@ -5,7 +5,7 @@ from __future__ import division
 from __future__ import print_function
 
 
-from xarrayms.descriptors import dminfo_factory
+from xarrayms.descriptors.dminfo import dminfo_factory
 
 
 def test_dminfo_factory():
