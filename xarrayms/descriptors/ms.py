@@ -109,6 +109,7 @@ class MeasurementSetPlugin(Plugin):
 
     @staticmethod
     def _maybe_fix_column(column, desc, shape):
+        """ Try set column to fixed if it exists in the descriptor """
         try:
             col_desc = desc[column]
         except KeyError:
@@ -121,6 +122,7 @@ class MeasurementSetPlugin(Plugin):
             col_desc['dataManagerType'] = "TiledColumnStMan"
 
     def fix_columns(self, variables, desc):
+        """ Set large columns to fixed columns """
         # We need to find sizes of the channel and correlation dimensions
         expanded_vars = {v.var.name: v for k, lv in variables.items()
                          for v in lv}
@@ -168,6 +170,7 @@ class MeasurementSetPlugin(Plugin):
         return desc
 
     def _fit_tile_shape(self, desc):
+        """ Infer a tile shape """
         try:
             shape = desc['shape']
         except KeyError:
@@ -191,6 +194,11 @@ class MeasurementSetPlugin(Plugin):
         return {"DEFAULTTILESHAPE": np.int32(rev_shape + [2*rows])}
 
     def dminfo(self, table_desc):
+        """
+        Create Data Manager Info for the MS, adding Tiled Shapes to
+        all TiledColumnStMan groups.
+        """
+
         dm_groups = {}
 
         for column, desc in table_desc.items():
@@ -204,24 +212,22 @@ class MeasurementSetPlugin(Plugin):
             try:
                 dm_group = dm_groups[group]
             except KeyError:
-                dm_groups[group] = dm_group = {
-                    'COLUMNS': [column],
-                    'NAME': group,
-                    'TYPE': dmtype,
-                }
+                # Create the group
+                dm_groups[group] = dm_group = {'COLUMNS': [column],
+                                               'NAME': group, 'TYPE': dmtype}
 
+                # Create a tiling SPEC if the group's TYPE is right
                 if dmtype.startswith('Tiled'):
                     dm_group['SPEC'] = self._fit_tile_shape(desc)
             else:
-                if not dmtype == dm_group['TYPE']:
+                # Sanity check the TYPE
+                if dmtype != dm_group['TYPE']:
                     raise TypeError("DataManagerType is not the same "
                                     "across all columns of "
                                     "DataManagerGroup %s" % group)
+
                 dm_group['COLUMNS'].append(column)
 
-        dminfo = {}
-
-        for i, (group, dm_group) in enumerate(dm_groups.items()):
-            dminfo['*%d' % (i + 1)] = dm_group
-
-        return dminfo
+        # Now create the dminfo object
+        return {'*%d' % (i + 1): dm_group for i, dm_group
+                in enumerate(dm_groups.values())}
