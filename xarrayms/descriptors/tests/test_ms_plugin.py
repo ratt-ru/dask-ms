@@ -10,7 +10,6 @@ import numpy as np
 import pyrap.tables as pt
 import pytest
 
-from xarrayms.descriptors.plugin import Plugin
 from xarrayms.descriptors.ms import MeasurementSetPlugin
 
 
@@ -32,7 +31,7 @@ def test_ms_plugin(tmp_path, variables):
     required_cols = {k for k in pt.required_ms_desc().keys()
                      if not k.startswith('_')}
 
-    filename = str(tmp_path / "test.ms")
+    filename = str(tmp_path / "test_plugin.ms")
 
     with pt.table(filename, tab_desc, dminfo=dminfo, ack=False) as T:
         T.addrows(10)
