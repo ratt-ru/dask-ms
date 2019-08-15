@@ -9,8 +9,7 @@ from threading import Lock
 import weakref
 
 import concurrent.futures as cf
-
-from xarrayms.utils import with_metaclass
+import six
 
 log = logging.getLogger(__name__)
 
@@ -47,7 +46,7 @@ def executor_delete_reference(ex, threadpool_executor):
     return weakref.ref(ex, _callback)
 
 
-@with_metaclass(ExecutorMetaClass)
+@six.add_metaclass(ExecutorMetaClass)
 class Executor(object):
     def __init__(self):
         # Initialise a single thread

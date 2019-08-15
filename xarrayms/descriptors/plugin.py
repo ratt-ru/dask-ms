@@ -4,6 +4,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import abc
+
+import six
+
+from xarrayms.columns import infer_casa_type
+from xarrayms.dataset import Variable
+
 _descriptor_plugins = {}
 
 
@@ -15,18 +22,22 @@ def register_descriptor_plugin(name):
     return decorator
 
 
-class AbstractPlugin(object):
+@six.add_metaclass(abc.ABCMeta)
+class Plugin(object):
+    @abc.abstractmethod
     def default_descriptor(self):
-        raise NotImplementedError()
+        pass
 
+    @abc.abstractmethod
     def descriptor(self, variables, default_desc):
-        raise NotImplementedError()
+        pass
 
+    @abc.abstractmethod
     def dminfo(self, table_desc):
-        raise NotImplementedError()
+        pass
 
 
-class Plugin(AbstractPlugin):
+class DefaultPlugin(Plugin):
     @staticmethod
     def variable_descriptor(column, variable):
         return variable_column_descriptor(column, variable)

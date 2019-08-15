@@ -9,9 +9,9 @@ from threading import Lock
 import weakref
 
 from dask.base import normalize_token
+import six
 import pyrap.tables as pt
 from xarrayms.table_executor import Executor
-from xarrayms.utils import with_metaclass
 
 log = logging.getLogger(__name__)
 
@@ -182,7 +182,7 @@ def taql_factory(query, style='Python', tables=[]):
             t._release(READLOCK)
 
 
-@with_metaclass(TableProxyMetaClass)
+@six.add_metaclass(TableProxyMetaClass)
 class TableProxy(object):
     def __init__(self, factory, *args, **kwargs):
         # Save the arguments as keys for pickling and tokenising
