@@ -6,11 +6,12 @@ from __future__ import print_function
 
 import pyrap.tables as pt
 
-from xarrayms.descriptors.plugin import register_descriptor_plugin, Plugin
+from xarrayms.descriptors.builder import (register_descriptor_builder,
+                                          AbstractDescriptorBuilder)
 
 
-@register_descriptor_plugin("subtable")
-class MSSubTablePlugin(Plugin):
+@register_descriptor_builder("subtable")
+class MSSubTableDescriptorBuilder(AbstractDescriptorBuilder):
     SUBTABLES = ("ANTENNA", "DATA_DESCRIPTION", "DOPPLER",
                  "FEED", "FIELD", "FLAG_CMD", "FREQ_OFFSET",
                  "HISTORY", "OBSERVATION", "POINTING", "POLARIZATION",

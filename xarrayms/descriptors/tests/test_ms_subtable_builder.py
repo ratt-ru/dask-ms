@@ -11,16 +11,16 @@ import pyrap.tables as pt
 import pytest
 
 from xarrayms.dataset import Variable
-from xarrayms.descriptors.ms_subtable import MSSubTablePlugin
+from xarrayms.descriptors.ms_subtable import MSSubTableDescriptorBuilder
 
 
-@pytest.mark.parametrize("table", MSSubTablePlugin.SUBTABLES)
+@pytest.mark.parametrize("table", MSSubTableDescriptorBuilder.SUBTABLES)
 def test_ms_subtable_plugin(tmp_path, table):
     A = da.zeros((10, 20, 30), chunks=(2, 20, 30), dtype=np.int32)
     variables = {"FOO": Variable(("row", "chan", "corr"), A, {})}
     var_names = set(variables.keys())
 
-    plugin = MSSubTablePlugin(table)
+    plugin = MSSubTableDescriptorBuilder(table)
     default_desc = plugin.default_descriptor()
     tab_desc = plugin.descriptor(variables, default_desc)
     dminfo = plugin.dminfo(tab_desc)
@@ -30,9 +30,6 @@ def test_ms_subtable_plugin(tmp_path, table):
                      if not k.startswith('_')}
 
     filename = str(tmp_path / ("%s.table" % table))
-
-    from pprint import pprint
-    pprint(tab_desc)
 
     with pt.table(filename, tab_desc, dminfo=dminfo, ack=False) as T:
         T.addrows(10)

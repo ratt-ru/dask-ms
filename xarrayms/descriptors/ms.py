@@ -13,22 +13,23 @@ import pyrap.tables as pt
 from six.moves import reduce
 
 from xarrayms.columns import infer_dtype
-from xarrayms.descriptors.plugin import register_descriptor_plugin, Plugin
+from xarrayms.descriptors.builder import (register_descriptor_builder,
+                                          AbstractDescriptorBuilder)
 from xarrayms.dataset import data_var_dims, data_var_chunks
 
 
 log = logging.getLogger(__name__)
 
 
-@register_descriptor_plugin("ms")
-class MeasurementSetPlugin(Plugin):
+@register_descriptor_builder("ms")
+class MSDescriptorBuilder(AbstractDescriptorBuilder):
     INDEX_COLS = ("ARRAY_ID", "DATA_DESC_ID", "FIELD_ID",
                   "OBSERVATION_ID", "PROCESSOR_ID",
                   "SCAN_NUMBER", "STATE_ID")
     DATA_COLS = ("DATA", "MODEL_DATA", "CORRECTED_DATA")
 
     def __init__(self, fixed=True):
-        super(Plugin, self).__init__()
+        super(AbstractDescriptorBuilder, self).__init__()
         self.DEFAULT_MS_DESC = pt.required_ms_desc()
         self.REQUIRED_FIELDS = set(self.DEFAULT_MS_DESC.keys())
         self.fixed = fixed

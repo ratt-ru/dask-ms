@@ -14,7 +14,7 @@ import pyrap.tables as pt
 import pytest
 
 from xarrayms.dataset import Variable
-from xarrayms.descriptors.ms import MeasurementSetPlugin
+from xarrayms.descriptors.ms import MSDescriptorBuilder
 
 
 @pytest.mark.parametrize("variables", [
@@ -44,7 +44,7 @@ def test_ms_plugin(tmp_path, variables, chunks, fixed):
                  for n, dims, dtype in variables}
     var_names = set(variables.keys())
 
-    plugin = MeasurementSetPlugin(fixed)
+    plugin = MSDescriptorBuilder(fixed)
     default_desc = plugin.default_descriptor()
     tab_desc = plugin.descriptor(variables, default_desc)
     dminfo = plugin.dminfo(tab_desc)

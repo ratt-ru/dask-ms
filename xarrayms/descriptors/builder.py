@@ -11,19 +11,19 @@ import six
 from xarrayms.columns import infer_casa_type
 from xarrayms.dataset import Variable
 
-_descriptor_plugins = {}
+_descriptor_builders = {}
 
 
-def register_descriptor_plugin(name):
+def register_descriptor_builder(name):
     def decorator(cls):
-        _descriptor_plugins[name] = cls
+        _descriptor_builders[name] = cls
         return cls
 
     return decorator
 
 
 @six.add_metaclass(abc.ABCMeta)
-class Plugin(object):
+class AbstractDescriptorBuilder(object):
     @staticmethod
     def variable_descriptor(column, variable):
         return variable_column_descriptor(column, variable)
@@ -41,7 +41,7 @@ class Plugin(object):
         pass
 
 
-class DefaultPlugin(Plugin):
+class DefaultDescriptorBuilder(AbstractDescriptorBuilder):
     def default_descriptor(self):
         return {}
 

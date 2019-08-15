@@ -12,7 +12,7 @@ import pyrap.tables as pt
 import pytest
 
 from xarrayms.dataset import Variable
-from xarrayms.descriptors.plugin import DefaultPlugin
+from xarrayms.descriptors.builder import DefaultDescriptorBuilder
 
 
 @pytest.mark.parametrize("chunks", [
@@ -34,7 +34,7 @@ def test_default_plugin(tmp_path, chunks):
         "IMAGING_WEIGHT": _variable_factory(("row", "chan"), np.float64),
     }
 
-    plugin = DefaultPlugin()
+    plugin = DefaultDescriptorBuilder()
     default_desc = plugin.default_descriptor()
     tab_desc = plugin.descriptor(variables, default_desc)
     dminfo = plugin.dminfo(tab_desc)

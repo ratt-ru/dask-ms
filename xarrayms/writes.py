@@ -12,7 +12,7 @@ from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 import pyrap.tables as pt
 
-from xarrayms.descriptors.plugin import variable_column_descriptor
+from xarrayms.descriptors.builder import variable_column_descriptor
 from xarrayms.columns import dim_extents_array
 from xarrayms.ordering import row_run_factory
 from xarrayms.table import table_exists
