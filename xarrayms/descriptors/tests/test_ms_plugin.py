@@ -5,24 +5,46 @@ from __future__ import division
 from __future__ import print_function
 
 import os
+from pprint import pprint
 
+import dask.array as da
 import numpy as np
+from numpy.testing import assert_array_equal
 import pyrap.tables as pt
 import pytest
 
+from xarrayms.dataset import Variable
 from xarrayms.descriptors.ms import MeasurementSetPlugin
 
 
 @pytest.mark.parametrize("variables", [
-    ["DATA"],
-    ["DATA", "MODEL_DATA"],
-    ["IMAGING_WEIGHT", "SIGMA_SPECTRUM"]
+    [("DATA", ("row", "chan", "corr"), np.complex64)],
+    [("DATA", ("row", "chan", "corr"), np.complex128),
+     ("MODEL_DATA", ("row", "chan", "corr"), np.complex128)],
+    [("IMAGING_WEIGHT", ("row", "chan"), np.float32),
+     ("SIGMA_SPECTRUM", ("row", "chan", "corr"), np.float)],
 ], ids=lambda v: "variables=%s" % v)
-def test_ms_plugin(tmp_path, variables):
-    var_names = set(variables)
-    variables = {v: None for v in variables}
+@pytest.mark.parametrize("chunks", [
+    {"row": (2, 2, 2, 2, 2),
+     "chan": (4, 4, 4, 4),
+     "corr": (2, 2)}
+])
+@pytest.mark.parametrize("fixed", [
+    True,
+    False
+])
+def test_ms_plugin(tmp_path, variables, chunks, fixed):
+    def _variable_factory(dims, dtype):
+        shape = tuple(sum(chunks[d]) for d in dims)
+        achunks = tuple(chunks[d] for d in dims)
+        dask_array = da.random.random(shape, chunks=achunks).astype(dtype)
+        return [Variable(dims, dask_array, {})]
 
-    plugin = MeasurementSetPlugin()
+    variables = {n: _variable_factory(dims, dtype)
+                 for n, dims, dtype in variables}
+    var_names = set(variables.keys())
+
+    plugin = MeasurementSetPlugin(fixed)
     default_desc = plugin.default_descriptor()
     tab_desc = plugin.descriptor(variables, default_desc)
     dminfo = plugin.dminfo(tab_desc)
@@ -33,8 +55,22 @@ def test_ms_plugin(tmp_path, variables):
 
     filename = str(tmp_path / "test_plugin.ms")
 
-    with pt.table(filename, tab_desc, dminfo=dminfo, ack=False) as T:
-        T.addrows(10)
-
+    with pt.table(filename, tab_desc, dminfo=dminfo, ack=False, nrow=10) as T:
         # We got required + the extra columns we asked for
         assert set(T.colnames()) == set.union(var_names, required_cols)
+
+        if fixed:
+            original_dminfo = {v['NAME']: v for v in dminfo.values()}
+            table_dminfo = {v['NAME']: v for v in T.getdminfo().values()}
+
+            assert len(original_dminfo) == len(table_dminfo)
+
+            for dm_name, dm_group in table_dminfo.items():
+                odm_group = original_dminfo[dm_name]
+                assert odm_group['TYPE'] == dm_group['TYPE']
+                assert set(odm_group['COLUMNS']) == set(dm_group['COLUMNS'])
+
+                if dm_group['TYPE'] == 'TiledColumnStMan':
+                    original_tile = odm_group['SPEC']['DEFAULTTILESHAPE']
+                    table_tile = dm_group['SPEC']['DEFAULTTILESHAPE']
+                    assert_array_equal(original_tile, table_tile)

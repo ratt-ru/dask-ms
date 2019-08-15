@@ -46,7 +46,7 @@ class DefaultPlugin(Plugin):
         return {}
 
     def descriptor(self, variables, default_desc):
-        desc = {}
+        desc = default_desc
 
         for k, v in variables.items():
             try:
