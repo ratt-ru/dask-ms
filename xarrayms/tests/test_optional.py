@@ -329,7 +329,6 @@ def test_tiledstman_addcols(tmp_path, column, row, shape, dtype):
             }
         }
 
-        # Trying to update an existing DataManager Group fails
         with pytest.raises(RuntimeError, match="Data manager name FRED_GROUP"):
             T.addcols(desc, dminfo=dminfo)
 
@@ -338,7 +337,7 @@ def test_tiledstman_addcols(tmp_path, column, row, shape, dtype):
 
         # Adding new QUX column succeeds, but can't
         # add columns to an existing TiledColumnStMan?
-        # casacore creates a new group, FREQ_GROUP_1
+        # casacore creates a new group, FRED_GROUP_1
         T.addcols(desc)
 
         groups = {g['NAME']: g for g in T.getdminfo().values()}
@@ -374,3 +373,5 @@ def test_tiledstman_addcols(tmp_path, column, row, shape, dtype):
         groups = {g['NAME']: g for g in T.getdminfo().values()}
         assert set(["BAZ_GROUP", "FRED_GROUP",
                     "FRED_GROUP_1", "ACKBAR_GROUP"]) == set(groups.keys())
+
+        assert set(groups["ACKBAR_GROUP"]['COLUMNS']) == set(["ACK", "BAR"])
