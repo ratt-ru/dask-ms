@@ -11,12 +11,16 @@ import six
 from xarrayms.columns import infer_casa_type
 from xarrayms.dataset import Variable
 
-_descriptor_builders = {}
+descriptor_builders = {}
 
 
 def register_descriptor_builder(name):
     def decorator(cls):
-        _descriptor_builders[name] = cls
+        if name in descriptor_builders:
+            raise ValueError("'%s' already registered as a "
+                             "descriptor builder" % name)
+
+        descriptor_builders[name] = cls
         return cls
 
     return decorator
