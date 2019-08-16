@@ -33,7 +33,7 @@ from xarrayms.descriptors.ms import MSDescriptorBuilder
     True,
     False
 ])
-def test_ms_plugin(tmp_path, variables, chunks, fixed):
+def test_ms_builder(tmp_path, variables, chunks, fixed):
     def _variable_factory(dims, dtype):
         shape = tuple(sum(chunks[d]) for d in dims)
         achunks = tuple(chunks[d] for d in dims)

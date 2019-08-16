@@ -15,7 +15,7 @@ from xarrayms.descriptors.ms_subtable import MSSubTableDescriptorBuilder
 
 
 @pytest.mark.parametrize("table", MSSubTableDescriptorBuilder.SUBTABLES)
-def test_ms_subtable_plugin(tmp_path, table):
+def test_ms_subtable_builder(tmp_path, table):
     A = da.zeros((10, 20, 30), chunks=(2, 20, 30), dtype=np.int32)
     variables = {"FOO": Variable(("row", "chan", "corr"), A, {})}
     var_names = set(variables.keys())

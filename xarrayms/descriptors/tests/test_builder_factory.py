@@ -32,7 +32,7 @@ def test_filename_builder_factory(filename, builder_cls):
 @pytest.mark.parametrize("builder, builder_cls", [
     ("ms", MSDescriptorBuilder),
     ("ms(False)", MSDescriptorBuilder),
-    ("subtable('SOURCE')", MSSubTableDescriptorBuilder)])
+    ("mssubtable('SOURCE')", MSSubTableDescriptorBuilder)])
 def test_string_builder_factory(builder, builder_cls):
     assert isinstance(string_builder_factory(builder), builder_cls)
 

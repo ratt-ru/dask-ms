@@ -10,7 +10,7 @@ from xarrayms.descriptors.builder import (register_descriptor_builder,
                                           AbstractDescriptorBuilder)
 
 
-@register_descriptor_builder("subtable")
+@register_descriptor_builder("mssubtable")
 class MSSubTableDescriptorBuilder(AbstractDescriptorBuilder):
     SUBTABLES = ("ANTENNA", "DATA_DESCRIPTION", "DOPPLER",
                  "FEED", "FIELD", "FLAG_CMD", "FREQ_OFFSET",

@@ -5,6 +5,7 @@ from __future__ import division
 from __future__ import print_function
 
 import abc
+from ast import parse
 
 import six
 
@@ -14,11 +15,23 @@ from xarrayms.dataset import Variable
 descriptor_builders = {}
 
 
+def is_valid_variable_name(name):
+    try:
+        parse('{} = None'.format(name))
+        return True
+    except (SyntaxError, ValueError, TypeError):
+        return False
+
+
 def register_descriptor_builder(name):
     def decorator(cls):
         if name in descriptor_builders:
             raise ValueError("'%s' already registered as a "
                              "descriptor builder" % name)
+
+        if not is_valid_variable_name(name):
+            raise ValueError("'%s' is not a valid "
+                             "Python variable name." % name)
 
         descriptor_builders[name] = cls
         return cls
