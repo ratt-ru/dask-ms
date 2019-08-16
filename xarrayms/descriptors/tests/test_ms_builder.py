@@ -44,10 +44,10 @@ def test_ms_builder(tmp_path, variables, chunks, fixed):
                  for n, dims, dtype in variables}
     var_names = set(variables.keys())
 
-    plugin = MSDescriptorBuilder(fixed)
-    default_desc = plugin.default_descriptor()
-    tab_desc = plugin.descriptor(variables, default_desc)
-    dminfo = plugin.dminfo(tab_desc)
+    builder = MSDescriptorBuilder(fixed)
+    default_desc = builder.default_descriptor()
+    tab_desc = builder.descriptor(variables, default_desc)
+    dminfo = builder.dminfo(tab_desc)
 
     # These columns must always be present on an MS
     required_cols = {k for k in pt.required_ms_desc().keys()

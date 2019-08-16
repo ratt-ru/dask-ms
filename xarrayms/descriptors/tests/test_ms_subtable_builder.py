@@ -20,10 +20,10 @@ def test_ms_subtable_builder(tmp_path, table):
     variables = {"FOO": Variable(("row", "chan", "corr"), A, {})}
     var_names = set(variables.keys())
 
-    plugin = MSSubTableDescriptorBuilder(table)
-    default_desc = plugin.default_descriptor()
-    tab_desc = plugin.descriptor(variables, default_desc)
-    dminfo = plugin.dminfo(tab_desc)
+    builder = MSSubTableDescriptorBuilder(table)
+    default_desc = builder.default_descriptor()
+    tab_desc = builder.descriptor(variables, default_desc)
+    dminfo = builder.dminfo(tab_desc)
 
     # These columns must always be present on an MS
     required_cols = {k for k in pt.required_ms_desc(table).keys()

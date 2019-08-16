@@ -36,10 +36,10 @@ def test_default_plugin(tmp_path, chunks):
         "IMAGING_WEIGHT": _variable_factory(("row", "chan"), np.float64),
     }
 
-    plugin = DefaultDescriptorBuilder()
-    default_desc = plugin.default_descriptor()
-    tab_desc = plugin.descriptor(variables, default_desc)
-    dminfo = plugin.dminfo(tab_desc)
+    builder = DefaultDescriptorBuilder()
+    default_desc = builder.default_descriptor()
+    tab_desc = builder.descriptor(variables, default_desc)
+    dminfo = builder.dminfo(tab_desc)
 
     with pt.table(filename, tab_desc, dminfo=dminfo, ack=False) as T:
         T.addrows(10)
