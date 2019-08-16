@@ -16,7 +16,7 @@ import pytest
 
 from xarrayms.dataset import Dataset, Variable
 from xarrayms.reads import read_datasets
-from xarrayms.writes import variable_column_descriptor, write_datasets
+from xarrayms.writes import write_datasets
 from xarrayms.utils import (select_cols_str, group_cols_str,
                             index_cols_str, assert_liveness)
 
@@ -260,13 +260,14 @@ def test_dataset_table_schemas(ms):
                  marks=pytest.mark.xfail(reason="Creates uint16 column")),
 ])
 def test_dataset_add_column(ms, dtype):
+    import xarrayms.descriptors.ratt_ms
     datasets = read_datasets(ms, [], [], [])
     assert len(datasets) == 1
     ds = datasets[0]
 
     bitflag = da.zeros_like(ds.DATA, dtype=dtype)
     nds = ds.assign(BITFLAG=(("row", "chan", "corr"), bitflag))
-    writes = write_datasets(ms, nds, ["BITFLAG"])
+    writes = write_datasets(ms, nds, ["BITFLAG"], descriptor='ratt_ms')
 
     dask.compute(writes)
 
@@ -300,6 +301,7 @@ def test_dataset_add_string_column(ms):
         assert name_list == T.getcol("NAMES")
 
 
+@pytest.mark.skip
 @pytest.mark.parametrize("chunks", [{'row': (5, 5),
                                      'chan': (4, 4, 4, 4),
                                      'corr': (4,)}])

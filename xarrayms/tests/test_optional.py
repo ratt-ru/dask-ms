@@ -14,6 +14,7 @@ from __future__ import division
 from __future__ import print_function
 
 import os
+from pprint import pprint  # noqa
 
 import numpy as np
 from numpy.testing import assert_array_equal
@@ -216,9 +217,7 @@ def test_scalar_ndim(tmp_path, column, dtype):
 @pytest.mark.parametrize("row", [10])
 @pytest.mark.parametrize("shape", [(16, 4)])
 @pytest.mark.parametrize("dtype", [np.int32])
-def test_tiled_storage_manager(tmp_path, column, row, shape, dtype):
-
-    """ ndim set to zero implies scalars """
+def test_tiledstman(tmp_path, column, row, shape, dtype):
     casa_type = infer_casa_type(dtype)
 
     # Column descriptor
@@ -254,3 +253,93 @@ def test_tiled_storage_manager(tmp_path, column, row, shape, dtype):
         assert_array_equal(dmg['SPEC']['DEFAULTTILESHAPE'], tile_shape)
         assert dmg['TYPE'] == 'TiledColumnStMan'
         assert dmg['COLUMNS'] == ['BAZ']
+
+
+@pytest.mark.optional
+@pytest.mark.parametrize("column", ["BAZ"])
+@pytest.mark.parametrize("row", [10])
+@pytest.mark.parametrize("shape", [(16, 4)])
+@pytest.mark.parametrize("dtype", [np.int32])
+def test_tiledstman_addcols(tmp_path, column, row, shape, dtype):
+
+    """ ndim set to zero implies scalars """
+    casa_type = infer_casa_type(dtype)
+
+    # Column descriptor
+    desc = {'desc': {'_c_order': True,
+                     'comment': '%s column' % column,
+                     'dataManagerGroup': 'BAZ_GROUP',
+                     'dataManagerType': 'TiledColumnStMan',
+                     'keywords': {},
+                     'maxlen': 0,
+                     'ndim': len(shape),
+                     'option': 0,
+                     'shape': shape,
+                     'valueType': casa_type},
+            'name': column}
+
+    table_desc = pt.maketabdesc([desc])
+
+    tile_shape = tuple(reversed(shape)) + (row,)
+
+    dminfo = {'*1': {
+            'NAME': 'BAZ_GROUP',
+            'TYPE': 'TiledColumnStMan',
+            'SPEC': {'DEFAULTTILESHAPE': tile_shape},
+            'COLUMNS': ['BAZ'],
+        }
+    }
+
+    fn = os.path.join(str(tmp_path), "test.table")
+
+    with pt.table(fn, table_desc, dminfo=dminfo, nrow=10, ack=False) as T:
+        # Add a new FRED column
+        desc = {'FRED': {
+            'dataManagerGroup': 'FRED_GROUP',
+            'dataManagerType': 'TiledColumnStMan',
+            'ndim': len(shape),
+            'shape': shape,
+            'valueType': casa_type
+        }}
+
+        dminfo = {'*1': {
+                'NAME': 'FRED_GROUP',
+                'TYPE': 'TiledColumnStMan',
+                'SPEC': {'DEFAULTTILESHAPE': tile_shape},
+                'COLUMNS': ['FRED'],
+            }
+        }
+
+        T.addcols(desc, dminfo=dminfo)
+
+        # Trying to add a new QUX column by redefining FRED_GROUP fails
+        desc = {'QUX': {
+            'dataManagerGroup': 'FRED_GROUP',
+            'dataManagerType': 'TiledColumnStMan',
+            'ndim': len(shape),
+            'shape': shape,
+            'valueType': casa_type
+        }}
+
+        dminfo = {'*1': {
+                'NAME': 'FRED_GROUP',
+                'TYPE': 'TiledColumnStMan',
+                'SPEC': {'DEFAULTTILESHAPE': tile_shape},
+                'COLUMNS': ['FRED', 'QUX'],
+            }
+        }
+
+        # Trying to update an existing DataManager Group fails
+        with pytest.raises(RuntimeError, match="Data manager name FRED_GROUP"):
+            T.addcols(desc, dminfo=dminfo)
+
+        group_names = {g['NAME'] for g in T.getdminfo().values()}
+        assert set(["BAZ_GROUP", "FRED_GROUP"]) == group_names
+
+        # Adding new QUX column succeeds, but can't
+        # add columns to an existing TiledColumnStMan?
+        # casacore creates a new group, FREQ_GROUP_1
+        T.addcols(desc)
+
+        group_names = {g['NAME'] for g in T.getdminfo().values()}
+        assert set(["BAZ_GROUP", "FRED_GROUP", "FRED_GROUP_1"]) == group_names

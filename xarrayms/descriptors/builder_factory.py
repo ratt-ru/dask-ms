@@ -147,4 +147,7 @@ def string_builder_factory(builder_str):
         return builder_cls(*args, **kwargs)
 
     raise ValueError("No builders registered for "
-                     "builder string '%s'" % builder_str)
+                     "builder string '%s'. "
+                     "Perhaps the appropriate python module "
+                     "registering the builder has not yet "
+                     "been imported." % builder_str)

@@ -12,7 +12,6 @@ from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 import pyrap.tables as pt
 
-from xarrayms.descriptors.builder import variable_column_descriptor
 from xarrayms.columns import dim_extents_array
 from xarrayms.ordering import row_run_factory
 from xarrayms.table import table_exists
@@ -98,46 +97,70 @@ def putter_wrapper(row_orders, *args):
     return np.full(out_shape, True)
 
 
-def _create_table(table, datasets, columns):
-    ds = datasets[0]
-    data_vars = ds.variables
+def descriptor_builder(table, descriptor):
+    from xarrayms.descriptors.builder_factory import filename_builder_factory
+    from xarrayms.descriptors.builder_factory import string_builder_factory
 
-    coldescs = []
+    if descriptor is None:
+        return filename_builder_factory(table)
 
-    for k, var in data_vars.items():
-        desc = variable_column_descriptor(k, var)
-        coldescs.append(desc)
+    return string_builder_factory(descriptor)
 
-    table_desc = pt.maketabdesc(coldescs)
 
-    table_proxy = TableProxy(pt.table, table, table_desc, ack=False,
-                             readonly=False, lockoptions='user')
+def _create_table(table, datasets, columns, descriptor):
+    builder = descriptor_builder(table, descriptor)
+    table_desc, dminfo = builder.execute(datasets)
+
+    table_proxy = TableProxy(pt.table, table, table_desc, dminfo=dminfo,
+                             ack=False, readonly=False, lockoptions='user')
 
     return table_proxy
 
 
-def _updated_table(table, datasets, columns):
+def _updated_table(table, datasets, columns, descriptor):
     table_proxy = TableProxy(pt.table, table, ack=False,
                              readonly=False, lockoptions='user')
 
     table_columns = set(table_proxy.colnames().result())
     missing = set(columns) - table_columns
 
-    # Create column metadata for each missing column and
-    # add it to the table if necessary
+    # Add missing columns to the table
     if len(missing) > 0:
-        data_vars = datasets[0].variables
-        coldescs = [variable_column_descriptor(m, data_vars[m])
-                    for m in missing]
+        # NOTE(sjperkins)
+        # Updating a table with new columns with data managers
+        # is a little tricky. Trying to update existing data managers
+        # seems to incur casacore's internal wrath.
+        #
+        # Here, we
+        # 1. Build a full table description from all variables
+        # 2. Take only the column descriptions for the missing variables.
+        # 3. Create Data Managers associated with missing variables,
+        #    discarding any that currently exist on the table
+        builder = descriptor_builder(table, descriptor)
+        variables = builder.dataset_variables(datasets)
+        default_desc = builder.default_descriptor()
+        table_desc = builder.descriptor(variables, default_desc)
+        table_desc = {m: table_desc[m] for m in missing}
 
-        table_desc = pt.maketabdesc(coldescs)
-        table_proxy.addcols(table_desc).result()
+        # Original Data Manager Groups
+        odminfo = {g['NAME'] for g in table_proxy.getdminfo()
+                                                 .result()
+                                                 .values()}
+
+        # Construct a dminfo object with Data Manager Groups not present
+        # on the original dminfo object
+        dminfo = {"*%d" % (i + 1): v for i, v
+                  in enumerate(builder.dminfo(table_desc).values())
+                  if v['NAME'] not in odminfo}
+
+        # Add the columns
+        table_proxy.addcols(table_desc, dminfo=dminfo).result()
 
     return table_proxy
 
 
-def update_datasets(table, datasets, columns):
-    table_proxy = _updated_table(table, datasets, columns)
+def update_datasets(table, datasets, columns, descriptor):
+    table_proxy = _updated_table(table, datasets, columns, descriptor)
     table_name = short_table_name(table)
     writes = []
 
@@ -316,11 +339,11 @@ def add_row_order_factory(table_proxy, datasets):
     return row_add_ops
 
 
-def create_datasets(table_name, datasets, columns):
+def create_datasets(table_name, datasets, columns, descriptor):
     """
     Create new dataset
     """
-    table_proxy = _create_table(table_name, datasets, columns)
+    table_proxy = _create_table(table_name, datasets, columns, descriptor)
     row_orders = add_row_order_factory(table_proxy, datasets)
     short_name = short_table_name(table_name)
     writes = []
@@ -371,7 +394,7 @@ def create_datasets(table_name, datasets, columns):
     return da.concatenate(writes)
 
 
-def write_datasets(table, datasets, columns):
+def write_datasets(table, datasets, columns, descriptor=None):
     # Promote datasets to list
     if isinstance(datasets, tuple):
         datasets = list(datasets)
@@ -379,6 +402,8 @@ def write_datasets(table, datasets, columns):
         datasets = [datasets]
 
     if not table_exists(table):
-        return create_datasets(table, datasets, columns)
+        return create_datasets(table, datasets, columns,
+                               descriptor=descriptor)
     else:
-        return update_datasets(table, datasets, columns)
+        return update_datasets(table, datasets, columns,
+                               descriptor=descriptor)

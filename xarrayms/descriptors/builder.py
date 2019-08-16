@@ -6,6 +6,7 @@ from __future__ import print_function
 
 import abc
 from ast import parse
+from collections import defaultdict
 
 import six
 
@@ -56,6 +57,27 @@ class AbstractDescriptorBuilder(object):
     @abc.abstractmethod
     def dminfo(self, table_desc):
         pass
+
+    @staticmethod
+    def dataset_variables(datasets):
+        variables = defaultdict(list)
+
+        if not isinstance(datasets, list):
+            datasets = list(datasets)
+
+        for ds in datasets:
+            for column, variable in ds.variables.items():
+                variables[column].append(variable)
+
+        return variables
+
+    def execute(self, datasets):
+        default_desc = self.default_descriptor()
+        variables = self.dataset_variables(datasets)
+        table_desc = self.descriptor(variables, default_desc)
+        dminfo = self.dminfo(table_desc)
+
+        return table_desc, dminfo
 
 
 class DefaultDescriptorBuilder(AbstractDescriptorBuilder):

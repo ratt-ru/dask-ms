@@ -33,6 +33,7 @@ class MSDescriptorBuilder(AbstractDescriptorBuilder):
         self.DEFAULT_MS_DESC = pt.required_ms_desc()
         self.REQUIRED_FIELDS = set(self.DEFAULT_MS_DESC.keys())
         self.fixed = fixed
+        self.ms_dims = None
 
     def default_descriptor(self):
         desc = self.DEFAULT_MS_DESC.copy()
@@ -104,9 +105,29 @@ class MSDescriptorBuilder(AbstractDescriptorBuilder):
                 desc[k] = self.variable_descriptor(k, lv)
 
         if self.fixed:
-            desc = self.fix_columns(variables, desc)
+            ms_dims = self.infer_ms_dims(variables)
+            desc = self.fix_columns(variables, desc, ms_dims)
 
         return desc
+
+    @staticmethod
+    def infer_ms_dims(variables):
+
+        # Create a dictionary of all variables in all datasets
+        expanded_vars = {v.var.name: v for k, lv in variables.items()
+                         for v in lv}
+
+        # Now try find consistent dimension sizes across all variables
+        try:
+            dim_sizes = data_var_dims(expanded_vars)
+        except ValueError as e:
+            log.warning("Unable to determine fixed column shapes as "
+                        "input variable dimension sizes are inconsistent",
+                        exc_info=True)
+
+            return {}
+        else:
+            return dim_sizes
 
     @staticmethod
     def _maybe_fix_column(column, desc, shape):
@@ -114,42 +135,35 @@ class MSDescriptorBuilder(AbstractDescriptorBuilder):
         try:
             col_desc = desc[column]
         except KeyError:
-            pass
-        else:
-            col_desc['shape'] = shape
-            col_desc['ndim'] = len(shape)
-            col_desc['option'] |= 4
-            col_desc['dataManagerGroup'] = "%s_GROUP" % column
-            col_desc['dataManagerType'] = "TiledColumnStMan"
+            return
 
-    def fix_columns(self, variables, desc):
+        # Can't Tile STRING arrays
+        if col_desc['valueType'].upper() == "STRING":
+            return
+
+        col_desc['shape'] = shape
+        col_desc['ndim'] = len(shape)
+        col_desc['option'] |= 4
+        col_desc['dataManagerGroup'] = "%s_GROUP" % column
+        col_desc['dataManagerType'] = "TiledColumnStMan"
+
+    def fix_columns(self, variables, desc, dim_sizes):
         """ Set large columns to fixed columns """
-        # We need to find sizes of the channel and correlation dimensions
-        expanded_vars = {v.var.name: v for k, lv in variables.items()
-                         for v in lv}
 
-        try:
-            dim_sizes = data_var_dims(expanded_vars)
-        except ValueError as e:
-            log.warning("Unable fix column shapes as input variable"
-                        "dimension sizes are inconsistent.",
-                        exc_info=True)
-            return desc
-
+        # We need channel and correlation
         try:
             chan = dim_sizes['chan']
         except KeyError:
-            log.warning("Unable to infer 'chan' dimension "
-                        "from input variables")
+            log.warning("Unable to infer 'chan' dimension from variables")
             return desc
         else:
+            # We can fix IMAGING_WEIGHT at least
             self._maybe_fix_column('IMAGING_WEIGHT', desc, (chan,))
 
         try:
             corr = dim_sizes['corr']
         except KeyError:
-            log.warning("Unable to infer 'corr' dimension "
-                        "from input variables")
+            log.warning("Unable to infer 'corr' dimension from variables")
             return desc
 
         self._maybe_fix_column('FLAG', desc, (chan, corr))
@@ -215,7 +229,8 @@ class MSDescriptorBuilder(AbstractDescriptorBuilder):
             except KeyError:
                 # Create the group
                 dm_groups[group] = dm_group = {'COLUMNS': [column],
-                                               'NAME': group, 'TYPE': dmtype}
+                                               'NAME': group,
+                                               'TYPE': dmtype}
 
                 # Create a tiling SPEC if the group's TYPE is right
                 if dmtype.startswith('Tiled'):
