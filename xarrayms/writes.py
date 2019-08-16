@@ -111,10 +111,8 @@ def _create_table(table, datasets, columns, descriptor):
     builder = descriptor_builder(table, descriptor)
     table_desc, dminfo = builder.execute(datasets)
 
-    table_proxy = TableProxy(pt.table, table, table_desc, dminfo=dminfo,
-                             ack=False, readonly=False, lockoptions='user')
-
-    return table_proxy
+    return TableProxy(pt.table, table, table_desc, dminfo=dminfo,
+                      ack=False, readonly=False, lockoptions='user')
 
 
 def _updated_table(table, datasets, columns, descriptor):
