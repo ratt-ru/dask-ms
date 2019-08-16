@@ -38,7 +38,7 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
 
     Returns
     -------
-    :class:`dask.array.Array`
+    writes : :class:`dask.array.Array`
         dask array representing the write to the
         datset.
     """
@@ -167,7 +167,7 @@ def xds_from_table(table_name, columns=None,
 
     Returns
     -------
-    list of :class:`xarray.Dataset`
+    datasets : list of :class:`xarray.Dataset`
         datasets for each group, each ordered by indexing columns
     """
     columns = promote_columns(columns, [])
@@ -215,7 +215,7 @@ def xds_from_ms(ms, columns=None, index_cols=None, group_cols=None, **kwargs):
 
     Returns
     -------
-    list of :class:`xarray.Dataset`
+    datasets : list of :class:`xarray.Dataset`
         xarray datasets for each group
     """
 

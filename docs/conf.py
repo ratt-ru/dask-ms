@@ -55,7 +55,6 @@ for m in _MOCK_MODULES:
 
 sys.modules.update((k, v) for k, v in MOCK_MODULES.items())
 
-import sphinx_rtd_theme
 import xarrayms
 
 # -- General configuration ---------------------------------------------
@@ -66,9 +65,9 @@ import xarrayms
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.viewcode',
-              'sphinx.ext.intersphinx', 'sphinx.ext.extlinks',
-              'numpydoc']
+extensions = ['sphinx.ext.autodoc', 'sphinx.ext.autosummary',
+              'sphinx.ext.viewcode', 'sphinx.ext.intersphinx',
+              'sphinx.ext.extlinks', 'sphinx_rtd_theme', 'numpydoc']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -197,6 +196,7 @@ texinfo_documents = [
 
 napoleon_numpy_docstring = True
 napoleon_google_docstring = False
+numpydoc_show_class_members = False
 
 extlinks = {
     'issue': ('https://github.com/ska-sa/xarray-ms/issues/%s', 'GH#'),

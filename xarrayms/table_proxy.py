@@ -53,12 +53,12 @@ _proxied_methods = [
 
 
 _PROXY_DOCSTRING = ("""
-Proxies calls to pyrap.tables.table.%s
-via a concurrent.futures.ThreadPoolExecutor
+Proxies calls to :func:`~pyrap.tables.table.%s`
+via a :class:`~concurrent.futures.ThreadPoolExecutor`
 
 Returns
 -------
-future : concurrent.futures.Future
+future : :class:`concurrent.futures.Future`
     Future containing the result of the call
 """)
 
@@ -84,8 +84,8 @@ def proxied_method_factory(method, locktype):
             self._release(locktype)
 
     _impl.__name__ = method + "_impl"
-    _impl.doc = ("Calls table.%s, wrapped in a %s." %
-                 (method, _LOCKTYPE_STRINGS[locktype]))
+    _impl.__doc__ = ("Calls table.%s, wrapped in a %s." %
+                     (method, _LOCKTYPE_STRINGS[locktype]))
 
     def public_method(self, *args, **kwargs):
         """
@@ -118,8 +118,6 @@ class TableProxyMetaClass(type):
     def __new__(cls, name, bases, dct):
         for method, locktype in _proxied_methods:
             proxy_method = proxied_method_factory(method, locktype)
-            proxy_method.__name__ = method
-            proxy_method.__doc__ = _PROXY_DOCSTRING
             dct[method] = proxy_method
 
         return type.__new__(cls, name, bases, dct)
@@ -184,6 +182,10 @@ def taql_factory(query, style='Python', tables=[]):
 
 @six.add_metaclass(TableProxyMetaClass)
 class TableProxy(object):
+    """
+    Proxies calls to a :class:`pyrap.tables.table` object via
+    a :class:`concurrent.futures.ThreadPoolExecutor`.
+    """
     def __init__(self, factory, *args, **kwargs):
         # Save the arguments as keys for pickling and tokenising
         self._factory = factory
@@ -246,9 +248,9 @@ class TableProxy(object):
         **kwargs :
             Keyword arguments passed to `fn`
 
-        Result
-        ------
-        :class:`concurrent.futures.Future`
+        Returns
+        -------
+        future : :class:`concurrent.futures.Future`
             Future containing the result of :code:`fn(table, *args, **kwargs)`
         """
         return self._ex.submit(self.__runner, fn, locktype, args, kwargs)
