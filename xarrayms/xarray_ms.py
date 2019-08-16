@@ -118,6 +118,7 @@ def xds_from_table(table_name, columns=None,
         each column in the table. For example:
 
         .. code-block:: python
+
             {
                 "UVW": {'dask': {'dims': ('uvw',)}},
                 "DATA": {'dask': {'dims': ('chan', 'corr')}},
