@@ -260,7 +260,8 @@ def test_dataset_table_schemas(ms):
                  marks=pytest.mark.xfail(reason="Creates uint16 column")),
 ])
 def test_dataset_add_column(ms, dtype):
-    import xarrayms.descriptors.ratt_ms
+    import xarrayms.descriptors.ratt_ms  # noqa. needed for descriptor to work
+
     datasets = read_datasets(ms, [], [], [])
     assert len(datasets) == 1
     ds = datasets[0]

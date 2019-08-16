@@ -7,11 +7,15 @@ from __future__ import print_function
 import abc
 from ast import parse
 from collections import defaultdict
+import logging
 
 import six
 
 from xarrayms.columns import infer_casa_type
 from xarrayms.dataset import Variable
+
+
+log = logging.getLogger(__name__)
 
 descriptor_builders = {}
 
@@ -189,4 +193,3 @@ def variable_column_descriptor(column, variable):
         desc['ndim'] = -1
 
     return desc
-

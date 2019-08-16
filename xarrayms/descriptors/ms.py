@@ -4,7 +4,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from collections import namedtuple
 import logging
 from operator import mul
 
@@ -15,7 +14,7 @@ from six.moves import reduce
 from xarrayms.columns import infer_dtype
 from xarrayms.descriptors.builder import (register_descriptor_builder,
                                           AbstractDescriptorBuilder)
-from xarrayms.dataset import data_var_dims, data_var_chunks
+from xarrayms.dataset import data_var_dims
 
 
 log = logging.getLogger(__name__)
@@ -120,7 +119,7 @@ class MSDescriptorBuilder(AbstractDescriptorBuilder):
         # Now try find consistent dimension sizes across all variables
         try:
             dim_sizes = data_var_dims(expanded_vars)
-        except ValueError as e:
+        except ValueError:
             log.warning("Unable to determine fixed column shapes as "
                         "input variable dimension sizes are inconsistent",
                         exc_info=True)
