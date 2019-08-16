@@ -333,13 +333,44 @@ def test_tiledstman_addcols(tmp_path, column, row, shape, dtype):
         with pytest.raises(RuntimeError, match="Data manager name FRED_GROUP"):
             T.addcols(desc, dminfo=dminfo)
 
-        group_names = {g['NAME'] for g in T.getdminfo().values()}
-        assert set(["BAZ_GROUP", "FRED_GROUP"]) == group_names
+        groups = {g['NAME']: g for g in T.getdminfo().values()}
+        assert set(["BAZ_GROUP", "FRED_GROUP"]) == set(groups.keys())
 
         # Adding new QUX column succeeds, but can't
         # add columns to an existing TiledColumnStMan?
         # casacore creates a new group, FREQ_GROUP_1
         T.addcols(desc)
 
-        group_names = {g['NAME'] for g in T.getdminfo().values()}
-        assert set(["BAZ_GROUP", "FRED_GROUP", "FRED_GROUP_1"]) == group_names
+        groups = {g['NAME']: g for g in T.getdminfo().values()}
+        assert set(["BAZ_GROUP", "FRED_GROUP",
+                    "FRED_GROUP_1"]) == set(groups.keys())
+
+        # Add ACK and BAR to the ACKBAR_GROUP at the same time succeeds
+        desc = {
+            "ACK": {
+                'dataManagerGroup': 'ACKBAR_GROUP',
+                'dataManagerType': 'TiledColumnStMan',
+                'ndim': len(shape),
+                'shape': shape,
+                'valueType': casa_type},
+            "BAR": {
+                'dataManagerGroup': 'ACKBAR_GROUP',
+                'dataManagerType': 'TiledColumnStMan',
+                'ndim': len(shape),
+                'shape': shape,
+                'valueType': casa_type},
+        }
+
+        dminfo = {'*1': {
+                'NAME': 'ACKBAR_GROUP',
+                'TYPE': 'TiledColumnStMan',
+                'SPEC': {'DEFAULTTILESHAPE': tile_shape},
+                'COLUMNS': ['ACK', 'BAR'],
+            }
+        }
+
+        T.addcols(desc, dminfo=dminfo)
+
+        groups = {g['NAME']: g for g in T.getdminfo().values()}
+        assert set(["BAZ_GROUP", "FRED_GROUP",
+                    "FRED_GROUP_1", "ACKBAR_GROUP"]) == set(groups.keys())
