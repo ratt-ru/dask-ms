@@ -190,7 +190,7 @@ class MSDescriptorBuilder(AbstractDescriptorBuilder):
         except KeyError:
             raise ValueError("No shape in descriptor %s" % desc)
         else:
-            rev_shape = list(reversed(shape))
+            rev_shape = tuple(reversed(shape))
 
         try:
             casa_type = desc['valueType']
@@ -202,10 +202,10 @@ class MSDescriptorBuilder(AbstractDescriptorBuilder):
 
         rows = 1
 
-        while reduce(mul, rev_shape + [2*rows], 1)*nbytes < 4*1024*1024:
+        while reduce(mul, rev_shape + (2*rows,), 1)*nbytes < 4*1024*1024:
             rows *= 2
 
-        return {"DEFAULTTILESHAPE": np.int32(rev_shape + [2*rows])}
+        return {"DEFAULTTILESHAPE": np.int32(rev_shape + (2*rows,))}
 
     def dminfo(self, table_desc):
         """
