@@ -135,6 +135,18 @@ def test_ms_create(tmp_path, chunks, num_chans, corr_types):
 
     dask.compute(ms_writes, ant_writes, pol_writes, spw_writes, ddid_writes)
 
+    # Check ANTENNA table correctly created
+    with pt.table(ant_table_name, ack=False) as A:
+        assert_array_equal(A.getcol("NAME"), names)
+        assert_array_equal(A.getcol("POSITION"), position)
+        assert_array_equal(A.getcol("OFFSET"), offset)
+
+        required_desc = pt.required_ms_desc("ANTENNA")
+        required_columns = set(k for k in required_desc.keys()
+                               if not k.startswith("_"))
+
+        assert set(A.colnames()) == set(required_columns)
+
     # Check POLARIZATION table correctly created
     with pt.table(pol_table_name, ack=False) as P:
         for r, corr_type in enumerate(corr_types):
