@@ -77,7 +77,7 @@ def test_ms_read(ms, group_cols, index_cols, select_cols):
     ids=index_cols_str)
 @pytest.mark.parametrize('select_cols', [
     ['DATA', 'STATE_ID']])
-def test_ms_write(ms, group_cols, index_cols, select_cols):
+def test_ms_update(ms, group_cols, index_cols, select_cols):
     # Zero everything to be sure
     with TableProxy(pt.table, ms, readonly=False,
                     lockoptions='auto', ack=False) as T:
