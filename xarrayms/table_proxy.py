@@ -9,6 +9,7 @@ from threading import Lock
 import weakref
 
 from dask.base import normalize_token
+import numpy as np
 import six
 import pyrap.tables as pt
 from xarrayms.table_executor import Executor
@@ -106,6 +107,12 @@ def _hasher(args):
         return hash(tuple(_hasher(v) for v in args))
     elif isinstance(args, dict):
         return hash(tuple((k, _hasher(v)) for k, v in sorted(args.items())))
+    elif isinstance(args, np.ndarray):
+        # NOTE(sjperkins)
+        # https://stackoverflow.com/a/16592241/1611416
+        # Slowish, but we shouldn't be passing
+        # huge numpy arrays in the TableProxy constructor
+        return hash(args.tostring())
     else:
         return hash(args)
 
