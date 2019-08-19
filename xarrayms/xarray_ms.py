@@ -28,8 +28,10 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
 
     Parameters
     ----------
-    xds : :class:`xarray.Dataset`
-        dataset containing the specified columns.
+    xds : :class:`xarray.Dataset` or list of :class:`xarray.Dataset`
+        dataset(s) containing the specified columns. If a list of datasets
+        is provided, the concatenation of the columns in
+        sequential datasets will be written.
     table_name : str
         CASA table path
     columns : tuple or list, optional
@@ -40,14 +42,24 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
     -------
     writes : :class:`dask.array.Array`
         dask array representing the write to the
-        datset.
+        dataset.
     """
 
-    variables = {k: (v.dims, v.data, v.attrs) for k, v
-                 in xds.data_vars.items()}
-    ds = Dataset(variables, attrs=xds.attrs)
+    # Promote dataset to a list
+    if not isinstance(xds, (tuple, list)):
+        xds = [xds]
 
-    return write_datasets(table_name, ds, columns)
+    # Produce a list of internal variable and dataset types
+    # from the xarray Dataset
+    variables = [{k: (v.dims, v.data, v.attrs) for k, v
+                 in ds.data_vars.items()}
+                 for ds in xds]
+
+    datasets = [Dataset(v, attrs=ds.attrs) for v, ds
+                in zip(variables, xds)]
+
+    # Write the datasets
+    return write_datasets(table_name, datasets, columns)
 
 
 def xds_from_table(table_name, columns=None,
