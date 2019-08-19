@@ -191,9 +191,15 @@ def update_datasets(table, datasets, columns, descriptor):
         except AttributeError:
             # No ROWID's, assume they're missing from the table
             # and remaining datasets. Generate addrows
+            # NOTE(sjperkins)
+            # This could be somewhat brittle, but exists to
+            # update of MS subtables once they've been
+            # created (empty) along with the main MS by a call to default_ms.
+            # Users could also it to append rows to an existing table.
+            # An xds_append_to_table is probably the correct solution...
             last_datasets = datasets[di:]
 
-            # Try depend on any previous row orderings
+            # Try depend on any previous row orderings (if any)
             try:
                 prev_row_order = row_orders[-1]
             except IndexError:
@@ -203,6 +209,8 @@ def update_datasets(table, datasets, columns, descriptor):
                                                     last_datasets,
                                                     prev_row_order)
             row_orders.extend(last_row_orders)
+            # We should have established row orders for all datasets
+            # at this point, quit the loop
             break
         else:
             # Generate row orderings from existing row IDs
@@ -322,14 +330,16 @@ def add_row_orders(data, table_proxy, prev=None):
 
     # This is the first link in the chain
     if prev is None:
-        return (table_proxy.submit(_add_row_wrapper, WRITELOCK, rows, 0)
+        return (table_proxy.submit(_add_row_wrapper,
+                                   WRITELOCK, rows, 0)
                            .result())
     else:
         # There's a previous link in the chain
         prev_runs, _ = prev
         startrow = prev_runs.sum()
 
-        return (table_proxy.submit(_add_row_wrapper, WRITELOCK, rows, startrow)
+        return (table_proxy.submit(_add_row_wrapper,
+                                   WRITELOCK, rows, startrow)
                            .result())
 
 
