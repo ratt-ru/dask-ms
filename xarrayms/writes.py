@@ -399,6 +399,11 @@ def write_datasets(table, datasets, columns, descriptor=None):
     elif not isinstance(datasets, list):
         datasets = [datasets]
 
+    # If no columns are defined, write all dataset variables by default
+    if not columns:
+        columns = set.union(*(set(ds.variables.keys()) for ds in datasets))
+        columns = list(sorted(columns))
+
     if not table_exists(table):
         return create_datasets(table, datasets, columns,
                                descriptor=descriptor)
