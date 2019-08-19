@@ -43,25 +43,25 @@ class Frozen(Mapping):
         return '%s(%r)' % (type(self).__name__, self.mapping)
 
 
-class Variable(namedtuple("_Variable", ["dims", "var", "attrs"])):
+class Variable(namedtuple("_Variable", ["dims", "data", "attrs"])):
     @property
     def dtype(self):
-        return self.var.dtype
+        return self.data.dtype
 
     @property
     def chunks(self):
-        if isinstance(self.var, da.Array):
-            return self.var.chunks
+        if isinstance(self.data, da.Array):
+            return self.data.chunks
 
         return None
 
     @property
     def shape(self):
-        return self.var.shape
+        return self.data.shape
 
     @property
     def ndim(self):
-        return self.var.ndim
+        return self.data.ndim
 
 
 def data_var_dims(data_vars):
@@ -87,7 +87,7 @@ def data_var_chunks(data_vars):
     chunks = {}
 
     for k, var in data_vars.items():
-        if not isinstance(var.var, da.Array):
+        if not isinstance(var.data, da.Array):
             continue
 
         for dim, c in zip(var.dims, var.chunks):

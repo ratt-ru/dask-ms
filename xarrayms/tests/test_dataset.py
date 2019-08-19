@@ -60,12 +60,12 @@ def test_dataset(ms, select_cols, group_cols, index_cols, shapes, chunks):
         compute_dict = {}
 
         for k, v in ds.variables.items():
-            compute_dict[k] = v.var
+            compute_dict[k] = v.data
 
             if k in select_cols:
                 assert "__coldesc__" in v.attrs
 
-            assert v.dtype == v.var.dtype
+            assert v.dtype == v.data.dtype
 
         res = dask.compute(compute_dict)[0]
 

@@ -233,7 +233,7 @@ def update_datasets(table, datasets, columns, descriptor):
                 continue
 
             full_dims = column_entry.dims
-            array = column_entry.var
+            array = column_entry.data
             args = [row_order, ("row",)]
 
             # We only need to pass in dimension extent arrays if

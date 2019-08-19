@@ -113,7 +113,7 @@ class MSDescriptorBuilder(AbstractDescriptorBuilder):
     def infer_ms_dims(variables):
 
         # Create a dictionary of all variables in all datasets
-        expanded_vars = {v.var.name: v for k, lv in variables.items()
+        expanded_vars = {v.data.name: v for k, lv in variables.items()
                          for v in lv}
 
         # Now try find consistent dimension sizes across all variables

@@ -204,7 +204,7 @@ def xds_from_table(table_name, columns=None,
         data_vars = collections.OrderedDict()
 
         for k, v in ds.variables.items():
-            data_vars[k] = xr.DataArray(v.var, dims=v.dims, attrs=v.attrs)
+            data_vars[k] = xr.DataArray(v.data, dims=v.dims, attrs=v.attrs)
 
         try:
             rowid = data_vars.pop('ROWID')
