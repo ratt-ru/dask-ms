@@ -56,9 +56,9 @@ def test_ms_create(tmp_path, chunks, num_chans, corr_types):
     offset = da.random.random((na, 3))
     names = np.array(['ANTENNA-%d' % i for i in range(na)], dtype=np.object)
     ds = xr.Dataset({
-        'POSITION': xr.DataArray(position, dims=("row", "xyz")),
-        'OFFSET': xr.DataArray(offset, dims=("row", "xyz")),
-        'NAMES': xr.DataArray(da.from_array(names, chunks=na), dims=("row",)),
+        'POSITION': (("row", "xyz"), position),
+        'OFFSET': (("row", "xyz"), offset),
+        'NAME': (("row",), da.from_array(names, chunks=na)),
     })
     ant_datasets.append(ds)
 
@@ -69,8 +69,8 @@ def test_ms_create(tmp_path, chunks, num_chans, corr_types):
         dask_corr_type = da.from_array(corr_type,
                                        chunks=len(corr_type))[None, :]
         ds = xr.Dataset({
-            "NUM_CORR": xr.DataArray(dask_num_corr, dims=("row",)),
-            "CORR_TYPE": xr.DataArray(dask_corr_type, dims=("row", "corr")),
+            "NUM_CORR": (("row",), dask_num_corr),
+            "CORR_TYPE": (("row", "corr"), dask_corr_type),
         })
 
         pol_datasets.append(ds)
@@ -84,9 +84,9 @@ def test_ms_create(tmp_path, chunks, num_chans, corr_types):
         dask_chan_width = da.full((1, num_chan), .856e9/num_chan)
 
         ds = xr.Dataset({
-            "NUM_CHAN": xr.DataArray(dask_num_chan, dims=("row",)),
-            "CHAN_FREQ": xr.DataArray(dask_chan_freq, dims=("row", "chan")),
-            "CHAN_WIDTH": xr.DataArray(dask_chan_width, dims=("row", "chan")),
+            "NUM_CHAN": (("row",), dask_num_chan),
+            "CHAN_FREQ": (("row", "chan"), dask_chan_freq),
+            "CHAN_WIDTH": (("row", "chan"), dask_chan_width),
         })
 
         spw_datasets.append(ds)
@@ -99,8 +99,8 @@ def test_ms_create(tmp_path, chunks, num_chans, corr_types):
     dask_spw_ids = da.asarray(np.asarray(spw_ids, dtype=np.int32))
     dask_pol_ids = da.asarray(np.asarray(pol_ids, dtype=np.int32))
     ddid_datasets.append(xr.Dataset({
-        "SPECTRAL_WINDOW_ID": xr.DataArray(dask_spw_ids, dims=("row",)),
-        "POLARIZATION_ID": xr.DataArray(dask_pol_ids, dims=("row",)),
+        "SPECTRAL_WINDOW_ID": (("row",), dask_spw_ids),
+        "POLARIZATION_ID": (("row",), dask_pol_ids),
     }))
 
     # Now create the associated MS dataset
@@ -120,8 +120,8 @@ def test_ms_create(tmp_path, chunks, num_chans, corr_types):
         # Create dask ddid column
         dask_ddid = da.full(row, ddid, chunks=chunks['row'], dtype=np.int32)
         dataset = xr.Dataset({
-            'DATA': xr.DataArray(dask_data, dims=dims),
-            'DATA_DESC_ID': xr.DataArray(dask_ddid, dims=("row",))
+            'DATA': (dims, dask_data),
+            'DATA_DESC_ID': (("row",), dask_ddid)
         })
         ms_datasets.append(dataset)
         all_data.append(dask_data)
