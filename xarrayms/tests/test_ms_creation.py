@@ -5,7 +5,6 @@ from __future__ import division
 from __future__ import print_function
 
 from itertools import product
-from pprint import pprint
 
 import dask
 import dask.array as da
@@ -67,7 +66,6 @@ def test_ms_create(tmp_path, chunks, num_chans, corr_types):
     # Dataset per output row required because column shapes are variable
     for r, corr_type in enumerate(corr_types):
         dask_num_corr = da.full((1,), len(corr_type), dtype=np.int32)
-        dask_row_id = da.full((1,), r, dtype=np.int32)
         dask_corr_type = da.from_array(corr_type,
                                        chunks=len(corr_type))[None, :]
         ds = xr.Dataset({
@@ -84,7 +82,6 @@ def test_ms_create(tmp_path, chunks, num_chans, corr_types):
         dask_chan_freq = da.linspace(.856e9, 2*.856e9, num_chan,
                                      chunks=num_chan)[None, :]
         dask_chan_width = da.full((1, num_chan), .856e9/num_chan)
-        dask_row_id = da.full((1,), r, dtype=np.int32)
 
         ds = xr.Dataset({
             "NUM_CHAN": xr.DataArray(dask_num_chan, dims=("row",)),

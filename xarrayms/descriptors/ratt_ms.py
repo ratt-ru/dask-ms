@@ -5,7 +5,6 @@ from __future__ import division
 from __future__ import print_function
 
 
-from xarrayms.columns import infer_casa_type
 from xarrayms.descriptors.builder import register_descriptor_builder
 from xarrayms.descriptors.ms import MSDescriptorBuilder
 
