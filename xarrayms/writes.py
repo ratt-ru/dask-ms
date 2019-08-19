@@ -7,7 +7,6 @@ from __future__ import print_function
 import logging
 
 import dask
-from dask.core import flatten
 import dask.array as da
 from dask.highlevelgraph import HighLevelGraph
 import numpy as np
