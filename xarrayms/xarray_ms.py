@@ -51,12 +51,20 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
 
     # Produce a list of internal variable and dataset types
     # from the xarray Dataset
-    variables = [{k: (v.dims, v.data, v.attrs) for k, v
-                 in ds.data_vars.items()}
-                 for ds in xds]
+    datasets = []
 
-    datasets = [Dataset(v, attrs=ds.attrs) for v, ds
-                in zip(variables, xds)]
+    for ds in xds:
+        variables = {k: (v.dims, v.data, v.attrs) for k, v
+                     in ds.data_vars.items()}
+
+        try:
+            rowid = ds.coords['ROWID']
+        except KeyError:
+            pass
+        else:
+            variables["ROWID"] = (rowid.dims, rowid.data, rowid.attrs)
+
+        datasets.append(Dataset(variables, attrs=ds.attrs))
 
     # Write the datasets
     return write_datasets(table_name, datasets, columns)
@@ -198,7 +206,16 @@ def xds_from_table(table_name, columns=None,
         for k, v in ds.variables.items():
             data_vars[k] = xr.DataArray(v.var, dims=v.dims, attrs=v.attrs)
 
-        xarray_datasets.append(xr.Dataset(data_vars, attrs=dict(ds.attrs)))
+        try:
+            rowid = data_vars.pop('ROWID')
+        except KeyError:
+            coords = None
+        else:
+            coords = {"ROWID": rowid}
+
+        xarray_datasets.append(xr.Dataset(data_vars,
+                                          attrs=dict(ds.attrs),
+                                          coords=coords))
 
     return xarray_datasets
 
