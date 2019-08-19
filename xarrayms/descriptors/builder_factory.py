@@ -95,15 +95,12 @@ def filename_builder_factory(filename):
         from xarrayms.descriptors.ms import MSDescriptorBuilder
         return MSDescriptorBuilder()
 
-    # Perhaps it looks like an MS subtable?
-    parts = canonical_name.split('::')
+    from xarrayms.descriptors.ms_subtable import MSSubTableDescriptorBuilder
 
-    if len(parts) > 1:
-        from xarrayms.descriptors.ms_subtable import (
-                            MSSubTableDescriptorBuilder)
-
-        if parts[-1] in MSSubTableDescriptorBuilder.SUBTABLES:
-            return MSSubTableDescriptorBuilder(parts[-1])
+    # Perhaps its an MS subtable?
+    for subtable in MSSubTableDescriptorBuilder.SUBTABLES:
+        if canonical_name.endswith(subtable):
+            return MSSubTableDescriptorBuilder(subtable)
 
     # Just a standard CASA Table I guess
     from xarrayms.descriptors.builder import DefaultDescriptorBuilder

@@ -22,6 +22,8 @@ from xarrayms.descriptors.builder_factory import (filename_builder_factory,
     (pjoin(sep, "tmp", "test.ms%s%s" % (sep, sep)), MSDescriptorBuilder),
     (pjoin(sep, "tmp", "test.ms::SOURCE"), MSSubTableDescriptorBuilder),
     (pjoin(sep, "tmp", "test.ms::SOURCE", ""), MSSubTableDescriptorBuilder),
+    (pjoin(sep, "tmp", "test.ms", "SOURCE"), MSSubTableDescriptorBuilder),
+    (pjoin(sep, "tmp", "test.ms", "SOURCE", ""), MSSubTableDescriptorBuilder),
     (pjoin(sep, "tmp", "test.table"), DefaultDescriptorBuilder),
     (pjoin(sep, "tmp", "test.table", ""), DefaultDescriptorBuilder)
 ])
