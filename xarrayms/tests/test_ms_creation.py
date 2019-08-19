@@ -236,7 +236,6 @@ def test_ms_create_and_update(tmp_path, chunks):
     dataset = xr.Dataset({
         'DATA': xr.DataArray(dask_data, dims=dims),
         'DATA_DESC_ID': xr.DataArray(dask_ddid, dims=("row",)),
-        # 'ROWID': xr.DataArray(da.arange(row, dtype=np.int32), dims=("row",)),
     })
     ms_datasets.append(dataset)
 

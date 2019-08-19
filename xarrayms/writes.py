@@ -184,8 +184,16 @@ def update_datasets(table, datasets, columns, descriptor):
     writes = []
     row_orders = []
 
+    # Sort datasets on (not has "ROWID", index) such that
+    # datasets with ROWID's are handled first, while
+    # those without (which imply appends to the MS)
+    # are handled last
+    sorted_datasets = sorted(enumerate(datasets),
+                             key=lambda t: ("ROWID" not in t[1].variables,
+                                            t[0]))
+
     # Establish row orders for each dataset
-    for di, ds in enumerate(datasets):
+    for di, ds in sorted_datasets:
         try:
             rowid = ds.ROWID
         except AttributeError:
@@ -198,18 +206,9 @@ def update_datasets(table, datasets, columns, descriptor):
             # Users could also it to append rows to an existing table.
             # An xds_append_to_table is probably the correct solution...
             last_datasets = datasets[di:]
-
-            # Try depend on any previous row orderings (if any)
-            try:
-                prev_row_order = row_orders[-1]
-            except IndexError:
-                prev_row_order = None
-
-            last_row_orders = add_row_order_factory(table_proxy,
-                                                    last_datasets,
-                                                    prev_row_order)
+            last_row_orders = add_row_order_factory(table_proxy, last_datasets)
             row_orders.extend(last_row_orders)
-            # We should have established row orders for all datasets
+            # We have established row orders for all datasets
             # at this point, quit the loop
             break
         else:
@@ -221,7 +220,7 @@ def update_datasets(table, datasets, columns, descriptor):
 
     assert len(row_orders) == len(datasets)
 
-    for di, (ds, row_order) in enumerate(zip(datasets, row_orders)):
+    for (di, ds), row_order in zip(sorted_datasets, row_orders):
         data_vars = ds.variables
 
         # Generate a dask array for each column
@@ -268,10 +267,10 @@ def update_datasets(table, datasets, columns, descriptor):
     return da.concatenate(writes)
 
 
-def _add_row_wrapper(table, rows, checkrow=0):
+def _add_row_wrapper(table, rows, checkrow=-1):
     startrow = table.nrows()
 
-    if startrow != checkrow:
+    if checkrow != -1 and startrow != checkrow:
         raise ValueError("Inconsistent starting row %d %d"
                          % (startrow, checkrow))
 
@@ -331,7 +330,7 @@ def add_row_orders(data, table_proxy, prev=None):
     # This is the first link in the chain
     if prev is None:
         return (table_proxy.submit(_add_row_wrapper,
-                                   WRITELOCK, rows, 0)
+                                   WRITELOCK, rows, -1)
                            .result())
     else:
         # There's a previous link in the chain
@@ -343,7 +342,7 @@ def add_row_orders(data, table_proxy, prev=None):
                            .result())
 
 
-def add_row_order_factory(table_proxy, datasets, prev_row_order=None):
+def add_row_order_factory(table_proxy, datasets):
     """
     Generate arrays which add the appropriate rows for each array row chunk
     of a dataset, as well as returning the appropriate row ordering
@@ -363,15 +362,8 @@ def add_row_order_factory(table_proxy, datasets, prev_row_order=None):
     list of :class:`dask.array.Array`
         row orderings for each dataset
     """
-    if isinstance(prev_row_order, da.Array):
-        # Get the array keys, and take the last one in the order
-        prev_keys = list(sorted(flatten(prev_row_order.__dask_keys__())))
-        prev_key = prev_keys[-1]
-        prev_deps = [prev_row_order]
-    else:
-        prev_key = None
-        prev_deps = []
-
+    prev_key = None
+    prev_deps = []
     row_add_ops = []
 
     for di, ds in enumerate(datasets):
