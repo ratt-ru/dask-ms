@@ -334,6 +334,8 @@ class DatasetFactory(object):
             attrs = dict(zip(self.group_cols, group_id))
             datasets.append(Dataset(group_var_dims, attrs=attrs))
 
+        # print(groups, group_ids, datasets)
+
         return datasets
 
     def datasets(self):
@@ -376,6 +378,7 @@ class DatasetFactory(object):
 
             groups = [order_taql.getcol(g).result() for g in self.group_cols]
             exemplar_rows = order_taql.getcol("__firstrow__").result()
+            print(len(orders), len(groups), len(exemplar_rows))
             assert len(orders) == len(exemplar_rows)
 
             return self._group_datasets(groups, exemplar_rows, orders)

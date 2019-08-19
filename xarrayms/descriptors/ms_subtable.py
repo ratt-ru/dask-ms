@@ -23,6 +23,7 @@ class MSSubTableDescriptorBuilder(AbstractDescriptorBuilder):
             raise ValueError("'%s' is not a valid Measurement Set "
                              "sub-table" % subtable)
 
+        self.subtable = subtable
         self.DEFAULT_TABLE_DESC = pt.required_ms_desc(subtable)
         self.REQUIRED_FIELDS = set(self.DEFAULT_TABLE_DESC.keys())
 

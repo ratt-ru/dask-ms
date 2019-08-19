@@ -14,7 +14,7 @@ from numpy.testing import assert_array_equal
 import pyrap.tables as pt
 import pytest
 
-from xarrayms import xds_to_table
+from xarrayms import xds_to_table, xds_from_ms
 
 
 @pytest.mark.parametrize("chunks", [{
@@ -65,13 +65,14 @@ def test_ms_create(tmp_path, chunks, num_chans, corr_types):
 
     # Create POLARISATION datasets.
     # Dataset per output row required because column shapes are variable
-    for corr_type in corr_types:
+    for r, corr_type in enumerate(corr_types):
         dask_num_corr = da.full((1,), len(corr_type), dtype=np.int32)
+        dask_row_id = da.full((1,), r, dtype=np.int32)
         dask_corr_type = da.from_array(corr_type,
                                        chunks=len(corr_type))[None, :]
         ds = xr.Dataset({
             "NUM_CORR": xr.DataArray(dask_num_corr, dims=("row",)),
-            "CORR_TYPE": xr.DataArray(dask_corr_type, dims=("row", "corr"))
+            "CORR_TYPE": xr.DataArray(dask_corr_type, dims=("row", "corr")),
         })
 
         pol_datasets.append(ds)
@@ -83,11 +84,12 @@ def test_ms_create(tmp_path, chunks, num_chans, corr_types):
         dask_chan_freq = da.linspace(.856e9, 2*.856e9, num_chan,
                                      chunks=num_chan)[None, :]
         dask_chan_width = da.full((1, num_chan), .856e9/num_chan)
+        dask_row_id = da.full((1,), r, dtype=np.int32)
 
         ds = xr.Dataset({
             "NUM_CHAN": xr.DataArray(dask_num_chan, dims=("row",)),
             "CHAN_FREQ": xr.DataArray(dask_chan_freq, dims=("row", "chan")),
-            "CHAN_WIDTH": xr.DataArray(dask_chan_width, dims=("row", "chan"))
+            "CHAN_WIDTH": xr.DataArray(dask_chan_width, dims=("row", "chan")),
         })
 
         spw_datasets.append(ds)
@@ -197,3 +199,68 @@ def test_ms_create(tmp_path, chunks, num_chans, corr_types):
         # Check we have the required columns
         assert set(T.colnames()) == required_columns.union(["DATA",
                                                             "DATA_DESC_ID"])
+
+
+@pytest.mark.parametrize("chunks", [{
+    "row": (10,),
+    "chan": (4, 4),
+    "corr": (2, 2),
+}])
+def test_ms_create_and_update(tmp_path, chunks):
+    """ Test that we can update and append at the same time """
+    xr = pytest.importorskip("xarray")
+    filename = str(tmp_path / "create-and-update.ms")
+
+    rs = np.random.RandomState(42)
+
+    # Create a dataset of 10 rows with DATA and DATA_DESC_ID
+    dims = ("row", "chan", "corr")
+    row, chan, corr = tuple(sum(chunks[d]) for d in dims)
+    ms_datasets = []
+    np_data = (rs.normal(size=(row, chan, corr)) +
+               1j*rs.normal(size=(row, chan, corr))).astype(np.complex64)
+
+    data_chunks = tuple((chunks['row'], chan, corr))
+    dask_data = da.from_array(np_data, chunks=data_chunks)
+    # Create dask ddid column
+    dask_ddid = da.full(row, 0, chunks=chunks['row'], dtype=np.int32)
+    dataset = xr.Dataset({
+        'DATA': xr.DataArray(dask_data, dims=dims),
+        'DATA_DESC_ID': xr.DataArray(dask_ddid, dims=("row",)),
+        # 'ROWID': xr.DataArray(da.arange(row, dtype=np.int32), dims=("row",)),
+    })
+    ms_datasets.append(dataset)
+
+    # Write it
+    writes = xds_to_table(ms_datasets, filename, ["DATA", "DATA_DESC_ID"])
+    dask.compute(writes)
+
+    ms_datasets = xds_from_ms(filename)
+
+    # Now add another dataset (different DDID), with no ROWID
+    np_data = (rs.normal(size=(row, chan, corr)) +
+               1j*rs.normal(size=(row, chan, corr))).astype(np.complex64)
+    data_chunks = tuple((chunks['row'], chan, corr))
+    dask_data = da.from_array(np_data, chunks=data_chunks)
+    # Create dask ddid column
+    dask_ddid = da.full(row, 1, chunks=chunks['row'], dtype=np.int32)
+    dataset = xr.Dataset({
+        'DATA': xr.DataArray(dask_data, dims=dims),
+        'DATA_DESC_ID': xr.DataArray(dask_ddid, dims=("row",)),
+    })
+    ms_datasets.append(dataset)
+
+    # Write it
+    writes = xds_to_table(ms_datasets, filename, ["DATA", "DATA_DESC_ID"])
+    dask.compute(writes)
+
+    # Rows have been added and additional data is present
+    with pt.table(filename, ack=False, readonly=True) as T:
+        first_data_desc_id = da.full(row, ms_datasets[0].DATA_DESC_ID,
+                                     chunks=chunks['row'])
+        ds_data = da.concatenate([ms_datasets[0].DATA.data,
+                                  ms_datasets[1].DATA.data])
+        ds_ddid = da.concatenate([first_data_desc_id,
+                                  ms_datasets[1].DATA_DESC_ID.data])
+        assert_array_equal(T.getcol("DATA"), ds_data)
+        assert_array_equal(T.getcol("DATA_DESC_ID"), ds_ddid)

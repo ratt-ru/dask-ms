@@ -7,6 +7,7 @@ from __future__ import print_function
 import logging
 
 import dask
+from dask.core import flatten
 import dask.array as da
 from dask.highlevelgraph import HighLevelGraph
 import numpy as np
@@ -111,8 +112,28 @@ def _create_table(table, datasets, columns, descriptor):
     builder = descriptor_builder(table, descriptor)
     table_desc, dminfo = builder.execute(datasets)
 
-    return TableProxy(pt.table, table, table_desc, dminfo=dminfo,
-                      ack=False, readonly=False, lockoptions='user')
+    from xarrayms.descriptors.ms import MSDescriptorBuilder
+    from xarrayms.descriptors.ms_subtable import MSSubTableDescriptorBuilder
+    from xarrayms.utils import short_table_name
+
+    if isinstance(builder, MSDescriptorBuilder):
+        # Create the MS
+        with pt.default_ms(table, tabdesc=table_desc, dminfo=dminfo):
+            pass
+    elif isinstance(builder, MSSubTableDescriptorBuilder):
+        # Create the MS subtable
+        subtable = builder.subtable
+        create_dir = short_table_name(table).rstrip(subtable)
+        with pt.default_ms_subtable(builder.subtable, create_dir,
+                                    tabdesc=table_desc, dminfo=dminfo):
+            pass
+    else:
+        # Create the table
+        with pt.table(table, table_desc, dminfo=dminfo, ack=False):
+            pass
+
+    return TableProxy(pt.table, table, ack=False,
+                      readonly=False, lockoptions='user')
 
 
 def _updated_table(table, datasets, columns, descriptor):
@@ -161,11 +182,38 @@ def update_datasets(table, datasets, columns, descriptor):
     table_proxy = _updated_table(table, datasets, columns, descriptor)
     table_name = short_table_name(table)
     writes = []
+    row_orders = []
 
+    # Establish row orders for each dataset
     for di, ds in enumerate(datasets):
-        row_order = ds.ROWID.map_blocks(row_run_factory,
-                                        sort_dir="write",
-                                        dtype=np.object)
+        try:
+            rowid = ds.ROWID
+        except AttributeError:
+            # No ROWID's, assume they're missing from the table
+            # and remaining datasets. Generate addrows
+            last_datasets = datasets[di:]
+
+            # Try depend on any previous row orderings
+            try:
+                prev_row_order = row_orders[-1]
+            except IndexError:
+                prev_row_order = None
+
+            last_row_orders = add_row_order_factory(table_proxy,
+                                                    last_datasets,
+                                                    prev_row_order)
+            row_orders.extend(last_row_orders)
+            break
+        else:
+            # Generate row orderings from existing row IDs
+            row_order = rowid.map_blocks(row_run_factory,
+                                         sort_dir="write",
+                                         dtype=np.object)
+            row_orders.append(row_order)
+
+    assert len(row_orders) == len(datasets)
+
+    for di, (ds, row_order) in enumerate(zip(datasets, row_orders)):
         data_vars = ds.variables
 
         # Generate a dask array for each column
@@ -174,7 +222,7 @@ def update_datasets(table, datasets, columns, descriptor):
                 column_entry = data_vars[column]
             except KeyError:
                 log.warning("Ignoring '%s' not present "
-                            "on dataset %d" % di)
+                            "on dataset %d" % (column, di))
                 continue
 
             full_dims = column_entry.dims
@@ -209,7 +257,19 @@ def update_datasets(table, datasets, columns, descriptor):
 
             writes.append(write_col.ravel())
 
-        return da.concatenate(writes)
+    return da.concatenate(writes)
+
+
+def _add_row_wrapper(table, rows, checkrow=0):
+    startrow = table.nrows()
+
+    if startrow != checkrow:
+        raise ValueError("Inconsistent starting row %d %d"
+                         % (startrow, checkrow))
+
+    table.addrows(rows)
+
+    return (np.array([[startrow, rows]], dtype=np.int32), None)
 
 
 def add_row_orders(data, table_proxy, prev=None):
@@ -260,21 +320,20 @@ def add_row_orders(data, table_proxy, prev=None):
     """
     rows = data.shape[0]
 
-    # Add rows to table
-    table_proxy.addrows(rows).result()
-
     # This is the first link in the chain
     if prev is None:
-        return (np.array([[0, rows]], dtype=np.int32), None)
+        return (table_proxy.submit(_add_row_wrapper, WRITELOCK, rows, 0)
+                           .result())
+    else:
+        # There's a previous link in the chain
+        prev_runs, _ = prev
+        startrow = prev_runs.sum()
 
-    # There's a previous link in the chain
-    prev_runs, _ = prev
-    startrow = prev_runs.sum()
-
-    return (np.array([[startrow, rows]], dtype=np.int32), None)
+        return (table_proxy.submit(_add_row_wrapper, WRITELOCK, rows, startrow)
+                           .result())
 
 
-def add_row_order_factory(table_proxy, datasets):
+def add_row_order_factory(table_proxy, datasets, prev_row_order=None):
     """
     Generate arrays which add the appropriate rows for each array row chunk
     of a dataset, as well as returning the appropriate row ordering
@@ -294,8 +353,15 @@ def add_row_order_factory(table_proxy, datasets):
     list of :class:`dask.array.Array`
         row orderings for each dataset
     """
-    prev_key = None
-    prev_deps = []
+    if isinstance(prev_row_order, da.Array):
+        # Get the array keys, and take the last one in the order
+        prev_keys = list(sorted(flatten(prev_row_order.__dask_keys__())))
+        prev_key = prev_keys[-1]
+        prev_deps = [prev_row_order]
+    else:
+        prev_key = None
+        prev_deps = []
+
     row_add_ops = []
 
     for di, ds in enumerate(datasets):
