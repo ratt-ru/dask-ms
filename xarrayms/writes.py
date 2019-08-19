@@ -323,7 +323,6 @@ def add_row_order_factory(table_proxy, datasets):
                                                     prev_deps + [array])
             chunks = (array.chunks[0],)
             row_adds = da.Array(graph, name, chunks, dtype=np.object)
-            row_adds = row_adds.map_blocks(lambda b: np.array(b))
             row_add_ops.append(row_adds)
             prev_deps = [row_adds]
 
