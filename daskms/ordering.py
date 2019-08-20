@@ -146,17 +146,15 @@ def _group_ordering_arrays(taql_proxy, index_cols, group,
         shape = (group_nrows,)
         group_row_chunks = normalize_chunks(group_row_chunks, shape=shape)
     except ValueError as e:
-        raise
-        new_ex = GroupChunkingError("%s\n"
-                                    "Unable to match chunks '%s' "
-                                    "with shape '%s' for group '%d'. "
-                                    "This can occur if too few chunk "
-                                    "dictionaries have been supplied for "
-                                    "the number of groups "
-                                    "and an earlier group's chunking strategy "
-                                    "is applied to a later one." %
-                                    (str(e), group_row_chunks, shape, group))
-        raise (new_ex, None, sys.exc_info()[2])
+        raise GroupChunkingError("%s\n"
+                                 "Unable to match chunks '%s' "
+                                 "with shape '%s' for group '%d'. "
+                                 "This can occur if too few chunk "
+                                 "dictionaries have been supplied for "
+                                 "the number of groups "
+                                 "and an earlier group's chunking strategy "
+                                 "is applied to a later one." %
+                                 (str(e), group_row_chunks, shape, group))
 
     group_rows = group_rows.rechunk(group_row_chunks)
     row_runs = group_rows.map_blocks(row_run_factory, sort_dir="read",
