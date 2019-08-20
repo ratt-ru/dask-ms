@@ -124,7 +124,8 @@ def test_dataset_writes(ms, select_cols,
 
         # Create write operations and execute them
         for i, ds in enumerate(datasets):
-            new_ds = ds.assign(STATE_ID=ds.STATE_ID + 1, DATA=ds.DATA + 1)
+            new_ds = ds.assign(STATE_ID=ds.STATE_ID.data + 1,
+                               DATA=ds.DATA.data + 1)
             writes.append(write_datasets(ms, new_ds, ["STATE_ID", "DATA"]))
 
         dask.compute(writes)
@@ -163,8 +164,8 @@ def test_row_grouping(spw_table, spw_chan_freqs, chunks):
     assert len(datasets) == len(spw_chan_freqs)
 
     for i, chan_freq in enumerate(spw_chan_freqs):
-        assert_array_equal(datasets[i].CHAN_FREQ, chan_freq)
-        assert_array_equal(datasets[i].NUM_CHAN, chan_freq.shape[0])
+        assert_array_equal(datasets[i].CHAN_FREQ.data, chan_freq)
+        assert_array_equal(datasets[i].NUM_CHAN.data, chan_freq.shape[0])
 
     del datasets
     assert_liveness(0, 0)
@@ -177,10 +178,10 @@ def test_antenna_table_string_names(ant_table, wsrt_antenna_positions):
 
     names = ["ANTENNA-%d" % i for i in range(wsrt_antenna_positions.shape[0])]
 
-    assert_array_equal(ds.POSITION, wsrt_antenna_positions)
-    assert_array_equal(ds.NAME, names)
+    assert_array_equal(ds.POSITION.data, wsrt_antenna_positions)
+    assert_array_equal(ds.NAME.data, names)
 
-    names = ds.NAME.compute()
+    names = ds.NAME.data.compute()
 
     # Test that writing back string ndarrays work as
     # they must be converted from ndarrays to lists
@@ -200,18 +201,18 @@ def test_dataset_assign(ms):
 
     # Assign on an existing column is easier because we can
     # infer the dimension schema from it
-    nds = ds.assign(TIME=ds.TIME + 1)
-    assert ds.DATA is nds.DATA
-    assert ds.TIME is not nds.TIME
-    assert_array_equal(nds.TIME, ds.TIME + 1)
+    nds = ds.assign(TIME=ds.TIME.data + 1)
+    assert ds.DATA.data is nds.DATA.data
+    assert ds.TIME.data is not nds.TIME.data
+    assert_array_equal(nds.TIME.data, ds.TIME.data + 1)
 
     # This doesn't work for new columns
     with pytest.raises(ValueError, match="Couldn't find existing dimension"):
-        ds.assign(ANTENNA3=ds.ANTENNA1 + 3)
+        ds.assign(ANTENNA3=ds.ANTENNA1.data + 3)
 
     # We have to explicitly supply a dimension schema
-    nds = ds.assign(ANTENNA3=(("row",), ds.ANTENNA1 + 3))
-    assert_array_equal(ds.ANTENNA1 + 3, nds.ANTENNA3)
+    nds = ds.assign(ANTENNA3=(("row",), ds.ANTENNA1.data + 3))
+    assert_array_equal(ds.ANTENNA1.data + 3, nds.ANTENNA3.data)
 
     dims = ds.dims
     chunks = ds.chunks
@@ -266,7 +267,7 @@ def test_dataset_add_column(ms, dtype):
     assert len(datasets) == 1
     ds = datasets[0]
 
-    bitflag = da.zeros_like(ds.DATA, dtype=dtype)
+    bitflag = da.zeros_like(ds.DATA.data, dtype=dtype)
     nds = ds.assign(BITFLAG=(("row", "chan", "corr"), bitflag))
     writes = write_datasets(ms, nds, ["BITFLAG"], descriptor='ratt_ms')
 

@@ -174,7 +174,7 @@ class Dataset(object):
 
     def __getattr__(self, name):
         try:
-            return self._data_vars[name][1]
+            return self._data_vars[name]
         except KeyError:
             pass
 

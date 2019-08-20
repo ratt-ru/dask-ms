@@ -194,7 +194,7 @@ def update_datasets(table, datasets, columns, descriptor):
     # Establish row orders for each dataset
     for di, ds in sorted_datasets:
         try:
-            rowid = ds.ROWID
+            rowid = ds.ROWID.data
         except AttributeError:
             # No ROWID's, assume they're missing from the table
             # and remaining datasets. Generate addrows
