@@ -12,6 +12,7 @@ before_install:
 install:
   - pip install -r requirements.readthedocs.txt
   - pip install travis-sphinx
+  - find .
   # - docker build . -t ${TARGET} -f .travis/${TARGET}.docker
 before_script:
   - true
