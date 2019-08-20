@@ -6,15 +6,19 @@ matrix:
   - env: TARGET=python36
 sudo: required
 services:
-- docker
+  - docker
 before_install:
-- true
+  - true
 install:
-- docker build . -t ${TARGET} -f .travis/${TARGET}.docker
+  - docker build . -t ${TARGET} -f .travis/${TARGET}.docker
+  - pip install --user -r requirements.readthedocs.txt
+  - pip install --user travis-sphinx
 before_script:
-- true
+  - true
 script:
-- true
+  - travis-sphinx build --source=doc/ -b test-travis-sphinx
+after_success:
+  - travis-sphinx deploy
 deploy:
   provider: pypi
   user: sperkins
