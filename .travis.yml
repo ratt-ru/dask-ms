@@ -20,7 +20,7 @@ before_script:
 script:
   - travis-sphinx build --source=docs/
 after_success:
-  - travis-sphinx deploy -b test-travis-sphinx
+  - travis-sphinx deploy -b test-travis-sphinx,0.1.8
 deploy:
   provider: pypi
   user: sperkins
