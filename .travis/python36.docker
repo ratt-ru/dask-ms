@@ -3,6 +3,11 @@ RUN docker-apt-install python3-pip python3-casacore
 RUN pip3 install --upgrade pip setuptools
 ADD . /code
 WORKDIR /code
+# Test without xarray
 RUN pip3 install .[testing]
+RUN pip3 freeze
+RUN py.test --flake8 -s -vvv /code/daskms
+# Retest with xarray installed
+RUN pip3 install .[testing,xarray]
 RUN pip3 freeze
 RUN py.test --flake8 -s -vvv /code/daskms

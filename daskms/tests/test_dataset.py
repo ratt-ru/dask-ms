@@ -59,7 +59,7 @@ def test_dataset(ms, select_cols, group_cols, index_cols, shapes, chunks):
     for ds in datasets:
         compute_dict = {}
 
-        for k, v in ds.variables.items():
+        for k, v in ds.data_vars.items():
             compute_dict[k] = v.data
 
             if k in select_cols:
@@ -186,7 +186,7 @@ def test_antenna_table_string_names(ant_table, wsrt_antenna_positions):
     # Test that writing back string ndarrays work as
     # they must be converted from ndarrays to lists
     # of strings internally
-    write_cols = set(ds.variables.keys()) - set(["ROWID"])
+    write_cols = set(ds.data_vars.keys()) - set(["ROWID"])
     writes = write_datasets(ant_table, ds, write_cols)
 
     dask.compute(writes)
@@ -238,7 +238,7 @@ def test_dataset_table_schemas(ms):
     data_dims = ("mychan", "mycorr")
     table_schema = ["MS", {"DATA": {'dask': {"dims": data_dims}}}]
     datasets = read_datasets(ms, [], [], [], table_schema=table_schema)
-    assert datasets[0].variables["DATA"].dims == ("row", ) + data_dims
+    assert datasets[0].data_vars["DATA"].dims == ("row", ) + data_dims
 
 
 @pytest.mark.parametrize("dtype", [

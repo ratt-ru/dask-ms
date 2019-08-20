@@ -290,6 +290,8 @@ class DatasetFactory(object):
                                               single_row=single_row)
 
         if single_row:
+            # ROWID is assigned as an attribute
+            del variables['ROWID']
             return Dataset(variables, attrs={"ROWID": exemplar_row})
         else:
             return Dataset(variables)
