@@ -83,8 +83,9 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'dask-ms'
-copyright = (u"2019, South African Radio Astronomy Observatory, "
-             "National Research Foundation")
+copyright = (u"2019, "
+             "National Research Foundation, "
+             "South African Radio Astronomy Observatory")
 author = u"Simon Perkins"
 
 # The version info for the project you're documenting, acts as replacement
