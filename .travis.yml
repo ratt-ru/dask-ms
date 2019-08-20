@@ -10,9 +10,9 @@ services:
 before_install:
   - true
 install:
+  - pip install -r requirements.readthedocs.txt
+  - pip install travis-sphinx
   - docker build . -t ${TARGET} -f .travis/${TARGET}.docker
-  - pip install --user -r requirements.readthedocs.txt
-  - pip install --user travis-sphinx
 before_script:
   - true
 script:
