@@ -332,7 +332,7 @@ def add_row_orders(data, table_proxy, prev=None):
     if prev is None:
         return (table_proxy.submit(_add_row_wrapper,
                                    WRITELOCK, rows, -1)
-                           .result())
+                .result())
     else:
         # There's a previous link in the chain
         prev_runs, _ = prev
@@ -340,7 +340,7 @@ def add_row_orders(data, table_proxy, prev=None):
 
         return (table_proxy.submit(_add_row_wrapper,
                                    WRITELOCK, rows, startrow)
-                           .result())
+                .result())
 
 
 def add_row_order_factory(table_proxy, datasets):

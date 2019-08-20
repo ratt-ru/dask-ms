@@ -12,9 +12,9 @@ import numpy as np
 import pyrap.tables as pt
 
 from daskms.columns import (column_metadata, ColumnMetadataError,
-                              dim_extents_array)
+                            dim_extents_array)
 from daskms.ordering import (ordering_taql, row_ordering,
-                               group_ordering_taql, group_row_ordering)
+                             group_ordering_taql, group_row_ordering)
 from daskms.dataset import Dataset
 from daskms.table import table_exists
 from daskms.table_proxy import TableProxy, READLOCK

@@ -12,8 +12,8 @@ from daskms.descriptors.builder import DefaultDescriptorBuilder
 from daskms.descriptors.ms import MSDescriptorBuilder
 from daskms.descriptors.ms_subtable import MSSubTableDescriptorBuilder
 from daskms.descriptors.builder_factory import (filename_builder_factory,
-                                                  string_builder_factory,
-                                                  parse_function_call_string)
+                                                string_builder_factory,
+                                                parse_function_call_string)
 
 
 @pytest.mark.parametrize("filename, builder_cls", [

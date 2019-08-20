@@ -7,7 +7,7 @@ from __future__ import print_function
 import pyrap.tables as pt
 
 from daskms.descriptors.builder import (register_descriptor_builder,
-                                          AbstractDescriptorBuilder)
+                                        AbstractDescriptorBuilder)
 
 
 @register_descriptor_builder("mssubtable")

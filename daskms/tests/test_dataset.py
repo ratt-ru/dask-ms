@@ -18,7 +18,7 @@ from daskms.dataset import Dataset, Variable
 from daskms.reads import read_datasets
 from daskms.writes import write_datasets
 from daskms.utils import (select_cols_str, group_cols_str,
-                            index_cols_str, assert_liveness)
+                          index_cols_str, assert_liveness)
 
 
 @pytest.mark.parametrize("group_cols", [

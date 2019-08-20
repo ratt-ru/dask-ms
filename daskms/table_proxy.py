@@ -193,6 +193,7 @@ class TableProxy(object):
     Proxies calls to a :class:`pyrap.tables.table` object via
     a :class:`concurrent.futures.ThreadPoolExecutor`.
     """
+
     def __init__(self, factory, *args, **kwargs):
         # Save the arguments as keys for pickling and tokenising
         self._factory = factory
@@ -336,10 +337,10 @@ class TableProxy(object):
 
     def __repr__(self):
         return "TableProxy(%s, %s, %s)" % (
-                    self._factory.__name__,
-                    ",".join(str(s) for s in self._args),
-                    ",".join("%s=%s" % (str(k), str(v))
-                             for k, v in self._kwargs.items()))
+            self._factory.__name__,
+            ",".join(str(s) for s in self._args),
+            ",".join("%s=%s" % (str(k), str(v))
+                     for k, v in self._kwargs.items()))
 
     __str__ = __repr__
 

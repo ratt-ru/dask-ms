@@ -238,11 +238,11 @@ def test_tiledstman(tmp_path, column, row, shape, dtype):
     tile_shape = tuple(reversed(shape)) + (row,)
 
     dminfo = {'*1': {
-            'NAME': 'BAZ-GROUP',
-            'TYPE': 'TiledColumnStMan',
-            'SPEC': {'DEFAULTTILESHAPE': tile_shape},
-            'COLUMNS': ['BAZ'],
-        }
+        'NAME': 'BAZ-GROUP',
+        'TYPE': 'TiledColumnStMan',
+        'SPEC': {'DEFAULTTILESHAPE': tile_shape},
+        'COLUMNS': ['BAZ'],
+    }
     }
 
     fn = os.path.join(str(tmp_path), "test.table")
@@ -261,7 +261,6 @@ def test_tiledstman(tmp_path, column, row, shape, dtype):
 @pytest.mark.parametrize("shape", [(16, 4)])
 @pytest.mark.parametrize("dtype", [np.int32])
 def test_tiledstman_addcols(tmp_path, column, row, shape, dtype):
-
     """ ndim set to zero implies scalars """
     casa_type = infer_casa_type(dtype)
 
@@ -283,11 +282,11 @@ def test_tiledstman_addcols(tmp_path, column, row, shape, dtype):
     tile_shape = tuple(reversed(shape)) + (row,)
 
     dminfo = {'*1': {
-            'NAME': 'BAZ_GROUP',
-            'TYPE': 'TiledColumnStMan',
-            'SPEC': {'DEFAULTTILESHAPE': tile_shape},
-            'COLUMNS': ['BAZ'],
-        }
+        'NAME': 'BAZ_GROUP',
+        'TYPE': 'TiledColumnStMan',
+        'SPEC': {'DEFAULTTILESHAPE': tile_shape},
+        'COLUMNS': ['BAZ'],
+    }
     }
 
     fn = os.path.join(str(tmp_path), "test.table")
@@ -303,11 +302,11 @@ def test_tiledstman_addcols(tmp_path, column, row, shape, dtype):
         }}
 
         dminfo = {'*1': {
-                'NAME': 'FRED_GROUP',
-                'TYPE': 'TiledColumnStMan',
-                'SPEC': {'DEFAULTTILESHAPE': tile_shape},
-                'COLUMNS': ['FRED'],
-            }
+            'NAME': 'FRED_GROUP',
+            'TYPE': 'TiledColumnStMan',
+            'SPEC': {'DEFAULTTILESHAPE': tile_shape},
+            'COLUMNS': ['FRED'],
+        }
         }
 
         T.addcols(desc, dminfo=dminfo)
@@ -322,11 +321,11 @@ def test_tiledstman_addcols(tmp_path, column, row, shape, dtype):
         }}
 
         dminfo = {'*1': {
-                'NAME': 'FRED_GROUP',
-                'TYPE': 'TiledColumnStMan',
-                'SPEC': {'DEFAULTTILESHAPE': tile_shape},
-                'COLUMNS': ['FRED', 'QUX'],
-            }
+            'NAME': 'FRED_GROUP',
+            'TYPE': 'TiledColumnStMan',
+            'SPEC': {'DEFAULTTILESHAPE': tile_shape},
+            'COLUMNS': ['FRED', 'QUX'],
+        }
         }
 
         with pytest.raises(RuntimeError, match="Data manager name FRED_GROUP"):
@@ -361,11 +360,11 @@ def test_tiledstman_addcols(tmp_path, column, row, shape, dtype):
         }
 
         dminfo = {'*1': {
-                'NAME': 'ACKBAR_GROUP',
-                'TYPE': 'TiledColumnStMan',
-                'SPEC': {'DEFAULTTILESHAPE': tile_shape},
-                'COLUMNS': ['ACK', 'BAR'],
-            }
+            'NAME': 'ACKBAR_GROUP',
+            'TYPE': 'TiledColumnStMan',
+            'SPEC': {'DEFAULTTILESHAPE': tile_shape},
+            'COLUMNS': ['ACK', 'BAR'],
+        }
         }
 
         T.addcols(desc, dminfo=dminfo)

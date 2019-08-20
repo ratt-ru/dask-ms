@@ -48,7 +48,7 @@ _PY_TO_TABLE = OrderedDict({
     'complex64': 'COMPLEX',
     'complex128': 'DCOMPLEX',
     'object': 'STRING'
-    })
+})
 
 
 def infer_dtype(column, coldesc):

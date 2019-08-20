@@ -9,8 +9,8 @@ import pyrap.tables as pt
 import pytest
 
 from daskms.columns import (infer_dtype, _TABLE_TO_PY,
-                              infer_casa_type, _PY_TO_TABLE,
-                              column_metadata)
+                            infer_casa_type, _PY_TO_TABLE,
+                            column_metadata)
 from daskms.table_proxy import TableProxy
 from daskms.utils import assert_liveness
 

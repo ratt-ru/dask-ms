@@ -131,6 +131,7 @@ class Dataset(object):
     be an optional dependency, as it in turn depends on pandas
     which is a fairly heavy dependency
     """
+
     def __init__(self, data_vars, attrs=None, coords=None):
         self._data_vars = {k: _convert_to_variable(k, v)
                            for k, v in data_vars.items()}

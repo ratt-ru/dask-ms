@@ -19,7 +19,7 @@ import pytest
 
 from daskms.table_executor import Executor, _executor_cache
 from daskms.table_proxy import (TableProxy, _table_cache, taql_factory,
-                                  MismatchedLocks, READLOCK, WRITELOCK, NOLOCK)
+                                MismatchedLocks, READLOCK, WRITELOCK, NOLOCK)
 from daskms.utils import assert_liveness
 
 

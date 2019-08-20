@@ -14,7 +14,7 @@ import pytest
 
 from daskms.dataset import Variable
 from daskms.descriptors.builder import (DefaultDescriptorBuilder,
-                                          variable_column_descriptor)
+                                        variable_column_descriptor)
 
 
 @pytest.mark.parametrize("chunks", [

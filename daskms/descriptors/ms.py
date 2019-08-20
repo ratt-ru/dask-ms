@@ -13,7 +13,7 @@ from six.moves import reduce
 
 from daskms.columns import infer_dtype
 from daskms.descriptors.builder import (register_descriptor_builder,
-                                          AbstractDescriptorBuilder)
+                                        AbstractDescriptorBuilder)
 from daskms.dataset import data_var_dims
 
 

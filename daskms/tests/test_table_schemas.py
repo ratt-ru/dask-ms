@@ -9,11 +9,11 @@ from os.path import join as pjoin
 import pytest
 
 from daskms.table_schemas import (lookup_table_schema,
-                                    MS_SCHEMA,
-                                    ANTENNA_SCHEMA,
-                                    FIELD_SCHEMA,
-                                    SPECTRAL_WINDOW,
-                                    POLARIZATION)
+                                  MS_SCHEMA,
+                                  ANTENNA_SCHEMA,
+                                  FIELD_SCHEMA,
+                                  SPECTRAL_WINDOW,
+                                  POLARIZATION)
 
 
 @pytest.mark.parametrize("filename, schema", [

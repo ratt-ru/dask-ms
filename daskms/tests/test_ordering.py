@@ -12,9 +12,9 @@ import pytest
 
 from daskms.table_proxy import TableProxy
 from daskms.ordering import (ordering_taql,
-                               row_ordering,
-                               group_ordering_taql,
-                               group_row_ordering)
+                             row_ordering,
+                             group_ordering_taql,
+                             group_row_ordering)
 from daskms.utils import group_cols_str, index_cols_str, assert_liveness
 
 
