@@ -16,7 +16,7 @@ install:
 before_script:
   - true
 script:
-  - travis-sphinx build --source=doc/
+  - travis-sphinx build --source=doc
 after_success:
   - travis-sphinx deploy -b test-travis-sphinx
 deploy:
