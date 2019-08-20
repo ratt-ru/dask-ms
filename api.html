@@ -1,0 +1,728 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>API &mdash; dask-ms 0.1.9 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script type="text/javascript" src="_static/jquery.js"></script>
+        <script type="text/javascript" src="_static/underscore.js"></script>
+        <script type="text/javascript" src="_static/doctools.js"></script>
+        <script type="text/javascript" src="_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Contributing" href="contributing.html" />
+    <link rel="prev" title="Usage" href="usage.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="index.html" class="icon icon-home"> dask-ms
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.1.9
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="readme.html">xarray Datasets from CASA Tables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage.html">Usage</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="authors.html">Credits</a></li>
+<li class="toctree-l1"><a class="reference internal" href="history.html">History</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">dask-ms</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>API</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/api.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="api">
+<h1>API<a class="headerlink" href="#api" title="Permalink to this headline">¶</a></h1>
+<dl class="function">
+<dt id="daskms.xds_from_ms">
+<code class="descclassname">daskms.</code><code class="descname">xds_from_ms</code><span class="sig-paren">(</span><em>ms</em>, <em>columns=None</em>, <em>index_cols=None</em>, <em>group_cols=None</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/daskms/dask_ms.html#xds_from_ms"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#daskms.xds_from_ms" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generator yielding a series of xarray datasets representing
+the contents a Measurement Set.
+It defers to <a class="reference internal" href="#daskms.xds_from_table" title="daskms.xds_from_table"><code class="xref py py-func docutils literal notranslate"><span class="pre">xds_from_table()</span></code></a>, which should be consulted
+for more information.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><p class="first"><strong>ms</strong> : str</p>
+<blockquote>
+<div><p>Measurement Set filename</p>
+</div></blockquote>
+<p><strong>columns</strong> : tuple or list, optional</p>
+<blockquote>
+<div><p>Columns present on the resulting dataset.
+Defaults to all if <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
+</div></blockquote>
+<p><strong>index_cols</strong> : tuple or list, optional</p>
+<blockquote>
+<div><p>Sequence of indexing columns.
+Defaults to <code class="code docutils literal notranslate"><span class="pre">['TIME']</span></code></p>
+</div></blockquote>
+<p><strong>group_cols</strong> : tuple or list, optional</p>
+<blockquote>
+<div><p>Sequence of grouping columns.
+Defaults to <code class="code docutils literal notranslate"><span class="pre">['FIELD_ID',</span> <span class="pre">'DATA_DESC_ID']</span></code></p>
+</div></blockquote>
+<p><strong>**kwargs</strong> : optional</p>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>datasets</strong> : list of <a class="reference external" href="https://xarray.pydata.org/en/stable/generated/xarray.Dataset.html#xarray.Dataset" title="(in xarray v0.12.3)"><code class="xref py py-class docutils literal notranslate"><span class="pre">xarray.Dataset</span></code></a></p>
+<blockquote class="last">
+<div><p>xarray datasets for each group</p>
+</div></blockquote>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="daskms.xds_from_table">
+<code class="descclassname">daskms.</code><code class="descname">xds_from_table</code><span class="sig-paren">(</span><em>table_name</em>, <em>columns=None</em>, <em>index_cols=None</em>, <em>group_cols=None</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/daskms/dask_ms.html#xds_from_table"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#daskms.xds_from_table" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generator producing multiple <a class="reference external" href="https://xarray.pydata.org/en/stable/generated/xarray.Dataset.html#xarray.Dataset" title="(in xarray v0.12.3)"><code class="xref py py-class docutils literal notranslate"><span class="pre">xarray.Dataset</span></code></a> objects
+from CASA table <code class="docutils literal notranslate"><span class="pre">table_name</span></code> with the rows lexicographically
+sorted according to the columns in <code class="docutils literal notranslate"><span class="pre">index_cols</span></code>.
+If <code class="docutils literal notranslate"><span class="pre">group_cols</span></code> is supplied, the table data is grouped into
+multiple <a class="reference external" href="https://xarray.pydata.org/en/stable/generated/xarray.Dataset.html#xarray.Dataset" title="(in xarray v0.12.3)"><code class="xref py py-class docutils literal notranslate"><span class="pre">xarray.Dataset</span></code></a> objects, each associated with a
+permutation of the unique values for the columns in <code class="docutils literal notranslate"><span class="pre">group_cols</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><p class="first"><strong>table_name</strong> : str</p>
+<blockquote>
+<div><p>CASA table</p>
+</div></blockquote>
+<p><strong>columns</strong> : list or tuple, optional</p>
+<blockquote>
+<div><p>Columns present on the returned dataset.
+Defaults to all if <code class="docutils literal notranslate"><span class="pre">None</span></code></p>
+</div></blockquote>
+<p><strong>index_cols</strong> : list or tuple, optional</p>
+<blockquote>
+<div><p>List of CASA table indexing columns. Defaults to <code class="code docutils literal notranslate"><span class="pre">()</span></code>.</p>
+</div></blockquote>
+<p><strong>group_cols</strong> : list or tuple, optional</p>
+<blockquote>
+<div><p>List of columns on which to group the CASA table.
+Defaults to <code class="code docutils literal notranslate"><span class="pre">()</span></code></p>
+</div></blockquote>
+<p><strong>table_schema</strong> : dict or str or list of dict or str, optional</p>
+<blockquote>
+<div><p>A schema dictionary defining the dimension naming scheme for
+each column in the table. For example:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+    <span class="s2">&quot;UVW&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;dask&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;dims&#39;</span><span class="p">:</span> <span class="p">(</span><span class="s1">&#39;uvw&#39;</span><span class="p">,)}},</span>
+    <span class="s2">&quot;DATA&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;dask&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;dims&#39;</span><span class="p">:</span> <span class="p">(</span><span class="s1">&#39;chan&#39;</span><span class="p">,</span> <span class="s1">&#39;corr&#39;</span><span class="p">)}},</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>will result in the UVW and DATA arrays having dimensions
+<code class="code docutils literal notranslate"><span class="pre">('row',</span> <span class="pre">'uvw')</span></code> and <code class="code docutils literal notranslate"><span class="pre">('row',</span> <span class="pre">'chan',</span> <span class="pre">'corr')</span></code>
+respectively.</p>
+<p>A string can be supplied, which will be matched
+against existing default schemas. Examples here include
+<code class="docutils literal notranslate"><span class="pre">MS</span></code>, <code class="docutils literal notranslate"><span class="pre">ANTENNA</span></code> and <code class="docutils literal notranslate"><span class="pre">SPECTRAL_WINDOW</span></code>
+corresponding to <code class="docutils literal notranslate"><span class="pre">Measurement</span> <span class="pre">Sets</span></code> the <code class="docutils literal notranslate"><span class="pre">ANTENNA</span></code> subtable
+and the <code class="docutils literal notranslate"><span class="pre">SPECTRAL_WINDOW</span></code> subtable, respectively.</p>
+<p>By default, the end of <code class="docutils literal notranslate"><span class="pre">table_name</span></code> will be
+inspected to see if it matches any default schemas.</p>
+<p>It is also possible to supply a list of strings or dicts defining
+a sequence of schemas which are combined. Later elements in the
+list override previous elements. In the following
+example, the standard UVW MS component name scheme is overridden
+with “my-uvw”.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="s2">&quot;MS&quot;</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;UVW&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;dask&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;dims&#39;</span><span class="p">:</span> <span class="p">(</span><span class="s1">&#39;my-uvw&#39;</span><span class="p">,)}}}]</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p><strong>taql_where</strong> : str, optional</p>
+<blockquote>
+<div><p>TAQL where clause. For example, to exclude auto-correlations</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">xds_from_table</span><span class="p">(</span><span class="s2">&quot;WSRT.MS&quot;</span><span class="p">,</span> <span class="n">taql_where</span><span class="o">=</span><span class="s2">&quot;ANTENNA1 != ANTENNA2&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p><strong>chunks</strong> : list of dicts or dict, optional</p>
+<blockquote>
+<div><p>A <code class="code docutils literal notranslate"><span class="pre">{dim:</span> <span class="pre">chunk}</span></code> dictionary, specifying the chunking
+strategy of each dimension in the schema.
+Defaults to <code class="code docutils literal notranslate"><span class="pre">{'row':</span> <span class="pre">100000</span> <span class="pre">}</span></code>.</p>
+<ul class="simple">
+<li>If a dict, the chunking strategy is applied to each group.</li>
+<li>If a list of dicts, each element is applied
+to the associated group. The last element is
+extended over the remaining groups if there
+are insufficient elements.</li>
+</ul>
+</div></blockquote>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>datasets</strong> : list of <a class="reference external" href="https://xarray.pydata.org/en/stable/generated/xarray.Dataset.html#xarray.Dataset" title="(in xarray v0.12.3)"><code class="xref py py-class docutils literal notranslate"><span class="pre">xarray.Dataset</span></code></a></p>
+<blockquote class="last">
+<div><p>datasets for each group, each ordered by indexing columns</p>
+</div></blockquote>
+</td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Notes</p>
+<p>Both <code class="docutils literal notranslate"><span class="pre">group_cols</span></code> and <code class="docutils literal notranslate"><span class="pre">index_cols</span></code> should consist of
+columns that are part of the table index.</p>
+<p>However, this may not always be possible as CASA tables
+may not always contain indexing columns.
+The <code class="docutils literal notranslate"><span class="pre">ANTENNA</span></code> or <code class="docutils literal notranslate"><span class="pre">SPECTRAL_WINDOW</span></code> Measurement Set subtables
+are examples in which the <code class="docutils literal notranslate"><span class="pre">row</span> <span class="pre">id</span></code> serves as the index.</p>
+<p>Generally, calling</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">antds</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">xds_from_table</span><span class="p">(</span><span class="s2">&quot;WSRT.MS::ANTENNA&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>is fine, since the data associated with each row of the <code class="docutils literal notranslate"><span class="pre">ANTENNA</span></code>
+table has the same shape and so a dask or numpy array can be
+constructed around the contents of the table.</p>
+<p>This may not be the case for the <code class="docutils literal notranslate"><span class="pre">SPECTRAL_WINDOW</span></code> subtable.
+Here, each row defines a separate spectral window, but each
+spectral window may contain different numbers of frequencies.
+In this case, it is probably better to group the subtable
+by <code class="docutils literal notranslate"><span class="pre">row</span></code>.</p>
+<p>There is a <em>special</em> group column <code class="code docutils literal notranslate"><span class="pre">&quot;__row__&quot;</span></code>
+that can be used to group the table by row.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">for</span> <span class="n">spwds</span> <span class="ow">in</span> <span class="n">xds_from_table</span><span class="p">(</span><span class="s2">&quot;WSRT.MS::SPECTRAL_WINDOW&quot;</span><span class="p">,</span>
+                                    <span class="n">group_cols</span><span class="o">=</span><span class="s2">&quot;__row__&quot;</span><span class="p">):</span>
+    <span class="o">...</span>
+</pre></div>
+</div>
+<p>If <code class="code docutils literal notranslate"><span class="pre">&quot;__row__&quot;</span></code> is used for grouping, then no other
+column may be used. It should also only be used for <em>small</em>
+tables, as the number of datasets produced, may be prohibitively
+large.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="daskms.xds_to_table">
+<code class="descclassname">daskms.</code><code class="descname">xds_to_table</code><span class="sig-paren">(</span><em>xds</em>, <em>table_name</em>, <em>columns=None</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/daskms/dask_ms.html#xds_to_table"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#daskms.xds_to_table" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generates a dask array which writes the
+specified columns from an <a class="reference external" href="https://xarray.pydata.org/en/stable/generated/xarray.Dataset.html#xarray.Dataset" title="(in xarray v0.12.3)"><code class="xref py py-class docutils literal notranslate"><span class="pre">xarray.Dataset</span></code></a> into
+the CASA table specified by <code class="docutils literal notranslate"><span class="pre">table_name</span></code> when
+the <code class="xref py py-meth docutils literal notranslate"><span class="pre">dask.array.Array.compute()</span></code> method is called.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><p class="first"><strong>xds</strong> : <a class="reference external" href="https://xarray.pydata.org/en/stable/generated/xarray.Dataset.html#xarray.Dataset" title="(in xarray v0.12.3)"><code class="xref py py-class docutils literal notranslate"><span class="pre">xarray.Dataset</span></code></a> or list of <a class="reference external" href="https://xarray.pydata.org/en/stable/generated/xarray.Dataset.html#xarray.Dataset" title="(in xarray v0.12.3)"><code class="xref py py-class docutils literal notranslate"><span class="pre">xarray.Dataset</span></code></a></p>
+<blockquote>
+<div><p>dataset(s) containing the specified columns. If a list of datasets
+is provided, the concatenation of the columns in
+sequential datasets will be written.</p>
+</div></blockquote>
+<p><strong>table_name</strong> : str</p>
+<blockquote>
+<div><p>CASA table path</p>
+</div></blockquote>
+<p><strong>columns</strong> : tuple or list, optional</p>
+<blockquote>
+<div><p>list of column names to write to the table.
+If <code class="docutils literal notranslate"><span class="pre">None</span></code> all columns will be written.</p>
+</div></blockquote>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>writes</strong> : <a class="reference external" href="http://docs.dask.org/en/stable/array-api.html#dask.array.Array" title="(in Dask v2.2.0)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dask.array.Array</span></code></a></p>
+<blockquote class="last">
+<div><p>dask array representing the write to the
+dataset.</p>
+</div></blockquote>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="class">
+<dt id="daskms.TableProxy">
+<em class="property">class </em><code class="descclassname">daskms.</code><code class="descname">TableProxy</code><span class="sig-paren">(</span><em>factory</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/daskms/table_proxy.html#TableProxy"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#daskms.TableProxy" title="Permalink to this definition">¶</a></dt>
+<dd><p>Proxies calls to a <code class="xref py py-class docutils literal notranslate"><span class="pre">pyrap.tables.table</span></code> object via
+a <a class="reference external" href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.ThreadPoolExecutor" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">concurrent.futures.ThreadPoolExecutor</span></code></a>.</p>
+<dl class="method">
+<dt id="daskms.TableProxy.addcols">
+<code class="descname">addcols</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#daskms.TableProxy.addcols" title="Permalink to this definition">¶</a></dt>
+<dd><p>Proxies calls to <code class="xref py py-func docutils literal notranslate"><span class="pre">addcols()</span></code>
+via a <a class="reference external" href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.ThreadPoolExecutor" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ThreadPoolExecutor</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>future</strong> : <a class="reference external" href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Future" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">concurrent.futures.Future</span></code></a></p>
+<blockquote class="last">
+<div><p>Future containing the result of the call</p>
+</div></blockquote>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="daskms.TableProxy.addrows">
+<code class="descname">addrows</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#daskms.TableProxy.addrows" title="Permalink to this definition">¶</a></dt>
+<dd><p>Proxies calls to <code class="xref py py-func docutils literal notranslate"><span class="pre">addrows()</span></code>
+via a <a class="reference external" href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.ThreadPoolExecutor" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ThreadPoolExecutor</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>future</strong> : <a class="reference external" href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Future" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">concurrent.futures.Future</span></code></a></p>
+<blockquote class="last">
+<div><p>Future containing the result of the call</p>
+</div></blockquote>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="daskms.TableProxy.colnames">
+<code class="descname">colnames</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#daskms.TableProxy.colnames" title="Permalink to this definition">¶</a></dt>
+<dd><p>Proxies calls to <code class="xref py py-func docutils literal notranslate"><span class="pre">colnames()</span></code>
+via a <a class="reference external" href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.ThreadPoolExecutor" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ThreadPoolExecutor</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>future</strong> : <a class="reference external" href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Future" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">concurrent.futures.Future</span></code></a></p>
+<blockquote class="last">
+<div><p>Future containing the result of the call</p>
+</div></blockquote>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="daskms.TableProxy.getcellslice">
+<code class="descname">getcellslice</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#daskms.TableProxy.getcellslice" title="Permalink to this definition">¶</a></dt>
+<dd><p>Proxies calls to <code class="xref py py-func docutils literal notranslate"><span class="pre">getcellslice()</span></code>
+via a <a class="reference external" href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.ThreadPoolExecutor" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ThreadPoolExecutor</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>future</strong> : <a class="reference external" href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Future" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">concurrent.futures.Future</span></code></a></p>
+<blockquote class="last">
+<div><p>Future containing the result of the call</p>
+</div></blockquote>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="daskms.TableProxy.getcol">
+<code class="descname">getcol</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#daskms.TableProxy.getcol" title="Permalink to this definition">¶</a></dt>
+<dd><p>Proxies calls to <code class="xref py py-func docutils literal notranslate"><span class="pre">getcol()</span></code>
+via a <a class="reference external" href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.ThreadPoolExecutor" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ThreadPoolExecutor</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>future</strong> : <a class="reference external" href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Future" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">concurrent.futures.Future</span></code></a></p>
+<blockquote class="last">
+<div><p>Future containing the result of the call</p>
+</div></blockquote>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="daskms.TableProxy.getcoldesc">
+<code class="descname">getcoldesc</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#daskms.TableProxy.getcoldesc" title="Permalink to this definition">¶</a></dt>
+<dd><p>Proxies calls to <code class="xref py py-func docutils literal notranslate"><span class="pre">getcoldesc()</span></code>
+via a <a class="reference external" href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.ThreadPoolExecutor" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ThreadPoolExecutor</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>future</strong> : <a class="reference external" href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Future" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">concurrent.futures.Future</span></code></a></p>
+<blockquote class="last">
+<div><p>Future containing the result of the call</p>
+</div></blockquote>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="daskms.TableProxy.getcolnp">
+<code class="descname">getcolnp</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#daskms.TableProxy.getcolnp" title="Permalink to this definition">¶</a></dt>
+<dd><p>Proxies calls to <code class="xref py py-func docutils literal notranslate"><span class="pre">getcolnp()</span></code>
+via a <a class="reference external" href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.ThreadPoolExecutor" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ThreadPoolExecutor</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>future</strong> : <a class="reference external" href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Future" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">concurrent.futures.Future</span></code></a></p>
+<blockquote class="last">
+<div><p>Future containing the result of the call</p>
+</div></blockquote>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="daskms.TableProxy.getdminfo">
+<code class="descname">getdminfo</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#daskms.TableProxy.getdminfo" title="Permalink to this definition">¶</a></dt>
+<dd><p>Proxies calls to <code class="xref py py-func docutils literal notranslate"><span class="pre">getdminfo()</span></code>
+via a <a class="reference external" href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.ThreadPoolExecutor" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ThreadPoolExecutor</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>future</strong> : <a class="reference external" href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Future" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">concurrent.futures.Future</span></code></a></p>
+<blockquote class="last">
+<div><p>Future containing the result of the call</p>
+</div></blockquote>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="daskms.TableProxy.getvarcol">
+<code class="descname">getvarcol</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#daskms.TableProxy.getvarcol" title="Permalink to this definition">¶</a></dt>
+<dd><p>Proxies calls to <code class="xref py py-func docutils literal notranslate"><span class="pre">getvarcol()</span></code>
+via a <a class="reference external" href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.ThreadPoolExecutor" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ThreadPoolExecutor</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>future</strong> : <a class="reference external" href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Future" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">concurrent.futures.Future</span></code></a></p>
+<blockquote class="last">
+<div><p>Future containing the result of the call</p>
+</div></blockquote>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="daskms.TableProxy.nrows">
+<code class="descname">nrows</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#daskms.TableProxy.nrows" title="Permalink to this definition">¶</a></dt>
+<dd><p>Proxies calls to <code class="xref py py-func docutils literal notranslate"><span class="pre">nrows()</span></code>
+via a <a class="reference external" href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.ThreadPoolExecutor" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ThreadPoolExecutor</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>future</strong> : <a class="reference external" href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Future" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">concurrent.futures.Future</span></code></a></p>
+<blockquote class="last">
+<div><p>Future containing the result of the call</p>
+</div></blockquote>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="daskms.TableProxy.putcellslice">
+<code class="descname">putcellslice</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#daskms.TableProxy.putcellslice" title="Permalink to this definition">¶</a></dt>
+<dd><p>Proxies calls to <code class="xref py py-func docutils literal notranslate"><span class="pre">putcellslice()</span></code>
+via a <a class="reference external" href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.ThreadPoolExecutor" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ThreadPoolExecutor</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>future</strong> : <a class="reference external" href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Future" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">concurrent.futures.Future</span></code></a></p>
+<blockquote class="last">
+<div><p>Future containing the result of the call</p>
+</div></blockquote>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="daskms.TableProxy.putcol">
+<code class="descname">putcol</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#daskms.TableProxy.putcol" title="Permalink to this definition">¶</a></dt>
+<dd><p>Proxies calls to <code class="xref py py-func docutils literal notranslate"><span class="pre">putcol()</span></code>
+via a <a class="reference external" href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.ThreadPoolExecutor" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ThreadPoolExecutor</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>future</strong> : <a class="reference external" href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Future" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">concurrent.futures.Future</span></code></a></p>
+<blockquote class="last">
+<div><p>Future containing the result of the call</p>
+</div></blockquote>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="daskms.TableProxy.putcolnp">
+<code class="descname">putcolnp</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#daskms.TableProxy.putcolnp" title="Permalink to this definition">¶</a></dt>
+<dd><p>Proxies calls to <code class="xref py py-func docutils literal notranslate"><span class="pre">putcolnp()</span></code>
+via a <a class="reference external" href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.ThreadPoolExecutor" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ThreadPoolExecutor</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>future</strong> : <a class="reference external" href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Future" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">concurrent.futures.Future</span></code></a></p>
+<blockquote class="last">
+<div><p>Future containing the result of the call</p>
+</div></blockquote>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="daskms.TableProxy.putvarcol">
+<code class="descname">putvarcol</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#daskms.TableProxy.putvarcol" title="Permalink to this definition">¶</a></dt>
+<dd><p>Proxies calls to <code class="xref py py-func docutils literal notranslate"><span class="pre">putvarcol()</span></code>
+via a <a class="reference external" href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.ThreadPoolExecutor" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ThreadPoolExecutor</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>future</strong> : <a class="reference external" href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Future" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">concurrent.futures.Future</span></code></a></p>
+<blockquote class="last">
+<div><p>Future containing the result of the call</p>
+</div></blockquote>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="daskms.TableProxy.submit">
+<code class="descname">submit</code><span class="sig-paren">(</span><em>fn</em>, <em>locktype</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/daskms/table_proxy.html#TableProxy.submit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#daskms.TableProxy.submit" title="Permalink to this definition">¶</a></dt>
+<dd><p>Submits <code class="code docutils literal notranslate"><span class="pre">fn(table,</span> <span class="pre">*args,</span> <span class="pre">**kwargs)</span></code> within
+the executor, returning a Future.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><p class="first"><strong>fn</strong> : callable</p>
+<blockquote>
+<div><p>Function with signature <code class="code docutils literal notranslate"><span class="pre">fn(table,</span> <span class="pre">*args,</span> <span class="pre">**kwargs)</span></code></p>
+</div></blockquote>
+<p><strong>locktype</strong> : {NOLOCK, READLOCK, WRITELOCK}</p>
+<blockquote>
+<div><p>Type of lock to acquire before and release
+after calling <cite>fn</cite></p>
+</div></blockquote>
+<p><strong>*args :</strong></p>
+<blockquote>
+<div><p>Arguments passed to <cite>fn</cite></p>
+</div></blockquote>
+<p><strong>**kwargs :</strong></p>
+<blockquote>
+<div><p>Keyword arguments passed to <cite>fn</cite></p>
+</div></blockquote>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>future</strong> : <a class="reference external" href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Future" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">concurrent.futures.Future</span></code></a></p>
+<blockquote class="last">
+<div><p>Future containing the result of <code class="code docutils literal notranslate"><span class="pre">fn(table,</span> <span class="pre">*args,</span> <span class="pre">**kwargs)</span></code></p>
+</div></blockquote>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="contributing.html" class="btn btn-neutral float-right" title="Contributing" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="usage.html" class="btn btn-neutral float-left" title="Usage" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2019, National Research Foundation, South African Radio Astronomy Observatory
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

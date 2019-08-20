@@ -1,0 +1,462 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>daskms.dask_ms &mdash; dask-ms 0.1.9 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../../_static/jquery.js"></script>
+        <script type="text/javascript" src="../../_static/underscore.js"></script>
+        <script type="text/javascript" src="../../_static/doctools.js"></script>
+        <script type="text/javascript" src="../../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> dask-ms
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.1.9
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../readme.html">xarray Datasets from CASA Tables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../usage.html">Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../contributing.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../authors.html">Credits</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../history.html">History</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">dask-ms</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+      <li>daskms.dask_ms</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for daskms.dask_ms</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="k">import</span> <span class="n">absolute_import</span>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="k">import</span> <span class="n">division</span>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="k">import</span> <span class="n">print_function</span>
+
+<span class="kn">import</span> <span class="nn">collections</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+
+<span class="kn">import</span> <span class="nn">xarray</span> <span class="k">as</span> <span class="nn">xr</span>
+<span class="kn">from</span> <span class="nn">daskms.dataset</span> <span class="k">import</span> <span class="n">Dataset</span>
+<span class="kn">from</span> <span class="nn">daskms.reads</span> <span class="k">import</span> <span class="n">DatasetFactory</span>
+<span class="kn">from</span> <span class="nn">daskms.writes</span> <span class="k">import</span> <span class="n">write_datasets</span>
+<span class="kn">from</span> <span class="nn">daskms.utils</span> <span class="k">import</span> <span class="n">promote_columns</span>
+
+<span class="n">_DEFAULT_GROUP_COLUMNS</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;FIELD_ID&quot;</span><span class="p">,</span> <span class="s2">&quot;DATA_DESC_ID&quot;</span><span class="p">]</span>
+<span class="n">_DEFAULT_INDEX_COLUMNS</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;TIME&quot;</span><span class="p">]</span>
+
+<span class="n">log</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="xds_to_table"><a class="viewcode-back" href="../../api.html#daskms.xds_to_table">[docs]</a><span class="k">def</span> <span class="nf">xds_to_table</span><span class="p">(</span><span class="n">xds</span><span class="p">,</span> <span class="n">table_name</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generates a dask array which writes the</span>
+<span class="sd">    specified columns from an :class:`xarray.Dataset` into</span>
+<span class="sd">    the CASA table specified by ``table_name`` when</span>
+<span class="sd">    the :meth:`dask.array.Array.compute` method is called.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    xds : :class:`xarray.Dataset` or list of :class:`xarray.Dataset`</span>
+<span class="sd">        dataset(s) containing the specified columns. If a list of datasets</span>
+<span class="sd">        is provided, the concatenation of the columns in</span>
+<span class="sd">        sequential datasets will be written.</span>
+<span class="sd">    table_name : str</span>
+<span class="sd">        CASA table path</span>
+<span class="sd">    columns : tuple or list, optional</span>
+<span class="sd">        list of column names to write to the table.</span>
+<span class="sd">        If ``None`` all columns will be written.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    writes : :class:`dask.array.Array`</span>
+<span class="sd">        dask array representing the write to the</span>
+<span class="sd">        dataset.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Promote dataset to a list</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">xds</span><span class="p">,</span> <span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="nb">list</span><span class="p">)):</span>
+        <span class="n">xds</span> <span class="o">=</span> <span class="p">[</span><span class="n">xds</span><span class="p">]</span>
+
+    <span class="c1"># Produce a list of internal variable and dataset types</span>
+    <span class="c1"># from the xarray Dataset</span>
+    <span class="n">datasets</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">ds</span> <span class="ow">in</span> <span class="n">xds</span><span class="p">:</span>
+        <span class="n">variables</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="p">(</span><span class="n">v</span><span class="o">.</span><span class="n">dims</span><span class="p">,</span> <span class="n">v</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">v</span><span class="o">.</span><span class="n">attrs</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span>
+                     <span class="ow">in</span> <span class="n">ds</span><span class="o">.</span><span class="n">data_vars</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+
+        <span class="n">coords</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="p">(</span><span class="n">v</span><span class="o">.</span><span class="n">dims</span><span class="p">,</span> <span class="n">v</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">v</span><span class="o">.</span><span class="n">attrs</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span>
+                  <span class="ow">in</span> <span class="n">ds</span><span class="o">.</span><span class="n">coords</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+
+        <span class="n">datasets</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Dataset</span><span class="p">(</span><span class="n">variables</span><span class="p">,</span> <span class="n">attrs</span><span class="o">=</span><span class="n">ds</span><span class="o">.</span><span class="n">attrs</span><span class="p">,</span> <span class="n">coords</span><span class="o">=</span><span class="n">coords</span><span class="p">))</span>
+
+    <span class="c1"># Write the datasets</span>
+    <span class="k">return</span> <span class="n">write_datasets</span><span class="p">(</span><span class="n">table_name</span><span class="p">,</span> <span class="n">datasets</span><span class="p">,</span> <span class="n">columns</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="xds_from_table"><a class="viewcode-back" href="../../api.html#daskms.xds_from_table">[docs]</a><span class="k">def</span> <span class="nf">xds_from_table</span><span class="p">(</span><span class="n">table_name</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                   <span class="n">index_cols</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">group_cols</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                   <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generator producing multiple :class:`xarray.Dataset` objects</span>
+<span class="sd">    from CASA table ``table_name`` with the rows lexicographically</span>
+<span class="sd">    sorted according to the columns in ``index_cols``.</span>
+<span class="sd">    If ``group_cols`` is supplied, the table data is grouped into</span>
+<span class="sd">    multiple :class:`xarray.Dataset` objects, each associated with a</span>
+<span class="sd">    permutation of the unique values for the columns in ``group_cols``.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    Both ``group_cols`` and ``index_cols`` should consist of</span>
+<span class="sd">    columns that are part of the table index.</span>
+
+<span class="sd">    However, this may not always be possible as CASA tables</span>
+<span class="sd">    may not always contain indexing columns.</span>
+<span class="sd">    The ``ANTENNA`` or ``SPECTRAL_WINDOW`` Measurement Set subtables</span>
+<span class="sd">    are examples in which the ``row id`` serves as the index.</span>
+
+<span class="sd">    Generally, calling</span>
+
+<span class="sd">    .. code-block:: python</span>
+
+<span class="sd">        antds = list(xds_from_table(&quot;WSRT.MS::ANTENNA&quot;))</span>
+
+<span class="sd">    is fine, since the data associated with each row of the ``ANTENNA``</span>
+<span class="sd">    table has the same shape and so a dask or numpy array can be</span>
+<span class="sd">    constructed around the contents of the table.</span>
+
+<span class="sd">    This may not be the case for the ``SPECTRAL_WINDOW`` subtable.</span>
+<span class="sd">    Here, each row defines a separate spectral window, but each</span>
+<span class="sd">    spectral window may contain different numbers of frequencies.</span>
+<span class="sd">    In this case, it is probably better to group the subtable</span>
+<span class="sd">    by ``row``.</span>
+
+<span class="sd">    There is a *special* group column :code:`&quot;__row__&quot;`</span>
+<span class="sd">    that can be used to group the table by row.</span>
+
+<span class="sd">    .. code-block:: python</span>
+
+<span class="sd">        for spwds in xds_from_table(&quot;WSRT.MS::SPECTRAL_WINDOW&quot;,</span>
+<span class="sd">                                            group_cols=&quot;__row__&quot;):</span>
+<span class="sd">            ...</span>
+
+<span class="sd">    If :code:`&quot;__row__&quot;` is used for grouping, then no other</span>
+<span class="sd">    column may be used. It should also only be used for *small*</span>
+<span class="sd">    tables, as the number of datasets produced, may be prohibitively</span>
+<span class="sd">    large.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    table_name : str</span>
+<span class="sd">        CASA table</span>
+<span class="sd">    columns : list or tuple, optional</span>
+<span class="sd">        Columns present on the returned dataset.</span>
+<span class="sd">        Defaults to all if ``None``</span>
+<span class="sd">    index_cols  : list or tuple, optional</span>
+<span class="sd">        List of CASA table indexing columns. Defaults to :code:`()`.</span>
+<span class="sd">    group_cols : list or tuple, optional</span>
+<span class="sd">        List of columns on which to group the CASA table.</span>
+<span class="sd">        Defaults to :code:`()`</span>
+<span class="sd">    table_schema : dict or str or list of dict or str, optional</span>
+<span class="sd">        A schema dictionary defining the dimension naming scheme for</span>
+<span class="sd">        each column in the table. For example:</span>
+
+<span class="sd">        .. code-block:: python</span>
+
+<span class="sd">            {</span>
+<span class="sd">                &quot;UVW&quot;: {&#39;dask&#39;: {&#39;dims&#39;: (&#39;uvw&#39;,)}},</span>
+<span class="sd">                &quot;DATA&quot;: {&#39;dask&#39;: {&#39;dims&#39;: (&#39;chan&#39;, &#39;corr&#39;)}},</span>
+<span class="sd">            }</span>
+
+<span class="sd">        will result in the UVW and DATA arrays having dimensions</span>
+<span class="sd">        :code:`(&#39;row&#39;, &#39;uvw&#39;)` and :code:`(&#39;row&#39;, &#39;chan&#39;, &#39;corr&#39;)`</span>
+<span class="sd">        respectively.</span>
+
+<span class="sd">        A string can be supplied, which will be matched</span>
+<span class="sd">        against existing default schemas. Examples here include</span>
+<span class="sd">        ``MS``, ``ANTENNA`` and ``SPECTRAL_WINDOW``</span>
+<span class="sd">        corresponding to ``Measurement Sets`` the ``ANTENNA`` subtable</span>
+<span class="sd">        and the ``SPECTRAL_WINDOW`` subtable, respectively.</span>
+
+<span class="sd">        By default, the end of ``table_name`` will be</span>
+<span class="sd">        inspected to see if it matches any default schemas.</span>
+
+<span class="sd">        It is also possible to supply a list of strings or dicts defining</span>
+<span class="sd">        a sequence of schemas which are combined. Later elements in the</span>
+<span class="sd">        list override previous elements. In the following</span>
+<span class="sd">        example, the standard UVW MS component name scheme is overridden</span>
+<span class="sd">        with &quot;my-uvw&quot;.</span>
+
+<span class="sd">        .. code-block:: python</span>
+
+<span class="sd">            [&quot;MS&quot;, {&quot;UVW&quot;: {&#39;dask&#39;: {&#39;dims&#39;: (&#39;my-uvw&#39;,)}}}]</span>
+
+<span class="sd">    taql_where : str, optional</span>
+<span class="sd">        TAQL where clause. For example, to exclude auto-correlations</span>
+
+<span class="sd">        .. code-block:: python</span>
+
+<span class="sd">            xds_from_table(&quot;WSRT.MS&quot;, taql_where=&quot;ANTENNA1 != ANTENNA2&quot;)</span>
+
+<span class="sd">    chunks : list of dicts or dict, optional</span>
+<span class="sd">        A :code:`{dim: chunk}` dictionary, specifying the chunking</span>
+<span class="sd">        strategy of each dimension in the schema.</span>
+<span class="sd">        Defaults to :code:`{&#39;row&#39;: 100000 }`.</span>
+
+<span class="sd">        * If a dict, the chunking strategy is applied to each group.</span>
+<span class="sd">        * If a list of dicts, each element is applied</span>
+<span class="sd">          to the associated group. The last element is</span>
+<span class="sd">          extended over the remaining groups if there</span>
+<span class="sd">          are insufficient elements.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    datasets : list of :class:`xarray.Dataset`</span>
+<span class="sd">        datasets for each group, each ordered by indexing columns</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">columns</span> <span class="o">=</span> <span class="n">promote_columns</span><span class="p">(</span><span class="n">columns</span><span class="p">,</span> <span class="p">[])</span>
+    <span class="n">index_cols</span> <span class="o">=</span> <span class="n">promote_columns</span><span class="p">(</span><span class="n">index_cols</span><span class="p">,</span> <span class="p">[])</span>
+    <span class="n">group_cols</span> <span class="o">=</span> <span class="n">promote_columns</span><span class="p">(</span><span class="n">group_cols</span><span class="p">,</span> <span class="p">[])</span>
+
+    <span class="n">dask_datasets</span> <span class="o">=</span> <span class="n">DatasetFactory</span><span class="p">(</span><span class="n">table_name</span><span class="p">,</span> <span class="n">columns</span><span class="p">,</span>
+                                   <span class="n">group_cols</span><span class="p">,</span> <span class="n">index_cols</span><span class="p">,</span>
+                                   <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span><span class="o">.</span><span class="n">datasets</span><span class="p">()</span>
+
+    <span class="n">xarray_datasets</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">ds</span> <span class="ow">in</span> <span class="n">dask_datasets</span><span class="p">:</span>
+        <span class="n">data_vars</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">OrderedDict</span><span class="p">()</span>
+        <span class="n">coords</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">OrderedDict</span><span class="p">()</span>
+
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">ds</span><span class="o">.</span><span class="n">variables</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">data_vars</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">DataArray</span><span class="p">(</span><span class="n">v</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">dims</span><span class="o">=</span><span class="n">v</span><span class="o">.</span><span class="n">dims</span><span class="p">,</span> <span class="n">attrs</span><span class="o">=</span><span class="n">v</span><span class="o">.</span><span class="n">attrs</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">ds</span><span class="o">.</span><span class="n">coords</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">coords</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">DataArray</span><span class="p">(</span><span class="n">v</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">dims</span><span class="o">=</span><span class="n">v</span><span class="o">.</span><span class="n">dims</span><span class="p">,</span> <span class="n">attrs</span><span class="o">=</span><span class="n">v</span><span class="o">.</span><span class="n">attrs</span><span class="p">)</span>
+
+        <span class="n">xarray_datasets</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">xr</span><span class="o">.</span><span class="n">Dataset</span><span class="p">(</span><span class="n">data_vars</span><span class="p">,</span>
+                                          <span class="n">attrs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">ds</span><span class="o">.</span><span class="n">attrs</span><span class="p">),</span>
+                                          <span class="n">coords</span><span class="o">=</span><span class="n">coords</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="n">xarray_datasets</span></div>
+
+
+<div class="viewcode-block" id="xds_from_ms"><a class="viewcode-back" href="../../api.html#daskms.xds_from_ms">[docs]</a><span class="k">def</span> <span class="nf">xds_from_ms</span><span class="p">(</span><span class="n">ms</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">index_cols</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">group_cols</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generator yielding a series of xarray datasets representing</span>
+<span class="sd">    the contents a Measurement Set.</span>
+<span class="sd">    It defers to :func:`xds_from_table`, which should be consulted</span>
+<span class="sd">    for more information.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    ms : str</span>
+<span class="sd">        Measurement Set filename</span>
+<span class="sd">    columns : tuple or list, optional</span>
+<span class="sd">        Columns present on the resulting dataset.</span>
+<span class="sd">        Defaults to all if ``None``.</span>
+<span class="sd">    index_cols  : tuple or list, optional</span>
+<span class="sd">        Sequence of indexing columns.</span>
+<span class="sd">        Defaults to :code:`%(index)s`</span>
+<span class="sd">    group_cols  : tuple or list, optional</span>
+<span class="sd">        Sequence of grouping columns.</span>
+<span class="sd">        Defaults to :code:`%(parts)s`</span>
+<span class="sd">    **kwargs : optional</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    datasets : list of :class:`xarray.Dataset`</span>
+<span class="sd">        xarray datasets for each group</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">columns</span> <span class="o">=</span> <span class="n">promote_columns</span><span class="p">(</span><span class="n">columns</span><span class="p">,</span> <span class="p">[])</span>
+    <span class="n">index_cols</span> <span class="o">=</span> <span class="n">promote_columns</span><span class="p">(</span><span class="n">index_cols</span><span class="p">,</span> <span class="n">_DEFAULT_INDEX_COLUMNS</span><span class="p">)</span>
+    <span class="n">group_cols</span> <span class="o">=</span> <span class="n">promote_columns</span><span class="p">(</span><span class="n">group_cols</span><span class="p">,</span> <span class="n">_DEFAULT_GROUP_COLUMNS</span><span class="p">)</span>
+
+    <span class="n">kwargs</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;table_schema&quot;</span><span class="p">,</span> <span class="s2">&quot;MS&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">xds_from_table</span><span class="p">(</span><span class="n">ms</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="n">columns</span><span class="p">,</span>
+                          <span class="n">index_cols</span><span class="o">=</span><span class="n">index_cols</span><span class="p">,</span>
+                          <span class="n">group_cols</span><span class="o">=</span><span class="n">group_cols</span><span class="p">,</span>
+                          <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+
+<span class="c1"># Set docstring variables in try/except</span>
+<span class="c1"># ``__doc__`` may not be present as</span>
+<span class="c1"># ``python -OO`` strips docstrings</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="n">xds_from_ms</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">%=</span> <span class="p">{</span>
+        <span class="s1">&#39;index&#39;</span><span class="p">:</span> <span class="n">_DEFAULT_INDEX_COLUMNS</span><span class="p">,</span>
+        <span class="s1">&#39;parts&#39;</span><span class="p">:</span> <span class="n">_DEFAULT_GROUP_COLUMNS</span><span class="p">}</span>
+<span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+    <span class="k">pass</span>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2019, National Research Foundation, South African Radio Astronomy Observatory
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

@@ -1,0 +1,549 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>daskms.table_proxy &mdash; dask-ms 0.1.9 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../../_static/jquery.js"></script>
+        <script type="text/javascript" src="../../_static/underscore.js"></script>
+        <script type="text/javascript" src="../../_static/doctools.js"></script>
+        <script type="text/javascript" src="../../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> dask-ms
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.1.9
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../readme.html">xarray Datasets from CASA Tables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../usage.html">Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../contributing.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../authors.html">Credits</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../history.html">History</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">dask-ms</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+      <li>daskms.table_proxy</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for daskms.table_proxy</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="k">import</span> <span class="n">absolute_import</span>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="k">import</span> <span class="n">division</span>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="k">import</span> <span class="n">print_function</span>
+
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">threading</span> <span class="k">import</span> <span class="n">Lock</span>
+<span class="kn">import</span> <span class="nn">weakref</span>
+
+<span class="kn">from</span> <span class="nn">dask.base</span> <span class="k">import</span> <span class="n">normalize_token</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">six</span>
+<span class="kn">import</span> <span class="nn">pyrap.tables</span> <span class="k">as</span> <span class="nn">pt</span>
+<span class="kn">from</span> <span class="nn">daskms.table_executor</span> <span class="k">import</span> <span class="n">Executor</span>
+
+<span class="n">log</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="n">_table_cache</span> <span class="o">=</span> <span class="n">weakref</span><span class="o">.</span><span class="n">WeakValueDictionary</span><span class="p">()</span>
+<span class="n">_table_lock</span> <span class="o">=</span> <span class="n">Lock</span><span class="p">()</span>
+
+<span class="c1"># CASA Table Locking Modes</span>
+<span class="n">NOLOCK</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="n">READLOCK</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">WRITELOCK</span> <span class="o">=</span> <span class="mi">2</span>
+
+<span class="n">_LOCKTYPE_STRINGS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="mi">0</span><span class="p">:</span> <span class="s1">&#39;NOLOCK&#39;</span><span class="p">,</span>
+    <span class="mi">1</span><span class="p">:</span> <span class="s1">&#39;READLOCK&#39;</span><span class="p">,</span>
+    <span class="mi">2</span><span class="p">:</span> <span class="s1">&#39;WRITELOCK&#39;</span>
+<span class="p">}</span>
+
+
+<span class="c1"># List of CASA Table methods to proxy and the appropriate locking mode</span>
+<span class="n">_proxied_methods</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="c1"># Queries</span>
+    <span class="p">(</span><span class="s2">&quot;nrows&quot;</span><span class="p">,</span> <span class="n">READLOCK</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">&quot;colnames&quot;</span><span class="p">,</span> <span class="n">READLOCK</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">&quot;getcoldesc&quot;</span><span class="p">,</span> <span class="n">READLOCK</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">&quot;getdminfo&quot;</span><span class="p">,</span> <span class="n">READLOCK</span><span class="p">),</span>
+    <span class="c1"># Modification</span>
+    <span class="p">(</span><span class="s2">&quot;addrows&quot;</span><span class="p">,</span> <span class="n">WRITELOCK</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">&quot;addcols&quot;</span><span class="p">,</span> <span class="n">WRITELOCK</span><span class="p">),</span>
+    <span class="c1"># Reads</span>
+    <span class="p">(</span><span class="s2">&quot;getcol&quot;</span><span class="p">,</span> <span class="n">READLOCK</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">&quot;getcolnp&quot;</span><span class="p">,</span> <span class="n">READLOCK</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">&quot;getvarcol&quot;</span><span class="p">,</span> <span class="n">READLOCK</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">&quot;getcellslice&quot;</span><span class="p">,</span> <span class="n">READLOCK</span><span class="p">),</span>
+    <span class="c1"># Writes</span>
+    <span class="p">(</span><span class="s2">&quot;putcol&quot;</span><span class="p">,</span> <span class="n">WRITELOCK</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">&quot;putcolnp&quot;</span><span class="p">,</span> <span class="n">WRITELOCK</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">&quot;putvarcol&quot;</span><span class="p">,</span> <span class="n">WRITELOCK</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">&quot;putcellslice&quot;</span><span class="p">,</span> <span class="n">WRITELOCK</span><span class="p">)]</span>
+
+
+<span class="n">_PROXY_DOCSTRING</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">Proxies calls to :func:`~pyrap.tables.table.</span><span class="si">%s</span><span class="s2">`</span>
+<span class="s2">via a :class:`~concurrent.futures.ThreadPoolExecutor`</span>
+
+<span class="s2">Returns</span>
+<span class="s2">-------</span>
+<span class="s2">future : :class:`concurrent.futures.Future`</span>
+<span class="s2">    Future containing the result of the call</span>
+<span class="s2">&quot;&quot;&quot;</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">proxied_method_factory</span><span class="p">(</span><span class="n">method</span><span class="p">,</span> <span class="n">locktype</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Proxy pyrap.tables.table.method calls.</span>
+
+<span class="sd">    Creates a private implementation function which performs</span>
+<span class="sd">    the call locked according to to ``locktype``.</span>
+
+<span class="sd">    The private implementation is accessed by a public ``method``</span>
+<span class="sd">    which submits a call to the implementation</span>
+<span class="sd">    on a concurrent.futures.ThreadPoolExecutor.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_acquire</span><span class="p">(</span><span class="n">locktype</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_table</span><span class="p">,</span> <span class="n">method</span><span class="p">)(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_release</span><span class="p">(</span><span class="n">locktype</span><span class="p">)</span>
+
+    <span class="n">_impl</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">=</span> <span class="n">method</span> <span class="o">+</span> <span class="s2">&quot;_impl&quot;</span>
+    <span class="n">_impl</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;Calls table.</span><span class="si">%s</span><span class="s2">, wrapped in a </span><span class="si">%s</span><span class="s2">.&quot;</span> <span class="o">%</span>
+                     <span class="p">(</span><span class="n">method</span><span class="p">,</span> <span class="n">_LOCKTYPE_STRINGS</span><span class="p">[</span><span class="n">locktype</span><span class="p">]))</span>
+
+    <span class="k">def</span> <span class="nf">public_method</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Submits _impl(args, kwargs) to the executor</span>
+<span class="sd">        and returns a Future</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ex</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">_impl</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="n">public_method</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">=</span> <span class="n">method</span>
+    <span class="n">public_method</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">=</span> <span class="n">_PROXY_DOCSTRING</span> <span class="o">%</span> <span class="n">method</span>
+
+    <span class="k">return</span> <span class="n">public_method</span>
+
+
+<span class="k">def</span> <span class="nf">_hasher</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Recursively hash data structures -- handles list and dicts &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="nb">list</span><span class="p">,</span> <span class="nb">set</span><span class="p">)):</span>
+        <span class="k">return</span> <span class="nb">hash</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">_hasher</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">args</span><span class="p">))</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">hash</span><span class="p">(</span><span class="nb">tuple</span><span class="p">((</span><span class="n">k</span><span class="p">,</span> <span class="n">_hasher</span><span class="p">(</span><span class="n">v</span><span class="p">))</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">items</span><span class="p">())))</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+        <span class="c1"># NOTE(sjperkins)</span>
+        <span class="c1"># https://stackoverflow.com/a/16592241/1611416</span>
+        <span class="c1"># Slowish, but we shouldn&#39;t be passing</span>
+        <span class="c1"># huge numpy arrays in the TableProxy constructor</span>
+        <span class="k">return</span> <span class="nb">hash</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">tostring</span><span class="p">())</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">hash</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+
+
+<span class="k">class</span> <span class="nc">TableProxyMetaClass</span><span class="p">(</span><span class="nb">type</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    https://en.wikipedia.org/wiki/Multiton_pattern</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">bases</span><span class="p">,</span> <span class="n">dct</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">method</span><span class="p">,</span> <span class="n">locktype</span> <span class="ow">in</span> <span class="n">_proxied_methods</span><span class="p">:</span>
+            <span class="n">proxy_method</span> <span class="o">=</span> <span class="n">proxied_method_factory</span><span class="p">(</span><span class="n">method</span><span class="p">,</span> <span class="n">locktype</span><span class="p">)</span>
+            <span class="n">dct</span><span class="p">[</span><span class="n">method</span><span class="p">]</span> <span class="o">=</span> <span class="n">proxy_method</span>
+
+        <span class="k">return</span> <span class="nb">type</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">bases</span><span class="p">,</span> <span class="n">dct</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="n">_hasher</span><span class="p">((</span><span class="bp">cls</span><span class="p">,)</span> <span class="o">+</span> <span class="n">args</span> <span class="o">+</span> <span class="p">(</span><span class="n">kwargs</span><span class="p">,))</span>
+
+        <span class="k">with</span> <span class="n">_table_lock</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">_table_cache</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+            <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+                <span class="n">instance</span> <span class="o">=</span> <span class="nb">type</span><span class="o">.</span><span class="fm">__call__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+                <span class="n">_table_cache</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">instance</span>
+                <span class="k">return</span> <span class="n">instance</span>
+
+
+<span class="k">def</span> <span class="nf">proxy_delete_reference</span><span class="p">(</span><span class="n">table_proxy</span><span class="p">,</span> <span class="n">table</span><span class="p">):</span>
+    <span class="c1"># http://pydev.blogspot.com/2015/01/creating-safe-cyclic-reference.html</span>
+    <span class="c1"># To avoid cyclic references, table_proxy may not be used within _callback</span>
+    <span class="k">def</span> <span class="nf">_callback</span><span class="p">(</span><span class="n">ref</span><span class="p">):</span>
+        <span class="c1"># We close the table **without** using the executor due to</span>
+        <span class="c1"># reentrancy issues with Python queues and garbage collection</span>
+        <span class="c1"># https://codewithoutrules.com/2017/08/16/concurrency-python/</span>
+        <span class="c1"># There could be internal casacore issues here, due to accessing</span>
+        <span class="c1"># the table from a different thread, but test cases are passing</span>
+        <span class="n">tabstr</span> <span class="o">=</span> <span class="nb">hash</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">table</span><span class="p">))</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Begin closing </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">tabstr</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">table</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;Error closing </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">tabstr</span><span class="p">)</span>
+            <span class="k">raise</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Finished closing </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">tabstr</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">weakref</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="n">table_proxy</span><span class="p">,</span> <span class="n">_callback</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_map_create_proxy</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">factory</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Support pickling of kwargs in TableProxy.__reduce__ &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">factory</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+
+<span class="k">class</span> <span class="nc">MismatchedLocks</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+    <span class="k">pass</span>
+
+
+<span class="k">def</span> <span class="nf">taql_factory</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s1">&#39;Python&#39;</span><span class="p">,</span> <span class="n">tables</span><span class="o">=</span><span class="p">[]):</span>
+    <span class="sd">&quot;&quot;&quot; Calls pt.taql, converting TableProxy&#39;s in tables to pyrap tables &quot;&quot;&quot;</span>
+    <span class="n">tabs</span> <span class="o">=</span> <span class="p">[</span><span class="n">t</span><span class="o">.</span><span class="n">_table</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">tables</span><span class="p">]</span>
+
+    <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">tables</span><span class="p">:</span>
+        <span class="n">t</span><span class="o">.</span><span class="n">_acquire</span><span class="p">(</span><span class="n">READLOCK</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">pt</span><span class="o">.</span><span class="n">taql</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="n">style</span><span class="p">,</span> <span class="n">tables</span><span class="o">=</span><span class="n">tabs</span><span class="p">)</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">tables</span><span class="p">:</span>
+            <span class="n">t</span><span class="o">.</span><span class="n">_release</span><span class="p">(</span><span class="n">READLOCK</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="TableProxy"><a class="viewcode-back" href="../../api.html#daskms.TableProxy">[docs]</a><span class="nd">@six</span><span class="o">.</span><span class="n">add_metaclass</span><span class="p">(</span><span class="n">TableProxyMetaClass</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">TableProxy</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Proxies calls to a :class:`pyrap.tables.table` object via</span>
+<span class="sd">    a :class:`concurrent.futures.ThreadPoolExecutor`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">factory</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="c1"># Save the arguments as keys for pickling and tokenising</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_factory</span> <span class="o">=</span> <span class="n">factory</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_args</span> <span class="o">=</span> <span class="n">args</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_kwargs</span> <span class="o">=</span> <span class="n">kwargs</span>
+
+        <span class="n">ex</span> <span class="o">=</span> <span class="n">Executor</span><span class="p">()</span>
+        <span class="n">table</span> <span class="o">=</span> <span class="n">ex</span><span class="o">.</span><span class="n">impl</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">factory</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span><span class="o">.</span><span class="n">result</span><span class="p">()</span>
+
+        <span class="c1"># Ensure tables are closed when the object is deleted</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_del_ref</span> <span class="o">=</span> <span class="n">proxy_delete_reference</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">table</span><span class="p">)</span>
+
+        <span class="c1"># Store a reference to the Executor wrapper class</span>
+        <span class="c1"># so that the Executor is retained while this TableProxy</span>
+        <span class="c1"># still lives</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_ex_wrapper</span> <span class="o">=</span> <span class="n">ex</span>
+        <span class="c1"># Reference to the internal ThreadPoolExecutor</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_ex</span> <span class="o">=</span> <span class="n">ex</span><span class="o">.</span><span class="n">impl</span>
+
+        <span class="c1"># Private, should be inaccessible</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_table</span> <span class="o">=</span> <span class="n">table</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_readlocks</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_writelocks</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_write</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_writeable</span> <span class="o">=</span> <span class="n">table</span><span class="o">.</span><span class="n">iswritable</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">__reduce__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Defer to _map_create_proxy to support kwarg pickling &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">_map_create_proxy</span><span class="p">,</span> <span class="p">(</span><span class="n">TableProxy</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_factory</span><span class="p">,</span>
+                                    <span class="bp">self</span><span class="o">.</span><span class="n">_args</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_kwargs</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="nf">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">evalue</span><span class="p">,</span> <span class="n">etype</span><span class="p">,</span> <span class="n">etraceback</span><span class="p">):</span>
+        <span class="k">pass</span>
+
+    <span class="k">def</span> <span class="nf">__runner</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fn</span><span class="p">,</span> <span class="n">locktype</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_acquire</span><span class="p">(</span><span class="n">locktype</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">fn</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_table</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_release</span><span class="p">(</span><span class="n">locktype</span><span class="p">)</span>
+
+<div class="viewcode-block" id="TableProxy.submit"><a class="viewcode-back" href="../../api.html#daskms.TableProxy.submit">[docs]</a>    <span class="k">def</span> <span class="nf">submit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fn</span><span class="p">,</span> <span class="n">locktype</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Submits :code:`fn(table, *args, **kwargs)` within</span>
+<span class="sd">        the executor, returning a Future.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        fn : callable</span>
+<span class="sd">            Function with signature :code:`fn(table, *args, **kwargs)`</span>
+<span class="sd">        locktype : {NOLOCK, READLOCK, WRITELOCK}</span>
+<span class="sd">            Type of lock to acquire before and release</span>
+<span class="sd">            after calling `fn`</span>
+<span class="sd">        *args :</span>
+<span class="sd">            Arguments passed to `fn`</span>
+<span class="sd">        **kwargs :</span>
+<span class="sd">            Keyword arguments passed to `fn`</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        future : :class:`concurrent.futures.Future`</span>
+<span class="sd">            Future containing the result of :code:`fn(table, *args, **kwargs)`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ex</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__runner</span><span class="p">,</span> <span class="n">fn</span><span class="p">,</span> <span class="n">locktype</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="nf">_acquire</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">locktype</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Acquire a lock on the table</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        This should **only** be called from within the associated Executor</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">locktype</span> <span class="o">==</span> <span class="n">READLOCK</span><span class="p">:</span>
+            <span class="c1"># No locks at all, acquire readlock</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_readlocks</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">_writelocks</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_table</span><span class="o">.</span><span class="n">lock</span><span class="p">(</span><span class="n">write</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_readlocks</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">elif</span> <span class="n">locktype</span> <span class="o">==</span> <span class="n">WRITELOCK</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_writeable</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Table is not writeable&quot;</span><span class="p">)</span>
+
+            <span class="c1"># Acquire writelock if we had none previously</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_writelocks</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_table</span><span class="o">.</span><span class="n">lock</span><span class="p">(</span><span class="n">write</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_write</span> <span class="o">=</span> <span class="kc">True</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_writelocks</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">elif</span> <span class="n">locktype</span> <span class="o">==</span> <span class="n">NOLOCK</span><span class="p">:</span>
+            <span class="k">pass</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid lock type </span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">locktype</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_release</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">locktype</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Release a lock on the table</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        This should **only** be called from within the associated Executor</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">locktype</span> <span class="o">==</span> <span class="n">READLOCK</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_readlocks</span> <span class="o">-=</span> <span class="mi">1</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_readlocks</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_writelocks</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="c1"># Should be write-locked, check the invariant</span>
+                    <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_write</span> <span class="ow">is</span> <span class="kc">True</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="c1"># Release all locks</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_table</span><span class="o">.</span><span class="n">unlock</span><span class="p">()</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_write</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_readlocks</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">MismatchedLocks</span><span class="p">(</span><span class="s2">&quot;mismatched readlocks&quot;</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="n">locktype</span> <span class="o">==</span> <span class="n">WRITELOCK</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_writelocks</span> <span class="o">-=</span> <span class="mi">1</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_writelocks</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_readlocks</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="c1"># Downgrade from write to read lock if</span>
+                    <span class="c1"># there are any remaining readlocks</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_write</span> <span class="o">=</span> <span class="kc">False</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_table</span><span class="o">.</span><span class="n">lock</span><span class="p">(</span><span class="n">write</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="c1"># Release all locks</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_write</span> <span class="o">=</span> <span class="kc">False</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_table</span><span class="o">.</span><span class="n">unlock</span><span class="p">()</span>
+            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_writelocks</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">MismatchedLocks</span><span class="p">(</span><span class="s2">&quot;mismatched writelocks&quot;</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="n">locktype</span> <span class="o">==</span> <span class="n">NOLOCK</span><span class="p">:</span>
+            <span class="k">pass</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid lock type </span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">locktype</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;TableProxy(</span><span class="si">%s</span><span class="s2">, </span><span class="si">%s</span><span class="s2">, </span><span class="si">%s</span><span class="s2">)&quot;</span> <span class="o">%</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_factory</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
+            <span class="s2">&quot;,&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_args</span><span class="p">),</span>
+            <span class="s2">&quot;,&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">=</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">k</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">v</span><span class="p">))</span>
+                     <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_kwargs</span><span class="o">.</span><span class="n">items</span><span class="p">()))</span>
+
+    <span class="fm">__str__</span> <span class="o">=</span> <span class="fm">__repr__</span></div>
+
+
+<span class="nd">@normalize_token</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">TableProxy</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">_normalize_table_proxy_tokens</span><span class="p">(</span><span class="n">tp</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Generate tokens based on TableProxy arguments &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">tp</span><span class="o">.</span><span class="n">_factory</span><span class="p">,</span> <span class="n">tp</span><span class="o">.</span><span class="n">_args</span><span class="p">,</span> <span class="n">tp</span><span class="o">.</span><span class="n">_kwargs</span><span class="p">)</span>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2019, National Research Foundation, South African Radio Astronomy Observatory
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
