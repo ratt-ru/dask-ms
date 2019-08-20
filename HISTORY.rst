@@ -5,6 +5,10 @@ History
 0.1.10 (YYYY-MM-DD)
 -------------------
 
+* Allow chunking by arbitrary dimensions (:pr:`41`)
+* Add a simple Dataset, making xarray an optional dependency. (:pr:`41`)
+* Add support for writing new tables from Datasets (:pr:`41`)
+* Add support for appending to tables from Datasets (:pr:`41`)
 * Correctly promote singleton column arguments (:pr:`40`)
 * Make TableProxy pickleable (:pr:`39`)
 * Replace deprecated logging.warn with logging.warning (:pr:`37`)

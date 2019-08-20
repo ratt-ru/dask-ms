@@ -1,7 +1,8 @@
-FROM kernsuite/base:dev
+FROM kernsuite/base:5
 RUN docker-apt-install python3-pip python3-casacore
 RUN pip3 install --upgrade pip setuptools
 ADD . /code
 WORKDIR /code
 RUN pip3 install .[testing]
-RUN py.test -s -vvv /code/xarrayms
+RUN pip3 freeze
+RUN py.test --flake8 -s -vvv /code/xarrayms
