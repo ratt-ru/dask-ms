@@ -48,47 +48,46 @@ Example Usage
     import dask.array as da
     from daskms import xds_from_table, xds_to_table
 
-    # Create xarray dataset from Measurement Set "WSRT.MS"
+    # Create xarray datasets from Measurement Set "WSRT.MS"
     ds = xds_from_table("WSRT.MS")
-    # Set the flag DataArray to it's inverse
-    ds['flag'] = (ds.flag.dims, da.logical_not(ds.flag))
+    # Set the flag DataArray on first Dataset to it's inverse
+    ds[0]['flag'] = (ds[0].flag.dims, da.logical_not(ds[0].flag))
     # Write the flag column back to the Measurement Set
     xds_to_table(ds, "WSRT.MS", "FLAG").compute()
 
     print ds
 
-    <xarray.Dataset>
-    Dimensions:         ((u,v,w): 3, chan: 64, corr: 4, row: 6552, table_row: 6552)
-    Coordinates:
-      * row             (row) int32 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 ...
-      * table_row       (table_row) int32 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 ...
-    Dimensions without coordinates: (u,v,w), chan, corr
-    Data variables:
-        ANTENNA1        (row) int32 dask.array<shape=(6552,), chunksize=(1000,)>
-        ANTENNA2        (row) int32 dask.array<shape=(6552,), chunksize=(1000,)>
-        ARRAY_ID        (row) int32 dask.array<shape=(6552,), chunksize=(1000,)>
-        CORRECTED_DATA  (row, chan, corr) complex64 dask.array<shape=(6552, 64, 4), chunksize=(1000, 64, 4)>
-        DATA            (row, chan, corr) complex64 dask.array<shape=(6552, 64, 4), chunksize=(1000, 64, 4)>
-        EXPOSURE        (row) float64 dask.array<shape=(6552,), chunksize=(1000,)>
-        FEED1           (row) int32 dask.array<shape=(6552,), chunksize=(1000,)>
-        FEED2           (row) int32 dask.array<shape=(6552,), chunksize=(1000,)>
-        FLAG            (row, chan, corr) bool dask.array<shape=(6552, 64, 4), chunksize=(1000, 64, 4)>
-        FLAG_ROW        (row) bool dask.array<shape=(6552,), chunksize=(1000,)>
-        IMAGING_WEIGHT  (row, chan) float32 dask.array<shape=(6552, 64), chunksize=(1000, 64)>
-        INTERVAL        (row) float64 dask.array<shape=(6552,), chunksize=(1000,)>
-        MODEL_DATA      (row, chan, corr) complex64 dask.array<shape=(6552, 64, 4), chunksize=(1000, 64, 4)>
-        OBSERVATION_ID  (row) int32 dask.array<shape=(6552,), chunksize=(1000,)>
-        PROCESSOR_ID    (row) int32 dask.array<shape=(6552,), chunksize=(1000,)>
-        SCAN_NUMBER     (row) int32 dask.array<shape=(6552,), chunksize=(1000,)>
-        SIGMA           (row, corr) float32 dask.array<shape=(6552, 4), chunksize=(1000, 4)>
-        STATE_ID        (row) int32 dask.array<shape=(6552,), chunksize=(1000,)>
-        TIME            (row) float64 dask.array<shape=(6552,), chunksize=(1000,)>
-        TIME_CENTROID   (row) float64 dask.array<shape=(6552,), chunksize=(1000,)>
-        UVW             (row, (u,v,w)) float64 dask.array<shape=(6552, 3), chunksize=(1000, 3)>
-        WEIGHT          (row, corr) float32 dask.array<shape=(6552, 4), chunksize=(1000, 4)>
-    Attributes:
-        FIELD_ID:      0
-        DATA_DESC_ID:  0
+  [<xarray.Dataset>
+   Dimensions:         (chan: 64, corr: 4, row: 6552, uvw: 3)
+   Coordinates:
+       ROWID           (row) int32 dask.array<shape=(6552,), chunksize=(6552,)>
+   Dimensions without coordinates: chan, corr, row, uvw
+   Data variables:
+       IMAGING_WEIGHT  (row, chan) float32 dask.array<shape=(6552, 64), chunksize=(6552, 64)>
+       ANTENNA1        (row) int32 dask.array<shape=(6552,), chunksize=(6552,)>
+       STATE_ID        (row) int32 dask.array<shape=(6552,), chunksize=(6552,)>
+       EXPOSURE        (row) float64 dask.array<shape=(6552,), chunksize=(6552,)>
+       MODEL_DATA      (row, chan, corr) complex64 dask.array<shape=(6552, 64, 4), chunksize=(6552, 64, 4)>
+       FLAG_ROW        (row) bool dask.array<shape=(6552,), chunksize=(6552,)>
+       CORRECTED_DATA  (row, chan, corr) complex64 dask.array<shape=(6552, 64, 4), chunksize=(6552, 64, 4)>
+       PROCESSOR_ID    (row) int32 dask.array<shape=(6552,), chunksize=(6552,)>
+       WEIGHT          (row, corr) float32 dask.array<shape=(6552, 4), chunksize=(6552, 4)>
+       FLAG            (row, chan, corr) bool dask.array<shape=(6552, 64, 4), chunksize=(6552, 64, 4)>
+       TIME            (row) float64 dask.array<shape=(6552,), chunksize=(6552,)>
+       SIGMA           (row, corr) float32 dask.array<shape=(6552, 4), chunksize=(6552, 4)>
+       SCAN_NUMBER     (row) int32 dask.array<shape=(6552,), chunksize=(6552,)>
+       INTERVAL        (row) float64 dask.array<shape=(6552,), chunksize=(6552,)>
+       OBSERVATION_ID  (row) int32 dask.array<shape=(6552,), chunksize=(6552,)>
+       TIME_CENTROID   (row) float64 dask.array<shape=(6552,), chunksize=(6552,)>
+       ARRAY_ID        (row) int32 dask.array<shape=(6552,), chunksize=(6552,)>
+       ANTENNA2        (row) int32 dask.array<shape=(6552,), chunksize=(6552,)>
+       DATA            (row, chan, corr) complex64 dask.array<shape=(6552, 64, 4), chunksize=(6552, 64, 4)>
+       FEED1           (row) int32 dask.array<shape=(6552,), chunksize=(6552,)>
+       FEED2           (row) int32 dask.array<shape=(6552,), chunksize=(6552,)>
+       UVW             (row, uvw) float64 dask.array<shape=(6552, 3), chunksize=(6552, 3)>
+   Attributes:
+       FIELD_ID:      0
+       DATA_DESC_ID:  0]
 
 -------------
 Documentation
