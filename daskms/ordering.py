@@ -4,8 +4,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import sys
-
 import dask
 import dask.array as da
 from dask.array.core import normalize_chunks
