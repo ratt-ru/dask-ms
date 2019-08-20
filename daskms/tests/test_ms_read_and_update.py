@@ -47,6 +47,7 @@ def test_ms_read(ms, group_cols, index_cols, select_cols):
 
     with TableProxy(pt.table, ms, lockoptions='auto', ack=False) as T:
         for ds in xds:
+            assert "ROWID" in ds.coords
             group_col_values = [ds.attrs[a] for a in group_cols]
             where = where_clause(group_cols, group_col_values)
             query = "SELECT * FROM $1 %s %s" % (where, order)
