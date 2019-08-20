@@ -1,4 +1,4 @@
-Welcome to xarray-ms's documentation!
+Welcome to dask-ms's documentation!
 ======================================
 
 .. toctree::

@@ -1,6 +1,6 @@
 import argparse
 import dask
-from xarrayms import xds_from_table, xds_from_ms, xds_to_table, TableProxy
+from daskms import xds_from_table, xds_from_ms, xds_to_table, TableProxy
 
 from sched_context import scheduler_context
 
