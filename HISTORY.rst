@@ -5,7 +5,6 @@ History
 0.1.10 (YYYY-MM-DD)
 -------------------
 
-
 * Rename xarray-ms to dask-ms (:pr:`42`)
 * Allow chunking by arbitrary dimensions (:pr:`41`)
 * Add a simple Dataset, making xarray an optional dependency. (:pr:`41`)
