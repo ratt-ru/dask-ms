@@ -10,6 +10,7 @@ services:
 before_install:
   - true
 install:
+  - pip install .
   - pip install -r requirements.readthedocs.txt
   - pip install travis-sphinx
   - find .
