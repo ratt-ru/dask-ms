@@ -57,14 +57,10 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
         variables = {k: (v.dims, v.data, v.attrs) for k, v
                      in ds.data_vars.items()}
 
-        try:
-            rowid = ds.coords['ROWID']
-        except KeyError:
-            pass
-        else:
-            variables["ROWID"] = (rowid.dims, rowid.data, rowid.attrs)
+        coords = {k: (v.dims, v.data, v.attrs) for k, v
+                  in ds.coords.items()}
 
-        datasets.append(Dataset(variables, attrs=ds.attrs))
+        datasets.append(Dataset(variables, attrs=ds.attrs, coords=coords))
 
     # Write the datasets
     return write_datasets(table_name, datasets, columns)
@@ -202,16 +198,13 @@ def xds_from_table(table_name, columns=None,
 
     for ds in dask_datasets:
         data_vars = collections.OrderedDict()
+        coords = collections.OrderedDict()
 
         for k, v in ds.variables.items():
             data_vars[k] = xr.DataArray(v.data, dims=v.dims, attrs=v.attrs)
 
-        try:
-            rowid = data_vars.pop('ROWID')
-        except KeyError:
-            coords = None
-        else:
-            coords = {"ROWID": rowid}
+        for k, v in ds.coords.items():
+            coords[k] = xr.DataArray(v.data, dims=v.dims, attrs=v.attrs)
 
         xarray_datasets.append(xr.Dataset(data_vars,
                                           attrs=dict(ds.attrs),

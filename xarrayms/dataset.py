@@ -103,35 +103,43 @@ def data_var_chunks(data_vars):
     return chunks
 
 
+def _convert_to_variable(k, v):
+    """ Converts ``v`` to a :class:`xarrayms.dataset.Variable` """
+    if isinstance(v, Variable):
+        return v
+
+    if not isinstance(v, (tuple, list)) and len(v) not in (2, 3):
+        raise ValueError("'%s' must be a (dims, array) or "
+                         "(dims, array, attrs) tuple. "
+                         "Got '%s' instead," % (k, type(v)))
+
+    dims = v[0]
+    data = v[1]
+    attrs = v[2] if len(v) > 2 else {}
+
+    if len(dims) != data.ndim:
+        raise ValueError("Dimension schema '%s' does "
+                         "not match shape of associated array %s"
+                         % (dims, data.shape))
+
+    return Variable(dims, data, attrs)
+
+
 class Dataset(object):
     """
     Poor man's xarray Dataset. It mostly exists so that xarray can
     be an optional dependency, as it in turn depends on pandas
     which is a fairly heavy dependency
     """
-    def __init__(self, data_vars, attrs=None):
-        self._data_vars = {}
+    def __init__(self, data_vars, attrs=None, coords=None):
+        self._data_vars = {k: _convert_to_variable(k, v)
+                           for k, v in data_vars.items()}
 
-        for k, v in data_vars.items():
-            if isinstance(v, Variable):
-                self._data_vars[k] = v
-                continue
-
-            if not isinstance(v, (tuple, list)) and len(v) not in (2, 3):
-                raise ValueError("'%s' must be a (dims, array) or "
-                                 "(dims, array, attrs) tuple. "
-                                 "Got '%s' instead," % (k, type(v)))
-
-            dims = v[0]
-            var = v[1]
-            var_attrs = v[2] if len(v) > 2 else {}
-
-            if len(dims) != var.ndim:
-                raise ValueError("Dimension schema '%s' does "
-                                 "not match shape of associated array %s"
-                                 % (dims, var))
-
-            self._data_vars[k] = Variable(dims, var, var_attrs)
+        if coords is not None:
+            self._coords = {k: _convert_to_variable(k, v)
+                            for k, v in coords.items()}
+        else:
+            self._coords = {}
 
         self._attrs = attrs or {}
 
@@ -152,6 +160,10 @@ class Dataset(object):
     @property
     def variables(self):
         return Frozen(self._data_vars)
+
+    @property
+    def coords(self):
+        return Frozen(self._coords)
 
     def assign(self, **kwargs):
         data_vars = self._data_vars.copy()
