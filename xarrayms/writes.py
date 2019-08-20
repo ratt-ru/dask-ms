@@ -13,10 +13,14 @@ import numpy as np
 import pyrap.tables as pt
 
 from xarrayms.columns import dim_extents_array
+from xarrayms.descriptors.builder import AbstractDescriptorBuilder
+from xarrayms.descriptors.builder_factory import filename_builder_factory
+from xarrayms.descriptors.builder_factory import string_builder_factory
 from xarrayms.ordering import row_run_factory
 from xarrayms.table import table_exists
 from xarrayms.table_proxy import TableProxy, WRITELOCK
 from xarrayms.utils import short_table_name
+
 
 log = logging.getLogger(__name__)
 
@@ -98,13 +102,12 @@ def putter_wrapper(row_orders, *args):
 
 
 def descriptor_builder(table, descriptor):
-    from xarrayms.descriptors.builder_factory import filename_builder_factory
-    from xarrayms.descriptors.builder_factory import string_builder_factory
-
     if descriptor is None:
         return filename_builder_factory(table)
-
-    return string_builder_factory(descriptor)
+    elif isinstance(descriptor, AbstractDescriptorBuilder):
+        return descriptor
+    else:
+        return string_builder_factory(descriptor)
 
 
 def _create_table(table, datasets, columns, descriptor):
@@ -113,7 +116,6 @@ def _create_table(table, datasets, columns, descriptor):
 
     from xarrayms.descriptors.ms import MSDescriptorBuilder
     from xarrayms.descriptors.ms_subtable import MSSubTableDescriptorBuilder
-    from xarrayms.utils import short_table_name
 
     if isinstance(builder, MSDescriptorBuilder):
         # Create the MS
