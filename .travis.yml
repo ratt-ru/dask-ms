@@ -26,4 +26,4 @@ deploy:
   on:
     tags: true
     branch: master
-    repo: ska-sa/xarray-ms
+    repo: ska-sa/dask-ms

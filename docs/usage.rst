@@ -2,6 +2,6 @@
 Usage
 =====
 
-To use xarray-ms in a project::
+To use dask-ms in a project::
 
-    import xarrayms
+    import daskms

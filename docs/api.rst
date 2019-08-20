@@ -1,11 +1,11 @@
 API
 ===
 
-.. autofunction:: xarrayms.xds_from_ms
+.. autofunction:: daskms.xds_from_ms
 
-.. autofunction:: xarrayms.xds_from_table
+.. autofunction:: daskms.xds_from_table
 
-.. autofunction:: xarrayms.xds_to_table
+.. autofunction:: daskms.xds_to_table
 
-.. autoclass:: xarrayms.TableProxy
+.. autoclass:: daskms.TableProxy
     :members:

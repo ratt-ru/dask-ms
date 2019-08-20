@@ -94,7 +94,7 @@ def object_getcolslice(row_runs, table_proxy, column, result,
             # NOTE(sjperkins)
             # Dask wants ndarrays internally, so we asarray objects
             # the returning list of objects.
-            # See https://github.com/ska-sa/xarray-ms/issues/42
+            # See https://github.com/ska-sa/dask-ms/issues/42
             result[rr:rr + rl] = np.asarray(getcolslice(column, blc, trc,
                                                         startrow=rs, nrow=rl),
                                             dtype=dtype)

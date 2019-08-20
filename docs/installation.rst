@@ -8,13 +8,13 @@ Installation
 Stable release
 --------------
 
-To install xarray-ms, run this command in your terminal:
+To install dask-ms, run this command in your terminal:
 
 .. code-block:: console
 
-    $ pip install xarray-ms
+    $ pip install dask-ms
 
-This is the preferred method to install xarray-ms, as it will always install the most recent stable release.
+This is the preferred method to install dask-ms, as it will always install the most recent stable release.
 
 If you don't have `pip`_ installed, this `Python installation guide`_ can guide
 you through the process.
@@ -26,19 +26,19 @@ you through the process.
 From sources
 ------------
 
-The sources for xarray-ms can be downloaded from the `Github repo`_.
+The sources for dask-ms can be downloaded from the `Github repo`_.
 
 You can either clone the public repository:
 
 .. code-block:: console
 
-    $ git clone git://github.com/ska-sa/xarray-ms
+    $ git clone git://github.com/ska-sa/dask-ms
 
 Or download the `tarball`_:
 
 .. code-block:: console
 
-    $ curl  -OL https://github.com/ska-sa/xarray-ms/tarball/master
+    $ curl  -OL https://github.com/ska-sa/dask-ms/tarball/master
 
 Once you have a copy of the source, you can install it with:
 
@@ -47,5 +47,5 @@ Once you have a copy of the source, you can install it with:
     $ python setup.py install
 
 
-.. _Github repo: https://github.com/ska-sa/xarray-ms
-.. _tarball: https://github.com/ska-sa/xarray-ms/tarball/master
+.. _Github repo: https://github.com/ska-sa/dask-ms
+.. _tarball: https://github.com/ska-sa/dask-ms/tarball/master

@@ -35,11 +35,11 @@ def readme():
         return f.read()
 
 
-setup(name='xarray-ms',
+setup(name='dask-ms',
       version='0.1.9',
       description='xarray Datasets from CASA Tables.',
       long_description=readme(),
-      url='http://github.com/ska-sa/xarray-ms',
+      url='http://github.com/ska-sa/dask-ms',
       classifiers=[
           "Development Status :: 3 - Alpha",
           "Intended Audience :: Developers",

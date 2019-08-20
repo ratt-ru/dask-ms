@@ -2,14 +2,14 @@
 xarray Datasets from CASA Tables
 ================================
 
-.. image:: https://img.shields.io/pypi/v/xarray-ms.svg
-        :target: https://pypi.python.org/pypi/xarray-ms
+.. image:: https://img.shields.io/pypi/v/dask-ms.svg
+        :target: https://pypi.python.org/pypi/dask-ms
 
-.. image:: https://img.shields.io/travis/ska-sa/xarray-ms.svg
-        :target: https://travis-ci.org/ska-sa/xarray-ms
+.. image:: https://img.shields.io/travis/ska-sa/dask-ms.svg
+        :target: https://travis-ci.org/ska-sa/dask-ms
 
-.. image:: https://readthedocs.org/projects/xarray-ms/badge/?version=latest
-        :target: https://xarray-ms.readthedocs.io/en/latest/?badge=latest
+.. image:: https://readthedocs.org/projects/dask-ms/badge/?version=latest
+        :target: https://dask-ms.readthedocs.io/en/latest/?badge=latest
         :alt: Documentation Status
 
 Constructs xarray_ ``Datasets`` from CASA Tables via python-casacore_.
@@ -25,7 +25,7 @@ Radio Astronomy algorithms.
 .. code-block:: python
 
     import dask.array as da
-    from xarrayms import xds_from_table, xds_to_table
+    from daskms import xds_from_table, xds_to_table
 
     # Create xarray dataset from Measurement Set "WSRT.MS"
     ds = xds_from_table("WSRT.MS")
@@ -73,7 +73,7 @@ Radio Astronomy algorithms.
 Documentation
 -------------
 
-https://xarray-ms.readthedocs.io.
+https://dask-ms.readthedocs.io.
 
 -----------
 Limitations
@@ -81,14 +81,14 @@ Limitations
 
 1. Many Measurement Sets columns are defined as variably shaped,
    but the actual data is fixed.
-   xarray-ms_ will infer the shape of the
+   dask-ms_ will infer the shape of the
    data from the first row and must be consistent
    with that of other rows.
    For example, this may be issue where multiple Spectral Windows
    are present in the Measurement Set with differing channels
    per SPW.
 
-   xarray-ms_ works around this by partitioning the
+   dask-ms_ works around this by partitioning the
    Measurement Set into multiple datasets.
    The first row's shape is used to infer the shape of the partition.
    Thus, in the case of multiple Spectral Window's, we can partition
@@ -96,6 +96,6 @@ Limitations
    each Spectral Window.
 
 .. _dask: https://dask.pydata.org
-.. _xarray-ms: https://github.com/ska-sa/xarray-ms
+.. _dask-ms: https://github.com/ska-sa/dask-ms
 .. _xarray: https://xarray.pydata.org
 .. _python-casacore: https://github.com/casacore/python-casacore

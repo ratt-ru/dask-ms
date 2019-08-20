@@ -9,7 +9,7 @@ if "%SPHINXBUILD%" == "" (
 )
 set SOURCEDIR=.
 set BUILDDIR=_build
-set SPHINXPROJ=xarrayms
+set SPHINXPROJ=daskms
 
 if "%1" == "" goto help
 

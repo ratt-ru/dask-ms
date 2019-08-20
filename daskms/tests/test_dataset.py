@@ -133,7 +133,7 @@ def test_dataset_writes(ms, select_cols,
         # NOTE(sjperkins)
         # Interesting behaviour here. If these objects are not
         # cleared up at this point, attempts to re-open the table below
-        # can fail, reproducing https://github.com/ska-sa/xarray-ms/issues/26
+        # can fail, reproducing https://github.com/ska-sa/dask-ms/issues/26
         # Adding auto-locking to the table opening command seems to fix
         # this somehow
         del ds, new_ds, datasets, writes
