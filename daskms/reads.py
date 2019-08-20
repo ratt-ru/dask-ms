@@ -291,10 +291,17 @@ class DatasetFactory(object):
 
         if single_row:
             # ROWID is assigned as an attribute
-            del variables['ROWID']
+            variables.pop('ROWID', None)
             return Dataset(variables, attrs={"ROWID": exemplar_row})
         else:
-            return Dataset(variables)
+            try:
+                rowid = variables.pop("ROWID")
+            except KeyError:
+                coords = None
+            else:
+                coords = {"ROWID": rowid}
+
+            return Dataset(variables, coords=coords)
 
     def _group_datasets(self, groups, exemplar_rows, orders):
         table_proxy = self._table_proxy()
@@ -331,10 +338,19 @@ class DatasetFactory(object):
                                                        order, group_chunks,
                                                        array_prefix)
 
+            # Extract ROWID
+            try:
+                rowid = group_var_dims.pop("ROWID")
+            except KeyError:
+                coords = None
+            else:
+                coords = {"ROWID": rowid}
+
             # Assign values for the dataset's grouping columns
             # as attributes
             attrs = dict(zip(self.group_cols, group_id))
-            datasets.append(Dataset(group_var_dims, attrs=attrs))
+            datasets.append(Dataset(group_var_dims, attrs=attrs,
+                                    coords=coords))
 
         return datasets
 

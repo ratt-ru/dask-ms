@@ -183,7 +183,7 @@ class Dataset(object):
             else:
                 data_vars[k] = v
 
-        return Dataset(data_vars, attrs=self._attrs)
+        return Dataset(data_vars, attrs=self._attrs, coords=self._coords)
 
     def __getattr__(self, name):
         try:
