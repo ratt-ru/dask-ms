@@ -70,7 +70,7 @@ class AbstractDescriptorBuilder(object):
             datasets = list(datasets)
 
         for ds in datasets:
-            for column, variable in ds.variables.items():
+            for column, variable in ds.data_vars.items():
                 variables[column].append(variable)
 
         return variables

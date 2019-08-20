@@ -159,7 +159,7 @@ class Dataset(object):
         return data_var_chunks(self._data_vars)
 
     @property
-    def variables(self):
+    def data_vars(self):
         return Frozen(self._data_vars)
 
     @property
@@ -192,6 +192,16 @@ class Dataset(object):
             pass
 
         try:
+            return self._coords[name]
+        except KeyError:
+            pass
+
+        try:
             return self._attrs[name]
         except KeyError:
             raise AttributeError("Invalid Attribute %s" % name)
+
+    def copy(self):
+        return Dataset(self._data_vars,
+                       attrs=self._attrs.copy(),
+                       coords=self._coords)

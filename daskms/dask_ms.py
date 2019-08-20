@@ -7,7 +7,11 @@ from __future__ import print_function
 import collections
 import logging
 
-import xarray as xr
+try:
+    import xarray as xr
+except ImportError:
+    xr = None
+
 from daskms.dataset import Dataset
 from daskms.reads import DatasetFactory
 from daskms.writes import write_datasets
@@ -22,7 +26,7 @@ log = logging.getLogger(__name__)
 def xds_to_table(xds, table_name, columns=None, **kwargs):
     """
     Generates a dask array which writes the
-    specified columns from an :class:`xarray.Dataset` into
+    specified columns from :class:`xarray.Dataset`'s into
     the CASA table specified by ``table_name`` when
     the :meth:`dask.array.Array.compute` method is called.
 
@@ -49,18 +53,29 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
     if not isinstance(xds, (tuple, list)):
         xds = [xds]
 
-    # Produce a list of internal variable and dataset types
-    # from the xarray Dataset
     datasets = []
 
-    for ds in xds:
-        variables = {k: (v.dims, v.data, v.attrs) for k, v
-                     in ds.data_vars.items()}
+    # No xarray available, assume dask datasets
+    if xr is None:
+        datasets = xds
+    else:
+        for ds in xds:
+            if isinstance(ds, Dataset):
+                # Already a dask dataset
+                datasets.append(ds)
+            elif isinstance(ds, xr.Dataset):
+                # Produce a list of internal variable and dataset types
+                # from the xarray Dataset
+                variables = {k: (v.dims, v.data, v.attrs) for k, v
+                             in ds.data_vars.items()}
 
-        coords = {k: (v.dims, v.data, v.attrs) for k, v
-                  in ds.coords.items()}
+                coords = {k: (v.dims, v.data, v.attrs) for k, v
+                          in ds.coords.items()}
 
-        datasets.append(Dataset(variables, attrs=ds.attrs, coords=coords))
+                dds = Dataset(variables, attrs=ds.attrs, coords=coords)
+                datasets.append(dds)
+            else:
+                raise TypeError("Invalid Dataset type '%s'" % type(ds))
 
     # Write the datasets
     return write_datasets(table_name, datasets, columns)
@@ -70,7 +85,7 @@ def xds_from_table(table_name, columns=None,
                    index_cols=None, group_cols=None,
                    **kwargs):
     """
-    Generator producing multiple :class:`xarray.Dataset` objects
+    Create multiple :class:`xarray.Dataset` objects
     from CASA table ``table_name`` with the rows lexicographically
     sorted according to the columns in ``index_cols``.
     If ``group_cols`` is supplied, the table data is grouped into
@@ -194,13 +209,17 @@ def xds_from_table(table_name, columns=None,
                                    group_cols, index_cols,
                                    **kwargs).datasets()
 
+    # Return dask datasets if xarray is not available
+    if xr is None:
+        return dask_datasets
+
     xarray_datasets = []
 
     for ds in dask_datasets:
         data_vars = collections.OrderedDict()
         coords = collections.OrderedDict()
 
-        for k, v in ds.variables.items():
+        for k, v in ds.data_vars.items():
             data_vars[k] = xr.DataArray(v.data, dims=v.dims, attrs=v.attrs)
 
         for k, v in ds.coords.items():

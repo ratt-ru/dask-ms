@@ -190,7 +190,7 @@ def update_datasets(table, datasets, columns, descriptor):
     # those without (which imply appends to the MS)
     # are handled last
     sorted_datasets = sorted(enumerate(datasets),
-                             key=lambda t: ("ROWID" not in t[1].variables,
+                             key=lambda t: ("ROWID" not in t[1].data_vars,
                                             t[0]))
 
     # Establish row orders for each dataset
@@ -222,7 +222,7 @@ def update_datasets(table, datasets, columns, descriptor):
     assert len(row_orders) == len(datasets)
 
     for (di, ds), row_order in zip(sorted_datasets, row_orders):
-        data_vars = ds.variables
+        data_vars = ds.data_vars
 
         # Generate a dask array for each column
         for column in columns:
@@ -368,7 +368,7 @@ def add_row_order_factory(table_proxy, datasets):
     row_add_ops = []
 
     for di, ds in enumerate(datasets):
-        data_vars = ds.variables
+        data_vars = ds.data_vars
         found = False
 
         for k, (dims, array, _) in data_vars.items():
@@ -415,7 +415,7 @@ def create_datasets(table_name, datasets, columns, descriptor):
     writes = []
 
     for di, (ds, row_order) in enumerate(zip(datasets, row_orders)):
-        data_vars = ds.variables
+        data_vars = ds.data_vars
 
         for column in columns:
             try:
@@ -469,7 +469,7 @@ def write_datasets(table, datasets, columns, descriptor=None):
 
     # If no columns are defined, write all dataset variables by default
     if not columns:
-        columns = set.union(*(set(ds.variables.keys()) for ds in datasets))
+        columns = set.union(*(set(ds.data_vars.keys()) for ds in datasets))
         columns = list(sorted(columns))
 
     if not table_exists(table):

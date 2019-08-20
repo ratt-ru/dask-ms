@@ -11,7 +11,6 @@ import numpy as np
 from numpy.testing import assert_array_equal
 import pyrap.tables as pt
 import pytest
-import xarray as xr
 
 
 from daskms.query import orderby_clause, where_clause
@@ -110,9 +109,9 @@ def test_ms_update(ms, group_cols, index_cols, select_cols):
         data = data.astype(data_dtype)
         written_data.append(data)
 
-        state = xr.DataArray(state, dims=['row'])
-        data = xr.DataArray(data, dims=['row', 'chan', 'corr'])
-        nds = ds.assign(STATE_ID=state, DATA=data)
+        nds = ds.assign(STATE_ID=(("row",), state),
+                        DATA=(("row", "chan", "corr"), data))
+
         write = xds_to_table(nds, ms, ["STATE_ID", "DATA"])
         writes.append(write)
 
@@ -218,8 +217,8 @@ def test_fragmented_ms(ms, group_cols, index_cols):
             # Now write some data to the STATE_ID column
             state = da.arange(i, i + ds.dims['row'], chunks=ds.chunks['row'])
             written_states.append(state)
-            state = xr.DataArray(state, dims=['row'])
-            nds = ds.assign(STATE_ID=state)
+
+            nds = ds.assign(STATE_ID=(("row",), state))
 
             with patch(patch_target, side_effect=mock_row_runs) as patch_fn:
                 xds_to_table(nds, ms, "STATE_ID",
@@ -306,23 +305,25 @@ def test_taql_where(ms, index_cols):
 
     assert len(xds) == 7
 
-    xds = [ds.compute() for ds in xds]
-
-    assert np.all(xds[0].FIELD_ID == 0)
-    assert np.all(xds[1].FIELD_ID == 0)
-    assert np.all(xds[2].FIELD_ID == 0)
-    assert np.all(xds[3].FIELD_ID == 1)
-    assert np.all(xds[4].FIELD_ID == 1)
-    assert np.all(xds[5].FIELD_ID == 1)
-    assert np.all(xds[6].FIELD_ID == 1)
+    assert np.all(xds[0].FIELD_ID.data.compute() == 0)
+    assert np.all(xds[1].FIELD_ID.data.compute() == 0)
+    assert np.all(xds[2].FIELD_ID.data.compute() == 0)
+    assert np.all(xds[3].FIELD_ID.data.compute() == 1)
+    assert np.all(xds[4].FIELD_ID.data.compute() == 1)
+    assert np.all(xds[5].FIELD_ID.data.compute() == 1)
+    assert np.all(xds[6].FIELD_ID.data.compute() == 1)
 
 
 def _proc_map_fn(args):
-    ms, i = args
-    xds = xds_from_ms(ms, columns=["STATE_ID"], group_cols=["FIELD_ID"])
-    xds[i] = xds[i].assign(STATE_ID=xds[i].STATE_ID + i)
-    write = xds_to_table(xds[i], ms, ["STATE_ID"])
-    write.compute(scheduler='sync')
+    try:
+        ms, i = args
+        xds = xds_from_ms(ms, columns=["STATE_ID"], group_cols=["FIELD_ID"])
+        xds[i] = xds[i].assign(STATE_ID=(("row",), xds[i].STATE_ID.data + i))
+        write = xds_to_table(xds[i], ms, ["STATE_ID"])
+        write.compute(scheduler='sync')
+    except Exception as e:
+        print(str(e))
+
     return True
 
 
@@ -365,5 +366,5 @@ def test_column_promotion(ms):
     xds = xds_from_ms(ms, group_cols="SCAN_NUMBER", columns=("DATA"))
 
     for ds in xds:
-        assert "DATA" in ds
+        assert "DATA" in ds.data_vars
         assert list(ds.attrs.keys()) == ["SCAN_NUMBER"]
