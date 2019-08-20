@@ -22,6 +22,27 @@ The intention behind this package is to support the Measurement Set as
 a data source and sink for the purposes of writing parallel, distributed
 Radio Astronomy algorithms.
 
+Installation
+============
+
+To install with xarray_ support:
+
+.. code-block:: bash
+
+  $ pip install dask-ms[xarray]
+
+Without xarray_ similar, but reduced Dataset functionality is replicated
+in dask-ms itself. Expert users may wish to use this option to reduce
+python package dependencies.
+
+.. code-block:: bash
+
+  $ pip install dask-ms
+
+Example Usage
+=============
+
+
 .. code-block:: python
 
     import dask.array as da
