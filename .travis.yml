@@ -12,13 +12,13 @@ before_install:
 install:
   - pip install -r requirements.readthedocs.txt
   - pip install travis-sphinx
-  - docker build . -t ${TARGET} -f .travis/${TARGET}.docker
+  # - docker build . -t ${TARGET} -f .travis/${TARGET}.docker
 before_script:
   - true
 script:
-  - travis-sphinx build --source=doc/ -b test-travis-sphinx
+  - travis-sphinx build --source=doc/
 after_success:
-  - travis-sphinx deploy
+  - travis-sphinx deploy -b test-travis-sphinx
 deploy:
   provider: pypi
   user: sperkins
