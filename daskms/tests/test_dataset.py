@@ -348,3 +348,21 @@ def test_dataset_create_table(tmp_path, dataset_chunks, dtype):
         assert row_sum == T.nrows()
         assert_array_equal(T.getcol("DATA"), np.concatenate(datas))
         assert_array_equal(T.getcol("NAMES"), names)
+
+
+def test_dataset_computes_and_values(ms):
+    datasets = read_datasets(ms, [], [], [])
+    assert len(datasets) == 1
+    ds = datasets[0]
+
+    # All dask arrays
+    for k, v in ds.data_vars.items():
+        assert isinstance(v.data, da.Array)
+
+    nds = ds.compute()
+
+    # Now we have numpy arrays that match original data
+    for k, v in nds.data_vars.items():
+        assert isinstance(v.data, np.ndarray)
+        assert_array_equal(v.data, ds.data_vars[k].data)
+        assert_array_equal(v.values, ds.data_vars[k].data)

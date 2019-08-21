@@ -25,4 +25,6 @@ def table_descriptor(table):
 
 
 def table_exists(table):
+    table = table.replace("::", os.sep)
+
     return os.path.exists(table) and os.path.isdir(table)

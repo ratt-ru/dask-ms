@@ -173,15 +173,14 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
     else:
         try:
             # Get an exemplar row and infer the shape
-            exemplar = table_proxy.getcol(column, exemplar_row,
-                                          nrow=1).result()
+            exemplar = table_proxy.getcell(column, exemplar_row).result()
         except Exception as e:
             raise ColumnMetadataError("Unable to infer shape of "
                                       "column '%s' due to:\n'%s'"
                                       % (column, str(e)))
 
         if isinstance(exemplar, np.ndarray):
-            shape = exemplar.shape[1:]
+            shape = exemplar.shape
 
             # Double-check the dtype
             if dtype != exemplar.dtype:
@@ -204,7 +203,7 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
     try:
         dims = table_schema[column]['dask']['dims']
     except KeyError:
-        dims = tuple("%s-%d" % (column, i) for i in range(1, len(shape)))
+        dims = tuple("%s-%d" % (column, i) for i in range(len(shape)))
 
     dim_chunks = []
 

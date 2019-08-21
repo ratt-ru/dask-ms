@@ -11,6 +11,7 @@ except ImportError:
 
 from collections import namedtuple
 
+import dask
 import dask.array as da
 
 
@@ -54,6 +55,13 @@ class Variable(namedtuple("_Variable", ["dims", "data", "attrs"])):
             return self.data.chunks
 
         return None
+
+    @property
+    def values(self):
+        if isinstance(self.data, da.Array):
+            return self.data.compute()
+
+        return self.data
 
     @property
     def shape(self):
@@ -166,6 +174,27 @@ class Dataset(object):
     def coords(self):
         return Frozen(self._coords)
 
+    def compute(self):
+        vnames, vdims, vdata, vattrs = zip(*tuple((k, v.dims, v.data, v.attrs)
+                                                  for k, v
+                                                  in self._data_vars.items()))
+
+        cnames, cdims, cdata, cattrs = zip(*tuple((k, v.dims, v.data, v.attrs)
+                                                  for k, v
+                                                  in self._coords.items()))
+
+        vdata, cdata = dask.compute(vdata, cdata)
+
+        data_vars = {n: (d, v, a) for n, d, v, a
+                     in zip(vnames, vdims, vdata, vattrs)}
+
+        coords = {n: (d, v, a) for n, d, v, a
+                  in zip(cnames, cdims, cdata, cattrs)}
+
+        return Dataset(data_vars,
+                       attrs=self._attrs.copy(),
+                       coords=coords)
+
     def assign(self, **kwargs):
         data_vars = self._data_vars.copy()
 
@@ -183,7 +212,9 @@ class Dataset(object):
             else:
                 data_vars[k] = v
 
-        return Dataset(data_vars, attrs=self._attrs, coords=self._coords)
+        return Dataset(data_vars,
+                       attrs=self._attrs.copy(),
+                       coords=self._coords)
 
     def __getattr__(self, name):
         try:
