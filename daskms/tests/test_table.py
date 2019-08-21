@@ -4,11 +4,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from os.path import join as pjoin
-
 from daskms.table import table_exists
-
-import pytest
 
 
 def test_table_exists(tmp_path):
