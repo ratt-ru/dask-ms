@@ -139,7 +139,7 @@ def spw_chan_freqs():
 def spw_table(tmp_path_factory, spw_chan_freqs):
     """ Simulate a SPECTRAL_WINDOW table with two spectral windows """
     spw_dir = tmp_path_factory.mktemp("spw_dir", numbered=True)
-    fn = os.path.join(str(spw_dir), "test.ms::SPECTRAL_WINDOW")
+    fn = os.path.join(str(spw_dir), "SPECTRAL_WINDOW")
 
     create_table_query = """
     CREATE TABLE %s
@@ -188,7 +188,7 @@ def wsrt_antenna_positions():
 @pytest.fixture
 def ant_table(tmp_path_factory, wsrt_antenna_positions):
     ant_dir = tmp_path_factory.mktemp("ant_dir", numbered=True)
-    fn = os.path.join(str(ant_dir), "test.ms::ANTENNA")
+    fn = os.path.join(str(ant_dir), "ANTENNA")
 
     create_table_query = """
     CREATE TABLE %s
