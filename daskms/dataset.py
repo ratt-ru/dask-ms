@@ -175,16 +175,36 @@ class Dataset(object):
         return Frozen(self._coords)
 
     def compute(self):
-        vnames, vdims, vdata, vattrs = zip(*tuple((k, v.dims, v.data, v.attrs)
-                                                  for k, v
-                                                  in self._data_vars.items()))
+        # Separate out the variable components
+        # so that we can compute the data arrays separately
+        vnames = []
+        vdims = []
+        vdata = []
+        vattrs = []
 
-        cnames, cdims, cdata, cattrs = zip(*tuple((k, v.dims, v.data, v.attrs)
-                                                  for k, v
-                                                  in self._coords.items()))
+        for k, v in self._data_vars.items():
+            vnames.append(k)
+            vdims.append(v.dims)
+            vdata.append(v.data)
+            vattrs.append(v.attrs)
 
+        # Separate out the coordinate components
+        # so that we can compute the data arrays separately
+        cnames = []
+        cdims = []
+        cdata = []
+        cattrs = []
+
+        for k, v in self._coords.items():
+            cnames.append(k)
+            cdims.append(v.dims)
+            cdata.append(v.data)
+            cattrs.append(v.attrs)
+
+        # Compute list of arrays
         vdata, cdata = dask.compute(vdata, cdata)
 
+        # Reform variable and coordinate arrays
         data_vars = {n: (d, v, a) for n, d, v, a
                      in zip(vnames, vdims, vdata, vattrs)}
 
