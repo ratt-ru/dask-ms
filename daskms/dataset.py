@@ -125,7 +125,7 @@ def _convert_to_variable(k, v):
     data = v[1]
     attrs = v[2] if len(v) > 2 else {}
 
-    if len(dims) != data.ndim:
+    if len(dims) > 0 and len(dims) != data.ndim:
         raise ValueError("Dimension schema '%s' does "
                          "not match shape of associated array %s"
                          % (dims, data.shape))
