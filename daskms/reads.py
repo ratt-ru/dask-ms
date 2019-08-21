@@ -324,6 +324,9 @@ class DatasetFactory(object):
             try:
                 group_chunks = self.chunks[g]   # Get group chunking strategy
             except IndexError:
+                log.warning("A chunk dictionary was unavailable for "
+                            "dataset %d. Re-using dataset %d's chunk "
+                            "dictionary.", g, len(self.chunks) - 1)
                 group_chunks = self.chunks[-1]  # Re-use last group's chunks
 
             # Prefix d
