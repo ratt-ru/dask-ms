@@ -53,6 +53,8 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
     if not isinstance(xds, (tuple, list)):
         xds = [xds]
 
+    columns = promote_columns(columns, [])
+
     datasets = []
 
     # No xarray available, assume dask datasets
