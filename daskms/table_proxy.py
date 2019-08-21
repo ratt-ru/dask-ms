@@ -45,6 +45,7 @@ _proxied_methods = [
     ("getcol", READLOCK),
     ("getcolnp", READLOCK),
     ("getvarcol", READLOCK),
+    ("getcell", READLOCK),
     ("getcellslice", READLOCK),
     # Writes
     ("putcol", WRITELOCK),
