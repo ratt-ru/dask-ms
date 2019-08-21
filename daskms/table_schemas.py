@@ -98,7 +98,7 @@ POLARIZATION = {
         'dask': {'dims': ('corr',)},
     },
     "CORR_PRODUCT": {
-        'dask': {'corr', 'corrprod_idx'},
+        'dask': {'dims': ('corr', 'corrprod_idx')},
     },
 }
 
