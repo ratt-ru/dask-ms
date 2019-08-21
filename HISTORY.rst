@@ -2,8 +2,8 @@
 History
 =======
 
-0.1.10 (YYYY-MM-DD)
--------------------
+0.2.0 (YYYY-MM-DD)
+------------------
 
 * Make xarray an optional dependency (:pr:`45`)
 * Rename xarray-ms to dask-ms (:pr:`43`)
