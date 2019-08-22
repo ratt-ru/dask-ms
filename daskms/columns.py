@@ -5,12 +5,15 @@ from __future__ import division
 from __future__ import print_function
 
 from collections import OrderedDict, namedtuple
+import logging
 from pprint import pformat
 
 import dask
 import dask.array as da
 from dask.highlevelgraph import HighLevelGraph
 import numpy as np
+
+log = logging.getLogger(__name__)
 
 # Map column string types to numpy/python types
 _TABLE_TO_PY = OrderedDict({
@@ -142,18 +145,11 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
         raise ColumnMetadataError("Column '%s' has no option "
                                   "in the column descriptor" % column)
 
-    # Each row can be any shape whatsoever
-    # NOTE(sjperkins)
-    # This is almost certainly not worth the hassle of supporting
-    if ndim == -1:
-        raise ColumnMetadataError("Unconstrained shapes in column '%s' "
-                                  "(ndim == %d) are not currently handled"
-                                  % (column, ndim))
     # Each row is a scalar
     # TODO(sjperkins)
     # Probably could be handled by getCell/putCell calls,
     # but the effort may not be worth it
-    elif ndim == 0:
+    if ndim == 0:
         raise ColumnMetadataError("Scalars in column '%s' "
                                   "(ndim == %d) are not currently handled"
                                   % (column, ndim))
@@ -179,14 +175,9 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
                                       "column '%s' due to:\n'%s'"
                                       % (column, str(e)))
 
+        # Try figure out the shape
         if isinstance(exemplar, np.ndarray):
             shape = exemplar.shape
-
-            # Double-check the dtype
-            if dtype != exemplar.dtype:
-                raise ColumnMetadataError("Inferred dtype '%s' does not match "
-                                          "the exemplar dtype '%s'" %
-                                          (dtype, exemplar.dtype))
         elif isinstance(exemplar, list):
             shape = (len(exemplar),)
             assert dtype == object
@@ -194,7 +185,21 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
             raise ColumnMetadataError("Unhandled exemplar "
                                       "type '%s'" % type(exemplar))
 
-        if len(shape) != ndim:
+        # Double-check the dtype
+        if dtype != exemplar.dtype:
+            raise ColumnMetadataError("Inferred dtype '%s' does not match "
+                                      "the exemplar dtype '%s'" %
+                                      (dtype, exemplar.dtype))
+
+        # NOTE(sjperkins)
+        # -1 implies each row can be any shape whatsoever
+        # Log a warning
+        if ndim == -1:
+            log.warning("The shape of column '%s' is unconstrained "
+                        "(ndim == -1). Assuming shape is %s from "
+                        "exemplar", column, shape)
+        # Otherwise confirm the shape and ndim
+        elif len(shape) != ndim:
             raise ColumnMetadataError("'ndim=%d' in column descriptor doesn't "
                                       "match shape of exemplar=%s" %
                                       (ndim, shape))
