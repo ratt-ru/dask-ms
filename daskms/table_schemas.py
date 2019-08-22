@@ -153,6 +153,27 @@ SPECTRAL_WINDOW_SCHEMA = {
     },
 }
 
+SOURCE_SCHEMA = {
+    "DIRECTION": {
+        'dask': {'dims': ('radec',)}
+    },
+    "POSITION": {
+        'dask': {'dims': ('position',)}
+    },
+    "PROPER_MOTION": {
+        'dask': {'dims': ('radec_per_sec',)}
+    },
+    "REST_FREQUENCY": {
+        'dask': {'dims': ('lines',)}
+    },
+    "SYSVEL": {
+        'dask': {'dims': ('lines',)}
+    },
+    "TRANSITION": {
+        'dask': {'dims': ('lines',)}
+    },
+}
+
 _SUBTABLE_SCHEMAS = {
     "ANTENNA": ANTENNA_SCHEMA,
     "FEED": FEED_SCHEMA,
@@ -160,6 +181,7 @@ _SUBTABLE_SCHEMAS = {
     "OBSERVATION": OBSERVATION_SCHEMA,
     "POINTING": POINTING_SCHEMA,
     "POLARIZATION": POLARIZATION_SCHEMA,
+    "SOURCE": SOURCE_SCHEMA,
     "SPECTRAL_WINDOW": SPECTRAL_WINDOW_SCHEMA,
 }
 
