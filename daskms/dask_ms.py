@@ -23,7 +23,7 @@ _DEFAULT_INDEX_COLUMNS = ["TIME"]
 log = logging.getLogger(__name__)
 
 
-def xds_to_table(xds, table_name, columns=None, **kwargs):
+def xds_to_table(xds, table_name, columns=None, descriptor=None):
     """
     Generates a dask array which writes the
     specified columns from :class:`xarray.Dataset`'s into
@@ -41,6 +41,15 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
     columns : tuple or list, optional
         list of column names to write to the table.
         If ``None`` all columns will be written.
+    descriptor : None or \
+        :class:`~daskms.descriptors.builder.AbstractBuilderFactory` or \
+        str
+
+        A class describing how CASA table descriptors and data managers
+        are constructors. Some defaults are available such
+        as `ms` and `ms_subtable`.
+
+        If None, defaults are used.
 
     Returns
     -------
@@ -80,7 +89,8 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
                 raise TypeError("Invalid Dataset type '%s'" % type(ds))
 
     # Write the datasets
-    return write_datasets(table_name, datasets, columns)
+    return write_datasets(table_name, datasets, columns,
+                          descriptor=descriptor)
 
 
 def xds_from_table(table_name, columns=None,
