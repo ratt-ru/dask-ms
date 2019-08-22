@@ -152,6 +152,7 @@ def test_dataset_updates(ms, select_cols,
             assert ds.STATE_ID.attrs['keywords'] == expected_kws
 
         del ds, datasets
+        assert_liveness(0, 0)
     finally:
         # Restore original STATE_ID
         with pt.table(ms, ack=False, readonly=False, lockoptions='auto') as T:
