@@ -25,9 +25,10 @@ from daskms.table_schemas import (lookup_table_schema,
     ("test.ms::ANTENNA", ANTENNA_SCHEMA),
     ("test.ms::FEED", FEED_SCHEMA),
     ("test.ms::FIELD", FIELD_SCHEMA),
-    ("test.ms::SPECTRAL_WINDOW", SPECTRAL_WINDOW_SCHEMA),
+    ("test.ms::OBSERVATION", OBSERVATION_SCHEMA),
     ("test.ms::POINTING", POINTING_SCHEMA),
-    ("test.ms::POLARIZATION", POLARIZATION_SCHEMA)])
+    ("test.ms::POLARIZATION", POLARIZATION_SCHEMA),
+    ("test.ms::SPECTRAL_WINDOW", SPECTRAL_WINDOW_SCHEMA)])
 def test_table_suffix_lookup(filename, schema):
     assert schema == lookup_table_schema(filename, None)
 
