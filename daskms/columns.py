@@ -178,18 +178,18 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
         # Try figure out the shape
         if isinstance(exemplar, np.ndarray):
             shape = exemplar.shape
+
+            # Double-check the dtype
+            if dtype != exemplar.dtype:
+                raise ColumnMetadataError("Inferred dtype '%s' does not match "
+                                          "the exemplar dtype '%s'" %
+                                          (dtype, exemplar.dtype))
         elif isinstance(exemplar, list):
             shape = (len(exemplar),)
             assert dtype == object
         else:
             raise ColumnMetadataError("Unhandled exemplar "
                                       "type '%s'" % type(exemplar))
-
-        # Double-check the dtype
-        if dtype != exemplar.dtype:
-            raise ColumnMetadataError("Inferred dtype '%s' does not match "
-                                      "the exemplar dtype '%s'" %
-                                      (dtype, exemplar.dtype))
 
         # NOTE(sjperkins)
         # -1 implies each row can be any shape whatsoever
