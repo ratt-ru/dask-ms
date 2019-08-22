@@ -178,8 +178,8 @@ def test_row_grouping(spw_table, spw_chan_freqs, chunks):
     assert len(datasets) == len(spw_chan_freqs)
 
     for i, chan_freq in enumerate(spw_chan_freqs):
-        assert_array_equal(datasets[i].CHAN_FREQ.data, chan_freq)
-        assert_array_equal(datasets[i].NUM_CHAN.data, chan_freq.shape[0])
+        assert_array_equal(datasets[i].CHAN_FREQ.data[0], chan_freq)
+        assert_array_equal(datasets[i].NUM_CHAN.data[0], chan_freq.shape[0])
 
     del datasets
     assert_liveness(0, 0)
