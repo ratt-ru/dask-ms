@@ -66,7 +66,7 @@ ANTENNA_SCHEMA = {
     },
 }
 
-FEED = {
+FEED_SCHEMA = {
     "BEAM_OFFSET": {
         'dask': {'dims': ('receptors', 'radec')}
     },
@@ -97,7 +97,7 @@ FIELD_SCHEMA = {
     },
 }
 
-OBSERVATION = {
+OBSERVATION_SCHEMA = {
     "LOG": {
         'dask': {'dims': ('log',)}
     },
@@ -110,7 +110,7 @@ OBSERVATION = {
 }
 
 
-POINTING = {
+POINTING_SCHEMA = {
     "DIRECTION": {
         'dask': {'dims': ('point-poly', 'radec')},
     },
@@ -129,7 +129,7 @@ POINTING = {
 }
 
 
-POLARIZATION = {
+POLARIZATION_SCHEMA = {
     "CORR_TYPE": {
         'dask': {'dims': ('corr',)},
     },
@@ -138,7 +138,7 @@ POLARIZATION = {
     },
 }
 
-SPECTRAL_WINDOW = {
+SPECTRAL_WINDOW_SCHEMA = {
     "CHAN_FREQ": {
         'dask': {'dims': ('chan',)},
     },
@@ -155,11 +155,12 @@ SPECTRAL_WINDOW = {
 
 _SUBTABLE_SCHEMAS = {
     "ANTENNA": ANTENNA_SCHEMA,
-    "FEED": FEED,
+    "FEED": FEED_SCHEMA,
     "FIELD": FIELD_SCHEMA,
-    "SPECTRAL_WINDOW": SPECTRAL_WINDOW,
-    "POLARIZATION": POLARIZATION,
-    "OBSERVATION": OBSERVATION,
+    "OBSERVATION": OBSERVATION_SCHEMA,
+    "POINTING": POINTING_SCHEMA,
+    "POLARIZATION": POLARIZATION_SCHEMA,
+    "SPECTRAL_WINDOW": SPECTRAL_WINDOW_SCHEMA,
 }
 
 _ALL_SCHEMAS = {
