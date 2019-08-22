@@ -66,54 +66,6 @@ ANTENNA_SCHEMA = {
     },
 }
 
-FIELD_SCHEMA = {
-    "DELAY_DIR": {
-        'dask': {'dims': ('field-dir', 'field-poly')},
-    },
-    "PHASE_DIR": {
-        'dask': {'dims': ('field-dir', 'field-poly')},
-    },
-    "REFERENCE_DIR": {
-        'dask': {'dims': ('field-dir', 'field-poly')},
-    },
-}
-
-SPECTRAL_WINDOW = {
-    "CHAN_FREQ": {
-        'dask': {'dims': ('chan',)},
-    },
-    "CHAN_WIDTH": {
-        'dask': {'dims': ('chan',)},
-    },
-    "EFFECTIVE_BW": {
-        'dask': {'dims': ('chan',)},
-    },
-    "RESOLUTION": {
-        'dask': {'dims': ('chan',)},
-    },
-}
-
-POLARIZATION = {
-    "CORR_TYPE": {
-        'dask': {'dims': ('corr',)},
-    },
-    "CORR_PRODUCT": {
-        'dask': {'dims': ('corr', 'corrprod_idx')},
-    },
-}
-
-OBSERVATION = {
-    "LOG": {
-        'dask': {'dims': ('log',)}
-    },
-    "SCHEDULE": {
-        'dask': {'dims': ('schedule',)}
-    },
-    "TIME_RANGE": {
-        'dask': {'dims': ('obs-exts',)}
-    }
-}
-
 FEED = {
     "BEAM_OFFSET": {
         'dask': {'dims': ('receptors', 'radec')}
@@ -132,6 +84,74 @@ FEED = {
     }
 }
 
+
+FIELD_SCHEMA = {
+    "DELAY_DIR": {
+        'dask': {'dims': ('field-poly', 'field-dir')},
+    },
+    "PHASE_DIR": {
+        'dask': {'dims': ('field-poly', 'field-dir')},
+    },
+    "REFERENCE_DIR": {
+        'dask': {'dims': ('field-poly', 'field-dir')},
+    },
+}
+
+OBSERVATION = {
+    "LOG": {
+        'dask': {'dims': ('log',)}
+    },
+    "SCHEDULE": {
+        'dask': {'dims': ('schedule',)}
+    },
+    "TIME_RANGE": {
+        'dask': {'dims': ('obs-exts',)}
+    }
+}
+
+
+POINTING = {
+    "DIRECTION": {
+        'dask': {'dims': ('point-poly', 'radec')},
+    },
+    "ENCODER": {
+        'dask': {'dims': ('radec',)},
+    },
+    "POINTING_OFFSET": {
+        'dask': {'dims': ('point-poly', 'radec')},
+    },
+    "SOURCE_OFFSET": {
+        'dask': {'dims': ('point-poly', 'radec')},
+    },
+    "TARGET": {
+        'dask': {'dims': ('point-poly', 'radec')},
+    }
+}
+
+
+POLARIZATION = {
+    "CORR_TYPE": {
+        'dask': {'dims': ('corr',)},
+    },
+    "CORR_PRODUCT": {
+        'dask': {'dims': ('corr', 'corrprod_idx')},
+    },
+}
+
+SPECTRAL_WINDOW = {
+    "CHAN_FREQ": {
+        'dask': {'dims': ('chan',)},
+    },
+    "CHAN_WIDTH": {
+        'dask': {'dims': ('chan',)},
+    },
+    "EFFECTIVE_BW": {
+        'dask': {'dims': ('chan',)},
+    },
+    "RESOLUTION": {
+        'dask': {'dims': ('chan',)},
+    },
+}
 
 _SUBTABLE_SCHEMAS = {
     "ANTENNA": ANTENNA_SCHEMA,
