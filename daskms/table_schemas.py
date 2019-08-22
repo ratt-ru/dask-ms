@@ -102,11 +102,44 @@ POLARIZATION = {
     },
 }
 
+OBSERVATION = {
+    "LOG": {
+        'dask': {'dims': ('log',)}
+    },
+    "SCHEDULE": {
+        'dask': {'dims': ('schedule',)}
+    },
+    "TIME_RANGE": {
+        'dask': {'dims': ('obs-exts',)}
+    }
+}
+
+FEED = {
+    "BEAM_OFFSET": {
+        'dask': {'dims': ('receptors', 'radec')}
+    },
+    "POLARIZATION_TYPE": {
+        'dask': {'dims': ('receptors',)}
+    },
+    "POL_RESPONSE": {
+        'dask': {'dims': ('receptors', 'receptors-2')}
+    },
+    "POSITION": {
+        'dask': {'dims': ("xyz",)}
+    },
+    "RECEPTOR_ANGLE": {
+        'dask': {'dims': ("receptors",)}
+    }
+}
+
+
 _SUBTABLE_SCHEMAS = {
     "ANTENNA": ANTENNA_SCHEMA,
+    "FEED": FEED,
     "FIELD": FIELD_SCHEMA,
     "SPECTRAL_WINDOW": SPECTRAL_WINDOW,
     "POLARIZATION": POLARIZATION,
+    "OBSERVATION": OBSERVATION,
 }
 
 _ALL_SCHEMAS = {
