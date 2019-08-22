@@ -227,14 +227,19 @@ def update_datasets(table, datasets, columns, descriptor):
         # Generate a dask array for each column
         for column in columns:
             try:
-                column_entry = data_vars[column]
+                full_dims, array, attrs = data_vars[column]
             except KeyError:
                 log.warning("Ignoring '%s' not present "
                             "on dataset %d" % (column, di))
                 continue
 
-            full_dims = column_entry.dims
-            array = column_entry.data
+            try:
+                keywords = attrs['keywords']
+            except KeyError:
+                pass
+            else:
+                table_proxy.putcolkeywords(column, keywords).result()
+
             args = [row_order, ("row",)]
 
             # We only need to pass in dimension extent arrays if
@@ -419,11 +424,18 @@ def create_datasets(table_name, datasets, columns, descriptor):
 
         for column in columns:
             try:
-                (dims, array, _) = data_vars[column]
+                (dims, array, attrs) = data_vars[column]
             except KeyError:
                 log.warn("Column %s doesn't exist on dataset %d "
                          "and will be ignored" % (column, di))
                 continue
+
+            try:
+                keywords = attrs['keywords']
+            except KeyError:
+                pass
+            else:
+                table_proxy.putcolkeywords(column, keywords).result()
 
             args = [row_order, ("row",)]
 

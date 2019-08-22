@@ -61,10 +61,6 @@ def test_dataset(ms, select_cols, group_cols, index_cols, shapes, chunks):
 
         for k, v in ds.data_vars.items():
             compute_dict[k] = v.data
-
-            if k in select_cols:
-                assert "__coldesc__" in v.attrs
-
             assert v.dtype == v.data.dtype
 
         res = dask.compute(compute_dict)[0]
@@ -104,9 +100,9 @@ def test_dataset(ms, select_cols, group_cols, index_cols, shapes, chunks):
     {"row": 3, "chan": 4, "corr": 1},
     {"row": 3, "chan": (4, 4, 4, 4), "corr": (2, 2)}],
     ids=lambda c: "chunks=%s" % c)
-def test_dataset_writes(ms, select_cols,
-                        group_cols, index_cols,
-                        shapes, chunks):
+def test_dataset_updates(ms, select_cols,
+                         group_cols, index_cols,
+                         shapes, chunks):
     """ Test dataset writes """
 
     # Get original STATE_ID and DATA
@@ -121,14 +117,20 @@ def test_dataset_writes(ms, select_cols,
 
         # Test writes
         writes = []
+        states = []
+        datas = []
 
         # Create write operations and execute them
         for i, ds in enumerate(datasets):
-            new_ds = ds.assign(STATE_ID=ds.STATE_ID.data + 1,
-                               DATA=ds.DATA.data + 1)
+            state_attrs = {"keywords": {"state-%d" % i: "foo"}}
+            state_var = (("row",), ds.STATE_ID.data + 1, state_attrs)
+            data_var = (("row", "chan", "corr"), ds.DATA.data + 1, {})
+            states.append(state_var[1])
+            datas.append(data_var[1])
+            new_ds = ds.assign(STATE_ID=state_var, DATA=data_var)
             writes.append(write_datasets(ms, new_ds, ["STATE_ID", "DATA"]))
 
-        dask.compute(writes)
+        _, states, datas = dask.compute(writes, states, datas)
 
         # NOTE(sjperkins)
         # Interesting behaviour here. If these objects are not
@@ -136,9 +138,20 @@ def test_dataset_writes(ms, select_cols,
         # can fail, reproducing https://github.com/ska-sa/dask-ms/issues/26
         # Adding auto-locking to the table opening command seems to fix
         # this somehow
-        del ds, new_ds, datasets, writes
+        del ds, new_ds, datasets, writes, state_var, data_var
         assert_liveness(0, 0)
 
+        datasets = read_datasets(ms, select_cols, group_cols,
+                                 index_cols, chunks=chunks)
+
+        expected_kws = {"state-%d" % i: "foo" for i in range(len(datasets))}
+
+        for i, (ds, state, data) in enumerate(zip(datasets, states, datas)):
+            assert_array_equal(ds.STATE_ID.data, state)
+            assert_array_equal(ds.DATA.data, data)
+            assert ds.STATE_ID.attrs['keywords'] == expected_kws
+
+        del ds, datasets
     finally:
         # Restore original STATE_ID
         with pt.table(ms, ack=False, readonly=False, lockoptions='auto') as T:
@@ -267,8 +280,14 @@ def test_dataset_add_column(ms, dtype):
     assert len(datasets) == 1
     ds = datasets[0]
 
+    # Create the dask array
     bitflag = da.zeros_like(ds.DATA.data, dtype=dtype)
-    nds = ds.assign(BITFLAG=(("row", "chan", "corr"), bitflag))
+    # Assign keyword attribute
+    bitflag_attrs = {"keywords": {'FLAGSETS': 'legacy,cubical',
+                                  'FLAGSET_legacy': 1,
+                                  'FLAGSET_cubical': 2}}
+    # Assign variable onto the dataset
+    nds = ds.assign(BITFLAG=(("row", "chan", "corr"), bitflag, bitflag_attrs))
     writes = write_datasets(ms, nds, ["BITFLAG"], descriptor='ratt_ms')
 
     dask.compute(writes)
@@ -278,6 +297,7 @@ def test_dataset_add_column(ms, dtype):
 
     with pt.table(ms, readonly=False, ack=False, lockoptions='auto') as T:
         bf = T.getcol("BITFLAG")
+        assert T.getcoldesc("BITFLAG")['keywords'] == bitflag_attrs['keywords']
         assert bf.dtype == dtype
 
 

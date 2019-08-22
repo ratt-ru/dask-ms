@@ -228,8 +228,13 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
                                   "dim_chunks '%s' do not agree." %
                                   (shape, dims, dim_chunks))
 
-    # Place CASA column descriptor in attributes
-    attrs = {"__coldesc__": coldesc}
+    # Place table keywords in attributes
+    try:
+        keywords = coldesc['keywords']
+    except KeyError:
+        attrs = {}
+    else:
+        attrs = {} if len(keywords) == 0 else {"keywords": keywords}
 
     return ColumnMetadata(shape, dims, dim_chunks, dtype, attrs)
 

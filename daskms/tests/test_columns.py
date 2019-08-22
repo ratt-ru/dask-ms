@@ -60,7 +60,6 @@ def test_column_metadata(ms, column, shape, chunks, table_schema, dtype):
     assert meta.dims == dims
     assert meta.chunks == [c[1] for c in chunks[:len(meta.shape)]]
     assert meta.dtype == dtype
-    assert "__coldesc__" in meta.attrs
 
     del table_proxy
     assert_liveness(0, 0)
