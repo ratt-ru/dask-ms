@@ -296,8 +296,8 @@ def test_taql_where(ms, index_cols):
     assert xds[1].DATA_DESC_ID == 0 and xds[1].SCAN_NUMBER == 1
 
     # Check field id's in each group
-    assert_array_equal(xds[0].FIELD_ID.data, [0, 0, 1, 1])
-    assert_array_equal(xds[1].FIELD_ID.data, [0, 1, 1])
+    fields = da.concatenate([ds.FIELD_ID.data for ds in xds])
+    assert_array_equal(fields, [0, 0, 1, 1, 0, 1, 1])
 
     # Group on each row
     xds = xds_from_table(ms, taql_where="FIELD_ID >= 0 AND FIELD_ID < 2",
@@ -306,13 +306,8 @@ def test_taql_where(ms, index_cols):
 
     assert len(xds) == 7
 
-    assert np.all(xds[0].FIELD_ID.data.compute() == 0)
-    assert np.all(xds[1].FIELD_ID.data.compute() == 0)
-    assert np.all(xds[2].FIELD_ID.data.compute() == 0)
-    assert np.all(xds[3].FIELD_ID.data.compute() == 1)
-    assert np.all(xds[4].FIELD_ID.data.compute() == 1)
-    assert np.all(xds[5].FIELD_ID.data.compute() == 1)
-    assert np.all(xds[6].FIELD_ID.data.compute() == 1)
+    fields = da.concatenate([ds.FIELD_ID.data for ds in xds])
+    assert_array_equal(fields, [0, 0, 0, 1, 1, 1, 1])
 
 
 def _proc_map_fn(args):
