@@ -119,13 +119,13 @@ The purpose of dask-ms is to expose CASA Table Column data to
 the user as dask arrays in order to facilitate parallel programming
 of Radio Astronomy Algorithms.
 
-xarray
+Xarray
 ~~~~~~
 
 `xarray <https://xarray.pydata.org>`_ groups logically related
 numpy and dask arrays into Datasets. Associated dimensions on multiple
 arrays can be related to each other, enabling rich data science
-applications
+applications.
 
 For example, using our example Measurement Set we can do the following:
 
