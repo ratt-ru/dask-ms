@@ -45,12 +45,20 @@ class Frozen(Mapping):
 
 
 class DataArray(namedtuple("_DataArray", ["dims", "data", "attrs"])):
+    """
+    Replicates a minimal subset of `xarray DataArray
+    <http://xarray.pydata.org/en/stable/data-structures.html#dataset>`_'s
+    functionality.
+    Exists to allows ``xarray`` to be an optional ``dask-ms`` dependency.
+    """
     @property
     def dtype(self):
+        """ Array data type """
         return self.data.dtype
 
     @property
     def chunks(self):
+        """ Array chunks if wrapping a dask array else None """
         if isinstance(self.data, da.Array):
             return self.data.chunks
 
@@ -58,6 +66,7 @@ class DataArray(namedtuple("_DataArray", ["dims", "data", "attrs"])):
 
     @property
     def values(self):
+        """ Returns actual array values """
         if isinstance(self.data, da.Array):
             return self.data.compute()
 
@@ -65,10 +74,12 @@ class DataArray(namedtuple("_DataArray", ["dims", "data", "attrs"])):
 
     @property
     def shape(self):
+        """ Array shape """
         return self.data.shape
 
     @property
     def ndim(self):
+        """ Number of array dimensions """
         return self.data.ndim
 
 
@@ -135,10 +146,10 @@ def _convert_to_variable(k, v):
 
 class Dataset(object):
     """
-    Poor man's `xarray Dataset
-    <http://xarray.pydata.org/en/stable/data-structures.html#dataset>`_.
-    Exists to allows ``xarray`` to be an optional ``dask-ms`` dependency,
-    by replicating a bare minimum of functionality.
+    Replicates a minimal subset of `xarray Dataset
+    <http://xarray.pydata.org/en/stable/data-structures.html#dataset>`_'s
+    functionality.
+    Exists to allows ``xarray`` to be an optional ``dask-ms`` dependency.
     """
 
     def __init__(self, data_vars, attrs=None, coords=None):
