@@ -253,29 +253,32 @@ Sorting
 ~~~~~~~
 
 Frequently we wish our rows to be ordered according to some sorting
-criteria. `index_cols` can be supplied in order to supply this ordering:
+criteria. `index_cols` can be supplied in order to produce this ordering on
+the Dataset arrays:
 
     >>> from daskms import xds_from_table
     >>> # Get Measurement Set datasets, grouped on DATA_DESC_ID and
     >>> # sorted on TIME, ANTENNA1 and ANTENNA2
     >>> ms = xds_from_ms("~/data/TEST.MS", group_cols=["DATA_DESC_ID"].
-    >>>                 index_cols=["SCAN_NUMBER", TIME", "ANTENNA1", "ANTENNA2"])
+    >>>                  index_cols=["SCAN_NUMBER", TIME", "ANTENNA1", "ANTENNA2"])
 
-Care should be taken to ensure that the requested ordering is
-not egregiously different from the way the data is structured internally
-within the table. This structure is usually defined by the order
-data is written to the table. A
-``["SCAN_NUMBER", TIME", "ANTENNA1", "ANTENNA2"]`` is a fairly natural ordering
-while the reverse is not.
+.. note::
 
-Unnatural orderings result in non-contiguous row access patterns which
-can badly affect I/O performance. dask-ms attempts to ameliorate this
-by resorting row id's within a dask array chunk to produce
-access patterns that are as contiguous as possible, but this is not
-a panacea.
+    Care should be taken to ensure that the requested ordering is
+    not egregiously different from the way the data is structured internally
+    within the table. This structure is usually defined by the order
+    data is written to the table. A
+    ``["SCAN_NUMBER", TIME", "ANTENNA1", "ANTENNA2"]`` is a fairly natural ordering
+    while the reverse is not.
 
-The rule of thumb is that the more your ``index_cols`` tends towards a
-lexicographical ordering, the more optimal your table access patterns will be.
+    Unnatural orderings result in non-contiguous row access patterns which
+    can badly affect I/O performance. dask-ms attempts to ameliorate this
+    by resorting row id's within a dask array chunk to produce
+    access patterns that are as contiguous as possible, but this is not
+    a panacea.
+
+    The rule of thumb is that the more your ``index_cols`` tends towards a
+    lexicographical ordering, the more optimal your table access patterns will be.
 
 
  .. _row-id-coordinates:

@@ -23,12 +23,13 @@ _DEFAULT_INDEX_COLUMNS = ["TIME"]
 log = logging.getLogger(__name__)
 
 
-def xds_to_table(xds, table_name, columns=None, descriptor=None):
+def xds_to_table(xds, table_name, columns, descriptor=None):
     """
-    Generates a dask array which writes the
-    specified columns from :class:`xarray.Dataset`'s into
-    the CASA table specified by ``table_name`` when
-    the :meth:`dask.array.Array.compute` method is called.
+    Generates a dask array representing a series of writes from the
+    specified arrays in :class:`xarray.Dataset`'s into
+    the CASA table columns specified by ``table_name`` and ``columns``.
+    This is lazy operation -- it is only execute when a :meth:`dask.compute`
+    or :meth:`dask.array.Array.compute` method is called.
 
     Parameters
     ----------
@@ -38,9 +39,13 @@ def xds_to_table(xds, table_name, columns=None, descriptor=None):
         sequential datasets will be written.
     table_name : str
         CASA table path
-    columns : tuple or list, optional
+    columns : tuple or list or "ALL"
         list of column names to write to the table.
-        If ``None`` all columns will be written.
+
+        "ALL" is a special marker which specifies that all columns
+        should be written. If you wish to write an "ALL" array to
+        a column, use :code:`columns=['ALL']`
+
     descriptor : None or \
         :class:`~daskms.descriptors.builder.AbstractBuilderFactory` or \
         str
@@ -62,7 +67,9 @@ def xds_to_table(xds, table_name, columns=None, descriptor=None):
     if not isinstance(xds, (tuple, list)):
         xds = [xds]
 
-    columns = promote_columns(columns, [])
+    if not isinstance(columns, (tuple, list)):
+        if columns != "ALL":
+            columns = [columns]
 
     datasets = []
 

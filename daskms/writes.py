@@ -526,10 +526,16 @@ def write_datasets(table, datasets, columns, descriptor=None):
     elif not isinstance(datasets, list):
         datasets = [datasets]
 
-    # If no columns are defined, write all dataset variables by default
-    if not columns:
+    # If ALL is requested
+    if columns == "ALL":
         columns = set.union(*(set(ds.data_vars.keys()) for ds in datasets))
         columns = list(sorted(columns))
+    elif len(columns) == 0:
+        raise ValueError("No columns were provided for writing. "
+                         "Use columns='ALL' if you intend to "
+                         "write all columns, or columns=['ALL'] "
+                         "if you're trying to write an 'ALL' "
+                         "array")
 
     if not table_exists(table):
         return create_datasets(table, datasets, columns,

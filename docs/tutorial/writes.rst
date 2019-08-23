@@ -16,7 +16,15 @@ The pattern for writing a writing a dataset is as follows:
 
 
 In the above example, given a list of ``datasets``, the
-``DATA`` and ``BITFLAG`` columns are written to the ``TEST.MS`` table
+``DATA`` and ``BITFLAG`` columns are written to the ``TEST.MS`` table.
+
+.. note::
+
+    It is possible to pass "ALL" to the column argument to specify
+    that all arrays should be written to the table. In general it is
+    advisable to explicitly specify which columns to write in order
+    to avoid accidentally overwriting data or or performing
+    unnecessary writes.
 
 
 Updating/Appending Rows
@@ -58,7 +66,13 @@ Creating Tables
 ~~~~~~~~~~~~~~~
 
 If the table does not exist, it will be created, the appropriate columns
-created, rows added and the data appended to it.
+created, rows added and the data appended to it. The "ALL" string should
+be supplied for the ``column`` argument to force all arrays to be written.
+
+.. doctest::
+
+    >>> writes = xds_to_table(datasets, "TEST.MS", "ALL")
+    >>> dask.compute(writes)
 
 
 Creating and updating the Measurement Set and it's sub-tables
