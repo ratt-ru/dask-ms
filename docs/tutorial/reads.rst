@@ -246,6 +246,9 @@ We now create datasets for each row of the **SPECTRAL_WINDOW** and
     >>>     # Get correlation type, removing single row dimension
     >>>     corr_type = pols[pol_id].CORR_TYPE.data[0]
 
+
+.. _read-sorting:
+
 Sorting
 ~~~~~~~
 
