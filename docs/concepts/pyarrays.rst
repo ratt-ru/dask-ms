@@ -118,3 +118,68 @@ executed in parallel.
 The purpose of dask-ms is to expose CASA Table Column data to
 the user as dask arrays in order to facilitate parallel programming
 of Radio Astronomy Algorithms.
+
+xarray
+~~~~~~
+
+`xarray <https://xarray.pydata.org>`_ groups logically related
+numpy and dask arrays into Datasets. Associated dimensions on multiple
+arrays can be related to each other, enabling rich data science
+applications
+
+For example, using our example Measurement Set we can do the following:
+
+
+.. testcode::
+
+    from daskms import xds_from_ms
+    from daskms.example_data import example_ms
+
+    datasets = xds_from_ms(example_ms())
+    print(datasets)
+
+produces a list of two datasets:
+
+.. testoutput::
+
+    [
+        <xarray.Dataset>
+         Dimensions:         (chan: 16, corr: 4, row: 4, uvw: 3)
+         Coordinates:
+             ROWID           (row) int32 dask.array<shape=(4,), chunksize=(4,)>
+         Dimensions without coordinates: chan, corr, row, uvw
+         Data variables:
+             UVW             (row, uvw) float64 dask.array<shape=(4, 3), chunksize=(4, 3)>
+             TIME            (row) float64 dask.array<shape=(4,), chunksize=(4,)>
+             ANTENNA1        (row) int32 dask.array<shape=(4,), chunksize=(4,)>
+             ANTENNA2        (row) int32 dask.array<shape=(4,), chunksize=(4,)>
+             DATA            (row, chan, corr) complex64 dask.array<shape=(4, 16, 4), chunksize=(4, 16, 4)>
+         Attributes:
+             FIELD_ID:      0
+             DATA_DESC_ID:  0,
+
+        <xarray.Dataset>
+         Dimensions:         (chan: 32, corr: 2, row: 6, uvw: 3)
+         Coordinates:
+             ROWID           (row) int32 dask.array<shape=(6,), chunksize=(6,)>
+         Dimensions without coordinates: chan, corr, row, uvw
+         Data variables:
+             UVW             (row, uvw) float64 dask.array<shape=(6, 3), chunksize=(6, 3)>
+             TIME            (row) float64 dask.array<shape=(6,), chunksize=(6,)>
+             ANTENNA1        (row) int32 dask.array<shape=(6,), chunksize=(6,)>
+             ANTENNA2        (row) int32 dask.array<shape=(6,), chunksize=(6,)>
+             DATA            (row, chan, corr) complex64 dask.array<shape=(6, 32, 2), chunksize=(6, 32, 2)>
+         Attributes:
+             FIELD_ID:      0
+             DATA_DESC_ID:  1
+    ]
+
+Keen-eyed readers will note that the first dataset has 4 rows,
+16 channels, 4 correlations and DATA_DESC_ID of 0, while the second has
+6 rows, 32 channels, 2 correlations and a DATA_DESC_ID of 1.
+Here, rows with the same DATA_DESC_ID have been grouped together
+into single dataset allowing a column that, while variably shaped,
+has fixed shapes for the same DATA_DESC_ID.
+
+The datasets are also grouped on FIELD_ID, but only one FIELD is present
+in this dataset.
