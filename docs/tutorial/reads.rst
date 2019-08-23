@@ -5,8 +5,8 @@ Basic Use
 ~~~~~~~~~
 
 There are two methods for creating Datasets from a CASA Table or
-Measurement Set. ``xds_from_table`` handles general tables while
-``xds_from_ms`` handles Measurement Sets specifically.
+Measurement Set. :func:`~daskms.xds_from_table` handles general tables while
+:func:`~daskms.xds_from_ms` handles Measurement Sets specifically.
 We will use the two interchangeably.
 
 Calling either of these two functions will produce a list of datasets:
@@ -274,3 +274,50 @@ a panacea.
 The rule of thumb is that the more your ``index_cols`` tends towards a
 lexicographical ordering, the more optimal your table access patterns will be.
 
+
+ .. _row-id-coordinates:
+
+ROWID Coordinates
+~~~~~~~~~~~~~~~~~
+
+Each read dataset has a ``ROWID`` coordinate associated with it.
+This is a dask array that associates a ROWID with each ``row``
+in the Dataset.
+
+.. doctest::
+
+    >>> from daskms import xds_from_ms
+    >>> datasets = xds_from_ms("~/data/TEST.MS")
+    >>> print(datasets)
+
+    [<xarray.Dataset>
+     Dimensions:         (chan: 64, corr: 4, row: 6552, uvw: 3)
+     Coordinates:
+         ROWID           (row) object dask.array<shape=(6552,), chunksize=(6552,)>
+     Data variables:
+        ...
+         DATA            (row, chan, corr) complex64 dask.array<shape=(6552, 64, 4), chunksize=(6552, 64, 4)>
+
+This array is related to the Sorting_ requested on the table and
+will generally be contiguous if no grouping or sorting is requested,
+or if the requested sorting represents a lexicographical ordering.
+
+For example a natural ordering:
+
+.. doctest::
+
+    >>> datasets = xds_from_ms("~/data/TEST.MS")
+    >>> print(datasets[0].ROWID.data.compute())
+    array([   0,    1,    2, ..., 6549, 6550, 6551])
+
+vs a non-contiguous ordering:
+
+.. doctest::
+
+
+    >>> datasets = xds_from_ms("~/data/TEST.MS", index_cols["ANTENNA2", "ANTENNA1", "TIME"])
+    >>> print(datasets[0].ROWID.data.compute())
+    array([   0,   91,  182, ..., 6369, 6460, 6551])
+
+Internally, it is used to request or supply **ranges** of data from the Table
+when reading and writing, respectively.
