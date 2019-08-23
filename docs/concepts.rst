@@ -2,7 +2,7 @@ Concepts
 ========
 
 .. toctree::
-    :maxdepth: 1
+    :maxdepth: 2
 
     concepts/ms.rst
     concepts/pyarrays.rst

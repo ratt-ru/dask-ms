@@ -1,11 +1,20 @@
 API
 ===
 
+Reading from Tables
+-------------------
+
 .. autofunction:: daskms.xds_from_ms
 
 .. autofunction:: daskms.xds_from_table
 
+Writing to Tables
+-----------------
+
 .. autofunction:: daskms.xds_to_table
+
+DataArrays and Datasets
+-----------------------
 
 .. autoclass:: daskms.DataArray
     :members:
@@ -29,6 +38,8 @@ API
     .. automethod:: __init__
 
 
+TableProxies
+------------
 
 .. autoclass:: daskms.TableProxy
     :members:

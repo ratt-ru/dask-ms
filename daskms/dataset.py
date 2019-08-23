@@ -47,7 +47,7 @@ class Frozen(Mapping):
 class DataArray(namedtuple("_DataArray", ["dims", "data", "attrs"])):
     """
     Replicates a minimal subset of `xarray DataArray
-    <http://xarray.pydata.org/en/stable/data-structures.html#dataset>`_'s
+    <http://xarray.pydata.org/en/stable/data-structures.html#datarrays>`_'s
     functionality.
     Exists to allows ``xarray`` to be an optional ``dask-ms`` dependency.
     """

@@ -2,7 +2,7 @@ Tutorial
 ========
 
 .. toctree::
-    :maxdepth: 1
+    :maxdepth: 2
 
     tutorial/reads.rst
     tutorial/datasets.rst

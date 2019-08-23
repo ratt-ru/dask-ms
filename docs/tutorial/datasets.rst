@@ -15,7 +15,8 @@ Datasets logically group arrays together into a single structure.
 Dataset Arrays
 ~~~~~~~~~~~~~~
 
-Dataset arrays are represented by a tuple of two or three variables.
+:class:`~daskms.DataArrays` are represented by a tuple
+of two or three variables.
 They have the form :code:`(dims, array[, attrs])`.
 
 - ``dim`` is a dimension schema. The first entry in ``dim`` must always
@@ -62,8 +63,8 @@ Next, create some dask arrays that we will place on our Dataset
 Next, create the dataset by assigning variable and coordinate
 dictionaries. They have the form :code:`{name: (dims, array[, attrs])}`
 
-The Dataset can also be assigned attributes via the ``attrs`` argument
-to the constructor.
+The :class:`~daskms.Dataset` can also be assigned attributes via
+the ``attrs`` argument to the constructor.
 
 .. code-block:: python
 
