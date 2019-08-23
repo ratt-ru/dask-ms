@@ -8,6 +8,7 @@ Welcome to dask-ms's documentation!
    readme
    installation
    usage
+   concepts
    api
    contributing
    authors
