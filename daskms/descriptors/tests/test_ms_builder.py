@@ -10,7 +10,7 @@ from numpy.testing import assert_array_equal
 import pyrap.tables as pt
 import pytest
 
-from daskms.dataset import Variable
+from daskms.dataset import DataArray
 from daskms.descriptors.ms import MSDescriptorBuilder
 
 
@@ -35,7 +35,7 @@ def test_ms_builder(tmp_path, variables, chunks, fixed):
         shape = tuple(sum(chunks[d]) for d in dims)
         achunks = tuple(chunks[d] for d in dims)
         dask_array = da.random.random(shape, chunks=achunks).astype(dtype)
-        return [Variable(dims, dask_array, {})]
+        return [DataArray(dims, dask_array, {})]
 
     variables = {n: _variable_factory(dims, dtype)
                  for n, dims, dtype in variables}

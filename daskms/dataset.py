@@ -44,7 +44,7 @@ class Frozen(Mapping):
         return '%s(%r)' % (type(self).__name__, self.mapping)
 
 
-class Variable(namedtuple("_Variable", ["dims", "data", "attrs"])):
+class DataArray(namedtuple("_DataArray", ["dims", "data", "attrs"])):
     @property
     def dtype(self):
         return self.data.dtype
@@ -112,8 +112,8 @@ def data_var_chunks(data_vars):
 
 
 def _convert_to_variable(k, v):
-    """ Converts ``v`` to a :class:`daskms.dataset.Variable` """
-    if isinstance(v, Variable):
+    """ Converts ``v`` to a :class:`daskms.dataset.DataArray` """
+    if isinstance(v, DataArray):
         return v
 
     if not isinstance(v, (tuple, list)) and len(v) not in (2, 3):
@@ -130,7 +130,7 @@ def _convert_to_variable(k, v):
                          "not match shape of associated array %s"
                          % (dims, data.shape))
 
-    return Variable(dims, data, attrs)
+    return DataArray(dims, data, attrs)
 
 
 class Dataset(object):
