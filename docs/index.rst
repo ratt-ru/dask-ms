@@ -9,6 +9,7 @@ Welcome to dask-ms's documentation!
    installation
    usage
    concepts
+   tutorial
    api
    contributing
    authors
