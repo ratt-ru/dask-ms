@@ -12,7 +12,7 @@ from numpy.testing import assert_array_equal
 import pyrap.tables as pt
 import pytest
 
-from daskms.dataset import DataArray
+from daskms.dataset import Variable
 from daskms.descriptors.builder import (DefaultDescriptorBuilder,
                                         variable_column_descriptor)
 
@@ -28,7 +28,7 @@ def test_default_plugin(tmp_path, chunks):
         shape = tuple(sum(chunks[d]) for d in dims)
         achunks = tuple(chunks[d] for d in dims)
         dask_array = da.random.random(shape, chunks=achunks).astype(dtype)
-        return DataArray(dims, dask_array, {})
+        return Variable(dims, dask_array, {})
 
     variables = {
         "ANTENNA1": _variable_factory(("row",), np.int32),
@@ -59,7 +59,7 @@ def test_variable_column_descriptor(chunks, dtype, tmp_path):
     shape = tuple(shapes[d] for d in dims)
     data_chunks = tuple(chunks[d] for d in dims)
     data = da.random.random(shape, chunks=data_chunks).astype(dtype)
-    data_var = DataArray(dims, data, {})
+    data_var = Variable(dims, data, {})
     meta = variable_column_descriptor("DATA", data_var)
     column_meta.append({"name": "DATA", "desc": meta})
 
@@ -69,7 +69,7 @@ def test_variable_column_descriptor(chunks, dtype, tmp_path):
     str_chunks = tuple(chunks[d] for d in dims)
     np_str_array = np.asarray(["BOB"] * shape[0], dtype=np.object)
     da_str_array = da.from_array(np_str_array, chunks=str_chunks)
-    str_array_var = DataArray(dims, da_str_array, {})
+    str_array_var = Variable(dims, da_str_array, {})
     meta = variable_column_descriptor("NAMES", str_array_var)
     column_meta.append({"name": "NAMES", "desc": meta})
 

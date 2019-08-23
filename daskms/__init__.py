@@ -16,5 +16,5 @@ from daskms.dask_ms import (xds_from_table,      # noqa
                                 xds_to_table,    # noqa
                                 xds_from_ms)     # noqa
 
-from daskms.dataset import Dataset, DataArray    # noqa
+from daskms.dataset import Dataset, Variable     # noqa
 from daskms.table_proxy import TableProxy        # noqa

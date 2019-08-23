@@ -12,10 +12,10 @@ Those wanting extended xarray Dataset functionality can simply install
 
 Datasets logically group arrays together into a single structure.
 
-Dataset Arrays
-~~~~~~~~~~~~~~
+Dataset Variables
+~~~~~~~~~~~~~~~~~
 
-:class:`~daskms.DataArrays` are represented by a tuple
+:class:`~daskms.Variable`'s' are represented by a tuple
 of two or three variables.
 They have the form :code:`(dims, array[, attrs])`.
 

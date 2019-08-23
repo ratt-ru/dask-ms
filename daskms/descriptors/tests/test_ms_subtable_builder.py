@@ -10,14 +10,14 @@ import numpy as np
 import pyrap.tables as pt
 import pytest
 
-from daskms.dataset import DataArray
+from daskms.dataset import Variable
 from daskms.descriptors.ms_subtable import MSSubTableDescriptorBuilder
 
 
 @pytest.mark.parametrize("table", MSSubTableDescriptorBuilder.SUBTABLES)
 def test_ms_subtable_builder(tmp_path, table):
     A = da.zeros((10, 20, 30), chunks=(2, 20, 30), dtype=np.int32)
-    variables = {"FOO": DataArray(("row", "chan", "corr"), A, {})}
+    variables = {"FOO": Variable(("row", "chan", "corr"), A, {})}
     var_names = set(variables.keys())
 
     builder = MSSubTableDescriptorBuilder(table)

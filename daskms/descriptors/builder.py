@@ -12,7 +12,7 @@ import logging
 import six
 
 from daskms.columns import infer_casa_type
-from daskms.dataset import DataArray
+from daskms.dataset import Variable
 
 
 log = logging.getLogger(__name__)
@@ -105,15 +105,15 @@ class DefaultDescriptorBuilder(AbstractDescriptorBuilder):
 
 def variable_column_descriptor(column, variable):
     """
-    Generate a CASA column descriptor from a DataArray
-    or list of DataArrays.
+    Generate a CASA column descriptor from a Variable
+    or list of Variables.
 
     Parameters
     ----------
     column : str
         Column name
-    variable : :class:`daskms.DataArray` or \
-       list of :class:`daskms.DataArray`
+    variable : :class:`daskms.Variable` or \
+       list of :class:`daskms.Variable`
 
         Dataset variable
 
@@ -123,7 +123,7 @@ def variable_column_descriptor(column, variable):
         CASA column descriptor
     """
 
-    if isinstance(variable, DataArray):
+    if isinstance(variable, Variable):
         variable = [variable]
     elif not isinstance(variable, (tuple, list)):
         variable = [variable]

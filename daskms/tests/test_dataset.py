@@ -14,7 +14,7 @@ from numpy.testing import assert_array_equal
 import pyrap.tables as pt
 import pytest
 
-from daskms.dataset import Dataset, DataArray
+from daskms.dataset import Dataset, Variable
 from daskms.reads import read_datasets
 from daskms.writes import write_datasets
 from daskms.utils import (select_cols_str, group_cols_str,
@@ -368,7 +368,7 @@ def test_dataset_create_table(tmp_path, dataset_chunks, dtype):
         shape = tuple(shapes[d] for d in dims)
         data_chunks = tuple(chunks[d] for d in dims)
         data = da.random.random(shape, chunks=data_chunks).astype(dtype)
-        data_var = DataArray(dims, data, {})
+        data_var = Variable(dims, data, {})
 
         # Make some string names
         dims = ("row",)
@@ -376,7 +376,7 @@ def test_dataset_create_table(tmp_path, dataset_chunks, dtype):
         str_chunks = tuple(chunks[d] for d in dims)
         np_str_array = np.asarray(["BOB"] * shape[0], dtype=np.object)
         da_str_array = da.from_array(np_str_array, chunks=str_chunks)
-        str_array_var = DataArray(dims, da_str_array, {})
+        str_array_var = Variable(dims, da_str_array, {})
 
         datasets.append(Dataset({"DATA": data_var, "NAMES": str_array_var}))
         datas.append(data)

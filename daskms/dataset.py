@@ -9,8 +9,6 @@ try:
 except ImportError:
     from collections import Mapping
 
-from collections import namedtuple
-
 import dask
 import dask.array as da
 
@@ -44,13 +42,29 @@ class Frozen(Mapping):
         return '%s(%r)' % (type(self).__name__, self.mapping)
 
 
-class DataArray(namedtuple("_DataArray", ["dims", "data", "attrs"])):
+class Variable(object):
     """
-    Replicates a minimal subset of `xarray DataArray
-    <http://xarray.pydata.org/en/stable/data-structures.html#datarrays>`_'s
+    Replicates a minimal subset of `xarray Variable
+    <http://xarray.pydata.org/en/stable/generated/xarray.Variable.html>`_'s
     functionality.
     Exists to allows ``xarray`` to be an optional ``dask-ms`` dependency.
     """
+
+    def __init__(self, dims, data, attrs=None):
+        """
+        Parameters
+        ----------
+        dims : str or tuple
+        data : :class:`numpy.ndarray` or :class:`dask.array.Array`
+        attrs : dict or None
+        """
+        self.dims = dims
+        self.data = data
+        self.attrs = attrs or {}
+
+    def __iter__(self):
+        return iter((self.dims, self.data, self.attrs))
+
     @property
     def dtype(self):
         """ Array data type """
@@ -123,8 +137,8 @@ def data_var_chunks(data_vars):
 
 
 def _convert_to_variable(k, v):
-    """ Converts ``v`` to a :class:`daskms.dataset.DataArray` """
-    if isinstance(v, DataArray):
+    """ Converts ``v`` to a :class:`daskms.dataset.Variable` """
+    if isinstance(v, Variable):
         return v
 
     if not isinstance(v, (tuple, list)) and len(v) not in (2, 3):
@@ -141,13 +155,13 @@ def _convert_to_variable(k, v):
                          "not match shape of associated array %s"
                          % (dims, data.shape))
 
-    return DataArray(dims, data, attrs)
+    return Variable(dims, data, attrs)
 
 
 class Dataset(object):
     """
     Replicates a minimal subset of `xarray Dataset
-    <http://xarray.pydata.org/en/stable/data-structures.html#dataset>`_'s
+    <http://xarray.pydata.org/en/stable/generated/xarray.Dataset.html#xarray.Dataset>`_'s
     functionality.
     Exists to allows ``xarray`` to be an optional ``dask-ms`` dependency.
     """
