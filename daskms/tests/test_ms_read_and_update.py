@@ -150,10 +150,13 @@ def test_row_query(ms, index_cols):
                       index_cols=index_cols,
                       chunks={"row": 2})
 
-    for ds, expected_row in zip(xds, expected_rows):
-        assert ds.ROWID == expected_row
+    # Create the var because it doesn't outlive the
+    # list comprehension in python 3
+    ds = None
+    actual_rows = da.concatenate([ds.ROWID.data for ds in xds])
+    assert_array_equal(actual_rows, expected_rows)
 
-    del xds, ds
+    del xds, ds, actual_rows
 
 
 @pytest.mark.parametrize('index_cols', [
