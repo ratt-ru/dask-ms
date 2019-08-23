@@ -322,6 +322,32 @@ def test_dataset_add_string_column(ms):
         assert name_list == T.getcol("NAMES")
 
 
+@pytest.mark.parametrize("chunks", [
+    {"row": (36,)},
+    {"row": (18, 18)}])
+def test_dataset_multidim_string_column(tmp_path, chunks):
+    row = sum(chunks['row'])
+
+    name_list = [["X-%d" % i, "Y-%d" % i, "Z-%d" % i] for i in range(row)]
+    np_names = np.array(name_list, dtype=np.object)
+    names = da.from_array(np_names, chunks=(chunks['row'], np_names.shape[1]))
+
+    ds = Dataset({"POLARIZATION_TYPE": (("row", "xyz"), names)})
+    table_name = str(tmp_path / "test.table")
+    writes = write_datasets(table_name, ds, ["POLARIZATION_TYPE"])
+    dask.compute(writes)
+
+    del writes
+    assert_liveness(0, 0)
+
+    datasets = read_datasets(table_name, [], [], [],
+                             chunks={'row': chunks['row']})
+    assert len(datasets) == 1
+    assert_array_equal(datasets[0].POLARIZATION_TYPE.data, np_names)
+    del datasets
+    assert_liveness(0, 0)
+
+
 @pytest.mark.parametrize("dataset_chunks", [
     [{'row': (5, 3, 2), 'chan': (4, 4, 4, 4), 'corr': (4,)},
      {'row': (4, 3, 3), 'chan': (5, 5, 3, 3), 'corr': (2, 2)}],

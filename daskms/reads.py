@@ -72,8 +72,20 @@ def object_getcol(row_runs, table_proxy, column, result, dtype):
 
     try:
         for rs, rl in row_runs:
-            result[rr:rr + rl] = np.asarray(getcol(column, rs, rl),
-                                            dtype=dtype)
+            data = getcol(column, rs, rl)
+
+            # Multi-dimensional string arrays are returned as a
+            # dict with 'array' and 'shape' keys. Massage the data.
+            if isinstance(data, dict):
+                data = (np.asarray(data['array'], dtype=dtype)
+                          .reshape(data['shape']))
+
+            # NOTE(sjperkins)
+            # Dask wants ndarrays internally, so we asarray objects
+            # the returning list of objects.
+            # See https://github.com/ska-sa/dask-ms/issues/42
+            result[rr:rr + rl] = np.asarray(data, dtype=dtype)
+
             rr += rl
     finally:
         table_proxy._release(READLOCK)
@@ -91,13 +103,20 @@ def object_getcolslice(row_runs, table_proxy, column, result,
 
     try:
         for rs, rl in row_runs:
+            data = getcolslice(column, blc, trc, startrow=rs, nrow=rl)
+
+            # Multi-dimensional string arrays are returned as a
+            # dict with 'array' and 'shape' keys. Massage the data.
+            if isinstance(data, dict):
+                data = (np.asarray(data['array'], dtype=dtype)
+                          .reshape(data['shape']))
+
             # NOTE(sjperkins)
             # Dask wants ndarrays internally, so we asarray objects
             # the returning list of objects.
             # See https://github.com/ska-sa/dask-ms/issues/42
-            result[rr:rr + rl] = np.asarray(getcolslice(column, blc, trc,
-                                                        startrow=rs, nrow=rl),
-                                            dtype=dtype)
+            result[rr:rr + rl] = np.asarray(data, dtype=dtype)
+
             rr += rl
     finally:
         table_proxy._release(READLOCK)
