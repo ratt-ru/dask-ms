@@ -231,10 +231,10 @@ def xds_from_table(table_name, columns=None,
         data_vars = collections.OrderedDict()
         coords = collections.OrderedDict()
 
-        for k, v in ds.data_vars.items():
+        for k, v in sorted(ds.data_vars.items()):
             data_vars[k] = xr.DataArray(v.data, dims=v.dims, attrs=v.attrs)
 
-        for k, v in ds.coords.items():
+        for k, v in sorted(ds.coords.items()):
             coords[k] = xr.DataArray(v.data, dims=v.dims, attrs=v.attrs)
 
         xarray_datasets.append(xr.Dataset(data_vars,
