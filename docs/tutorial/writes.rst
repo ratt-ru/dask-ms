@@ -20,9 +20,9 @@ In the above example, given a list of ``datasets``, the
 
 .. note::
 
-    It is possible to pass "ALL" to the column argument to specify
-    that all arrays should be written to the table. In general it is
-    advisable to explicitly specify which columns to write in order
+    "ALL" can be supplied to the column argument to specify
+    that all arrays should be written to the table. However,
+    it is advisable to explicitly specify which columns to write
     to avoid accidentally overwriting data or or performing
     unnecessary writes.
 

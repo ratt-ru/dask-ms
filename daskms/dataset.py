@@ -135,12 +135,27 @@ def _convert_to_variable(k, v):
 
 class Dataset(object):
     """
-    Poor man's xarray Dataset. It mostly exists so that xarray can
-    be an optional dependency, as it in turn depends on pandas
-    which is a fairly heavy dependency
+    Poor man's `xarray Dataset
+    <http://xarray.pydata.org/en/stable/data-structures.html#dataset>`_.
+    Exists to allows ``xarray`` to be an optional ``dask-ms`` dependency,
+    by replicating a bare minimum of functionality.
     """
 
     def __init__(self, data_vars, attrs=None, coords=None):
+        """
+        Parameters
+        ----------
+        data_vars: dict
+            Dictionary of variables of the form
+            :code:`{name: (dims, array [, attrs])}`. `attrs` can
+            be optional.
+        attrs : dict
+            Dictionary of Dataset attributes
+        coords : dict
+            Dictionary of coordinates of the form
+            :code:`{name: (dims, array [, attrs])}`. `attrs` can
+            be optional.
+        """
         self._data_vars = {k: _convert_to_variable(k, v)
                            for k, v in data_vars.items()}
 
@@ -154,27 +169,42 @@ class Dataset(object):
 
     @property
     def attrs(self):
+        """ Dataset attributes """
         return Frozen(self._attrs)
 
     @property
     def dims(self):
+        """ A :code:`{dim: size}` dictionary """
         return data_var_dims(self._data_vars)
 
     sizes = dims
 
     @property
     def chunks(self):
+        """ A :code:`{dim: chunks}` dictionary """
         return data_var_chunks(self._data_vars)
 
     @property
     def data_vars(self):
+        """ Dataset variables """
         return Frozen(self._data_vars)
 
     @property
     def coords(self):
+        """ Dataset coordinates """
         return Frozen(self._coords)
 
     def compute(self):
+        """
+        Calls dask compute on the dask arrays in this Dataset,
+        returning a new Dataset.
+
+        Returns
+        -------
+        :class:`~daskms.dataset.Dataset`
+            Dataset containing computed arrays.
+        """
+
         # Separate out the variable components
         # so that we can compute the data arrays separately
         vnames = []
@@ -216,6 +246,16 @@ class Dataset(object):
                        coords=coords)
 
     def assign(self, **kwargs):
+        """
+        Creates a new Dataset from existing variables combined with
+        those supplied in \*\*kwargs.
+
+        Returns
+        -------
+        :class:`~daskms.dataset.Dataset`
+            Dataset containing existing variables combined with
+            those in \*\*kwargs.
+        """
         data_vars = self._data_vars.copy()
 
         for k, v in kwargs.items():
@@ -236,6 +276,22 @@ class Dataset(object):
                        attrs=self._attrs.copy(),
                        coords=self._coords)
 
+    def assign_attrs(self, **kwargs):
+        """
+        Creates a new Dataset from existing attributes combined with
+        those supplied in \*\*kwargs.
+
+        Returns
+        -------
+        :class:`~daskms.dataset.Dataset`
+            Dataset containing existing attributes combined with
+            those in \*\*kwargs.
+        """
+
+        attrs = self._attrs.copy()
+        attrs.update(kwargs)
+        return Dataset(self._data_vars, attrs=attrs, coords=self._coords)
+
     def __getattr__(self, name):
         try:
             return self._data_vars[name]
@@ -253,6 +309,7 @@ class Dataset(object):
             raise AttributeError("Invalid Attribute %s" % name)
 
     def copy(self):
+        """ Returns a copy of the Dataset """
         return Dataset(self._data_vars,
                        attrs=self._attrs.copy(),
                        coords=self._coords)
