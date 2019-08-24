@@ -55,15 +55,15 @@ class Variable(object):
         Parameters
         ----------
         dims : str or tuple
+            Dimension schema. e.g. :code:`('row', 'chan', 'corr')`
         data : :class:`numpy.ndarray` or :class:`dask.array.Array`
+            Array
         attrs : dict or None
+            Array metadata
         """
         self.dims = dims
         self.data = data
         self.attrs = attrs or {}
-
-    def __iter__(self):
-        return iter((self.dims, self.data, self.attrs))
 
     @property
     def dtype(self):
@@ -136,26 +136,29 @@ def data_var_chunks(data_vars):
     return chunks
 
 
+def as_variable(args):
+    try:
+        return Variable(*args)
+    except TypeError as e:
+        if "takes at most" in str(e):
+            raise TypeError("Invalid number of arguments in Variable tuple. "
+                            "Must be a size 2 to 5 tuple of the form "
+                            "(dims, array[, attrs[, encoding[, fastpath]]]) ")
+
+        raise
+
+
 def _convert_to_variable(k, v):
     """ Converts ``v`` to a :class:`daskms.dataset.Variable` """
     if isinstance(v, Variable):
         return v
 
-    if not isinstance(v, (tuple, list)) and len(v) not in (2, 3):
-        raise ValueError("'%s' must be a (dims, array) or "
-                         "(dims, array, attrs) tuple. "
-                         "Got '%s' instead," % (k, type(v)))
+    if not isinstance(v, (tuple, list)):
+        raise ValueError("'%s' must be a size 2 to 5 tuple of the form"
+                         "(dims, array[, attrs[, encoding[, fastpath]]]) "
+                         "tuple. Got '%s' instead," % (k, type(v)))
 
-    dims = v[0]
-    data = v[1]
-    attrs = v[2] if len(v) > 2 else {}
-
-    if len(dims) > 0 and len(dims) != data.ndim:
-        raise ValueError("Dimension schema '%s' does "
-                         "not match shape of associated array %s"
-                         % (dims, data.shape))
-
-    return Variable(dims, data, attrs)
+    return as_variable(v)
 
 
 class Dataset(object):
@@ -166,7 +169,7 @@ class Dataset(object):
     Exists to allows ``xarray`` to be an optional ``dask-ms`` dependency.
     """
 
-    def __init__(self, data_vars, attrs=None, coords=None):
+    def __init__(self, data_vars, coords=None, attrs=None):
         """
         Parameters
         ----------
@@ -174,12 +177,12 @@ class Dataset(object):
             Dictionary of variables of the form
             :code:`{name: (dims, array [, attrs])}`. `attrs` can
             be optional.
-        attrs : dict
-            Dictionary of Dataset attributes
-        coords : dict
+        coords : dict, optional
             Dictionary of coordinates of the form
             :code:`{name: (dims, array [, attrs])}`. `attrs` can
             be optional.
+        attrs : dict, optional
+            Dictionary of Dataset attributes
         """
         self._data_vars = {k: _convert_to_variable(k, v)
                            for k, v in data_vars.items()}
@@ -267,8 +270,8 @@ class Dataset(object):
                   in zip(cnames, cdims, cdata, cattrs)}
 
         return Dataset(data_vars,
-                       attrs=self._attrs.copy(),
-                       coords=coords)
+                       coords=coords,
+                       attrs=self._attrs.copy())
 
     def assign(self, **kwargs):
         """
@@ -290,8 +293,8 @@ class Dataset(object):
                 except KeyError:
                     raise ValueError("Couldn't find existing dimension schema "
                                      "during assignment of variable '%s'. "
-                                     "Supply a full (dims, array) tuple."
-                                     % k)
+                                     "Supply a full (dims, array[, attrs]) "
+                                     "tuple." % k)
                 else:
                     data_vars[k] = (current_var.dims, v, current_var.attrs)
             else:
@@ -300,6 +303,23 @@ class Dataset(object):
         return Dataset(data_vars,
                        attrs=self._attrs.copy(),
                        coords=self._coords)
+
+    def assign_coords(self, **kwargs):
+        """
+        Creates a new Dataset from existing attributes combined with
+        those supplied in \*\*kwargs.
+
+        Returns
+        -------
+        :class:`~daskms.dataset.Dataset`
+            Dataset containing existing attributes combined with
+            those in \*\*kwargs.
+        """
+
+        coords = {k: as_variable(v) for k, v in kwargs.items()}
+        return Dataset(self._data_vars, attrs=attrs, coords=coords)
+
+
 
     def assign_attrs(self, **kwargs):
         """
@@ -336,5 +356,5 @@ class Dataset(object):
     def copy(self):
         """ Returns a copy of the Dataset """
         return Dataset(self._data_vars,
-                       attrs=self._attrs.copy(),
-                       coords=self._coords)
+                       coords=self._coords,
+                       attrs=self._attrs.copy())

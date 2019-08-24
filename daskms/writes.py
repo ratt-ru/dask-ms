@@ -274,11 +274,15 @@ def update_datasets(table, datasets, columns, descriptor):
         # Generate a dask array for each column
         for column in columns:
             try:
-                full_dims, array, attrs = data_vars[column]
+                variable = data_vars[column]
             except KeyError:
                 log.warning("Ignoring '%s' not present "
                             "on dataset %d" % (column, di))
                 continue
+            else:
+                full_dims = variable.dims
+                array = variable.data
+                attrs = variable.attrs
 
             try:
                 keywords = attrs['keywords']
@@ -423,7 +427,10 @@ def add_row_order_factory(table_proxy, datasets):
         data_vars = ds.data_vars
         found = False
 
-        for k, (dims, array, _) in data_vars.items():
+        for k, v in data_vars.items():
+            dims = v.dims
+            array = v.data
+
             # Need something with a row dimension
             if not dims[0] == 'row':
                 continue
@@ -471,11 +478,15 @@ def create_datasets(table_name, datasets, columns, descriptor):
 
         for column in columns:
             try:
-                (dims, array, attrs) = data_vars[column]
+                variable = data_vars[column]
             except KeyError:
                 log.warn("Column %s doesn't exist on dataset %d "
                          "and will be ignored" % (column, di))
                 continue
+            else:
+                dims = variable.dims
+                array = variable.data
+                attrs = variable.attrs
 
             try:
                 keywords = attrs['keywords']
