@@ -41,6 +41,25 @@ def ndarray_putcol(row_runs, table_proxy, column, data):
         table_proxy._release(WRITELOCK)
 
 
+def multdim_str_putcol(row_runs, table_proxy, column, data):
+    """ Put multidimensional string data into the table """
+    putcol = table_proxy._table.putcol
+    rr = 0
+
+    table_proxy._acquire(WRITELOCK)
+
+    try:
+        for rs, rl in row_runs:
+            # Construct a dict with the shape and a flattened list
+            chunk = data[rr:rr + rl]
+            chunk = {'shape': chunk.shape, 'array': chunk.ravel().tolist()}
+            putcol(column, chunk, startrow=rs, nrow=rl)
+            rr += rl
+
+    finally:
+        table_proxy._release(WRITELOCK)
+
+
 def ndarray_putcolslice(row_runs, blc, trc, table_proxy, column, data):
     """ Put data into the table """
     putcolslice = table_proxy._table.putcolslice
@@ -52,6 +71,25 @@ def ndarray_putcolslice(row_runs, blc, trc, table_proxy, column, data):
         for rs, rl in row_runs:
             putcolslice(column, data[rr:rr + rl], blc, trc,
                         startrow=rs, nrow=rl)
+            rr += rl
+
+    finally:
+        table_proxy._release(WRITELOCK)
+
+
+def multdim_str_putcolslice(row_runs, blc, trc, table_proxy, column, data):
+    """ Put multidimensional string data into the table """
+    putcol = table_proxy._table.putcol
+    rr = 0
+
+    table_proxy._acquire(WRITELOCK)
+
+    try:
+        for rs, rl in row_runs:
+            # Construct a dict with the shape and a flattened list
+            chunk = data[rr:rr + rl]
+            chunk = {'shape': chunk.shape, 'array': chunk.ravel().tolist()}
+            putcol(column, chunk, blc, trc, startrow=rs, nrow=rl)
             rr += rl
 
     finally:
@@ -86,16 +124,25 @@ def putter_wrapper(row_orders, *args):
     # ndarrays of python objects (strings).
     # Without this conversion python-casacore can segfault
     # See https://github.com/ska-sa/dask-ms/issues/42
+    multidim_str = False
+
     if data.dtype == np.object:
-        data = data.tolist()
+        # Multi-dimensional strings, we need to pass dicts through
+        if data.ndim > 1:
+            multidim_str = True
+        # We can just pass dictionaries through
+        else:
+            data = data.tolist()
 
     # There are other dimensions beside row
     if nextent_args > 0:
         blc, trc = zip(*args[:nextent_args])
-        table_proxy._ex.submit(ndarray_putcolslice, row_runs, blc, trc,
+        fn = multdim_str_putcolslice if multidim_str else ndarray_putcolslice
+        table_proxy._ex.submit(fn, row_runs, blc, trc,
                                table_proxy, column, data).result()
     else:
-        table_proxy._ex.submit(ndarray_putcol, row_runs, table_proxy,
+        fn = multdim_str_putcol if multidim_str else ndarray_putcol
+        table_proxy._ex.submit(fn, row_runs, table_proxy,
                                column, data).result()
 
     return np.full(out_shape, True)
@@ -227,14 +274,23 @@ def update_datasets(table, datasets, columns, descriptor):
         # Generate a dask array for each column
         for column in columns:
             try:
-                column_entry = data_vars[column]
+                variable = data_vars[column]
             except KeyError:
                 log.warning("Ignoring '%s' not present "
                             "on dataset %d" % (column, di))
                 continue
+            else:
+                full_dims = variable.dims
+                array = variable.data
+                attrs = variable.attrs
 
-            full_dims = column_entry.dims
-            array = column_entry.data
+            try:
+                keywords = attrs['keywords']
+            except KeyError:
+                pass
+            else:
+                table_proxy.putcolkeywords(column, keywords).result()
+
             args = [row_order, ("row",)]
 
             # We only need to pass in dimension extent arrays if
@@ -371,7 +427,10 @@ def add_row_order_factory(table_proxy, datasets):
         data_vars = ds.data_vars
         found = False
 
-        for k, (dims, array, _) in data_vars.items():
+        for k, v in data_vars.items():
+            dims = v.dims
+            array = v.data
+
             # Need something with a row dimension
             if not dims[0] == 'row':
                 continue
@@ -419,11 +478,22 @@ def create_datasets(table_name, datasets, columns, descriptor):
 
         for column in columns:
             try:
-                (dims, array, _) = data_vars[column]
+                variable = data_vars[column]
             except KeyError:
                 log.warn("Column %s doesn't exist on dataset %d "
                          "and will be ignored" % (column, di))
                 continue
+            else:
+                dims = variable.dims
+                array = variable.data
+                attrs = variable.attrs
+
+            try:
+                keywords = attrs['keywords']
+            except KeyError:
+                pass
+            else:
+                table_proxy.putcolkeywords(column, keywords).result()
 
             args = [row_order, ("row",)]
 
@@ -467,10 +537,16 @@ def write_datasets(table, datasets, columns, descriptor=None):
     elif not isinstance(datasets, list):
         datasets = [datasets]
 
-    # If no columns are defined, write all dataset variables by default
-    if not columns:
+    # If ALL is requested
+    if columns == "ALL":
         columns = set.union(*(set(ds.data_vars.keys()) for ds in datasets))
         columns = list(sorted(columns))
+    elif len(columns) == 0:
+        raise ValueError("No columns were provided for writing. "
+                         "Use columns='ALL' if you intend to "
+                         "write all columns, or columns=['ALL'] "
+                         "if you're trying to write an 'ALL' "
+                         "array")
 
     if not table_exists(table):
         return create_datasets(table, datasets, columns,

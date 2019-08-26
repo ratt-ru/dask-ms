@@ -105,15 +105,15 @@ class DefaultDescriptorBuilder(AbstractDescriptorBuilder):
 
 def variable_column_descriptor(column, variable):
     """
-    Generate a CASA column descriptor from a Dataset Variable
-    or list of Dataset Variables.
+    Generate a CASA column descriptor from a Variable
+    or list of Variables.
 
     Parameters
     ----------
     column : str
         Column name
-    variable : :class:`daskms.dataset.Variable` or \
-       list of :class:`daskms.dataset.Variable`
+    variable : :class:`daskms.Variable` or \
+       list of :class:`daskms.Variable`
 
         Dataset variable
 

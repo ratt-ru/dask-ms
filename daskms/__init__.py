@@ -12,8 +12,9 @@ __version__ = '0.2.0-alpha2'
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
-from daskms.dask_ms import (xds_from_table,  # noqa
+from daskms.dask_ms import (xds_from_table,      # noqa
                                 xds_to_table,    # noqa
                                 xds_from_ms)     # noqa
 
-from daskms.table_proxy import TableProxy      # noqa
+from daskms.dataset import Dataset, Variable     # noqa
+from daskms.table_proxy import TableProxy        # noqa

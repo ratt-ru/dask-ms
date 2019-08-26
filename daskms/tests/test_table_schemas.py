@@ -11,18 +11,24 @@ import pytest
 from daskms.table_schemas import (lookup_table_schema,
                                   MS_SCHEMA,
                                   ANTENNA_SCHEMA,
+                                  FEED_SCHEMA,
                                   FIELD_SCHEMA,
-                                  SPECTRAL_WINDOW,
-                                  POLARIZATION)
+                                  SPECTRAL_WINDOW_SCHEMA,
+                                  OBSERVATION_SCHEMA,
+                                  POLARIZATION_SCHEMA,
+                                  POINTING_SCHEMA)
 
 
 @pytest.mark.parametrize("filename, schema", [
     (pjoin("bob", "qux", "FRED.MS%s" % os.sep), MS_SCHEMA),
     ("test.ms", MS_SCHEMA),
     ("test.ms::ANTENNA", ANTENNA_SCHEMA),
+    ("test.ms::FEED", FEED_SCHEMA),
     ("test.ms::FIELD", FIELD_SCHEMA),
-    ("test.ms::SPECTRAL_WINDOW", SPECTRAL_WINDOW),
-    ("test.ms::POLARIZATION", POLARIZATION)])
+    ("test.ms::OBSERVATION", OBSERVATION_SCHEMA),
+    ("test.ms::POINTING", POINTING_SCHEMA),
+    ("test.ms::POLARIZATION", POLARIZATION_SCHEMA),
+    ("test.ms::SPECTRAL_WINDOW", SPECTRAL_WINDOW_SCHEMA)])
 def test_table_suffix_lookup(filename, schema):
     assert schema == lookup_table_schema(filename, None)
 

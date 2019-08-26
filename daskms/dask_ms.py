@@ -23,12 +23,13 @@ _DEFAULT_INDEX_COLUMNS = ["TIME"]
 log = logging.getLogger(__name__)
 
 
-def xds_to_table(xds, table_name, columns=None, **kwargs):
+def xds_to_table(xds, table_name, columns, descriptor=None):
     """
-    Generates a dask array which writes the
-    specified columns from :class:`xarray.Dataset`'s into
-    the CASA table specified by ``table_name`` when
-    the :meth:`dask.array.Array.compute` method is called.
+    Generates a dask array representing a series of writes from the
+    specified arrays in :class:`xarray.Dataset`'s into
+    the CASA table columns specified by ``table_name`` and ``columns``.
+    This is lazy operation -- it is only execute when a :meth:`dask.compute`
+    or :meth:`dask.array.Array.compute` method is called.
 
     Parameters
     ----------
@@ -38,9 +39,22 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
         sequential datasets will be written.
     table_name : str
         CASA table path
-    columns : tuple or list, optional
+    columns : tuple or list or "ALL"
         list of column names to write to the table.
-        If ``None`` all columns will be written.
+
+        "ALL" is a special marker which specifies that all columns
+        should be written. If you wish to write an "ALL" array to
+        a column, use :code:`columns=['ALL']`
+
+    descriptor : None or \
+        :class:`~daskms.descriptors.builder.AbstractBuilderFactory` or \
+        str
+
+        A class describing how CASA table descriptors and data managers
+        are constructors. Some defaults are available such
+        as `ms` and `ms_subtable`.
+
+        If None, defaults are used.
 
     Returns
     -------
@@ -53,7 +67,9 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
     if not isinstance(xds, (tuple, list)):
         xds = [xds]
 
-    columns = promote_columns(columns, [])
+    if not isinstance(columns, (tuple, list)):
+        if columns != "ALL":
+            columns = [columns]
 
     datasets = []
 
@@ -80,7 +96,8 @@ def xds_to_table(xds, table_name, columns=None, **kwargs):
                 raise TypeError("Invalid Dataset type '%s'" % type(ds))
 
     # Write the datasets
-    return write_datasets(table_name, datasets, columns)
+    return write_datasets(table_name, datasets, columns,
+                          descriptor=descriptor)
 
 
 def xds_from_table(table_name, columns=None,
@@ -221,10 +238,10 @@ def xds_from_table(table_name, columns=None,
         data_vars = collections.OrderedDict()
         coords = collections.OrderedDict()
 
-        for k, v in ds.data_vars.items():
+        for k, v in sorted(ds.data_vars.items()):
             data_vars[k] = xr.DataArray(v.data, dims=v.dims, attrs=v.attrs)
 
-        for k, v in ds.coords.items():
+        for k, v in sorted(ds.coords.items()):
             coords[k] = xr.DataArray(v.data, dims=v.dims, attrs=v.attrs)
 
         xarray_datasets.append(xr.Dataset(data_vars,

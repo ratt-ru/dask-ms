@@ -13,10 +13,10 @@ xarray Datasets from CASA Tables
         :alt: Documentation Status
 
 Constructs xarray_ ``Datasets`` from CASA Tables via python-casacore_.
-The ``DataArrays`` contained in the ``Dataset`` are dask_ arrays backed by
+The ``Variables`` contained in the ``Dataset`` are dask_ arrays backed by
 deferred calls to :code:`pyrap.tables.table.getcol`.
 
-Supports writing ``DataArrays`` back to the respective column in the Table.
+Supports writing ``Variables`` back to the respective column in the Table.
 
 The intention behind this package is to support the Measurement Set as
 a data source and sink for the purposes of writing parallel, distributed
@@ -50,7 +50,7 @@ Example Usage
 
     # Create xarray datasets from Measurement Set "WSRT.MS"
     ds = xds_from_table("WSRT.MS")
-    # Set the flag DataArray on first Dataset to it's inverse
+    # Set the flag Variable on first Dataset to it's inverse
     ds[0]['flag'] = (ds[0].flag.dims, da.logical_not(ds[0].flag))
     # Write the flag column back to the Measurement Set
     xds_to_table(ds, "WSRT.MS", "FLAG").compute()

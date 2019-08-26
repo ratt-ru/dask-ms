@@ -72,8 +72,20 @@ def object_getcol(row_runs, table_proxy, column, result, dtype):
 
     try:
         for rs, rl in row_runs:
-            result[rr:rr + rl] = np.asarray(getcol(column, rs, rl),
-                                            dtype=dtype)
+            data = getcol(column, rs, rl)
+
+            # Multi-dimensional string arrays are returned as a
+            # dict with 'array' and 'shape' keys. Massage the data.
+            if isinstance(data, dict):
+                data = (np.asarray(data['array'], dtype=dtype)
+                          .reshape(data['shape']))
+
+            # NOTE(sjperkins)
+            # Dask wants ndarrays internally, so we asarray objects
+            # the returning list of objects.
+            # See https://github.com/ska-sa/dask-ms/issues/42
+            result[rr:rr + rl] = np.asarray(data, dtype=dtype)
+
             rr += rl
     finally:
         table_proxy._release(READLOCK)
@@ -91,13 +103,20 @@ def object_getcolslice(row_runs, table_proxy, column, result,
 
     try:
         for rs, rl in row_runs:
+            data = getcolslice(column, blc, trc, startrow=rs, nrow=rl)
+
+            # Multi-dimensional string arrays are returned as a
+            # dict with 'array' and 'shape' keys. Massage the data.
+            if isinstance(data, dict):
+                data = (np.asarray(data['array'], dtype=dtype)
+                          .reshape(data['shape']))
+
             # NOTE(sjperkins)
             # Dask wants ndarrays internally, so we asarray objects
             # the returning list of objects.
             # See https://github.com/ska-sa/dask-ms/issues/42
-            result[rr:rr + rl] = np.asarray(getcolslice(column, blc, trc,
-                                                        startrow=rs, nrow=rl),
-                                            dtype=dtype)
+            result[rr:rr + rl] = np.asarray(data, dtype=dtype)
+
             rr += rl
     finally:
         table_proxy._release(READLOCK)
@@ -153,8 +172,7 @@ def getter_wrapper(row_orders, *args):
 
 
 def _dataset_variable_factory(table_proxy, table_schema, select_cols,
-                              exemplar_row, orders, chunks, array_prefix,
-                              single_row=False):
+                              exemplar_row, orders, chunks, array_prefix):
     """
     Returns a dictionary of dask arrays representing
     a series of getcols on the appropriate table.
@@ -179,11 +197,6 @@ def _dataset_variable_factory(table_proxy, table_schema, select_cols,
         Chunking strategy for the dataset.
     array_prefix : str
         dask array string prefix
-    single_row : bool, optional
-        Defaults to False.
-        Indicates whether the columns should be grouped on single rows.
-        If `True` the single row column is squeezed (contracted)
-        out of the array.
 
     Returns
     -------
@@ -236,11 +249,6 @@ def _dataset_variable_factory(table_proxy, table_schema, select_cols,
                                   new_axes=new_axes,
                                   dtype=meta.dtype)
 
-        # Squeeze out the single row if requested
-        if single_row:
-            dask_array = dask_array.squeeze(0)
-            full_dims = full_dims[1:]
-
         # Assign into variable and dimension dataset
         dataset_vars[column] = (full_dims, dask_array, meta.attrs)
 
@@ -278,7 +286,7 @@ class DatasetFactory(object):
     def _table_schema(self):
         return lookup_table_schema(self.table, self.table_schema)
 
-    def _single_dataset(self, orders, single_row=False, exemplar_row=0):
+    def _single_dataset(self, orders, exemplar_row=0):
         table_proxy = self._table_proxy()
         table_schema = self._table_schema()
         select_cols = set(self.select_cols or table_proxy.colnames().result())
@@ -286,22 +294,16 @@ class DatasetFactory(object):
         variables = _dataset_variable_factory(table_proxy, table_schema,
                                               select_cols, exemplar_row,
                                               orders, self.chunks[0],
-                                              short_table_name(self.table),
-                                              single_row=single_row)
+                                              short_table_name(self.table))
 
-        if single_row:
-            # ROWID is assigned as an attribute
-            variables.pop('ROWID', None)
-            return Dataset(variables, attrs={"ROWID": exemplar_row})
+        try:
+            rowid = variables.pop("ROWID")
+        except KeyError:
+            coords = None
         else:
-            try:
-                rowid = variables.pop("ROWID")
-            except KeyError:
-                coords = None
-            else:
-                coords = {"ROWID": rowid}
+            coords = {"ROWID": rowid}
 
-            return Dataset(variables, coords=coords)
+        return Dataset(variables, coords=coords)
 
     def _group_datasets(self, groups, exemplar_rows, orders):
         table_proxy = self._table_proxy()
@@ -383,7 +385,7 @@ class DatasetFactory(object):
             np_sorted_row = sorted_rows.compute()
 
             return [self._single_dataset((row_blocks[r], run_blocks[r]),
-                                         single_row=True, exemplar_row=er)
+                                         exemplar_row=er)
                     for r, er in enumerate(np_sorted_row)]
         # Grouping column case
         else:

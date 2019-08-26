@@ -132,6 +132,7 @@ def string_builder_factory(builder_str):
         Table Descriptor builder based on the builder_str
     """
 
+    import daskms.descriptors.register_default_builders  # noqa
     from daskms.descriptors.builder import descriptor_builders
 
     fn, args, kwargs = parse_function_call_string(builder_str)

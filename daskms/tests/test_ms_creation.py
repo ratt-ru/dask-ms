@@ -127,11 +127,11 @@ def test_ms_create(tmp_path, chunks, num_chans, corr_types):
         all_data.append(dask_data)
         all_data_desc_id.append(dask_ddid)
 
-    ms_writes = xds_to_table(ms_datasets, ms_table_name)
-    ant_writes = xds_to_table(ant_datasets, ant_table_name)
-    pol_writes = xds_to_table(pol_datasets, pol_table_name)
-    spw_writes = xds_to_table(spw_datasets, spw_table_name)
-    ddid_writes = xds_to_table(ddid_datasets, ddid_table_name)
+    ms_writes = xds_to_table(ms_datasets, ms_table_name, columns="ALL")
+    ant_writes = xds_to_table(ant_datasets, ant_table_name, columns="ALL")
+    pol_writes = xds_to_table(pol_datasets, pol_table_name, columns="ALL")
+    spw_writes = xds_to_table(spw_datasets, spw_table_name, columns="ALL")
+    ddid_writes = xds_to_table(ddid_datasets, ddid_table_name, columns="ALL")
 
     dask.compute(ms_writes, ant_writes, pol_writes, spw_writes, ddid_writes)
 
