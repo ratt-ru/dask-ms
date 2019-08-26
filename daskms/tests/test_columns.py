@@ -40,7 +40,7 @@ def test_missing_valuetype():
     ("TIME",  (), np.float64),
     ("ANTENNA1", (), np.int32)])
 @pytest.mark.parametrize("table_schema", [
-    {'DATA': {'dask': {'dims': ("chan", "corr")}}}
+    {'DATA': {'dims': ("chan", "corr")}}
 ])
 @pytest.mark.parametrize("chunks", [
     (("chan", (12, 4)), ("corr", (1, 1, 1, 1))),
@@ -50,7 +50,7 @@ def test_column_metadata(ms, column, shape, chunks, table_schema, dtype):
     assert_liveness(1, 1)
 
     try:
-        dims = table_schema[column]['dask']['dims']
+        dims = table_schema[column]['dims']
     except KeyError:
         dims = tuple("%s-%d" % (column, i) for i in range(1, len(shape) + 1))
 

@@ -206,9 +206,9 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
 
     # Extract dimension schema
     try:
-        dims = table_schema[column]['dask']['dims']
+        dims = table_schema[column]['dims']
     except KeyError:
-        dims = tuple("%s-%d" % (column, i) for i in range(len(shape)))
+        dims = tuple("%s-%d" % (column, i) for i in range(1, len(shape) + 1))
 
     dim_chunks = []
 
