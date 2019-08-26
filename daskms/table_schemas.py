@@ -9,7 +9,6 @@ try:
 except ImportError:
     from collections import Mapping
 
-from six import string_types
 from daskms.utils import short_table_name
 
 # https://casa.nrao.edu/Memos/229.html#SECTION00061000000000000000
@@ -158,7 +157,7 @@ def lookup_table_schema(table_name, lookup_str):
         if isinstance(ls, Mapping):
             table_schema.update(ls)
         # Get a registered table schema
-        elif isinstance(ls, string_types):
+        elif isinstance(ls, str):
             table_schema.update(_ALL_SCHEMAS.get(ls, {}))
         else:
             raise TypeError("Invalid lookup_str type '%s'" % type(ls))

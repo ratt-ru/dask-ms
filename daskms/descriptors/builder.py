@@ -9,8 +9,6 @@ from ast import parse
 from collections import defaultdict
 import logging
 
-import six
-
 from daskms.columns import infer_casa_type
 from daskms.dataset import Variable
 
@@ -44,8 +42,7 @@ def register_descriptor_builder(name):
     return decorator
 
 
-@six.add_metaclass(abc.ABCMeta)
-class AbstractDescriptorBuilder(object):
+class AbstractDescriptorBuilder(object, metaclass=abc.ABCMeta):
     @staticmethod
     def variable_descriptor(column, variable):
         return variable_column_descriptor(column, variable)

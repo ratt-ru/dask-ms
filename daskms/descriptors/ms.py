@@ -4,12 +4,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from functools import reduce
 import logging
 from operator import mul
 
 import numpy as np
 import pyrap.tables as pt
-from six.moves import reduce
 
 from daskms.columns import infer_dtype
 from daskms.descriptors.builder import (register_descriptor_builder,

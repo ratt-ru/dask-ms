@@ -9,7 +9,6 @@ from threading import Lock
 import weakref
 
 import concurrent.futures as cf
-import six
 
 log = logging.getLogger(__name__)
 
@@ -46,8 +45,7 @@ def executor_delete_reference(ex, threadpool_executor):
     return weakref.ref(ex, _callback)
 
 
-@six.add_metaclass(ExecutorMetaClass)
-class Executor(object):
+class Executor(object, metaclass=ExecutorMetaClass):
     def __init__(self):
         # Initialise a single thread
         self.impl = impl = cf.ThreadPoolExecutor(1)

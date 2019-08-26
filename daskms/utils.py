@@ -6,7 +6,6 @@ from __future__ import print_function
 
 import logging
 import os
-import six
 import time
 
 log = logging.getLogger(__name__)
@@ -40,11 +39,11 @@ def promote_columns(columns, default):
         return default
     elif isinstance(columns, (tuple, list)):
         for c in columns:
-            if not isinstance(c, six.string_types):
+            if not isinstance(c, str):
                 raise TypeError("columns must be a list of strings")
 
         return list(columns)
-    elif isinstance(columns, six.string_types):
+    elif isinstance(columns, str):
         return [columns]
 
     raise TypeError("'columns' must be a string or a list of strings")
