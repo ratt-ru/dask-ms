@@ -281,8 +281,7 @@ class Dataset(object):
             Dataset containing computed arrays.
         """
 
-        # Separate out the variable components
-        # so that we can compute the data arrays separately
+        # Compute dask arrays separately
         dask_data = {}
         data_vars = {}
 
