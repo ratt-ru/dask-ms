@@ -270,7 +270,7 @@ class Dataset(object):
         """ Dataset coordinates """
         return Frozen(self._coords)
 
-    def compute(self):
+    def compute(self, **kwargs):
         """
         Calls dask compute on the dask arrays in this Dataset,
         returning a new Dataset.
@@ -283,42 +283,22 @@ class Dataset(object):
 
         # Separate out the variable components
         # so that we can compute the data arrays separately
-        vnames = []
-        vdims = []
-        vdata = []
-        vattrs = []
+        dask_data = {}
+        data_vars = {}
 
+        # Split variables into dask and other data
         for k, v in self._data_vars.items():
-            vnames.append(k)
-            vdims.append(v.dims)
-            vdata.append(v.data)
-            vattrs.append(v.attrs)
+            if isinstance(v.data, da.Array):
+                dask_data[k] = v
+            else:
+                data_vars[k] = v
 
-        # Separate out the coordinate components
-        # so that we can compute the data arrays separately
-        cnames = []
-        cdims = []
-        cdata = []
-        cattrs = []
-
-        for k, v in self._coords.items():
-            cnames.append(k)
-            cdims.append(v.dims)
-            cdata.append(v.data)
-            cattrs.append(v.attrs)
-
-        # Compute list of arrays
-        vdata, cdata = dask.compute(vdata, cdata)
-
-        # Reform variable and coordinate arrays
-        data_vars = {n: (d, v, a) for n, d, v, a
-                     in zip(vnames, vdims, vdata, vattrs)}
-
-        coords = {n: (d, v, a) for n, d, v, a
-                  in zip(cnames, cdims, cdata, cattrs)}
+        # Compute dask arrays if present and add them to data variables
+        if len(dask_data) > 0:
+            data_vars.update(da.compute(dask_data, **kwargs)[0])
 
         return Dataset(data_vars,
-                       coords=coords,
+                       coords=self._coords,
                        attrs=self._attrs.copy())
 
     def assign(self, **kwargs):
