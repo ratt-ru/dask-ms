@@ -38,9 +38,42 @@ If the ``ROWID`` coordinate is *present* on a dataset, it will be used
 to update existing rows in the dataset. By contrast, the *absence* of
 ``ROWID`` will cause rows to be appended to the table.
 
+.. doctest::
+
+    >>> import dask
+    >>> import dask.array as da
+    >>> from daskms import Dataset
+    >>> # Create Dataset Variables
+    >>> data_vars = {
+        'DATA_DESC_ID': (("row",), da.zeros(10, chunks=2)),
+        'DATA': (("row", "chan", "corr"), da.zeros((10, 16, 4), chunks=(2, 16, 4))
+    }
+    >>> # Write dataset to table
+    >>> writes = xds_to_table([Dataset(data_vars)], "test.table", "ALL")
+    >>> dask.compute(writes)
+
+
 It is perfectly possible to combine the two operations by submitting
 multiple datasets, some of which contain ``ROWID`` coordinates
 while others do not.
+
+.. doctest::
+
+    >>> import dask
+    >>> from daskms import xds_from_ms, Dataset
+    >>> from daskms.example_data import example_ms
+    >>>
+    >>> # Create example Measurement Set and read datasets
+    >>> ms = example_ms()
+    >>> datasets = xds_from_ms(ms)
+    >>> # Add last Dataset to table using variables only (no ROWID coordinate)
+    >>> new_ds = Dataset(datasets[-1].data_vars)
+    >>> datasets.append(new_ds)
+    >>>
+    >>> # Write datasets back to Measurement Set
+    >>> writes = xds_to_table(datasets, ms, "ALL")
+    >>> dask.compute(writes)
+
 
 In these cases it is *strongly* suggested that
 the datasets representing updates are generated from
@@ -60,6 +93,23 @@ If a dataset array is present as a column in the dataset, it will be updated.
 By contrast, a missing column will lead cause :func:`~daskms.xds_to_table`
 to infer a CASA column descriptor, add the column to the table and then write
 the array to it.
+
+.. doctest::
+
+    >>> from daskms import xds_from_ms
+    >>> from daskms.example_data import example_ms
+    >>>
+    >>> ms = example_ms()
+    >>> datasets = xds_from_ms(ms)
+    >>>
+    >>> # Add BITFLAG data to datasets
+    >>> for i, ds in enumerate(datasets):
+    >>>     datasets[i] = ds.assign(BITFLAG=(("row", "chan", "corr",
+                                              da.zeros_like(ds.DATA.data))))
+    >>>
+    >>> # Write data back to ms
+    >>> writes = xds_to_table(datasets, ms, ["BITFLAG"])
+    >>> dask.compute(writes)
 
 
 Creating Tables
