@@ -27,6 +27,8 @@ In the above example, given a list of ``datasets``, the
     unnecessary writes.
 
 
+.. _update-append-rows:
+
 Updating/Appending Rows
 ~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -37,6 +39,8 @@ update or append rows to a table.
 If the ``ROWID`` coordinate is *present* on a dataset, it will be used
 to update existing rows in the dataset. By contrast, the *absence* of
 ``ROWID`` will cause rows to be appended to the table.
+
+The following Dataset without ``ROWID`` creates a new table from scratch.
 
 .. doctest::
 
@@ -112,34 +116,22 @@ the array to it.
     >>> dask.compute(writes)
 
 
-Creating Tables
-~~~~~~~~~~~~~~~
-
-If the table does not exist, it will be created, the appropriate columns
-created, rows added and the data appended to it. The "ALL" string should
-be supplied for the ``column`` argument to force all arrays to be written.
-
-.. doctest::
-
-    >>> writes = xds_to_table(datasets, "TEST.MS", "ALL")
-    >>> dask.compute(writes)
-
-
 Creating and updating the Measurement Set and it's sub-tables
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In the case of the Measurement Set and it's sub-tables,
-care is taken to ensure that added columns
-conform to the `Measurement Set v2.0 Specification
-<https://casacore.github.io/casacore-notes/229.html>`_
-if they are considered to be required.
+care is taken to ensure that
+
+1. Required columns are added.
+2. Required columns conform to the `Measurement Set v2.0 Specification
+<https://casacore.github.io/casacore-notes/229.html>`_.
 
 This means that, for example, if you have a UVW array
 with a non-standard shape ([4]) and type (float), the UVW column
 will still be created the shape ([3]) and type (double)
 mandated by the MSv2.0 spec.
 
-This also applies to the following optional columns in the MSv2.0:
+The above also applies to the following optional columns in the MSv2.0:
 
 +-----------------+
 | DATA            |

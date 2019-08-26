@@ -56,15 +56,18 @@ Next, create some dask arrays that we will place on our Dataset
     data = (da.random.random((row, chan, corr), chunks=vis_chunks) +
             da.random.random((row, chan, corr), chunks=vis_chunks)*1j)
 
-    # Define our coordinates.
-    rowid = da.arange(row, chunks=chunks['row'])
 
+Next, create the dataset by assigning variable dictionaries.
+They have the form :code:`{name: (dims, array[, attrs])}`
 
-Next, create the dataset by assigning variable and coordinate
-dictionaries. They have the form :code:`{name: (dims, array[, attrs])}`
+The :class:`~daskms.Dataset` can also be assigned coordinates and attributes
+via the ``coords`` and ``attrs`` argument to the constructor.
 
-The :class:`~daskms.Dataset` can also be assigned attributes via
-the ``attrs`` argument to the constructor.
+.. note::
+
+    The ROWID coordinate is not normally assigned when creating
+    a Dataset from scratch and is shown here for the purposes
+    of illustration. See :ref:`update-append-rows` for further information.
 
 .. code-block:: python
 
@@ -78,6 +81,8 @@ the ``attrs`` argument to the constructor.
 
     # Create the dataset
     ds = Dataset(data_vars, attrs={'observer': 'hugo'}, coords=coords})
+
+
 
 Modifying Datasets
 ~~~~~~~~~~~~~~~~~~
