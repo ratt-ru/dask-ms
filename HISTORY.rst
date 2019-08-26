@@ -5,6 +5,7 @@ History
 0.2.0 (YYYY-MM-DD)
 ------------------
 
+* Drop python 2 support (:pr:`51`)
 * Simplify Table Schemas (:pr:`50`)
 * Add Concepts + Tutorial Documentation (:pr:`48`)
 * Supporting reading and updating column keywords (:pr:`48`)
