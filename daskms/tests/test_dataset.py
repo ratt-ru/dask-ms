@@ -250,7 +250,7 @@ def test_dataset_assign(ms):
 def test_dataset_table_schemas(ms):
     """ Test that we can pass table schemas """
     data_dims = ("mychan", "mycorr")
-    table_schema = ["MS", {"DATA": {'dask': {"dims": data_dims}}}]
+    table_schema = ["MS", {"DATA": {"dims": data_dims}}]
     datasets = read_datasets(ms, [], [], [], table_schema=table_schema)
     assert datasets[0].data_vars["DATA"].dims == ("row", ) + data_dims
 

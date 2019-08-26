@@ -14,164 +14,77 @@ from daskms.utils import short_table_name
 
 # https://casa.nrao.edu/Memos/229.html#SECTION00061000000000000000
 MS_SCHEMA = {
-    'UVW': {
-        'dask': {'dims': ('uvw',)},
-    },
-    'UVW2': {
-        'dask': {'dims': ('uvw',)},
-    },
-    'DATA': {
-        'dask': {'dims': ('chan', 'corr')},
-    },
-    'FLOAT_DATA': {
-        'dask': {'dims': ('chan', 'corr')},
-    },
-    'SIGMA': {
-        'dask': {'dims': ('corr',)},
-    },
-    'SIGMA_SPECTRUM': {
-        'dask': {'dims': ('chan', 'corr')},
-    },
-    'WEIGHT': {
-        'dask': {'dims': ('corr',)},
-    },
-    'WEIGHT_SPECTRUM': {
-        'dask': {'dims': ('chan', 'corr')},
-    },
-    'FLAG': {
-        'dask': {'dims': ('chan', 'corr')},
-    },
-    'FLAG_CATEGORY': {
-        'dask': {'dims': ('flagcat', 'chan', 'corr')},
-    },
-
+    'UVW': {'dims': ('uvw',)},
+    'UVW2': {'dims': ('uvw',)},
+    'DATA': {'dims': ('chan', 'corr')},
+    'FLOAT_DATA': {'dims': ('chan', 'corr')},
+    'SIGMA': {'dims': ('corr',)},
+    'SIGMA_SPECTRUM': {'dims': ('chan', 'corr')},
+    'WEIGHT': {'dims': ('corr',)},
+    'WEIGHT_SPECTRUM': {('chan', 'corr')},
+    'FLAG': {'dims': ('chan', 'corr')},
+    'FLAG_CATEGORY': {'dims': ('flagcat', 'chan', 'corr')},
     # Extra imaging columns
-    'MODEL_DATA': {
-        'dask': {'dims': ('chan', 'corr')},
-    },
-    'CORRECTED_DATA': {
-        'dask': {'dims': ('chan', 'corr')},
-    },
-    'IMAGING_WEIGHT': {
-        'dask': {'dims': ('chan',)},
-    }
+    'MODEL_DATA': {'dims': ('chan', 'corr')},
+    'CORRECTED_DATA': {'dims': ('chan', 'corr')},
+    'IMAGING_WEIGHT': {'dims': ('chan',)}
 }
 
 ANTENNA_SCHEMA = {
-    "POSITION": {
-        'dask': {'dims': ('xyz',)},
-    },
-    "OFFSET": {
-        'dask': {'dims': ('xyz',)},
-    },
+    "POSITION": {'dims': ('xyz',)},
+    "OFFSET": {'dims': ('xyz',)},
 }
 
 FEED_SCHEMA = {
-    "BEAM_OFFSET": {
-        'dask': {'dims': ('receptors', 'radec')}
-    },
-    "POLARIZATION_TYPE": {
-        'dask': {'dims': ('receptors',)}
-    },
-    "POL_RESPONSE": {
-        'dask': {'dims': ('receptors', 'receptors-2')}
-    },
-    "POSITION": {
-        'dask': {'dims': ("xyz",)}
-    },
-    "RECEPTOR_ANGLE": {
-        'dask': {'dims': ("receptors",)}
-    }
+    "BEAM_OFFSET": {'dims': ('receptors', 'radec')},
+    "POLARIZATION_TYPE": {'dims': ('receptors',)},
+    "POL_RESPONSE": {'dims': ('receptors', 'receptors-2')},
+    "POSITION": {'dims': ("xyz",)},
+    "RECEPTOR_ANGLE": {'dims': ("receptors",)},
 }
 
 
 FIELD_SCHEMA = {
-    "DELAY_DIR": {
-        'dask': {'dims': ('field-poly', 'field-dir')},
-    },
-    "PHASE_DIR": {
-        'dask': {'dims': ('field-poly', 'field-dir')},
-    },
-    "REFERENCE_DIR": {
-        'dask': {'dims': ('field-poly', 'field-dir')},
-    },
+    "DELAY_DIR": {'dims': ('field-poly', 'field-dir')},
+    "PHASE_DIR": {'dims': ('field-poly', 'field-dir')},
+    "REFERENCE_DIR": {'dims': ('field-poly', 'field-dir')},
 }
 
 OBSERVATION_SCHEMA = {
-    "LOG": {
-        'dask': {'dims': ('log',)}
-    },
-    "SCHEDULE": {
-        'dask': {'dims': ('schedule',)}
-    },
-    "TIME_RANGE": {
-        'dask': {'dims': ('obs-exts',)}
-    }
+    "LOG": {'dims': ('log',)},
+    "SCHEDULE": {'dims': ('schedule',)},
+    "TIME_RANGE": {'dims': ('obs-exts',)},
 }
 
 
 POINTING_SCHEMA = {
-    "DIRECTION": {
-        'dask': {'dims': ('point-poly', 'radec')},
-    },
-    "ENCODER": {
-        'dask': {'dims': ('radec',)},
-    },
-    "POINTING_OFFSET": {
-        'dask': {'dims': ('point-poly', 'radec')},
-    },
-    "SOURCE_OFFSET": {
-        'dask': {'dims': ('point-poly', 'radec')},
-    },
-    "TARGET": {
-        'dask': {'dims': ('point-poly', 'radec')},
-    }
+    "DIRECTION": {'dims': ('point-poly', 'radec')},
+    "ENCODER": {'dims': ('radec',)},
+    "POINTING_OFFSET": {'dims': ('point-poly', 'radec')},
+    "SOURCE_OFFSET": {'dims': ('point-poly', 'radec')},
+    "TARGET": {'dims': ('point-poly', 'radec')},
 }
 
 
 POLARIZATION_SCHEMA = {
-    "CORR_TYPE": {
-        'dask': {'dims': ('corr',)},
-    },
-    "CORR_PRODUCT": {
-        'dask': {'dims': ('corr', 'corrprod_idx')},
-    },
+    "CORR_TYPE": {'dims': ('corr',)},
+    "CORR_PRODUCT": {'dims': ('corr', 'corrprod_idx')},
 }
 
 SPECTRAL_WINDOW_SCHEMA = {
-    "CHAN_FREQ": {
-        'dask': {'dims': ('chan',)},
-    },
-    "CHAN_WIDTH": {
-        'dask': {'dims': ('chan',)},
-    },
-    "EFFECTIVE_BW": {
-        'dask': {'dims': ('chan',)},
-    },
-    "RESOLUTION": {
-        'dask': {'dims': ('chan',)},
-    },
+    "CHAN_FREQ": {'dims': ('chan',)},
+    "CHAN_WIDTH": {'dims': ('chan',)},
+    "EFFECTIVE_BW": {'dims': ('chan',)},
+    "RESOLUTION": {'dims': ('chan',)},
 }
 
 SOURCE_SCHEMA = {
-    "DIRECTION": {
-        'dask': {'dims': ('radec',)}
-    },
-    "POSITION": {
-        'dask': {'dims': ('position',)}
-    },
-    "PROPER_MOTION": {
-        'dask': {'dims': ('radec_per_sec',)}
-    },
-    "REST_FREQUENCY": {
-        'dask': {'dims': ('lines',)}
-    },
-    "SYSVEL": {
-        'dask': {'dims': ('lines',)}
-    },
-    "TRANSITION": {
-        'dask': {'dims': ('lines',)}
-    },
+    "DIRECTION": {'dims': ('radec',)},
+    "POSITION": {'dims': ('position',)},
+    "PROPER_MOTION": {'dims': ('radec_per_sec',)},
+    "REST_FREQUENCY": {'dims': ('lines',)},
+    "SYSVEL": {'dims': ('lines',)},
+    "TRANSITION": {'dims': ('lines',)},
 }
 
 _SUBTABLE_SCHEMAS = {
@@ -225,7 +138,7 @@ def lookup_table_schema(table_name, lookup_str):
     -------
     dict
         A dictionary of the form
-        :code:`{column: {'dask': {...}, 'casa': {...}}}`.
+        :code:`{column: {'dims': (...)}}`.
     """
     if lookup_str is None:
         table_type = infer_table_type(short_table_name(table_name))
