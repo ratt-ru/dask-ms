@@ -274,7 +274,7 @@ class Dataset(object):
                        attrs=self._attrs.copy())
 
     def assign(self, **kwargs):
-        """
+        r"""
         Creates a new Dataset from existing variables combined with
         those supplied in \*\*kwargs.
 
@@ -305,7 +305,7 @@ class Dataset(object):
                        coords=self._coords)
 
     def assign_coords(self, **kwargs):
-        """
+        r"""
         Creates a new Dataset from existing attributes combined with
         those supplied in \*\*kwargs.
 
@@ -317,12 +317,10 @@ class Dataset(object):
         """
 
         coords = {k: as_variable(v) for k, v in kwargs.items()}
-        return Dataset(self._data_vars, attrs=attrs, coords=coords)
-
-
+        return Dataset(self._data_vars, attrs=self._attrs, coords=coords)
 
     def assign_attrs(self, **kwargs):
-        """
+        r"""
         Creates a new Dataset from existing attributes combined with
         those supplied in \*\*kwargs.
 
