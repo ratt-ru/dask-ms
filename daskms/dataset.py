@@ -9,8 +9,11 @@ try:
 except ImportError:
     from collections import Mapping
 
+from collections import OrderedDict
+
 import dask
 import dask.array as da
+from dask.highlevelgraph import HighLevelGraph
 
 try:
     import xarray as xr
@@ -100,6 +103,43 @@ class Variable(object):
     def ndim(self):
         """ Number of array dimensions """
         return self.data.ndim
+
+    def __dask_keys__(self):
+        return self.data.__dask_keys__()
+
+    def __dask_graph__(self):
+        if isinstance(self.data, da.Array):
+            return self.data.__dask_graph__()
+
+        return None
+
+    def __dask_layers__(self):
+        return self.data.__dask_layers__()
+
+    @property
+    def __dask_optimize__(self):
+        return self.data.__dask_optimize__
+
+    @property
+    def __dask_scheduler__(self):
+        return self.data.__dask_scheduler__
+
+    @staticmethod
+    def finalize_compute(results, fn, args, dims, attrs):
+        return Variable(dims, fn(results, *args), attrs=attrs)
+
+    def __dask_postcompute__(self):
+        fn, args = self.data.__dask_postcompute__()
+        return (self.finalize_compute, (fn, args, self.dims, self.attrs))
+
+    @staticmethod
+    def finalize_persist(results, fn, args, dims, attrs):
+        results = {k: v for k, v in results.items() if k[0] == args[0]}
+        return Variable(dims, fn(results, *args), attrs=attrs)
+
+    def __dask_postpersist__(self):
+        fn, args = self.data.__dask_postpersist__()
+        return (self.finalize_persist, (fn, args, self.dims, self.attrs))
 
 
 def data_var_dims(data_vars):
@@ -364,3 +404,76 @@ class Dataset(object):
         return Dataset(self._data_vars,
                        coords=self._coords,
                        attrs=self._attrs.copy())
+
+    def __dask_graph__(self):
+        graphs = {k: v.__dask_graph__() for k, v in self.data_vars.items()}
+        graphs = {k: v for k, v in graphs.items() if v is not None}
+
+        if len(graphs) > 0:
+            return HighLevelGraph.merge(*graphs.values())
+
+        return None
+
+    def __dask_keys__(self):
+        return [v.__dask_keys__()
+                for v in self._data_vars.values()
+                if dask.is_dask_collection(v)]
+
+    def __dask_layers__(self):
+        return sum([v.__dask_layers__()
+                    for v in self._data_vars.values()
+                    if dask.is_dask_collection(v)], ())
+
+    @property
+    def __dask_optimize__(self):
+        return da.Array.__dask_optimize__
+
+    @property
+    def __dask_scheduler__(self):
+        return da.Array.__dask_scheduler__
+
+    @staticmethod
+    def finalize_compute(results, info, coords, attrs):
+        data_vars = OrderedDict()
+        rev_results = list(results[::-1])
+
+        for (dask_collection, k, v) in info:
+            if dask_collection:
+                fn, args = v
+                r = rev_results.pop()
+                data_vars[k] = fn(r, *args)
+            else:
+                data_vars[k] = v
+
+        return Dataset(data_vars, coords=coords, attrs=attrs)
+
+    def __dask_postcompute__(self):
+        data_info = [
+            (True, k, v.__dask_postcompute__())
+            if dask.is_dask_collection(v)
+            else (False, k, v)
+            for k, v in self._data_vars.items()
+        ]
+        return self.finalize_compute, (data_info, self._coords, self._attrs)
+
+    @staticmethod
+    def finalize_persist(graph, info, coords, attrs):
+        data_vars = OrderedDict()
+
+        for dask_collection, k, v in info:
+            if dask_collection:
+                fn, args = v
+                data_vars[k] = fn(graph, *args)
+            else:
+                data_vars[k] = v
+
+        return Dataset(data_vars, coords=coords, attrs=attrs)
+
+    def __dask_postpersist__(self):
+        data_info = [
+            (True, k, v.__dask_postpersist__())
+            if dask.is_dask_collection(v)
+            else (False, k, v)
+            for k, v in self._data_vars.items()
+        ]
+        return self.finalize_persist, (data_info, self._coords, self._attrs)
