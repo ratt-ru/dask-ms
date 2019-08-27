@@ -10,7 +10,6 @@ import weakref
 
 from dask.base import normalize_token
 import numpy as np
-import six
 import pyrap.tables as pt
 from daskms.table_executor import Executor
 
@@ -190,8 +189,7 @@ def taql_factory(query, style='Python', tables=[]):
             t._release(READLOCK)
 
 
-@six.add_metaclass(TableProxyMetaClass)
-class TableProxy(object):
+class TableProxy(object, metaclass=TableProxyMetaClass):
     """
     Proxies calls to a :class:`pyrap.tables.table` object via
     a :class:`concurrent.futures.ThreadPoolExecutor`.
