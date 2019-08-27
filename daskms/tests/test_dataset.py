@@ -411,3 +411,42 @@ def test_dataset_computes_and_values(ms):
         assert isinstance(v.data, np.ndarray)
         assert_array_equal(v.data, ds.data_vars[k].data)
         assert_array_equal(v.values, ds.data_vars[k].data)
+
+
+def test_dataset_dask(ms):
+    datasets = read_datasets(ms, [], [], [])
+    assert len(datasets) == 1
+    ds = datasets[0]
+
+    # All dask arrays
+    for k, v in ds.data_vars.items():
+        assert isinstance(v.data, da.Array)
+
+        # Test variable compute
+        v2 = dask.compute(v)[0]
+        assert isinstance(v2, Variable)
+        assert isinstance(v2.data, np.ndarray)
+
+        # Test variable persists
+        v3 = dask.persist(v)[0]
+        assert isinstance(v3, Variable)
+
+        # Now have numpy array in the graph
+        assert len(v3.data.__dask_keys__()) == 1
+        assert isinstance(v3.data.__dask_graph__().values()[0], np.ndarray)
+
+    # Test compute
+    nds = dask.compute(ds)[0]
+
+    for k, v in nds.data_vars.items():
+        assert isinstance(v.data, np.ndarray)
+
+    # Test persist
+    nds = dask.persist(ds)[0]
+
+    for k, v in nds.data_vars.items():
+        assert isinstance(v.data, da.Array)
+
+        # Now have numpy array iin the graph
+        assert len(v.data.__dask_keys__()) == 1
+        assert isinstance(v.data.__dask_graph__().values()[0], np.ndarray)
