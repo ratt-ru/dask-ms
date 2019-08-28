@@ -19,5 +19,5 @@ History
 * Allow chunking by arbitrary dimensions (:pr:`41`)
 * Add a simple Dataset, making xarray an optional dependency.
   (:pr:`41`, :pr:`46`, :pr:`47`, :pr:`52`)
-* Add support for writing new tables from Datasets (:pr:`41`)
+* Add support for writing new tables from Datasets (:pr:`41`, :pr:`53`)
 * Add support for appending to tables from Datasets (:pr:`41`)
