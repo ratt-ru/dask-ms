@@ -317,6 +317,7 @@ def update_datasets(table, datasets, columns, descriptor):
                                      # a single bool is returned
                                      adjust_chunks={d: 1 for d in full_dims},
                                      name=name,
+                                     align_arrays=False,
                                      dtype=np.bool)
 
             writes.append(write_col.ravel())
@@ -521,6 +522,7 @@ def create_datasets(table_name, datasets, columns, descriptor):
                                      # a single bool is returned
                                      adjust_chunks={d: 1 for d in dims},
                                      name=name,
+                                     align_arrays=False,
                                      dtype=np.bool)
 
             # Flatten the writes so that they can be simply
