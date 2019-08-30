@@ -20,7 +20,7 @@ MS_SCHEMA = {
     'SIGMA': {'dims': ('corr',)},
     'SIGMA_SPECTRUM': {'dims': ('chan', 'corr')},
     'WEIGHT': {'dims': ('corr',)},
-    'WEIGHT_SPECTRUM': {('chan', 'corr')},
+    'WEIGHT_SPECTRUM': {'dims': ('chan', 'corr')},
     'FLAG': {'dims': ('chan', 'corr')},
     'FLAG_CATEGORY': {'dims': ('flagcat', 'chan', 'corr')},
     # Extra imaging columns
