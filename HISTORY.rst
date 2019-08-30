@@ -5,6 +5,7 @@ History
 0.2.0 (YYYY-MM-DD)
 ------------------
 
+* Pin python-casacore to 3.0.0 (:pr:`54`)
 * Drop python 2 support (:pr:`51`)
 * Simplify Table Schemas (:pr:`50`)
 * Add Concepts + Tutorial Documentation (:pr:`48`)
