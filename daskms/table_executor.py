@@ -5,6 +5,7 @@ from __future__ import division
 from __future__ import print_function
 
 import logging
+import os
 from threading import Lock
 import weakref
 
@@ -16,14 +17,18 @@ _executor_cache = weakref.WeakValueDictionary()
 _executor_lock = Lock()
 
 
+STANDARD_EXECUTOR = "__standard_executor__"
+
+
 class ExecutorMetaClass(type):
-    def __call__(cls, *args, **kwargs):
+    """ https://en.wikipedia.org/wiki/Multiton_pattern """
+    def __call__(cls, key=STANDARD_EXECUTOR):
         with _executor_lock:
             try:
-                return _executor_cache["key"]
+                return _executor_cache[key]
             except KeyError:
-                instance = type.__call__(cls, *args, **kwargs)
-                _executor_cache["key"] = instance
+                instance = type.__call__(cls, key)
+                _executor_cache[key] = instance
                 return instance
 
 
@@ -46,9 +51,10 @@ def executor_delete_reference(ex, threadpool_executor):
 
 
 class Executor(object, metaclass=ExecutorMetaClass):
-    def __init__(self):
+    def __init__(self, key=STANDARD_EXECUTOR):
         # Initialise a single thread
         self.impl = impl = cf.ThreadPoolExecutor(1)
+        self.key = key
         self.__del_ref = executor_delete_reference(self, impl)
 
     def shutdown(self, *args, **kwargs):
@@ -56,3 +62,26 @@ class Executor(object, metaclass=ExecutorMetaClass):
 
     def __reduce__(self):
         return (Executor, ())
+
+    def __repr__(self):
+        return "Executor(%s)" % self.key
+
+    __str__ = __repr__
+
+
+def executor_key(table_name):
+    """
+    Product an executor key from table_name
+    """
+
+    # Remove any path separators
+    table_name = table_name.rstrip(os.sep)
+
+    splits = table_name.split('::')
+
+    # Its a just a straightforward table/MS
+    if len(splits) == 1:
+        return table_name
+    # Sub-table. Return path bits without it (i.e the main table)
+    else:
+        return '::'.join(splits[:-1]).rstrip(os.sep)

@@ -8,18 +8,13 @@ import pyrap.tables as pt
 
 from daskms.descriptors.builder import (register_descriptor_builder,
                                         AbstractDescriptorBuilder)
+from daskms.table_schemas import SUBTABLES
 
 
 @register_descriptor_builder("mssubtable")
 class MSSubTableDescriptorBuilder(AbstractDescriptorBuilder):
-    SUBTABLES = ("ANTENNA", "DATA_DESCRIPTION", "DOPPLER",
-                 "FEED", "FIELD", "FLAG_CMD", "FREQ_OFFSET",
-                 "HISTORY", "OBSERVATION", "POINTING", "POLARIZATION",
-                 "PROCESSOR", "SOURCE", "SPECTRAL_WINDOW", "STATE",
-                 "SYSCAL", "WEATHER")
-
     def __init__(self, subtable):
-        if subtable not in self.SUBTABLES:
+        if subtable not in SUBTABLES:
             raise ValueError("'%s' is not a valid Measurement Set "
                              "sub-table" % subtable)
 

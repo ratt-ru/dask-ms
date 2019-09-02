@@ -11,7 +11,7 @@ import weakref
 from dask.base import normalize_token
 import numpy as np
 import pyrap.tables as pt
-from daskms.table_executor import Executor
+from daskms.table_executor import Executor, STANDARD_EXECUTOR
 
 log = logging.getLogger(__name__)
 
@@ -196,13 +196,44 @@ class TableProxy(object, metaclass=TableProxyMetaClass):
     """
 
     def __init__(self, factory, *args, **kwargs):
+        """
+        Parameters
+        ----------
+        factory : callable
+            Function to call which creates the CASA table
+        *args : tuple
+            Positional arguments passed to factory.
+        **kwargs : dict
+            Keyword arguments passed to factory.
+        __executor_key__ : str, optional
+            Executor key. Identifies a unique threadpool
+            in which table operations will be performed.
+        """
+
         # Save the arguments as keys for pickling and tokenising
         self._factory = factory
         self._args = args
         self._kwargs = kwargs
 
-        ex = Executor()
+        # NOTE(sjperkins)
+        # Copy the kwargs and remove (any) __executor_key__
+        # This is smelly but we do this to maintain
+        # key uniqueness derived from
+        # the *args and **kwargs in the MetaClass
+        # as well as uniqueness when pickling/unpickling
+        # A named keyword is possible but
+        # TableProxy(*args, *kwargs)
+        # doesn't produce the same unique key as
+        # TableProxy(*args, ex_key=..., **kwargs)
+        kwargs = kwargs.copy()
+        self._ex_key = kwargs.pop("__executor_key__", STANDARD_EXECUTOR)
+
+        ex = Executor(key=self._ex_key)
         table = ex.impl.submit(factory, *args, **kwargs).result()
+
+        if not isinstance(table, pt.table):
+            raise RuntimeError("'%s' did not produce a "
+                               "CASA table object" % factory)
 
         # Ensure tables are closed when the object is deleted
         self._del_ref = proxy_delete_reference(self, table)
@@ -220,6 +251,10 @@ class TableProxy(object, metaclass=TableProxyMetaClass):
         self._writelocks = 0
         self._write = False
         self._writeable = table.iswritable()
+
+    @property
+    def executor_key(self):
+        return self._ex_key
 
     def __reduce__(self):
         """ Defer to _map_create_proxy to support kwarg pickling """
@@ -337,7 +372,8 @@ class TableProxy(object, metaclass=TableProxyMetaClass):
             raise ValueError("Invalid lock type %d" % locktype)
 
     def __repr__(self):
-        return "TableProxy(%s, %s, %s)" % (
+        return "TableProxy[%s](%s, %s, %s)" % (
+            self._ex_key,
             self._factory.__name__,
             ",".join(str(s) for s in self._args),
             ",".join("%s=%s" % (str(k), str(v))
