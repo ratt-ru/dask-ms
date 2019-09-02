@@ -5,6 +5,7 @@ History
 0.2.0 (YYYY-MM-DD)
 ------------------
 
+* Support concurrent access of multiple independent tables (:pr:`57`)
 * Fix WEIGHT_SPECTRUM schema dimensions (:pr:`56`)
 * Pin python-casacore to 3.0.0 (:pr:`54`)
 * Drop python 2 support (:pr:`51`)
