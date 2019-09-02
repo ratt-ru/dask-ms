@@ -16,6 +16,7 @@ from daskms.columns import (column_metadata, ColumnMetadataError,
 from daskms.ordering import (ordering_taql, row_ordering,
                              group_ordering_taql, group_row_ordering)
 from daskms.dataset import Dataset
+from daskms.table_executor import executor_key
 from daskms.table import table_exists
 from daskms.table_proxy import TableProxy, READLOCK
 from daskms.table_schemas import lookup_table_schema
@@ -281,7 +282,8 @@ class DatasetFactory(object):
 
     def _table_proxy(self):
         return TableProxy(pt.table, self.table, ack=False,
-                          readonly=True, lockoptions='user')
+                          readonly=True, lockoptions='user',
+                          __executor_key__=executor_key(self.table))
 
     def _table_schema(self):
         return lookup_table_schema(self.table, self.table_schema)

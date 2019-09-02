@@ -17,39 +17,9 @@ from numpy.testing import assert_array_equal
 import pyrap.tables as pt
 import pytest
 
-from daskms.table_executor import Executor, _executor_cache
 from daskms.table_proxy import (TableProxy, _table_cache, taql_factory,
                                 MismatchedLocks, READLOCK, WRITELOCK, NOLOCK)
 from daskms.utils import assert_liveness
-
-
-def test_executor():
-    """ Test the executor """
-    ex = Executor()
-    ex2 = Executor()
-    assert ex is ex2
-
-    ex3 = pickle.loads(pickle.dumps(ex))
-
-    assert ex3 is ex
-
-    assert len(_executor_cache) == 1
-
-    assert ex.impl.submit(lambda x: x*2, 4).result() == 8
-    ex.shutdown(wait=True)
-    ex3.shutdown(wait=False)
-
-    # Executor should be shutdown at this point
-    with pytest.raises(RuntimeError):
-        ex2.impl.submit(lambda x: x*2, 4)
-
-    assert len(_executor_cache) == 1
-
-    # Force collection
-    del ex, ex2, ex3
-
-    # Check that callbacks
-    assert len(_executor_cache) == 0
 
 
 def test_table_proxy(ms):

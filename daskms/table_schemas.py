@@ -11,6 +11,14 @@ except ImportError:
 
 from daskms.utils import short_table_name
 
+# Measurement Set sub-tables
+SUBTABLES = ("ANTENNA", "DATA_DESCRIPTION", "DOPPLER",
+             "FEED", "FIELD", "FLAG_CMD", "FREQ_OFFSET",
+             "HISTORY", "OBSERVATION", "POINTING", "POLARIZATION",
+             "PROCESSOR", "SOURCE", "SPECTRAL_WINDOW", "STATE",
+             "SYSCAL", "WEATHER")
+
+
 # https://casa.nrao.edu/Memos/229.html#SECTION00061000000000000000
 MS_SCHEMA = {
     'UVW': {'dims': ('uvw',)},

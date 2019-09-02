@@ -18,6 +18,7 @@ from daskms.descriptors.builder_factory import filename_builder_factory
 from daskms.descriptors.builder_factory import string_builder_factory
 from daskms.ordering import row_run_factory
 from daskms.table import table_exists
+from daskms.table_executor import executor_key
 from daskms.table_proxy import TableProxy, WRITELOCK
 from daskms.utils import short_table_name
 
@@ -181,12 +182,14 @@ def _create_table(table, datasets, columns, descriptor):
             pass
 
     return TableProxy(pt.table, table, ack=False,
-                      readonly=False, lockoptions='user')
+                      readonly=False, lockoptions='user',
+                      __executor_key__=executor_key(table))
 
 
 def _updated_table(table, datasets, columns, descriptor):
     table_proxy = TableProxy(pt.table, table, ack=False,
-                             readonly=False, lockoptions='user')
+                             readonly=False, lockoptions='user',
+                             __executor_key__=executor_key(table))
 
     table_columns = set(table_proxy.colnames().result())
     missing = set(columns) - table_columns

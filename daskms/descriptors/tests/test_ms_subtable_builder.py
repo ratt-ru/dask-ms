@@ -12,9 +12,10 @@ import pytest
 
 from daskms.dataset import Variable
 from daskms.descriptors.ms_subtable import MSSubTableDescriptorBuilder
+from daskms.table_schemas import SUBTABLES
 
 
-@pytest.mark.parametrize("table", MSSubTableDescriptorBuilder.SUBTABLES)
+@pytest.mark.parametrize("table", SUBTABLES)
 def test_ms_subtable_builder(tmp_path, table):
     A = da.zeros((10, 20, 30), chunks=(2, 20, 30), dtype=np.int32)
     variables = {"FOO": Variable(("row", "chan", "corr"), A, {})}

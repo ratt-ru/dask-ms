@@ -7,6 +7,7 @@ from __future__ import print_function
 import ast
 
 from daskms.utils import short_table_name
+from daskms.table_schemas import SUBTABLES
 
 
 class ParseFunctionCallError(Exception):
@@ -98,7 +99,7 @@ def filename_builder_factory(filename):
     from daskms.descriptors.ms_subtable import MSSubTableDescriptorBuilder
 
     # Perhaps its an MS subtable?
-    for subtable in MSSubTableDescriptorBuilder.SUBTABLES:
+    for subtable in SUBTABLES:
         if canonical_name.endswith(subtable):
             return MSSubTableDescriptorBuilder(subtable)
 

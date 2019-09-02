@@ -75,7 +75,8 @@ def ordering_taql(table_proxy, index_cols, taql_where=''):
 
     query = "%s\nFROM\n\t$1\n%s%s" % (select, orderby, taql_where)
 
-    return TableProxy(taql_factory, query, tables=[table_proxy])
+    return TableProxy(taql_factory, query, tables=[table_proxy],
+                      __executor_key__=table_proxy.executor_key)
 
 
 def row_ordering(taql_proxy, index_cols, chunks):
@@ -183,7 +184,8 @@ def group_ordering_taql(table_proxy, group_cols, index_cols, taql_where=''):
 
         query = "%s\nFROM\n\t$1\n%s%s" % (select, groupby, taql_where)
 
-        return TableProxy(taql_factory, query, tables=[table_proxy])
+        return TableProxy(taql_factory, query, tables=[table_proxy],
+                          __executor_key__=table_proxy.executor_key)
 
     raise RuntimeError("Invalid condition in group_ordering_taql")
 
