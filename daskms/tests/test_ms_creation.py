@@ -13,7 +13,15 @@ from numpy.testing import assert_array_equal
 import pyrap.tables as pt
 import pytest
 
-from daskms import xds_to_table, xds_from_ms
+from daskms import xds_to_table, xds_from_ms, Dataset
+
+try:
+    from xarray import Dataset as xrDataset
+except ImportError:
+    xrDataset = None
+    xarray_param_marks = pytest.mark.skip(reason="xarray not installed")
+else:
+    xarray_param_marks = ()
 
 
 @pytest.mark.parametrize("chunks", [{
@@ -26,9 +34,12 @@ from daskms import xds_to_table, xds_from_ms
     [[9, 10, 11, 12], [5, 8]],
     [[5, 6, 7, 8], [9, 12]]
 ])
-def test_ms_create(tmp_path, chunks, num_chans, corr_types):
+@pytest.mark.parametrize("Dataset", [
+    Dataset,
+    pytest.param(xrDataset, marks=xarray_param_marks)
+], ids=["daskms.Dataset", "xarray.Dataset"])
+def test_ms_create(Dataset, tmp_path, chunks, num_chans, corr_types):
     # Set up
-    xr = pytest.importorskip('xarray')
     rs = np.random.RandomState(42)
 
     ms_path = tmp_path / "create.ms"
@@ -55,7 +66,7 @@ def test_ms_create(tmp_path, chunks, num_chans, corr_types):
     position = da.random.random((na, 3))*10000
     offset = da.random.random((na, 3))
     names = np.array(['ANTENNA-%d' % i for i in range(na)], dtype=np.object)
-    ds = xr.Dataset({
+    ds = Dataset({
         'POSITION': (("row", "xyz"), position),
         'OFFSET': (("row", "xyz"), offset),
         'NAME': (("row",), da.from_array(names, chunks=na)),
@@ -68,7 +79,7 @@ def test_ms_create(tmp_path, chunks, num_chans, corr_types):
         dask_num_corr = da.full((1,), len(corr_type), dtype=np.int32)
         dask_corr_type = da.from_array(corr_type,
                                        chunks=len(corr_type))[None, :]
-        ds = xr.Dataset({
+        ds = Dataset({
             "NUM_CORR": (("row",), dask_num_corr),
             "CORR_TYPE": (("row", "corr"), dask_corr_type),
         })
@@ -83,7 +94,7 @@ def test_ms_create(tmp_path, chunks, num_chans, corr_types):
                                      chunks=num_chan)[None, :]
         dask_chan_width = da.full((1, num_chan), .856e9/num_chan)
 
-        ds = xr.Dataset({
+        ds = Dataset({
             "NUM_CHAN": (("row",), dask_num_chan),
             "CHAN_FREQ": (("row", "chan"), dask_chan_freq),
             "CHAN_WIDTH": (("row", "chan"), dask_chan_width),
@@ -98,7 +109,7 @@ def test_ms_create(tmp_path, chunks, num_chans, corr_types):
                                     range(len(corr_types))))
     dask_spw_ids = da.asarray(np.asarray(spw_ids, dtype=np.int32))
     dask_pol_ids = da.asarray(np.asarray(pol_ids, dtype=np.int32))
-    ddid_datasets.append(xr.Dataset({
+    ddid_datasets.append(Dataset({
         "SPECTRAL_WINDOW_ID": (("row",), dask_spw_ids),
         "POLARIZATION_ID": (("row",), dask_pol_ids),
     }))
@@ -119,7 +130,7 @@ def test_ms_create(tmp_path, chunks, num_chans, corr_types):
         dask_data = da.from_array(np_data, chunks=data_chunks)
         # Create dask ddid column
         dask_ddid = da.full(row, ddid, chunks=chunks['row'], dtype=np.int32)
-        dataset = xr.Dataset({
+        dataset = Dataset({
             'DATA': (dims, dask_data),
             'DATA_DESC_ID': (("row",), dask_ddid)
         })
@@ -215,9 +226,12 @@ def test_ms_create(tmp_path, chunks, num_chans, corr_types):
     "chan": (4, 4),
     "corr": (2, 2),
 }])
-def test_ms_create_and_update(tmp_path, chunks):
+@pytest.mark.parametrize("Dataset", [
+    Dataset,
+    pytest.param(xrDataset, marks=xarray_param_marks)
+], ids=["daskms.Dataset", "xarray.Dataset"])
+def test_ms_create_and_update(Dataset, tmp_path, chunks):
     """ Test that we can update and append at the same time """
-    xr = pytest.importorskip("xarray")
     filename = str(tmp_path / "create-and-update.ms")
 
     rs = np.random.RandomState(42)
@@ -233,9 +247,9 @@ def test_ms_create_and_update(tmp_path, chunks):
     dask_data = da.from_array(np_data, chunks=data_chunks)
     # Create dask ddid column
     dask_ddid = da.full(row, 0, chunks=chunks['row'], dtype=np.int32)
-    dataset = xr.Dataset({
-        'DATA': xr.DataArray(dask_data, dims=dims),
-        'DATA_DESC_ID': xr.DataArray(dask_ddid, dims=("row",)),
+    dataset = Dataset({
+        'DATA': (dims, dask_data),
+        'DATA_DESC_ID': (("row",), dask_ddid),
     })
     ms_datasets.append(dataset)
 
@@ -252,9 +266,9 @@ def test_ms_create_and_update(tmp_path, chunks):
     dask_data = da.from_array(np_data, chunks=data_chunks)
     # Create dask ddid column
     dask_ddid = da.full(row, 1, chunks=chunks['row'], dtype=np.int32)
-    dataset = xr.Dataset({
-        'DATA': xr.DataArray(dask_data, dims=dims),
-        'DATA_DESC_ID': xr.DataArray(dask_ddid, dims=("row",)),
+    dataset = Dataset({
+        'DATA': (dims, dask_data),
+        'DATA_DESC_ID': (("row",), dask_ddid),
     })
     ms_datasets.append(dataset)
 
