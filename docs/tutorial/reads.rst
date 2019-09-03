@@ -327,3 +327,36 @@ vs a non-contiguous ordering:
 
 Internally, it is used to request or supply **ranges** of data from the Table
 when reading and writing, respectively.
+
+.. _read-keywords:
+
+Keywords
+~~~~~~~~
+
+It is possible to request both the table and column keywords:
+
+.. doctest::
+
+    >>> from daskms import xds_from_ms
+    >>> datasets, tabkw, colkw = xds_from_ms("~/data/TEST.MS",
+                                             table_keywords=True,
+                                             column_keywords=True)
+    >>> print(tabkw)
+    {'MS_VERSION': 2.0,
+     'ANTENNA': 'Table: ~/data/TEST.MS/ANTENNA',
+     'DATA_DESCRIPTION': 'Table: ~/data/TEST.MS/DATA_DESCRIPTION',
+     ...
+     'SPECTRAL_WINDOW': 'Table: ~/data/TEST.MS/SPECTRAL_WINDOW',
+     'STATE': 'Table: ~/data/TEST.MS/STATE'}
+
+    >>> print(colkw)
+    'UVW': {'QuantumUnits': ['m', 'm', 'm'],
+      'MEASINFO': {'type': 'uvw', 'Ref': 'J2000'}},
+      ...
+     'TIME': {'QuantumUnits': ['s'], 'MEASINFO': {'type': 'epoch', 'Ref': 'UTC'}},
+     'TIME_CENTROID': {'QuantumUnits': ['s'],
+      'MEASINFO': {'type': 'epoch', 'Ref': 'UTC'}},
+     'DATA': {'UNIT': 'Jy'},
+     'MODEL_DATA': {'CHANNEL_SELECTION': array([[ 0, 64]], dtype=int32)}}
+
+
