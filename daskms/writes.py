@@ -244,7 +244,7 @@ def update_datasets(table, datasets, columns, descriptor):
                                             t[0]))
 
     # Merge keywords and add them to the table
-    keywords = {k: v for ds in datasets for k, v in ds.items()}
+    keywords = {k: v for ds in datasets for k, v in ds.attrs.items()}
 
     if len(keywords) > 0:
         table_proxy.putkeywords(keywords)
@@ -484,7 +484,7 @@ def create_datasets(table_name, datasets, columns, descriptor):
     writes = []
 
     # Merge keywords and add them to the table
-    keywords = {k: v for ds in datasets for k, v in ds.items()}
+    keywords = {k: v for ds in datasets for k, v in ds.attrs.items()}
 
     if len(keywords) > 0:
         table_proxy.putkeywords(keywords).result()
