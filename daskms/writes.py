@@ -4,6 +4,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from collections import defaultdict
 import logging
 
 import dask
@@ -229,111 +230,6 @@ def _updated_table(table, datasets, columns, descriptor):
     return table_proxy
 
 
-def update_datasets(table, datasets, columns, descriptor):
-    table_proxy = _updated_table(table, datasets, columns, descriptor)
-    table_name = short_table_name(table)
-    writes = []
-    row_orders = []
-
-    # Sort datasets on (not has "ROWID", index) such that
-    # datasets with ROWID's are handled first, while
-    # those without (which imply appends to the MS)
-    # are handled last
-    sorted_datasets = sorted(enumerate(datasets),
-                             key=lambda t: ("ROWID" not in t[1].data_vars,
-                                            t[0]))
-
-    # Merge keywords and add them to the table
-    keywords = {k: v for ds in datasets for k, v in ds.attrs.items()}
-
-    if len(keywords) > 0:
-        table_proxy.putkeywords(keywords)
-
-    # Establish row orders for each dataset
-    for di, ds in sorted_datasets:
-        try:
-            rowid = ds.ROWID.data
-        except AttributeError:
-            # No ROWID's, assume they're missing from the table
-            # and remaining datasets. Generate addrows
-            # NOTE(sjperkins)
-            # This could be somewhat brittle, but exists to
-            # update of MS subtables once they've been
-            # created (empty) along with the main MS by a call to default_ms.
-            # Users could also it to append rows to an existing table.
-            # An xds_append_to_table is probably the correct solution...
-            last_datasets = datasets[di:]
-            last_row_orders = add_row_order_factory(table_proxy, last_datasets)
-            row_orders.extend(last_row_orders)
-            # We have established row orders for all datasets
-            # at this point, quit the loop
-            break
-        else:
-            # Generate row orderings from existing row IDs
-            row_order = rowid.map_blocks(row_run_factory,
-                                         sort_dir="write",
-                                         dtype=np.object)
-            row_orders.append(row_order)
-
-    assert len(row_orders) == len(datasets)
-
-    for (di, ds), row_order in zip(sorted_datasets, row_orders):
-        data_vars = ds.data_vars
-
-        # Generate a dask array for each column
-        for column in columns:
-            try:
-                variable = data_vars[column]
-            except KeyError:
-                log.warning("Ignoring '%s' not present "
-                            "on dataset %d" % (column, di))
-                continue
-            else:
-                full_dims = variable.dims
-                array = variable.data
-                attrs = variable.attrs
-
-            try:
-                keywords = attrs['keywords']
-            except KeyError:
-                pass
-            else:
-                table_proxy.putcolkeywords(column, keywords).result()
-
-            args = [row_order, ("row",)]
-
-            # We only need to pass in dimension extent arrays if
-            # there is more than one chunk in any of the non-row columns.
-            # In that case, we can putcol, otherwise putcolslice is required
-            if not all(len(c) == 1 for c in array.chunks[1:]):
-                # Add extent arrays
-                for d, c in zip(full_dims[1:], array.chunks[1:]):
-                    args.append(dim_extents_array(d, c))
-                    args.append((d,))
-
-            # Add other variables
-            args.extend([table_proxy, None,
-                         column, None,
-                         array, full_dims])
-
-            # Name of the dask array representing this column
-            token = dask.base.tokenize(di, args)
-            name = "-".join((table_name, 'write', column, token))
-
-            write_col = da.blockwise(putter_wrapper, full_dims,
-                                     *args,
-                                     # All dims shrink to 1,
-                                     # a single bool is returned
-                                     adjust_chunks={d: 1 for d in full_dims},
-                                     name=name,
-                                     align_arrays=False,
-                                     dtype=np.bool)
-
-            writes.append(write_col.ravel())
-
-    return da.concatenate(writes)
-
-
 def _add_row_wrapper(table, rows, checkrow=-1):
     startrow = table.nrows()
 
@@ -474,33 +370,73 @@ def add_row_order_factory(table_proxy, datasets):
     return row_add_ops
 
 
-def create_datasets(table_name, datasets, columns, descriptor):
-    """
-    Create new dataset
-    """
-    table_proxy = _create_table(table_name, datasets, columns, descriptor)
-    row_orders = add_row_order_factory(table_proxy, datasets)
-    short_name = short_table_name(table_name)
+def _put_keywords(table, table_keywords, column_keywords):
+    if len(table_keywords) > 0:
+        table.putkeywords(table_keywords)
+
+    for column, keywords in column_keywords.items():
+        if len(keywords) > 0:
+            table.putcolkeywords(column, keywords)
+
+    return True
+
+
+def __write_datasets(table, table_proxy, datasets, columns, descriptor):
+    table_name = short_table_name(table)
     writes = []
+    row_orders = []
 
-    # Merge keywords and add them to the table
-    keywords = {k: v for ds in datasets for k, v in ds.attrs.items()}
+    # Sort datasets on (not has "ROWID", index) such that
+    # datasets with ROWID's are handled first, while
+    # those without (which imply appends to the MS)
+    # are handled last
+    sorted_datasets = sorted(enumerate(datasets),
+                             key=lambda t: ("ROWID" not in t[1].data_vars,
+                                            t[0]))
 
-    if len(keywords) > 0:
-        table_proxy.putkeywords(keywords).result()
+    # Establish row orders for each dataset
+    for di, ds in sorted_datasets:
+        try:
+            rowid = ds.ROWID.data
+        except AttributeError:
+            # No ROWID's, assume they're missing from the table
+            # and remaining datasets. Generate addrows
+            # NOTE(sjperkins)
+            # This could be somewhat brittle, but exists to
+            # update of MS subtables once they've been
+            # created (empty) along with the main MS by a call to default_ms.
+            # Users could also it to append rows to an existing table.
+            # An xds_append_to_table is probably the correct solution...
+            last_datasets = datasets[di:]
+            last_row_orders = add_row_order_factory(table_proxy, last_datasets)
+            row_orders.extend(last_row_orders)
+            # We have established row orders for all datasets
+            # at this point, quit the loop
+            break
+        else:
+            # Generate row orderings from existing row IDs
+            row_order = rowid.map_blocks(row_run_factory,
+                                         sort_dir="write",
+                                         dtype=np.object)
+            row_orders.append(row_order)
 
-    for di, (ds, row_order) in enumerate(zip(datasets, row_orders)):
+    assert len(row_orders) == len(datasets)
+
+    column_keywords = defaultdict(dict)
+
+    for (di, ds), row_order in zip(sorted_datasets, row_orders):
         data_vars = ds.data_vars
 
+        # Generate a dask array for each column
         for column in columns:
             try:
                 variable = data_vars[column]
             except KeyError:
-                log.warn("Column %s doesn't exist on dataset %d "
-                         "and will be ignored" % (column, di))
+                log.warning("Ignoring '%s' not present "
+                            "on dataset %d" % (column, di))
                 continue
             else:
-                dims = variable.dims
+                full_dims = variable.dims
                 array = variable.data
                 attrs = variable.attrs
 
@@ -509,7 +445,7 @@ def create_datasets(table_name, datasets, columns, descriptor):
             except KeyError:
                 pass
             else:
-                table_proxy.putcolkeywords(column, keywords).result()
+                column_keywords[column].update(keywords)
 
             args = [row_order, ("row",)]
 
@@ -518,31 +454,33 @@ def create_datasets(table_name, datasets, columns, descriptor):
             # In that case, we can putcol, otherwise putcolslice is required
             if not all(len(c) == 1 for c in array.chunks[1:]):
                 # Add extent arrays
-                for d, c in zip(dims[1:], array.chunks[1:]):
+                for d, c in zip(full_dims[1:], array.chunks[1:]):
                     args.append(dim_extents_array(d, c))
                     args.append((d,))
 
             # Add other variables
             args.extend([table_proxy, None,
                          column, None,
-                         array, dims])
+                         array, full_dims])
 
             # Name of the dask array representing this column
             token = dask.base.tokenize(di, args)
-            name = "-".join((short_name, 'write', column, token))
+            name = "-".join((table_name, 'write', column, token))
 
-            write_col = da.blockwise(putter_wrapper, dims,
+            write_col = da.blockwise(putter_wrapper, full_dims,
                                      *args,
                                      # All dims shrink to 1,
                                      # a single bool is returned
-                                     adjust_chunks={d: 1 for d in dims},
+                                     adjust_chunks={d: 1 for d in full_dims},
                                      name=name,
                                      align_arrays=False,
                                      dtype=np.bool)
 
-            # Flatten the writes so that they can be simply
-            # concatenated together into a final aggregated array
             writes.append(write_col.ravel())
+
+    table_keywords = {k: v for ds in datasets for k, v in ds.attrs.items()}
+    table_proxy.submit(_put_keywords, WRITELOCK,
+                       table_keywords, column_keywords).result()
 
     return da.concatenate(writes)
 
@@ -566,8 +504,10 @@ def write_datasets(table, datasets, columns, descriptor=None):
                          "array")
 
     if not table_exists(table):
-        return create_datasets(table, datasets, columns,
-                               descriptor=descriptor)
+        table_proxy = _create_table(table, datasets, columns, descriptor)
+        return __write_datasets(table, table_proxy, datasets, columns,
+                                descriptor=descriptor)
     else:
-        return update_datasets(table, datasets, columns,
-                               descriptor=descriptor)
+        table_proxy = _updated_table(table, datasets, columns, descriptor)
+        return __write_datasets(table, table_proxy, datasets, columns,
+                                descriptor=descriptor)

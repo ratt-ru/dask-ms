@@ -317,6 +317,9 @@ class DatasetFactory(object):
 
         assert len(group_ids) == len(orders)
 
+        # Table keywords
+        keywords = table_proxy.getkeywords().result()
+
         # Select columns, excluding grouping columns
         select_cols = set(self.select_cols or table_proxy.colnames().result())
         select_cols -= set(self.group_cols)
@@ -354,7 +357,11 @@ class DatasetFactory(object):
             # Assign values for the dataset's grouping columns
             # as attributes
             attrs = dict(zip(self.group_cols, group_id))
-            attrs['keywords'] = table_proxy.getkeywords().result()
+
+            # Add any table keywords
+            if len(keywords) > 0:
+                attrs['keywords'] = keywords
+
             datasets.append(Dataset(group_var_dims, attrs=attrs,
                                     coords=coords))
 
