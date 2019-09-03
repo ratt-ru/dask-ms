@@ -243,7 +243,7 @@ def test_multireadwrite(ms, group_cols, index_cols):
 
 def test_column_promotion(ms):
     """ Test singleton columns promoted to lists """
-    xds = xds_from_ms(ms, group_cols="SCAN_NUMBER", columns=("DATA"))
+    xds = xds_from_ms(ms, group_cols="SCAN_NUMBER", columns=("DATA",))
 
     for ds in xds:
         assert "DATA" in ds.data_vars
