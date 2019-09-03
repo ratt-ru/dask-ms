@@ -243,6 +243,12 @@ def update_datasets(table, datasets, columns, descriptor):
                              key=lambda t: ("ROWID" not in t[1].data_vars,
                                             t[0]))
 
+    # Merge keywords and add them to the table
+    keywords = {k: v for ds in datasets for k, v in ds.items()}
+
+    if len(keywords) > 0:
+        table_proxy.putkeywords(keywords)
+
     # Establish row orders for each dataset
     for di, ds in sorted_datasets:
         try:
@@ -476,6 +482,12 @@ def create_datasets(table_name, datasets, columns, descriptor):
     row_orders = add_row_order_factory(table_proxy, datasets)
     short_name = short_table_name(table_name)
     writes = []
+
+    # Merge keywords and add them to the table
+    keywords = {k: v for ds in datasets for k, v in ds.items()}
+
+    if len(keywords) > 0:
+        table_proxy.putkeywords(keywords).result()
 
     for di, (ds, row_order) in enumerate(zip(datasets, row_orders)):
         data_vars = ds.data_vars

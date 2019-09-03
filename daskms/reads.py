@@ -292,6 +292,7 @@ class DatasetFactory(object):
         table_proxy = self._table_proxy()
         table_schema = self._table_schema()
         select_cols = set(self.select_cols or table_proxy.colnames().result())
+        keywords = table_proxy.getkeywords().result()
 
         variables = _dataset_variable_factory(table_proxy, table_schema,
                                               select_cols, exemplar_row,
@@ -305,7 +306,7 @@ class DatasetFactory(object):
         else:
             coords = {"ROWID": rowid}
 
-        return Dataset(variables, coords=coords)
+        return Dataset(variables, coords=coords, attrs={"keywords": keywords})
 
     def _group_datasets(self, groups, exemplar_rows, orders):
         table_proxy = self._table_proxy()
@@ -353,6 +354,7 @@ class DatasetFactory(object):
             # Assign values for the dataset's grouping columns
             # as attributes
             attrs = dict(zip(self.group_cols, group_id))
+            attrs['keywords'] = table_proxy.getkeywords().result()
             datasets.append(Dataset(group_var_dims, attrs=attrs,
                                     coords=coords))
 
