@@ -124,7 +124,7 @@ care is taken to ensure that
 
 1. Required columns are added.
 2. Required columns conform to the `Measurement Set v2.0 Specification
-<https://casacore.github.io/casacore-notes/229.html>`_.
+   <https://casacore.github.io/casacore-notes/229.html>`_.
 
 This means that, for example, if you have a UVW array
 with a non-standard shape ([4]) and type (float), the UVW column
@@ -155,14 +155,25 @@ Measurement Set table:
 
 .. doctest::
 
-    xds_to_table("test.ms", datasets, ["DATA", "BITFLAG"])
+    >>> xds_to_table("test.ms", datasets, ["DATA", "BITFLAG"])
 
 or when it ends with with ``::subtablename`` in the case of a subtable:
 
 .. doctest::
 
-    xds_to_table("test.ms::SPECTRAL_WINDOW", datasets, ["CHAN_FREQ"])
+    >>> xds_to_table("test.ms::SPECTRAL_WINDOW", datasets, ["CHAN_FREQ"])
 
 Respect the standard naming conventions and you'll be fine.
 
+
+Keywords
+~~~~~~~~
+
+Keywords can be added to the target table and columns:
+
+.. doctest::
+
+    >>> xds_to_table("test.ms", datasets, [],
+                     table_keywords={"foo":"bar"},
+                     column_keywords={"DATA": {"foo": "bar"}})
 

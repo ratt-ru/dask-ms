@@ -256,6 +256,11 @@ def _dataset_variable_factory(table_proxy, table_schema, select_cols,
     return dataset_vars
 
 
+def _col_keyword_getter(table):
+    """ Gets column keywords for all columns in table """
+    return {c: table.getcolkeywords(c) for c in table.colnames()}
+
+
 class DatasetFactory(object):
     def __init__(self, table, select_cols, group_cols, index_cols, **kwargs):
         if not table_exists(table):
@@ -276,6 +281,8 @@ class DatasetFactory(object):
         self.chunks = chunks
         self.table_schema = kwargs.pop('table_schema', None)
         self.taql_where = kwargs.pop('taql_where', '')
+        self.table_keywords = kwargs.pop('table_keywords', False)
+        self.column_keywords = kwargs.pop('column_keywords', False)
 
         if len(kwargs) > 0:
             raise ValueError("Unhandled kwargs: %s" % kwargs)
@@ -292,7 +299,6 @@ class DatasetFactory(object):
         table_proxy = self._table_proxy()
         table_schema = self._table_schema()
         select_cols = set(self.select_cols or table_proxy.colnames().result())
-
         variables = _dataset_variable_factory(table_proxy, table_schema,
                                               select_cols, exemplar_row,
                                               orders, self.chunks[0],
@@ -353,6 +359,7 @@ class DatasetFactory(object):
             # Assign values for the dataset's grouping columns
             # as attributes
             attrs = dict(zip(self.group_cols, group_id))
+
             datasets.append(Dataset(group_var_dims, attrs=attrs,
                                     coords=coords))
 
@@ -366,7 +373,7 @@ class DatasetFactory(object):
             order_taql = ordering_taql(table_proxy, self.index_cols,
                                        self.taql_where)
             orders = row_ordering(order_taql, self.index_cols, self.chunks[0])
-            return [self._single_dataset(orders)]
+            datasets = [self._single_dataset(orders)]
         # Group by row
         elif len(self.group_cols) == 1 and self.group_cols[0] == "__row__":
             order_taql = ordering_taql(table_proxy, self.index_cols,
@@ -386,9 +393,9 @@ class DatasetFactory(object):
             # dataset as an attribute
             np_sorted_row = sorted_rows.compute()
 
-            return [self._single_dataset((row_blocks[r], run_blocks[r]),
-                                         exemplar_row=er)
-                    for r, er in enumerate(np_sorted_row)]
+            datasets = [self._single_dataset((row_blocks[r], run_blocks[r]),
+                                             exemplar_row=er)
+                        for r, er in enumerate(np_sorted_row)]
         # Grouping column case
         else:
             order_taql = group_ordering_taql(table_proxy, self.group_cols,
@@ -400,7 +407,21 @@ class DatasetFactory(object):
             exemplar_rows = order_taql.getcol("__firstrow__").result()
             assert len(orders) == len(exemplar_rows)
 
-            return self._group_datasets(groups, exemplar_rows, orders)
+            datasets = self._group_datasets(groups, exemplar_rows, orders)
+
+        ret = (datasets,)
+
+        if self.table_keywords is True:
+            ret += (table_proxy.getkeywords().result(),)
+
+        if self.column_keywords is True:
+            keywords = table_proxy.submit(_col_keyword_getter, READLOCK)
+            ret += (keywords.result(),)
+
+        if len(ret) == 1:
+            return ret[0]
+
+        return ret
 
 
 def read_datasets(ms, columns, group_cols, index_cols, **kwargs):

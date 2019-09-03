@@ -122,8 +122,7 @@ def test_dataset_updates(ms, select_cols,
 
         # Create write operations and execute them
         for i, ds in enumerate(datasets):
-            state_attrs = {"keywords": {"state-%d" % i: "foo"}}
-            state_var = (("row",), ds.STATE_ID.data + 1, state_attrs)
+            state_var = (("row",), ds.STATE_ID.data + 1)
             data_var = (("row", "chan", "corr"), ds.DATA.data + 1, {})
             states.append(state_var[1])
             datas.append(data_var[1])
@@ -144,12 +143,9 @@ def test_dataset_updates(ms, select_cols,
         datasets = read_datasets(ms, select_cols, group_cols,
                                  index_cols, chunks=chunks)
 
-        expected_kws = {"state-%d" % i: "foo" for i in range(len(datasets))}
-
         for i, (ds, state, data) in enumerate(zip(datasets, states, datas)):
             assert_array_equal(ds.STATE_ID.data, state)
             assert_array_equal(ds.DATA.data, data)
-            assert ds.STATE_ID.attrs['keywords'] == expected_kws
 
         del ds, datasets
         assert_liveness(0, 0)
@@ -282,12 +278,13 @@ def test_dataset_add_column(ms, dtype):
     # Create the dask array
     bitflag = da.zeros_like(ds.DATA.data, dtype=dtype)
     # Assign keyword attribute
-    bitflag_attrs = {"keywords": {'FLAGSETS': 'legacy,cubical',
-                                  'FLAGSET_legacy': 1,
-                                  'FLAGSET_cubical': 2}}
+    col_kw = {"BITFLAG": {'FLAGSETS': 'legacy,cubical',
+                          'FLAGSET_legacy': 1,
+                          'FLAGSET_cubical': 2}}
     # Assign variable onto the dataset
-    nds = ds.assign(BITFLAG=(("row", "chan", "corr"), bitflag, bitflag_attrs))
-    writes = write_datasets(ms, nds, ["BITFLAG"], descriptor='ratt_ms')
+    nds = ds.assign(BITFLAG=(("row", "chan", "corr"), bitflag))
+    writes = write_datasets(ms, nds, ["BITFLAG"], descriptor='ratt_ms',
+                            column_keywords=col_kw)
 
     dask.compute(writes)
 
@@ -296,7 +293,7 @@ def test_dataset_add_column(ms, dtype):
 
     with pt.table(ms, readonly=False, ack=False, lockoptions='auto') as T:
         bf = T.getcol("BITFLAG")
-        assert T.getcoldesc("BITFLAG")['keywords'] == bitflag_attrs['keywords']
+        assert T.getcoldesc("BITFLAG")['keywords'] == col_kw['BITFLAG']
         assert bf.dtype == dtype
 
 

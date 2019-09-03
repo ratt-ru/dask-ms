@@ -23,7 +23,8 @@ _DEFAULT_INDEX_COLUMNS = ["TIME"]
 log = logging.getLogger(__name__)
 
 
-def xds_to_table(xds, table_name, columns, descriptor=None):
+def xds_to_table(xds, table_name, columns, descriptor=None,
+                 table_keywords=None, column_keywords=None):
     """
     Generates a dask array representing a series of writes from the
     specified arrays in :class:`xarray.Dataset`'s into
@@ -37,8 +38,10 @@ def xds_to_table(xds, table_name, columns, descriptor=None):
         dataset(s) containing the specified columns. If a list of datasets
         is provided, the concatenation of the columns in
         sequential datasets will be written.
+
     table_name : str
         CASA table path
+
     columns : tuple or list or "ALL"
         list of column names to write to the table.
 
@@ -55,6 +58,15 @@ def xds_to_table(xds, table_name, columns, descriptor=None):
         as `ms` and `ms_subtable`.
 
         If None, defaults are used.
+
+    table_keywords : dict, optional
+        Dictionary of table keywords to add to existing keywords.
+        The operation is performed immediately, not lazily.
+
+    column_keywords : dict, optional
+        Dictionary of :code:`{column: keywords}` to add to existing
+        column keywords.
+        The operation is performed immediately, not lazily.
 
     Returns
     -------
@@ -97,7 +109,9 @@ def xds_to_table(xds, table_name, columns, descriptor=None):
 
     # Write the datasets
     return write_datasets(table_name, datasets, columns,
-                          descriptor=descriptor)
+                          descriptor=descriptor,
+                          table_keywords=table_keywords,
+                          column_keywords=column_keywords)
 
 
 def xds_from_table(table_name, columns=None,
@@ -197,6 +211,14 @@ def xds_from_table(table_name, columns=None,
 
             ["MS", {"UVW": {'dims': ('my-uvw',)}}]
 
+    table_keywords : {False, True}, optional
+        If True, returns table keywords.
+        Changes return type of the function into a tuple
+
+    column_keywords : {False, True}, optional
+        If True return keywords for each column on the table
+        Changes return type of the function into a tuple
+
     taql_where : str, optional
         TAQL where clause. For example, to exclude auto-correlations
 
@@ -219,6 +241,11 @@ def xds_from_table(table_name, columns=None,
     -------
     datasets : list of :class:`xarray.Dataset`
         datasets for each group, each ordered by indexing columns
+    table_keywords : dict, optional
+        Returned if ``table_keywords==True``
+    column_keywords : dict, optional
+        return if ``column_keywords==True``
+
     """
     columns = promote_columns(columns, [])
     index_cols = promote_columns(index_cols, [])
@@ -234,6 +261,14 @@ def xds_from_table(table_name, columns=None,
 
     xarray_datasets = []
 
+    # Extract dataset list in case of table_keyword and column_keyword returns
+    if isinstance(dask_datasets, tuple):
+        extra = dask_datasets[1:]
+        dask_datasets = dask_datasets[0]
+    else:
+        extra = ()
+
+    # Convert each dask dataset into an xarray dataset
     for ds in dask_datasets:
         data_vars = collections.OrderedDict()
         coords = collections.OrderedDict()
@@ -247,6 +282,9 @@ def xds_from_table(table_name, columns=None,
         xarray_datasets.append(xr.Dataset(data_vars,
                                           attrs=dict(ds.attrs),
                                           coords=coords))
+
+    if len(extra) > 0:
+        return (xarray_datasets,) + extra
 
     return xarray_datasets
 
