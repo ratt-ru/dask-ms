@@ -370,21 +370,15 @@ def add_row_order_factory(table_proxy, datasets):
     return row_add_ops
 
 
-def _put_keywords(table, table_keywords, column_keywords):
-    if len(table_keywords) > 0:
-        table.putkeywords(table_keywords)
-
-    for column, keywords in column_keywords.items():
-        if len(keywords) > 0:
-            table.putcolkeywords(column, keywords)
-
-    return True
-
-
-def __write_datasets(table, table_proxy, datasets, columns, descriptor):
+def _write_datasets(table, table_proxy, datasets, columns, descriptor,
+                    table_keywords, column_keywords):
     table_name = short_table_name(table)
     writes = []
     row_orders = []
+
+    # Put table and column keywords
+    table_proxy.submit(_put_keywords, WRITELOCK,
+                       table_keywords, column_keywords).result()
 
     # Sort datasets on (not has "ROWID", index) such that
     # datasets with ROWID's are handled first, while
@@ -422,8 +416,6 @@ def __write_datasets(table, table_proxy, datasets, columns, descriptor):
 
     assert len(row_orders) == len(datasets)
 
-    column_keywords = defaultdict(dict)
-
     for (di, ds), row_order in zip(sorted_datasets, row_orders):
         data_vars = ds.data_vars
 
@@ -439,13 +431,6 @@ def __write_datasets(table, table_proxy, datasets, columns, descriptor):
                 full_dims = variable.dims
                 array = variable.data
                 attrs = variable.attrs
-
-            try:
-                keywords = attrs['keywords']
-            except KeyError:
-                pass
-            else:
-                column_keywords[column].update(keywords)
 
             args = [row_order, ("row",)]
 
@@ -478,16 +463,36 @@ def __write_datasets(table, table_proxy, datasets, columns, descriptor):
 
             writes.append(write_col.ravel())
 
-    table_keywords = {k: v for ds in datasets
-                      for k, v in ds.attrs.get('keywords', {}).items()}
-
-    table_proxy.submit(_put_keywords, WRITELOCK,
-                       table_keywords, column_keywords).result()
+    if len(writes) == 0:
+        return da.full(1, True, dtype=np.bool)
 
     return da.concatenate(writes)
 
 
-def write_datasets(table, datasets, columns, descriptor=None):
+DELKW = object()
+
+
+def _put_keywords(table, table_keywords, column_keywords):
+    if table_keywords is not None:
+        for k, v in table_keywords.items():
+            if v == DELKW:
+                table.removekeyword(k)
+            else:
+                table.putkeyword(k, v)
+
+    if column_keywords is not None:
+        for column, keywords in column_keywords.items():
+            for k, v in keywords.items():
+                if v == DELKW:
+                    table.removecolkeyword(column, k)
+                else:
+                    table.putcolkeyword(column, k, v)
+
+    return True
+
+
+def write_datasets(table, datasets, columns, descriptor=None,
+                   table_keywords=None, column_keywords=None):
     # Promote datasets to list
     if isinstance(datasets, tuple):
         datasets = list(datasets)
@@ -498,18 +503,13 @@ def write_datasets(table, datasets, columns, descriptor=None):
     if columns == "ALL":
         columns = set.union(*(set(ds.data_vars.keys()) for ds in datasets))
         columns = list(sorted(columns))
-    elif len(columns) == 0:
-        raise ValueError("No columns were provided for writing. "
-                         "Use columns='ALL' if you intend to "
-                         "write all columns, or columns=['ALL'] "
-                         "if you're trying to write an 'ALL' "
-                         "array")
 
     if not table_exists(table):
         table_proxy = _create_table(table, datasets, columns, descriptor)
-        return __write_datasets(table, table_proxy, datasets, columns,
-                                descriptor=descriptor)
     else:
         table_proxy = _updated_table(table, datasets, columns, descriptor)
-        return __write_datasets(table, table_proxy, datasets, columns,
-                                descriptor=descriptor)
+
+    return _write_datasets(table, table_proxy, datasets, columns,
+                           descriptor=descriptor,
+                           table_keywords=table_keywords,
+                           column_keywords=column_keywords)

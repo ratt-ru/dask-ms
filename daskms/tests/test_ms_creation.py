@@ -288,35 +288,3 @@ def test_ms_create_and_update(Dataset, tmp_path, chunks):
         assert_array_equal(T.getcol("DATA_DESC_ID"), ds_ddid)
 
 
-def test_keywords(tmp_path):
-    from daskms.example_data import example_ms
-    from pprint import pprint
-
-    # Create an example MS
-    ms = example_ms()
-
-    with pt.table(ms, ack=False, readonly=True) as T:
-        desc = T._getdesc(actual=True)
-
-    datasets = xds_from_ms(ms)
-
-    for ds in datasets:
-        assert desc["_keywords_"] == ds.attrs['keywords']
-
-        for column, variable in ds.data_vars.items():
-            try:
-                keywords = variable.attrs['keywords']
-            except KeyError:
-                pass
-            else:
-                assert desc[column]['keywords'] == keywords
-
-    for ds in datasets:
-        del ds.attrs['keywords']
-        ds.attrs['keywords'] = {'pants': 'qux'}
-
-    writes = xds_to_table(datasets, ms, "STATE_ID")
-    dask.compute(writes)
-
-    with pt.table(ms, ack=False, readonly=True) as T:
-        assert T._getdesc(actual=True)["_keywords_"]['pants'] == 'qux'
