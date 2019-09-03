@@ -286,5 +286,3 @@ def test_ms_create_and_update(Dataset, tmp_path, chunks):
                                   ms_datasets[1].DATA_DESC_ID.data])
         assert_array_equal(T.getcol("DATA"), ds_data)
         assert_array_equal(T.getcol("DATA_DESC_ID"), ds_ddid)
-
-

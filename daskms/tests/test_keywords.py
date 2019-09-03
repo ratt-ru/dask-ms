@@ -9,7 +9,7 @@ import pyrap.tables as pt
 import pytest
 
 from daskms.example_data import example_ms
-from daskms import xds_to_table, xds_from_ms, Dataset
+from daskms import xds_to_table, xds_from_ms
 
 
 @pytest.fixture(scope='module')
@@ -32,7 +32,6 @@ def test_keyword_read(keyword_ms, table_kw, column_kw):
                       column_keywords=column_kw)
 
     if isinstance(ret, tuple):
-        datasets = ret[0]
         ret_pos = 1
 
         if table_kw is True:
@@ -61,7 +60,6 @@ def test_keyword_write(ms):
 
     with pt.table(ms, ack=False, readonly=True) as T:
         assert T.getkeywords()['bob'] == 'qux'
-        nrows = T.nrows()
 
     # Add to column keywords
     writes = xds_to_table(datasets, ms, [],
@@ -81,4 +79,3 @@ def test_keyword_write(ms):
     with pt.table(ms, ack=False, readonly=True) as T:
         assert 'bob' not in T.getkeywords()
         assert 'bob' not in T.getcolkeywords("STATE_ID")
-

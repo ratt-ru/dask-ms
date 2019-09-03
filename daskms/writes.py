@@ -4,7 +4,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from collections import defaultdict
 import logging
 
 import dask
@@ -430,7 +429,6 @@ def _write_datasets(table, table_proxy, datasets, columns, descriptor,
             else:
                 full_dims = variable.dims
                 array = variable.data
-                attrs = variable.attrs
 
             args = [row_order, ("row",)]
 
