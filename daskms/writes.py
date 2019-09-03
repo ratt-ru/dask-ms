@@ -478,7 +478,9 @@ def __write_datasets(table, table_proxy, datasets, columns, descriptor):
 
             writes.append(write_col.ravel())
 
-    table_keywords = {k: v for ds in datasets for k, v in ds.attrs.items()}
+    table_keywords = {k: v for ds in datasets
+                      for k, v in ds.attrs.get('keywords', {}).items()}
+
     table_proxy.submit(_put_keywords, WRITELOCK,
                        table_keywords, column_keywords).result()
 
