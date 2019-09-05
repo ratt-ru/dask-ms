@@ -20,7 +20,7 @@ from daskms.ordering import row_run_factory
 from daskms.table import table_exists
 from daskms.table_executor import executor_key
 from daskms.table_proxy import TableProxy, WRITELOCK
-from daskms.utils import short_table_name, table_path_split
+from daskms.utils import table_path_split
 
 
 log = logging.getLogger(__name__)
@@ -397,7 +397,8 @@ def add_row_order_factory(table_proxy, datasets):
 
 def _write_datasets(table, table_proxy, datasets, columns, descriptor,
                     table_keywords, column_keywords):
-    table_name = short_table_name(table)
+    _, table_name, subtable = table_path_split(table)
+    table_name = '::'.join((table_name, subtable)) if subtable else table_name
     writes = []
     row_orders = []
 

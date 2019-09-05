@@ -9,7 +9,7 @@ try:
 except ImportError:
     from collections import Mapping
 
-from daskms.utils import short_table_name
+from daskms.utils import table_path_split
 
 # Measurement Set sub-tables
 SUBTABLES = ("ANTENNA", "DATA_DESCRIPTION", "DOPPLER",
@@ -115,12 +115,13 @@ _ALL_SCHEMAS["TABLE"] = {}
 
 def infer_table_type(table_name):
     """ Guess the schema from the table name """
-    if table_name[-3:].upper().endswith(".MS"):
+    _, table, subtable = table_path_split(table_name)
+
+    if not subtable and table[-3:].upper().endswith(".MS"):
         return "MS"
 
-    for k in _SUBTABLE_SCHEMAS.keys():
-        if table_name.endswith('::' + k):
-            return k
+    if subtable in _SUBTABLE_SCHEMAS.keys():
+        return subtable
 
     return "TABLE"
 
@@ -148,7 +149,7 @@ def lookup_table_schema(table_name, lookup_str):
         :code:`{column: {'dims': (...)}}`.
     """
     if lookup_str is None:
-        table_type = infer_table_type(short_table_name(table_name))
+        table_type = infer_table_type(table_name)
 
         try:
             return _ALL_SCHEMAS[table_type]
