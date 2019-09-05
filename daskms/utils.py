@@ -73,7 +73,7 @@ def table_path_split(path):
     if not isinstance(path, Path):
         path = Path(path)
 
-    root = str(path.parent)
+    root = path.parent
     table_name, _, subtable = path.name.partition("::")
 
     return root, table_name, subtable

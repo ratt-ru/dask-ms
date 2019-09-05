@@ -53,4 +53,4 @@ _root_path = Path("C:/" if platform.system() == "Windows" else os.sep,
      _root_path / "test.ms", "SOURCE", "")
 ])
 def test_table_path_split(path, root, table, subtable):
-    assert (str(root), table, subtable) == table_path_split(path)
+    assert (root, table, subtable) == table_path_split(path)

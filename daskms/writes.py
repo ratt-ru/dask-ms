@@ -171,7 +171,7 @@ def _create_table(table_name, datasets, columns, descriptor):
     table_desc, dminfo = builder.execute(datasets)
 
     root, table, subtable = table_path_split(table_name)
-    table_path = Path(root, table)
+    table_path = root / table
 
     from daskms.descriptors.ms import MSDescriptorBuilder
     from daskms.descriptors.ms_subtable import MSSubTableDescriptorBuilder
