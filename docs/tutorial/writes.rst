@@ -155,16 +155,48 @@ Measurement Set table:
 
 .. doctest::
 
-    >>> xds_to_table("test.ms", datasets, ["DATA", "BITFLAG"])
+    >>> xds_to_table(datasets, "test.ms", ["DATA", "BITFLAG"])
 
 or when it ends with with ``::subtablename`` in the case of a subtable:
 
 .. doctest::
 
-    >>> xds_to_table("test.ms::SPECTRAL_WINDOW", datasets, ["CHAN_FREQ"])
+    >>> xds_to_table(datasets, "test.ms::SPECTRAL_WINDOW", ["CHAN_FREQ"])
 
 Respect the standard naming conventions and you'll be fine.
 
+
+Creating Sub-tables
+~~~~~~~~~~~~~~~~~~~
+
+It is possible for sub-tables to be added to a table.
+For example, the SOURCE table is an optional table that may or may not
+be present on the Measurement Set
+
+The following convention specifies that the ``SOURCE`` sub-table
+of ``TEST.MS`` should be created:
+
+.. doctest::
+
+    >>> writes = xds_to_table(source_dataset,
+                              "~/data/TEST.MS::SOURCE",
+                              columns="ALL")
+
+``xds_to_table`` will also created the ``"Table: ~/data/TEST.MS/SOURCE"``
+keyword in ``TEST.MS`` linking it with the ``SOURCE`` sub-table.
+
+.. warning::
+
+    As discussed in :ref:`read-opening-sub-tables`, it is advisable to use the
+    `::` scope operator so that dask-ms understands the link between the
+    main table and the sub-table. The following will create a SOURCE table
+    but will not create a link between the table and the sub-table:
+
+    .. doctest::
+
+        >>> writes = xds_to_table(source_dataset,
+                                  "~/data/TEST.MS/SOURCE",
+                                  columns="ALL")
 
 Keywords
 ~~~~~~~~
@@ -173,7 +205,7 @@ Keywords can be added to the target table and columns:
 
 .. doctest::
 
-    >>> xds_to_table("test.ms", datasets, [],
+    >>> xds_to_table(datasets, "test.ms", [],
                      table_keywords={"foo":"bar"},
                      column_keywords={"DATA": {"foo": "bar"}})
 
