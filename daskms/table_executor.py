@@ -5,7 +5,6 @@ from __future__ import division
 from __future__ import print_function
 
 import logging
-import os
 from pathlib import Path
 from threading import Lock
 import weakref
