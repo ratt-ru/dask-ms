@@ -53,7 +53,7 @@ def test_ms_create(Dataset, tmp_path, chunks, num_chans, corr_types, sources):
     ddid_table_name = "::".join((ms_table_name, "DATA_DESCRIPTION"))
     pol_table_name = "::".join((ms_table_name, "POLARIZATION"))
     spw_table_name = "::".join((ms_table_name, "SPECTRAL_WINDOW"))
-    # SOURCE is not a standard MS sub-table
+    # SOURCE is an optional MS sub-table
     src_table_name = "::".join((ms_table_name, "SOURCE"))
 
     ms_datasets = []
@@ -234,7 +234,7 @@ def test_ms_create(Dataset, tmp_path, chunks, num_chans, corr_types, sources):
             assert_array_equal(S.getcol("DIRECTION", startrow=r, nrow=1),
                                [direction])
 
-    with pt.table(ms_path, ack=False) as T:
+    with pt.table(ms_table_name, ack=False) as T:
         # DATA_DESC_ID's are all the same shape
         assert_array_equal(T.getcol("DATA_DESC_ID"),
                            da.concatenate(all_data_desc_id))
