@@ -6,6 +6,7 @@ from __future__ import print_function
 
 import logging
 import os
+from pathlib import Path
 import time
 
 log = logging.getLogger(__name__)
@@ -65,6 +66,17 @@ def short_table_name(table_name):
 
     """
     return os.path.split(table_name.rstrip(os.sep))[1]
+
+
+def table_path_split(path):
+    """ Splits a table path into a (root, table, subtable) tuple """
+    if not isinstance(path, Path):
+        path = Path(path)
+
+    root = str(path.parent)
+    table_name, _, subtable = path.name.partition("::")
+
+    return root, table_name, subtable
 
 
 def group_cols_str(group_cols):

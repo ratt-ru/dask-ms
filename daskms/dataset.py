@@ -14,6 +14,7 @@ from collections import OrderedDict
 import dask
 import dask.array as da
 from dask.highlevelgraph import HighLevelGraph
+import numpy as np
 
 try:
     import xarray as xr
@@ -142,18 +143,25 @@ class Variable(object):
         return (self.finalize_persist, (fn, args, self.dims, self.attrs))
 
 
+class DimensionInferenceError(ValueError):
+    pass
+
+
+class ChunkInferenceError(ValueError):
+    pass
+
+
 def data_var_dims(data_vars):
     """ Returns a {dim: size} dictionary constructed from `data_vars` """
     dims = {}
 
     for k, var in data_vars.items():
         for d, s in zip(var.dims, var.shape):
-
-            if d in dims and s != dims[d]:
-                raise ValueError("Existing dimension size %d for "
-                                 "dimension '%s' is inconsistent "
-                                 "with same dimension of array %s" %
-                                 (s, d, k))
+            if d in dims and not np.isnan(s) and s != dims[d]:
+                raise DimensionInferenceError("Existing dimension size %s for "
+                                              "dimension '%s' is inconsistent "
+                                              "with same dimension %s of "
+                                              "array %s" % (s, d, dims[d], k))
 
             dims[d] = s
 
@@ -168,15 +176,15 @@ def data_var_chunks(data_vars):
         if not isinstance(var.data, da.Array):
             continue
 
-        for dim, c in zip(var.dims, var.chunks):
-            if dim in chunks and c != chunks[dim]:
-                raise ValueError("Existing chunking %s for "
-                                 "dimension '%s' is inconsistent "
-                                 "with chunking %s for the "
-                                 "same dimension of array %s" %
-                                 (c, dim, chunks[dim], k))
+        for d, c in zip(var.dims, var.chunks):
+            if d in chunks and c != chunks[d]:
+                raise ChunkInferenceError("Existing chunking %s for "
+                                          "dimension '%s' is inconsistent "
+                                          "with chunking %s for the "
+                                          "same dimension of array %s" %
+                                          (c, d, chunks[d], k))
 
-            chunks[dim] = c
+            chunks[d] = c
 
     return chunks
 

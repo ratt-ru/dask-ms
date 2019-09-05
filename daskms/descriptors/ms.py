@@ -14,7 +14,7 @@ import pyrap.tables as pt
 from daskms.columns import infer_dtype
 from daskms.descriptors.builder import (register_descriptor_builder,
                                         AbstractDescriptorBuilder)
-from daskms.dataset import data_var_dims
+from daskms.dataset import data_var_dims, DimensionInferenceError
 
 
 log = logging.getLogger(__name__)
@@ -119,7 +119,7 @@ class MSDescriptorBuilder(AbstractDescriptorBuilder):
         # Now try find consistent dimension sizes across all variables
         try:
             dim_sizes = data_var_dims(expanded_vars)
-        except ValueError:
+        except DimensionInferenceError:
             log.warning("Unable to determine fixed column shapes as "
                         "input variable dimension sizes are inconsistent",
                         exc_info=True)
@@ -153,17 +153,28 @@ class MSDescriptorBuilder(AbstractDescriptorBuilder):
         try:
             chan = dim_sizes['chan']
         except KeyError:
-            log.warning("Unable to infer 'chan' dimension from variables")
+            log.warning("Unable to infer 'chan' dimension from variables. "
+                        "Columns won't be FixedShape.")
             return desc
         else:
+            if np.isnan(chan):
+                log.warning("'nan' chan dimension. "
+                            "Columns won't be FixedShape.")
+                return desc
+
             # We can fix IMAGING_WEIGHT at least
             self._maybe_fix_column('IMAGING_WEIGHT', desc, (chan,))
 
         try:
             corr = dim_sizes['corr']
         except KeyError:
-            log.warning("Unable to infer 'corr' dimension from variables")
+            log.warning("Unable to infer 'corr' dimension from variables. "
+                        "Columns won't be FixedShape.")
             return desc
+        else:
+            if np.isnan(corr):
+                log.warning("'nan' corr dimension. "
+                            "Columns won't be FixedShape.")
 
         self._maybe_fix_column('FLAG', desc, (chan, corr))
         self._maybe_fix_column('DATA', desc, (chan, corr))

@@ -6,7 +6,7 @@ from __future__ import print_function
 
 import ast
 
-from daskms.utils import short_table_name
+from daskms.utils import table_path_split
 from daskms.table_schemas import SUBTABLES
 
 
@@ -89,19 +89,17 @@ def filename_builder_factory(filename):
     builder : :class:`daskms.descriptors.builder.AbtractDescriptorBuilder`
         Table Descriptor builder based on the filename
     """
-    canonical_name = short_table_name(filename)
+    _, table, subtable = table_path_split(filename)
 
     # Does this look like an MS
-    if canonical_name[-3:].upper().endswith('.MS'):
+    if not subtable and table[-3:].upper().endswith('.MS'):
         from daskms.descriptors.ms import MSDescriptorBuilder
         return MSDescriptorBuilder()
 
-    from daskms.descriptors.ms_subtable import MSSubTableDescriptorBuilder
-
     # Perhaps its an MS subtable?
-    for subtable in SUBTABLES:
-        if canonical_name.endswith(subtable):
-            return MSSubTableDescriptorBuilder(subtable)
+    if subtable in SUBTABLES:
+        from daskms.descriptors.ms_subtable import MSSubTableDescriptorBuilder
+        return MSSubTableDescriptorBuilder(subtable)
 
     # Just a standard CASA Table I guess
     from daskms.descriptors.builder import DefaultDescriptorBuilder

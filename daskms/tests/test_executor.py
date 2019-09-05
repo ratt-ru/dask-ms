@@ -50,7 +50,6 @@ def test_executor():
     ('/home/moriarty/test.ms::FIELD', '/home/moriarty/test.ms'),
     ('/home/moriarty/test.ms::FIELD/', '/home/moriarty/test.ms'),
     ('/home/moriarty/test.ms::QUX/', '/home/moriarty/test.ms'),
-    ('/home/moriarty/::test.ms::QUX/', '/home/moriarty/::test.ms'),
 ])
 def test_executor_key(key, result):
     assert executor_key(key) == result

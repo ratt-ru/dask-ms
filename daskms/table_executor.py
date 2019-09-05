@@ -6,10 +6,13 @@ from __future__ import print_function
 
 import logging
 import os
+from pathlib import Path
 from threading import Lock
 import weakref
 
 import concurrent.futures as cf
+
+from daskms.utils import table_path_split
 
 log = logging.getLogger(__name__)
 
@@ -75,13 +78,5 @@ def executor_key(table_name):
     """
 
     # Remove any path separators
-    table_name = table_name.rstrip(os.sep)
-
-    splits = table_name.split('::')
-
-    # Its a just a straightforward table/MS
-    if len(splits) == 1:
-        return table_name
-    # Sub-table. Return path bits without it (i.e the main table)
-    else:
-        return '::'.join(splits[:-1]).rstrip(os.sep)
+    root, table_name, subtable = table_path_split(table_name)
+    return str(Path(root, table_name))
