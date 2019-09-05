@@ -254,6 +254,18 @@ class TableProxy(object, metaclass=TableProxyMetaClass):
         self._write = False
         self._writeable = table.iswritable()
 
+        should_be_writeable = not kwargs.get('readonly', True)
+
+        if self._writeable is False and should_be_writeable:
+            # NOTE(sjperkins)
+            # This seems to happen if you've opened a WSRT.MS with
+            # readonly=False, and then you try to open WSRT.MS::SUBTABLE
+            # with readonly=False.
+            # Solution is to open WSRT.MS/SUBTABLE to avoid the locking,
+            # which may introduce it's own set of issues
+            raise RuntimeError("%s was opened as readonly=False but "
+                               "table.iswritable()==False" % table.name())
+
     @property
     def executor_key(self):
         return self._ex_key

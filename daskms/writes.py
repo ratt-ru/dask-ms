@@ -20,7 +20,7 @@ from daskms.ordering import row_run_factory
 from daskms.table import table_exists
 from daskms.table_executor import executor_key
 from daskms.table_proxy import TableProxy, WRITELOCK
-from daskms.utils import short_table_name
+from daskms.utils import table_path_split
 
 
 log = logging.getLogger(__name__)
@@ -158,39 +158,65 @@ def descriptor_builder(table, descriptor):
         return string_builder_factory(descriptor)
 
 
-def _create_table(table, datasets, columns, descriptor):
-    builder = descriptor_builder(table, descriptor)
+def _writable_table_proxy(table_name):
+    return TableProxy(pt.table, table_name, ack=False,
+                      readonly=False, lockoptions='user',
+                      __executor_key__=executor_key(table_name))
+
+
+def _create_table(table_name, datasets, columns, descriptor):
+    builder = descriptor_builder(table_name, descriptor)
     table_desc, dminfo = builder.execute(datasets)
+
+    root, table, subtable = table_path_split(table_name)
+    table_path = root / table
 
     from daskms.descriptors.ms import MSDescriptorBuilder
     from daskms.descriptors.ms_subtable import MSSubTableDescriptorBuilder
 
-    if isinstance(builder, MSDescriptorBuilder):
+    if not subtable and isinstance(builder, MSDescriptorBuilder):
+        table_path = str(table_path)
+
         # Create the MS
-        with pt.default_ms(table, tabdesc=table_desc, dminfo=dminfo):
-            pass
-    elif isinstance(builder, MSSubTableDescriptorBuilder):
-        # Create the MS subtable
-        subtable = builder.subtable
-        create_dir = short_table_name(table).rstrip(subtable)
-        with pt.default_ms_subtable(builder.subtable, create_dir,
-                                    tabdesc=table_desc, dminfo=dminfo):
-            pass
-    else:
-        # Create the table
-        with pt.table(table, table_desc, dminfo=dminfo, ack=False):
+        with pt.default_ms(table_path, tabdesc=table_desc, dminfo=dminfo):
             pass
 
-    return TableProxy(pt.table, table, ack=False,
-                      readonly=False, lockoptions='user',
-                      __executor_key__=executor_key(table))
+        return _writable_table_proxy(table_path)
+    elif subtable:
+        # NOTE(sjperkins)
+        # Recreate the subtable path with OS separator components
+        # This avoids accessing the subtable via the main table
+        # (e.g. WSRT.MS::SOURCE)
+        # which can cause lock issues as the subtables seemingly
+        # inherit the parent table lock
+        subtable_path = str(table_path / subtable)
+
+        # Create the subtable
+        if isinstance(builder, MSSubTableDescriptorBuilder):
+            with pt.default_ms_subtable(subtable, subtable_path,
+                                        tabdesc=table_desc, dminfo=dminfo):
+                pass
+        else:
+            with pt.table(subtable, table_desc, dminfo, ack=False):
+                pass
+
+        # Add subtable to the main table
+        table_proxy = _writable_table_proxy(str(table_path))
+        table_proxy.putkeywords({subtable: "Table: " + subtable_path}).result()
+        del table_proxy
+
+        # Return TableProxy
+        return _writable_table_proxy(subtable_path)
+    else:
+        # Create the table
+        with pt.table(str(table_path), table_desc, dminfo=dminfo, ack=False):
+            pass
+
+        return _writable_table_proxy(str(table_path))
 
 
 def _updated_table(table, datasets, columns, descriptor):
-    table_proxy = TableProxy(pt.table, table, ack=False,
-                             readonly=False, lockoptions='user',
-                             __executor_key__=executor_key(table))
-
+    table_proxy = _writable_table_proxy(table)
     table_columns = set(table_proxy.colnames().result())
     missing = set(columns) - table_columns
 
@@ -371,7 +397,8 @@ def add_row_order_factory(table_proxy, datasets):
 
 def _write_datasets(table, table_proxy, datasets, columns, descriptor,
                     table_keywords, column_keywords):
-    table_name = short_table_name(table)
+    _, table_name, subtable = table_path_split(table)
+    table_name = '::'.join((table_name, subtable)) if subtable else table_name
     writes = []
     row_orders = []
 
@@ -499,8 +526,10 @@ def write_datasets(table, datasets, columns, descriptor=None,
 
     # If ALL is requested
     if columns == "ALL":
-        columns = set.union(*(set(ds.data_vars.keys()) for ds in datasets))
-        columns = list(sorted(columns))
+        columns = list(set(ds.data_vars.keys()) for ds in datasets)
+
+        if len(columns) > 0:
+            columns = list(sorted(set.union(*columns)))
 
     if not table_exists(table):
         table_proxy = _create_table(table, datasets, columns, descriptor)

@@ -4,7 +4,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from os.path import join as pjoin, sep
+from pathlib import Path
+import os
+import platform
 
 import pytest
 
@@ -16,16 +18,29 @@ from daskms.descriptors.builder_factory import (filename_builder_factory,
                                                 parse_function_call_string)
 
 
+_root = Path("C:/" if platform.system() == "Windows" else os.sep,
+             "home", "moriarty")
+
+
 @pytest.mark.parametrize("filename, builder_cls", [
-    (pjoin(sep, "tmp", "test.ms"), MSDescriptorBuilder),
-    (pjoin(sep, "tmp", "test.ms", ""), MSDescriptorBuilder),
-    (pjoin(sep, "tmp", "test.ms%s%s" % (sep, sep)), MSDescriptorBuilder),
-    (pjoin(sep, "tmp", "test.ms::SOURCE"), MSSubTableDescriptorBuilder),
-    (pjoin(sep, "tmp", "test.ms::SOURCE", ""), MSSubTableDescriptorBuilder),
-    (pjoin(sep, "tmp", "test.ms", "SOURCE"), MSSubTableDescriptorBuilder),
-    (pjoin(sep, "tmp", "test.ms", "SOURCE", ""), MSSubTableDescriptorBuilder),
-    (pjoin(sep, "tmp", "test.table"), DefaultDescriptorBuilder),
-    (pjoin(sep, "tmp", "test.table", ""), DefaultDescriptorBuilder)
+    (_root / "test.ms", MSDescriptorBuilder),
+    (_root / "test.ms{s}".format(s=os.sep), MSDescriptorBuilder),
+    (_root / "test.ms{s}{s}".format(s=os.sep), MSDescriptorBuilder),
+    # Indirectly accessed subtable correctly identified
+    (_root / "test.ms::SOURCE", MSSubTableDescriptorBuilder),
+    (_root / "test.ms::SOURCE{s}".format(s=os.sep),
+     MSSubTableDescriptorBuilder),
+    # Directly accessed subtable not identified
+    (_root / "test.ms" / "SOURCE",
+     DefaultDescriptorBuilder),
+    (_root / "test.ms" / "SOURCE{s}".format(s=os.sep),
+     DefaultDescriptorBuilder),
+    # Default Table
+    (_root / "test.table", DefaultDescriptorBuilder),
+    # Default indirectly accessed Subtable
+    (_root / "test.table::SUBTABLE", DefaultDescriptorBuilder),
+    # Default directly accessed Subtable
+    (_root / "test.table" / "SUBTABLE", DefaultDescriptorBuilder),
 ])
 def test_filename_builder_factory(filename, builder_cls):
     assert isinstance(filename_builder_factory(filename), builder_cls)

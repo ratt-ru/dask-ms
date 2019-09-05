@@ -5,6 +5,7 @@ from __future__ import division
 from __future__ import print_function
 
 import logging
+from pathlib import Path
 
 import dask
 import dask.array as da
@@ -20,7 +21,7 @@ from daskms.table_executor import executor_key
 from daskms.table import table_exists
 from daskms.table_proxy import TableProxy, READLOCK
 from daskms.table_schemas import lookup_table_schema
-from daskms.utils import short_table_name
+from daskms.utils import table_path_split
 
 _DEFAULT_ROW_CHUNKS = 10000
 
@@ -274,7 +275,7 @@ class DatasetFactory(object):
         elif not isinstance(chunks, (tuple, list)):
             raise TypeError("'chunks' must be a dict or sequence of dicts")
 
-        self.table = table
+        self.table = str(Path(*table_path_split(table)))
         self.select_cols = select_cols
         self.group_cols = [] if group_cols is None else group_cols
         self.index_cols = [] if index_cols is None else index_cols
@@ -296,13 +297,16 @@ class DatasetFactory(object):
         return lookup_table_schema(self.table, self.table_schema)
 
     def _single_dataset(self, orders, exemplar_row=0):
+        _, t, s = table_path_split(self.table)
+        short_table_name = "/".join((t, s)) if s else t
+
         table_proxy = self._table_proxy()
         table_schema = self._table_schema()
         select_cols = set(self.select_cols or table_proxy.colnames().result())
         variables = _dataset_variable_factory(table_proxy, table_schema,
                                               select_cols, exemplar_row,
                                               orders, self.chunks[0],
-                                              short_table_name(self.table))
+                                              short_table_name)
 
         try:
             rowid = variables.pop("ROWID")
@@ -314,6 +318,8 @@ class DatasetFactory(object):
         return Dataset(variables, coords=coords)
 
     def _group_datasets(self, groups, exemplar_rows, orders):
+        _, t, s = table_path_split(self.table)
+        short_table_name = '/'.join((t, s)) if s else t
         table_proxy = self._table_proxy()
         table_schema = self._table_schema()
 
@@ -338,7 +344,7 @@ class DatasetFactory(object):
 
             # Prefix d
             gid_str = ",".join(str(gid) for gid in group_id)
-            array_prefix = "%s-[%s]" % (short_table_name(self.table), gid_str)
+            array_prefix = "%s-[%s]" % (short_table_name, gid_str)
 
             # Create dataset variables
             group_var_dims = _dataset_variable_factory(table_proxy,

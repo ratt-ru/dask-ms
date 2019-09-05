@@ -5,6 +5,7 @@ History
 0.2.0 (YYYY-MM-DD)
 ------------------
 
+* Improve sub-table creation logic (:pr:`59`)
 * Support table and column keywords (:pr:`58`)
 * Support concurrent access of multiple independent tables (:pr:`57`)
 * Fix WEIGHT_SPECTRUM schema dimensions (:pr:`56`)

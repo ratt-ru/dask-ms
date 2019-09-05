@@ -96,6 +96,37 @@ Access array attribute dictionary:
                   'MEASINFO': {'type': 'epoch', 'Ref': 'UTC'}}}
 
 
+.. _read-opening-sub-tables:
+
+Opening Sub-tables
+~~~~~~~~~~~~~~~~~~
+
+CASA Tables can also have sub-tables associated with them.
+For example, the Measurement Set has ANTENNA, SPECTRAL_WINDOW
+and DATA_DESCRIPTION sub-tables.
+
+``::``, the traditional scope operator used by
+`Taql <https://casacore.github.io/casacore-notes/199.html>`_
+used to reference the sub-tables of a table, is
+understood by python-casacore and dask-ms.
+The following convention specifies that the ``ANTENNA`` sub-table
+of ``TEST.MS`` should be opened:
+
+.. doctest::
+
+    >>> ant_datasets = xds_from_table("~/data/TEST.MS::ANTENNA")
+
+It is recommended that the ``TEST.MS::ANTENNA`` convention be
+followed as it makes the link between the table and sub-table clear to dask-ms.
+
+Alternatively, as sub-tables are simply stored as sub-directories
+of the main table, it is also possible to reference them as follows:
+
+.. doctest::
+
+    >>> ant_datasets = xds_from_table("~/data/TEST.MS/ANTENNA")
+
+
 Grouping
 ~~~~~~~~
 

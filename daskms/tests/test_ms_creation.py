@@ -34,26 +34,34 @@ else:
     [[9, 10, 11, 12], [5, 8]],
     [[5, 6, 7, 8], [9, 12]]
 ])
+@pytest.mark.parametrize("sources", [
+    [("PKS-1934", [5.1461782, -1.11199629], [0.9*.856e9, 1.1*.856e9]),
+     ("3C286",  [3.53925792, 0.53248541], [0.8*.856e9, .856e9, 1.2*.856e9])],
+])
 @pytest.mark.parametrize("Dataset", [
     Dataset,
     pytest.param(xrDataset, marks=xarray_param_marks)
 ], ids=["daskms.Dataset", "xarray.Dataset"])
-def test_ms_create(Dataset, tmp_path, chunks, num_chans, corr_types):
+def test_ms_create(Dataset, tmp_path, chunks, num_chans, corr_types, sources):
     # Set up
     rs = np.random.RandomState(42)
 
     ms_path = tmp_path / "create.ms"
+
     ms_table_name = str(ms_path)
-    ant_table_name = str(ms_path / "ANTENNA")
-    ddid_table_name = str(ms_path / "DATA_DESCRIPTION")
-    pol_table_name = str(ms_path / "POLARIZATION")
-    spw_table_name = str(ms_path / "SPECTRAL_WINDOW")
+    ant_table_name = "::".join((ms_table_name, "ANTENNA"))
+    ddid_table_name = "::".join((ms_table_name, "DATA_DESCRIPTION"))
+    pol_table_name = "::".join((ms_table_name, "POLARIZATION"))
+    spw_table_name = "::".join((ms_table_name, "SPECTRAL_WINDOW"))
+    # SOURCE is an optional MS sub-table
+    src_table_name = "::".join((ms_table_name, "SOURCE"))
 
     ms_datasets = []
     ant_datasets = []
     ddid_datasets = []
     pol_datasets = []
     spw_datasets = []
+    src_datasets = []
 
     # For comparison
     all_data_desc_id = []
@@ -72,6 +80,20 @@ def test_ms_create(Dataset, tmp_path, chunks, num_chans, corr_types):
         'NAME': (("row",), da.from_array(names, chunks=na)),
     })
     ant_datasets.append(ds)
+
+    # Create SOURCE datasets
+    for s, (name, direction, rest_freq) in enumerate(sources):
+        dask_num_lines = da.full((1,), len(rest_freq), dtype=np.int32)
+        dask_direction = da.asarray(direction)[None, :]
+        dask_rest_freq = da.asarray(rest_freq)[None, :]
+        dask_name = da.asarray(np.asarray([name], dtype=np.object))
+        ds = Dataset({
+            "NUM_LINES": (("row",), dask_num_lines),
+            "NAME": (("row",), dask_name),
+            "REST_FREQUENCY": (("row", "line"), dask_rest_freq),
+            "DIRECTION": (("row", "dir"), dask_direction),
+            })
+        src_datasets.append(ds)
 
     # Create POLARISATION datasets.
     # Dataset per output row required because column shapes are variable
@@ -143,8 +165,10 @@ def test_ms_create(Dataset, tmp_path, chunks, num_chans, corr_types):
     pol_writes = xds_to_table(pol_datasets, pol_table_name, columns="ALL")
     spw_writes = xds_to_table(spw_datasets, spw_table_name, columns="ALL")
     ddid_writes = xds_to_table(ddid_datasets, ddid_table_name, columns="ALL")
+    source_writes = xds_to_table(src_datasets, src_table_name, columns="ALL")
 
-    dask.compute(ms_writes, ant_writes, pol_writes, spw_writes, ddid_writes)
+    dask.compute(ms_writes, ant_writes, pol_writes,
+                 spw_writes, ddid_writes, source_writes)
 
     # Check ANTENNA table correctly created
     with pt.table(ant_table_name, ack=False) as A:
@@ -201,7 +225,16 @@ def test_ms_create(Dataset, tmp_path, chunks, num_chans, corr_types):
 
         assert set(D.colnames()) == set(required_columns)
 
-    with pt.table(str(ms_path), ack=False) as T:
+    with pt.table(src_table_name, ack=False) as S:
+        for r, (name, direction, rest_freq) in enumerate(sources):
+            assert_array_equal(S.getcol("NAME", startrow=r, nrow=1)[0],
+                               [name])
+            assert_array_equal(S.getcol("REST_FREQUENCY", startrow=r, nrow=1),
+                               [rest_freq])
+            assert_array_equal(S.getcol("DIRECTION", startrow=r, nrow=1),
+                               [direction])
+
+    with pt.table(ms_table_name, ack=False) as T:
         # DATA_DESC_ID's are all the same shape
         assert_array_equal(T.getcol("DATA_DESC_ID"),
                            da.concatenate(all_data_desc_id))
