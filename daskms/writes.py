@@ -197,7 +197,7 @@ def _create_table(table_name, datasets, columns, descriptor):
                                         tabdesc=table_desc, dminfo=dminfo):
                 pass
         else:
-            with pt.table(subtable, table_desc, dminfo, ack=False):
+            with pt.table(subtable_path, table_desc, dminfo=dminfo, ack=False):
                 pass
 
         # Add subtable to the main table

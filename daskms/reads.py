@@ -275,7 +275,8 @@ class DatasetFactory(object):
         elif not isinstance(chunks, (tuple, list)):
             raise TypeError("'chunks' must be a dict or sequence of dicts")
 
-        self.table = str(Path(*table_path_split(table)))
+        self.canonical_name = table
+        self.table_path = str(Path(*table_path_split(table)))
         self.select_cols = select_cols
         self.group_cols = [] if group_cols is None else group_cols
         self.index_cols = [] if index_cols is None else index_cols
@@ -289,15 +290,15 @@ class DatasetFactory(object):
             raise ValueError("Unhandled kwargs: %s" % kwargs)
 
     def _table_proxy(self):
-        return TableProxy(pt.table, self.table, ack=False,
+        return TableProxy(pt.table, self.table_path, ack=False,
                           readonly=True, lockoptions='user',
-                          __executor_key__=executor_key(self.table))
+                          __executor_key__=executor_key(self.canonical_name))
 
     def _table_schema(self):
-        return lookup_table_schema(self.table, self.table_schema)
+        return lookup_table_schema(self.canonical_name, self.table_schema)
 
     def _single_dataset(self, orders, exemplar_row=0):
-        _, t, s = table_path_split(self.table)
+        _, t, s = table_path_split(self.canonical_name)
         short_table_name = "/".join((t, s)) if s else t
 
         table_proxy = self._table_proxy()
@@ -318,7 +319,7 @@ class DatasetFactory(object):
         return Dataset(variables, coords=coords)
 
     def _group_datasets(self, groups, exemplar_rows, orders):
-        _, t, s = table_path_split(self.table)
+        _, t, s = table_path_split(self.canonical_name)
         short_table_name = '/'.join((t, s)) if s else t
         table_proxy = self._table_proxy()
         table_schema = self._table_schema()
