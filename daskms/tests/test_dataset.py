@@ -379,10 +379,15 @@ def test_dataset_create_table(tmp_path, dataset_chunks, dtype):
         datas.append(data)
         names.extend(np_str_array.tolist())
 
-    # Write the data to a new table
+    freq = da.linspace(.856e9, 2*.856e9, 64, chunks=16)
+    sub_datasets = [Dataset({"FREQ": (("row", "chan"), freq[None, :])})]
+
+    # Write the data to new tables
     table_name = os.path.join(str(tmp_path), 'test.table')
     writes = write_datasets(table_name, datasets, ["DATA", "NAMES"])
-    dask.compute(writes)
+    subt_writes = write_datasets(table_name + "::SPW",
+                                 sub_datasets, ["FREQ"])
+    dask.compute(writes, subt_writes)
 
     # Check written data
     with pt.table(table_name, readonly=True,
@@ -390,6 +395,12 @@ def test_dataset_create_table(tmp_path, dataset_chunks, dtype):
         assert row_sum == T.nrows()
         assert_array_equal(T.getcol("DATA"), np.concatenate(datas))
         assert_array_equal(T.getcol("NAMES"), names)
+
+    # Sub-table correctly linked and populated
+    with pt.table(table_name + "::SPW", readonly=True,
+                  lockoptions='auto', ack=False) as T:
+        assert T.nrows() == 1
+        assert_array_equal(T.getcol("FREQ")[0], freq)
 
 
 def test_dataset_computes_and_values(ms):
