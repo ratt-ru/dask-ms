@@ -7,7 +7,7 @@ History
 
 * Fix and test non-standard sub-table creation (:pr:`60`)
 * Improve sub-table creation logic (:pr:`59`, :pr:`60`)
-* Support table and column keywords (:pr:`58`)
+* Support table and column keywords (:pr:`58`, :pr:`62`)
 * Support concurrent access of multiple independent tables (:pr:`57`)
 * Fix WEIGHT_SPECTRUM schema dimensions (:pr:`56`)
 * Pin python-casacore to 3.0.0 (:pr:`54`)
