@@ -53,6 +53,7 @@ _proxied_methods = [
     ("putcolnp", WRITELOCK),
     ("putvarcol", WRITELOCK),
     ("putcellslice", WRITELOCK),
+    ("putkeyword", WRITELOCK),
     ("putkeywords", WRITELOCK),
     ("putcolkeywords", WRITELOCK)]
 
