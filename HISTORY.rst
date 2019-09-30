@@ -2,7 +2,7 @@
 History
 =======
 
-0.2.0 (YYYY-MM-DD)
+0.2.0 (2019-09-30)
 ------------------
 
 * Fix and test non-standard sub-table creation (:pr:`60`)
