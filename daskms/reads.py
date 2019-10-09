@@ -252,7 +252,7 @@ def _dataset_variable_factory(table_proxy, table_schema, select_cols,
                                   dtype=meta.dtype)
 
         # Assign into variable and dimension dataset
-        dataset_vars[column] = (full_dims, dask_array, meta.attrs)
+        dataset_vars[column] = (full_dims, dask_array)
 
     return dataset_vars
 
