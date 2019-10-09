@@ -93,7 +93,7 @@ class ColumnMetadataError(Exception):
 
 
 ColumnMetadata = namedtuple("ColumnMetadata",
-                            ["shape", "dims", "chunks", "dtype", "attrs"])
+                            ["shape", "dims", "chunks", "dtype"])
 
 
 def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
@@ -228,15 +228,7 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
                                   "dim_chunks '%s' do not agree." %
                                   (shape, dims, dim_chunks))
 
-    # Place table keywords in attributes
-    try:
-        keywords = coldesc['keywords']
-    except KeyError:
-        attrs = {}
-    else:
-        attrs = {} if len(keywords) == 0 else {"keywords": keywords}
-
-    return ColumnMetadata(shape, dims, dim_chunks, dtype, attrs)
+    return ColumnMetadata(shape, dims, dim_chunks, dtype)
 
 
 def dim_extents_array(dim, chunks):
