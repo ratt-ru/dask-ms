@@ -2,6 +2,11 @@
 History
 =======
 
+0.2.1 (YYYY-MM-DD)
+------------------
+
+* Remove keywords from variable attributes (:pr:`64`)
+
 0.2.0 (2019-09-30)
 ------------------
 
