@@ -88,6 +88,7 @@ def proxied_method_factory(method, locktype):
             return getattr(self._table, method)(*args, **kwargs)
         except Exception:
             log.exception("Exception in %s", method)
+            raise
         finally:
             self._release(locktype)
 
@@ -291,6 +292,7 @@ class TableProxy(object, metaclass=TableProxyMetaClass):
             return fn(self._table, *args, **kwargs)
         except Exception:
             log.exception("Exception in %s:", fn)
+            raise
         finally:
             self._release(locktype)
 
