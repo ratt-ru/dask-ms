@@ -158,16 +158,10 @@ def proxy_delete_reference(table_proxy, table):
         # https://codewithoutrules.com/2017/08/16/concurrency-python/
         # There could be internal casacore issues here, due to accessing
         # the table from a different thread, but test cases are passing
-        tabstr = hash(str(table))
-        log.debug("Begin closing %s", tabstr)
-
         try:
             table.close()
-        except Exception:
-            log.exception("Error closing %s", tabstr)
-            raise
-        finally:
-            log.debug("Finished closing %s", tabstr)
+        except Exception as e:
+            print("Error closing table %s: %s" % (str(table), str(e)))
 
     return weakref.ref(table_proxy, _callback)
 
