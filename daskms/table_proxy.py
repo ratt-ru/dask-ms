@@ -37,6 +37,7 @@ _proxied_methods = [
     ("colnames", READLOCK),
     ("getcoldesc", READLOCK),
     ("getdminfo", READLOCK),
+    ("iswritable", READLOCK),
     # Modification
     ("addrows", WRITELOCK),
     ("addcols", WRITELOCK),
@@ -81,16 +82,39 @@ def proxied_method_factory(method, locktype):
     on a concurrent.futures.ThreadPoolExecutor.
     """
 
-    def _impl(self, args, kwargs):
-        self._acquire(locktype)
+    if locktype == NOLOCK:
+        def _impl(table_future, args, kwargs):
+            try:
+                return getattr(table_future.result(), method)(*args, **kwargs)
+            except Exception:
+                log.exception("Exception in %s", method)
+                raise
+    elif locktype == READLOCK:
+        def _impl(table_future, args, kwargs):
+            table = table_future.result()
+            table.lock(write=False)
 
-        try:
-            return getattr(self._table, method)(*args, **kwargs)
-        except Exception:
-            log.exception("Exception in %s", method)
-            raise
-        finally:
-            self._release(locktype)
+            try:
+                return getattr(table, method)(*args, **kwargs)
+            except Exception:
+                log.exception("Exception in %s", method)
+                raise
+            finally:
+                table.unlock()
+    elif locktype == WRITELOCK:
+        def _impl(table_future, args, kwargs):
+            table = table_future.result()
+            table.lock(write=True)
+
+            try:
+                return getattr(table, method)(*args, **kwargs)
+            except Exception:
+                log.exception("Exception in %s", method)
+                raise
+            finally:
+                table.unlock()
+    else:
+        raise ValueError("Invalid locktype %s" % locktype)
 
     _impl.__name__ = method + "_impl"
     _impl.__doc__ = ("Calls table.%s, wrapped in a %s." %
@@ -101,7 +125,7 @@ def proxied_method_factory(method, locktype):
         Submits _impl(args, kwargs) to the executor
         and returns a Future
         """
-        return self._ex.submit(_impl, self, args, kwargs)
+        return self._ex.submit(_impl, self._table_future, args, kwargs)
 
     public_method.__name__ = method
     public_method.__doc__ = _PROXY_DOCSTRING % method
@@ -149,23 +173,6 @@ class TableProxyMetaClass(type):
                 return instance
 
 
-def proxy_delete_reference(table_proxy, table):
-    # http://pydev.blogspot.com/2015/01/creating-safe-cyclic-reference.html
-    # To avoid cyclic references, table_proxy may not be used within _callback
-    def _callback(ref):
-        # We close the table **without** using the executor due to
-        # reentrancy issues with Python queues and garbage collection
-        # https://codewithoutrules.com/2017/08/16/concurrency-python/
-        # There could be internal casacore issues here, due to accessing
-        # the table from a different thread, but test cases are passing
-        try:
-            table.close()
-        except Exception as e:
-            print("Error closing table %s: %s" % (str(table), str(e)))
-
-    return weakref.ref(table_proxy, _callback)
-
-
 def _map_create_proxy(cls, factory, args, kwargs):
     """ Support pickling of kwargs in TableProxy.__reduce__ """
     return cls(factory, *args, **kwargs)
@@ -177,16 +184,59 @@ class MismatchedLocks(Exception):
 
 def taql_factory(query, style='Python', tables=[]):
     """ Calls pt.taql, converting TableProxy's in tables to pyrap tables """
-    tabs = [t._table for t in tables]
+    tables = [t._table_future.result() for t in tables]
 
     for t in tables:
-        t._acquire(READLOCK)
+        t.lock()
 
     try:
-        return pt.taql(query, style=style, tables=tabs)
+        return pt.taql(query, style=style, tables=tables)
     finally:
         for t in tables:
-            t._release(READLOCK)
+            t.unlock()
+
+
+def _nolock_runner(fn, table_future, args, kwargs):
+    table = table_future.result()
+
+    try:
+        return fn(table, *args, **kwargs)
+    except Exception:
+        log.exception("Exception in %s:", fn)
+        raise
+
+
+def _readlock_runner(fn, table_future, args, kwargs):
+    table = table_future.result()
+    table.lock(write=False)
+
+    try:
+        return fn(table, *args, **kwargs)
+    except Exception:
+        log.exception("Exception in %s:", fn)
+        raise
+    finally:
+        table.unlock()
+
+
+def _writelock_runner(fn, table_future, args, kwargs):
+    table = table_future.result()
+    table.lock(write=True)
+
+    try:
+        result = fn(table, *args, **kwargs)
+        table.flush()
+    except Exception:
+        log.exception("Exception in %s:", fn)
+        raise
+    else:
+        return result
+    finally:
+        table.unlock()
+
+
+def _iswriteable(table_future):
+    return table_future.result().iswritable()
 
 
 class TableProxy(object, metaclass=TableProxyMetaClass):
@@ -229,14 +279,7 @@ class TableProxy(object, metaclass=TableProxyMetaClass):
         self._ex_key = kwargs.pop("__executor_key__", STANDARD_EXECUTOR)
 
         ex = Executor(key=self._ex_key)
-        table = ex.impl.submit(factory, *args, **kwargs).result()
-
-        if not isinstance(table, pt.table):
-            raise RuntimeError("'%s' did not produce a "
-                               "CASA table object" % factory)
-
-        # Ensure tables are closed when the object is deleted
-        self._del_ref = proxy_delete_reference(self, table)
+        self._table_future = table = ex.impl.submit(factory, *args, **kwargs)
 
         # Store a reference to the Executor wrapper class
         # so that the Executor is retained while this TableProxy
@@ -246,11 +289,8 @@ class TableProxy(object, metaclass=TableProxyMetaClass):
         self._ex = ex.impl
 
         # Private, should be inaccessible
-        self._table = table
-        self._readlocks = 0
-        self._writelocks = 0
         self._write = False
-        self._writeable = table.iswritable()
+        self._writeable = ex.impl.submit(_iswriteable, table).result()
 
         should_be_writeable = not kwargs.get('readonly', True)
 
@@ -279,17 +319,6 @@ class TableProxy(object, metaclass=TableProxyMetaClass):
     def __exit__(self, evalue, etype, etraceback):
         pass
 
-    def __runner(self, fn, locktype, args, kwargs):
-        self._acquire(locktype)
-
-        try:
-            return fn(self._table, *args, **kwargs)
-        except Exception:
-            log.exception("Exception in %s:", fn)
-            raise
-        finally:
-            self._release(locktype)
-
     def submit(self, fn, locktype, *args, **kwargs):
         """
         Submits :code:`fn(table, *args, **kwargs)` within
@@ -312,79 +341,20 @@ class TableProxy(object, metaclass=TableProxyMetaClass):
         future : :class:`concurrent.futures.Future`
             Future containing the result of :code:`fn(table, *args, **kwargs)`
         """
-        return self._ex.submit(self.__runner, fn, locktype, args, kwargs)
-
-    def _acquire(self, locktype):
-        """
-        Acquire a lock on the table
-
-        Notes
-        -----
-        This should **only** be called from within the associated Executor
-        """
-        if locktype == READLOCK:
-            # No locks at all, acquire readlock
-            if self._readlocks + self._writelocks == 0:
-                self._table.lock(write=False)
-
-            self._readlocks += 1
+        if locktype == NOLOCK:
+            return self._ex.submit(_nolock_runner, fn,
+                                   self._table_future,
+                                   args, kwargs)
+        elif locktype == READLOCK:
+            return self._ex.submit(_readlock_runner, fn,
+                                   self._table_future,
+                                   args, kwargs)
         elif locktype == WRITELOCK:
-            if not self._writeable:
-                raise ValueError("Table is not writeable")
-
-            # Acquire writelock if we had none previously
-            if self._writelocks == 0:
-                self._table.lock(write=True)
-                self._write = True
-
-            self._writelocks += 1
-        elif locktype == NOLOCK:
-            pass
+            return self._ex.submit(_writelock_runner, fn,
+                                   self._table_future,
+                                   args, kwargs)
         else:
-            raise ValueError("Invalid lock type %d" % locktype)
-
-    def _release(self, locktype):
-        """
-        Release a lock on the table
-
-        Notes
-        -----
-        This should **only** be called from within the associated Executor
-        """
-        if locktype == READLOCK:
-            self._readlocks -= 1
-
-            if self._readlocks == 0:
-                if self._writelocks > 0:
-                    # Should be write-locked, check the invariant
-                    assert self._write is True
-                else:
-                    # Release all locks
-                    self._table.unlock()
-                    self._write = False
-            elif self._readlocks < 0:
-                raise MismatchedLocks("mismatched readlocks")
-
-        elif locktype == WRITELOCK:
-            self._writelocks -= 1
-
-            if self._writelocks == 0:
-                if self._readlocks > 0:
-                    # Downgrade from write to read lock if
-                    # there are any remaining readlocks
-                    self._write = False
-                    self._table.lock(write=False)
-                else:
-                    # Release all locks
-                    self._write = False
-                    self._table.unlock()
-            elif self._writelocks < 0:
-                raise MismatchedLocks("mismatched writelocks")
-
-        elif locktype == NOLOCK:
-            pass
-        else:
-            raise ValueError("Invalid lock type %d" % locktype)
+            raise ValueError("Invalid locktype %s" % locktype)
 
     def __repr__(self):
         return "TableProxy[%s](%s, %s, %s)" % (

@@ -28,30 +28,32 @@ _DEFAULT_ROW_CHUNKS = 10000
 log = logging.getLogger(__name__)
 
 
-def ndarray_getcol(row_runs, table_proxy, column, result, dtype):
+def ndarray_getcol(row_runs, table_future, column, result, dtype):
     """ Get numpy array data """
-    getcolnp = table_proxy._table.getcolnp
+    table = table_future.result()
+    getcolnp = table.getcolnp
     rr = 0
 
-    table_proxy._acquire(READLOCK)
+    table.lock(write=False)
 
     try:
         for rs, rl in row_runs:
             getcolnp(column, result[rr:rr + rl], startrow=rs, nrow=rl)
             rr += rl
     finally:
-        table_proxy._release(READLOCK)
+        table.unlock()
 
     return result
 
 
-def ndarray_getcolslice(row_runs, table_proxy, column, result,
+def ndarray_getcolslice(row_runs, table_future, column, result,
                         blc, trc, dtype):
     """ Get numpy array data """
-    getcolslicenp = table_proxy._table.getcolslicenp
+    table = table_future.result()
+    getcolslicenp = table.getcolslicenp
     rr = 0
 
-    table_proxy._acquire(READLOCK)
+    table.lock(write=False)
 
     try:
         for rs, rl in row_runs:
@@ -60,17 +62,18 @@ def ndarray_getcolslice(row_runs, table_proxy, column, result,
                           startrow=rs, nrow=rl)
             rr += rl
     finally:
-        table_proxy._release(READLOCK)
+        table.unlock()
 
     return result
 
 
-def object_getcol(row_runs, table_proxy, column, result, dtype):
+def object_getcol(row_runs, table_future, column, result, dtype):
     """ Get object list data """
-    getcol = table_proxy._table.getcol
+    table = table_future.result()
+    getcol = table.getcol
     rr = 0
 
-    table_proxy._acquire(READLOCK)
+    table.lock(write=False)
 
     try:
         for rs, rl in row_runs:
@@ -90,18 +93,19 @@ def object_getcol(row_runs, table_proxy, column, result, dtype):
 
             rr += rl
     finally:
-        table_proxy._release(READLOCK)
+        table.unlock()
 
     return result
 
 
-def object_getcolslice(row_runs, table_proxy, column, result,
+def object_getcolslice(row_runs, table_future, column, result,
                        blc, trc, dtype):
     """ Get object list data """
-    getcolslice = table_proxy._table.getcolslice
+    table = table_future.result()
+    getcolslice = table.getcolslice
     rr = 0
 
-    table_proxy._acquire(READLOCK)
+    table.lock(write=False)
 
     try:
         for rs, rl in row_runs:
@@ -121,7 +125,7 @@ def object_getcolslice(row_runs, table_proxy, column, result,
 
             rr += rl
     finally:
-        table_proxy._release(READLOCK)
+        table.unlock()
 
     return result
 
@@ -152,7 +156,8 @@ def getter_wrapper(row_orders, *args):
                  else ndarray_getcolslice)
 
         # Submit table I/O on executor
-        future = table_proxy._ex.submit(io_fn, row_runs, table_proxy,
+        future = table_proxy._ex.submit(io_fn, row_runs,
+                                        table_proxy._table_future,
                                         column, result,
                                         blc, trc, dtype)
     # In this case, the full resolution data
@@ -163,7 +168,8 @@ def getter_wrapper(row_orders, *args):
                  else ndarray_getcol)
 
         # Submit table I/O on executor
-        future = table_proxy._ex.submit(io_fn, row_runs, table_proxy,
+        future = table_proxy._ex.submit(io_fn, row_runs,
+                                        table_proxy._table_future,
                                         column, result, dtype)
 
     # Resort result if necessary

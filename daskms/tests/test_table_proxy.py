@@ -17,8 +17,7 @@ from numpy.testing import assert_array_equal
 import pyrap.tables as pt
 import pytest
 
-from daskms.table_proxy import (TableProxy, _table_cache, taql_factory,
-                                MismatchedLocks, READLOCK, WRITELOCK, NOLOCK)
+from daskms.table_proxy import TableProxy, taql_factory
 from daskms.utils import assert_liveness
 
 
@@ -140,70 +139,3 @@ def test_proxy_dask_embedding(ms):
 
     # Cache's are now clear
     assert_liveness(0, 0)
-
-
-@pytest.mark.parametrize("lockseq", [
-    ["ar", "an", "aw", "dn", "dr", "dw"],
-    ["ar", "aw", "an", "dn", "dr", "dw"],
-    ["ar", "dr", "an", "dn", "aw", "dw"],
-    ["ar", "aw", "an", "dn", "dr", "dw"],
-    ["ar", "dr", "an", "dn", "aw", "dw"],
-    ["ar", "aw", "aw", "dw", "dr", "dw"],
-    ["aw", "aw", "ar", "dw", "dr", "dw"],
-    pytest.param(["ar", "aw", "aw", "dr", "dw", "dr"],
-                 marks=pytest.mark.xfail(raises=MismatchedLocks)),
-    pytest.param(["ar", "aw", "aw", "dr", "dw"],
-                 marks=pytest.mark.xfail(reason="Acquired three locks "
-                                                "only released two")),
-])
-def test_table_proxy_locks(ms, lockseq):
-    assert len(_table_cache) == 0
-
-    table_proxy = TableProxy(pt.table, ms, readonly=False, ack=False)
-
-    reads = 0
-    writes = 0
-
-    fn_map = {'a': table_proxy._acquire, 'd': table_proxy._release}
-    lock_map = {'n': NOLOCK, 'r': READLOCK, 'w': WRITELOCK}
-
-    for action, lock in lockseq:
-        try:
-            fn = fn_map[action]
-        except KeyError:
-            raise ValueError("Invalid action '%s'" % action)
-
-        try:
-            locktype = lock_map[lock]
-        except KeyError:
-            raise ValueError("Invalid lock type '%s'" % locktype)
-
-        # Increment/decrement on acquire/release
-        if action == "a":
-            if locktype == READLOCK:
-                reads += 1
-            elif locktype == WRITELOCK:
-                writes += 1
-        elif action == "d":
-            if locktype == READLOCK:
-                reads -= 1
-            elif locktype == WRITELOCK:
-                writes -= 1
-
-        fn(locktype)
-
-        # Check invariants
-        have_locks = reads + writes > 0
-        assert table_proxy._readlocks == reads
-        assert table_proxy._writelocks == writes
-        assert table_proxy._table.haslock(table_proxy._write) is have_locks
-        assert table_proxy._write is (writes > 0)
-
-    # Check invariants
-    have_locks = reads + writes > 0
-    assert reads == 0
-    assert writes == 0
-    assert table_proxy._readlocks == reads
-    assert table_proxy._writelocks == writes
-    assert table_proxy._table.haslock(table_proxy._write) is have_locks
-    assert table_proxy._write is (writes > 0)
