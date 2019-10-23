@@ -2,7 +2,7 @@
 History
 =======
 
-0.2.1 (YYYY-MM-DD)
+0.2.1 (2019-10-23)
 ------------------
 
 * Constrain table object access to Executor.
