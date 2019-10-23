@@ -196,7 +196,7 @@ def taql_factory(query, style='Python', tables=[]):
             t.unlock()
 
 
-def _nolock_runner(fn, table_future, args, kwargs):
+def _nolock_runner(table_future, fn, args, kwargs):
     table = table_future.result()
 
     try:
@@ -206,7 +206,7 @@ def _nolock_runner(fn, table_future, args, kwargs):
         raise
 
 
-def _readlock_runner(fn, table_future, args, kwargs):
+def _readlock_runner(table_future, fn, args, kwargs):
     table = table_future.result()
     table.lock(write=False)
 
@@ -219,7 +219,7 @@ def _readlock_runner(fn, table_future, args, kwargs):
         table.unlock()
 
 
-def _writelock_runner(fn, table_future, args, kwargs):
+def _writelock_runner(table_future, fn, args, kwargs):
     table = table_future.result()
     table.lock(write=True)
 
@@ -342,17 +342,14 @@ class TableProxy(object, metaclass=TableProxyMetaClass):
             Future containing the result of :code:`fn(table, *args, **kwargs)`
         """
         if locktype == NOLOCK:
-            return self._ex.submit(_nolock_runner, fn,
-                                   self._table_future,
-                                   args, kwargs)
+            return self._ex.submit(_nolock_runner, self._table_future,
+                                   fn, args, kwargs)
         elif locktype == READLOCK:
-            return self._ex.submit(_readlock_runner, fn,
-                                   self._table_future,
-                                   args, kwargs)
+            return self._ex.submit(_readlock_runner, self._table_future,
+                                   fn, args, kwargs)
         elif locktype == WRITELOCK:
-            return self._ex.submit(_writelock_runner, fn,
-                                   self._table_future,
-                                   args, kwargs)
+            return self._ex.submit(_writelock_runner, self._table_future,
+                                   fn, args, kwargs)
         else:
             raise ValueError("Invalid locktype %s" % locktype)
 
