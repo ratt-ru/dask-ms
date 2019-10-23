@@ -5,6 +5,8 @@ History
 0.2.1 (YYYY-MM-DD)
 ------------------
 
+* Constrain table object access to Executor.
+  Simplify table locking (:pr:`66`).
 * Fix stress test (:pr:`65`)
 * Remove keywords from variable attributes (:pr:`64`)
 
