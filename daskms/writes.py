@@ -26,28 +26,33 @@ from daskms.utils import table_path_split
 log = logging.getLogger(__name__)
 
 
-def ndarray_putcol(row_runs, table_proxy, column, data):
+def ndarray_putcol(row_runs, table_future, column, data):
     """ Put data into the table """
-    putcol = table_proxy._table.putcol
+    table = table_future.result()
+    putcol = table.putcol
     rr = 0
 
-    table_proxy._acquire(WRITELOCK)
+    table.lock(write=True)
 
     try:
         for rs, rl in row_runs:
             putcol(column, data[rr:rr + rl], startrow=rs, nrow=rl)
             rr += rl
 
+        table.flush()
+
     finally:
-        table_proxy._release(WRITELOCK)
+        table.unlock()
 
 
-def multdim_str_putcol(row_runs, table_proxy, column, data):
+def multdim_str_putcol(row_runs, table_future, column, data):
     """ Put multidimensional string data into the table """
-    putcol = table_proxy._table.putcol
+    table = table_future.result()
+    putcol = table.putcol
+
     rr = 0
 
-    table_proxy._acquire(WRITELOCK)
+    table.lock(write=True)
 
     try:
         for rs, rl in row_runs:
@@ -57,16 +62,19 @@ def multdim_str_putcol(row_runs, table_proxy, column, data):
             putcol(column, chunk, startrow=rs, nrow=rl)
             rr += rl
 
+        table.flush()
+
     finally:
-        table_proxy._release(WRITELOCK)
+        table.unlock()
 
 
-def ndarray_putcolslice(row_runs, blc, trc, table_proxy, column, data):
+def ndarray_putcolslice(row_runs, blc, trc, table_future, column, data):
     """ Put data into the table """
-    putcolslice = table_proxy._table.putcolslice
+    table = table_future.result()
+    putcolslice = table.putcolslice
     rr = 0
 
-    table_proxy._acquire(WRITELOCK)
+    table.lock(write=True)
 
     try:
         for rs, rl in row_runs:
@@ -74,16 +82,19 @@ def ndarray_putcolslice(row_runs, blc, trc, table_proxy, column, data):
                         startrow=rs, nrow=rl)
             rr += rl
 
+        table.flush()
+
     finally:
-        table_proxy._release(WRITELOCK)
+        table.unlock()
 
 
-def multdim_str_putcolslice(row_runs, blc, trc, table_proxy, column, data):
+def multdim_str_putcolslice(row_runs, blc, trc, table_future, column, data):
     """ Put multidimensional string data into the table """
-    putcol = table_proxy._table.putcol
+    table = table_future.result()
+    putcol = table.putcol
     rr = 0
 
-    table_proxy._acquire(WRITELOCK)
+    table.lock(write=True)
 
     try:
         for rs, rl in row_runs:
@@ -93,8 +104,10 @@ def multdim_str_putcolslice(row_runs, blc, trc, table_proxy, column, data):
             putcol(column, chunk, blc, trc, startrow=rs, nrow=rl)
             rr += rl
 
+        table.flush()
+
     finally:
-        table_proxy._release(WRITELOCK)
+        table.unlock()
 
 
 def putter_wrapper(row_orders, *args):
@@ -140,10 +153,12 @@ def putter_wrapper(row_orders, *args):
         blc, trc = zip(*args[:nextent_args])
         fn = multdim_str_putcolslice if multidim_str else ndarray_putcolslice
         table_proxy._ex.submit(fn, row_runs, blc, trc,
-                               table_proxy, column, data).result()
+                               table_proxy._table_future,
+                               column, data).result()
     else:
         fn = multdim_str_putcol if multidim_str else ndarray_putcol
-        table_proxy._ex.submit(fn, row_runs, table_proxy,
+        table_proxy._ex.submit(fn, row_runs,
+                               table_proxy._table_future,
                                column, data).result()
 
     return np.full(out_shape, True)

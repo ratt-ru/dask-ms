@@ -46,8 +46,8 @@ def executor_delete_reference(ex, threadpool_executor):
         # https://codewithoutrules.com/2017/08/16/concurrency-python/
         try:
             threadpool_executor.shutdown(wait=True)
-        except Exception:
-            log.exception("Error shutting down executor in _callback")
+        except Exception as e:
+            print("Error shutting down executor: %s" % str(e))
 
     return weakref.ref(ex, _callback)
 
