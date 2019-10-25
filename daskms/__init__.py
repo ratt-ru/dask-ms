@@ -8,7 +8,7 @@ import logging
 
 __author__ = """Simon Perkins"""
 __email__ = 'sperkins@ska.ac.za'
-__version__ = '0.2.1'
+__version__ = '0.2.2'
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
