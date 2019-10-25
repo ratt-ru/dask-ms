@@ -2,7 +2,7 @@
 History
 =======
 
-0.2.2 (YYYY-MM-DD)
+0.2.2 (2019-10-25)
 ------------------
 * Fix spacing in TAQL WHERE queries (:pr:`68`)
 
