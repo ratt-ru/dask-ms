@@ -68,12 +68,12 @@ def _sorted_rows(taql_proxy, startrow, nrow):
 
 def ordering_taql(table_proxy, index_cols, taql_where=''):
     select = select_clause(["ROWID() as __tablerow__"])
-    orderby = orderby_clause(index_cols)
+    orderby = "\n" + orderby_clause(index_cols)
 
     if taql_where != '':
-        taql_where = "WHERE\n\t%s" % taql_where
+        taql_where = "\nWHERE\n\t%s" % taql_where
 
-    query = "%s\nFROM\n\t$1\n%s%s" % (select, orderby, taql_where)
+    query = "%s\nFROM\n\t$1%s%s" % (select, taql_where, orderby)
 
     return TableProxy(taql_factory, query, tables=[table_proxy],
                       __executor_key__=table_proxy.executor_key)
