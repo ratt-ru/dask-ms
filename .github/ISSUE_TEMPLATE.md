@@ -1,4 +1,4 @@
-* xarray-ms version:
+* dask-ms version:
 * Python version:
 * Operating System:
 
