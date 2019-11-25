@@ -2,6 +2,11 @@
 History
 =======
 
+0.2.3 (YYYY-MM-DD)
+------------------
+* Produce write datasets rather a single concatenated dask array (:pr:`70`)
+
+
 0.2.2 (2019-10-25)
 ------------------
 * Fix spacing in TAQL WHERE queries (:pr:`68`)

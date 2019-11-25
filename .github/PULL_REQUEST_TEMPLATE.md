@@ -1,7 +1,7 @@
 - [ ] Tests added / passed
 
   ```bash
-  $ py.test -v -s xarrayms/tests
+  $ py.test -v -s daskms/tests
   ```
 
   If the pep8 tests fail, the quickest way to correct
@@ -10,9 +10,9 @@
 
   ```
   $ pip install -U autopep8 flake8 pycodestyle
-  $ autopep8 -r -i xarrayms
-  $ flake8 xarrayms
-  $ pycodestyle xarrayms
+  $ autopep8 -r -i daskms
+  $ flake8 daskms
+  $ pycodestyle daskms
   ```
 
 - [ ] Fully documented, including `HISTORY.rst` for all changes
