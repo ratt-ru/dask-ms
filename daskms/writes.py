@@ -13,6 +13,7 @@ import numpy as np
 import pyrap.tables as pt
 
 from daskms.columns import dim_extents_array
+from daskms.dataset import Dataset
 from daskms.descriptors.builder import AbstractDescriptorBuilder
 from daskms.descriptors.builder_factory import filename_builder_factory
 from daskms.descriptors.builder_factory import string_builder_factory
@@ -414,7 +415,6 @@ def _write_datasets(table, table_proxy, datasets, columns, descriptor,
                     table_keywords, column_keywords):
     _, table_name, subtable = table_path_split(table)
     table_name = '::'.join((table_name, subtable)) if subtable else table_name
-    writes = []
     row_orders = []
 
     # Put table and column keywords
@@ -457,8 +457,13 @@ def _write_datasets(table, table_proxy, datasets, columns, descriptor,
 
     assert len(row_orders) == len(datasets)
 
+    datasets = []
+
     for (di, ds), row_order in zip(sorted_datasets, row_orders):
         data_vars = ds.data_vars
+
+        # Hold the variables representing array writes
+        write_vars = {}
 
         # Generate a dask array for each column
         for column in columns:
@@ -501,12 +506,17 @@ def _write_datasets(table, table_proxy, datasets, columns, descriptor,
                                      align_arrays=False,
                                      dtype=np.bool)
 
-            writes.append(write_col.ravel())
+            # Writes for this column
+            write_vars[column] = (full_dims, write_col)
 
-    if len(writes) == 0:
-        return da.full(1, True, dtype=np.bool)
+        # Append a dataset with the write operations
+        datasets.append(Dataset(write_vars))
 
-    return da.concatenate(writes)
+    # Return an empty dataset
+    if len(datasets) == 0:
+        return Dataset({})
+
+    return datasets
 
 
 DELKW = object()

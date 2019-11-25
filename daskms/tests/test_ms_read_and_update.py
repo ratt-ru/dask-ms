@@ -195,12 +195,19 @@ def test_taql_where(ms, index_cols):
 
 
 def _proc_map_fn(args):
+    import dask.threaded as dt
+
+    # No dask pools are spun up
+    with dt.pools_lock:
+        assert dt.default_pool is None
+        assert len(dt.pools) == 0
+
     try:
         ms, i = args
         xds = xds_from_ms(ms, columns=["STATE_ID"], group_cols=["FIELD_ID"])
         xds[i] = xds[i].assign(STATE_ID=(("row",), xds[i].STATE_ID.data + i))
         write = xds_to_table(xds[i], ms, ["STATE_ID"])
-        write.compute(scheduler='sync')
+        dask.compute(write)
     except Exception as e:
         print(str(e))
 
@@ -209,9 +216,30 @@ def _proc_map_fn(args):
 
 @pytest.mark.parametrize("nprocs", [3])
 def test_multiprocess_table(ms, nprocs):
-    # Check here so that we don't fork threads
+    import time
+    import threading
+    import dask.threaded as dt
+
+    # Don't fork threads
     # https://rachelbythebay.com/w/2011/06/07/forked/
+    # Close and cleanup default dask threadpools
+    with dt.pools_lock:
+        if dt.default_pool is not None:
+            dt.default_pool.close()
+            dt.default_pool = None
+
+        for thread in list(dt.pools.keys()):
+            for p in dt.pools.pop(thread).values():
+                p.close()
+
+    # No TableProxies or Executors (with ThreadPools) live
     assert_liveness(0, 0)
+
+    # Wait for other threads to die
+    time.sleep(0.1)
+
+    # Only main thread is alive
+    assert len(threading.enumerate()) == 1
 
     from multiprocessing import Pool
     pool = Pool(nprocs)

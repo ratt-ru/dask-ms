@@ -26,11 +26,11 @@ log = logging.getLogger(__name__)
 def xds_to_table(xds, table_name, columns, descriptor=None,
                  table_keywords=None, column_keywords=None):
     """
-    Generates a dask array representing a series of writes from the
+    Generates a list of Datasets representing a write operations from the
     specified arrays in :class:`xarray.Dataset`'s into
     the CASA table columns specified by ``table_name`` and ``columns``.
     This is lazy operation -- it is only execute when a :meth:`dask.compute`
-    or :meth:`dask.array.Array.compute` method is called.
+    or :meth:`xarray.Dataset.compute` method is called.
 
     Parameters
     ----------
@@ -70,9 +70,9 @@ def xds_to_table(xds, table_name, columns, descriptor=None,
 
     Returns
     -------
-    writes : :class:`dask.array.Array`
-        dask array representing the write to the
-        dataset.
+    write_datasets : list of :class:`xarray.Dataset`
+        Datasets containing arrays representing write operations
+        into a CASA Table
     """
 
     # Promote dataset to a list
