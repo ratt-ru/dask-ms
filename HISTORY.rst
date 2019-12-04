@@ -4,7 +4,8 @@ History
 
 0.2.3 (YYYY-MM-DD)
 ------------------
-* Produce write datasets rather a single concatenated dask array (:pr:`70`)
+* Produce write datasets rather a single concatenated dask array
+  (:pr:`70`, :pr:`72`)
 
 
 0.2.2 (2019-10-25)

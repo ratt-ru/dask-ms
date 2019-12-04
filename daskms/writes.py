@@ -515,6 +515,9 @@ def _write_datasets(table, table_proxy, datasets, columns, descriptor,
     # Return an empty dataset
     if len(datasets) == 0:
         return Dataset({})
+    # Return singleton
+    elif len(datasets) == 1:
+        return datasets[0]
 
     return datasets
 
