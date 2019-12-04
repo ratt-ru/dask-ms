@@ -108,10 +108,43 @@ def xds_to_table(xds, table_name, columns, descriptor=None,
                 raise TypeError("Invalid Dataset type '%s'" % type(ds))
 
     # Write the datasets
-    return write_datasets(table_name, datasets, columns,
-                          descriptor=descriptor,
-                          table_keywords=table_keywords,
-                          column_keywords=column_keywords)
+    out_ds = write_datasets(table_name, datasets, columns,
+                            descriptor=descriptor,
+                            table_keywords=table_keywords,
+                            column_keywords=column_keywords)
+
+    # No xarray available assume dask datasets
+    if xr is None:
+        return out_ds
+
+    if isinstance(out_ds, Dataset):
+        out_ds = [out_ds]
+    elif isinstance(out_ds, (tuple, list)):
+        pass
+    else:
+        raise TypeError("Invalid Dataset type '%s'" % type(out_ds))
+
+    xformed_out_ds = []
+
+    for ds in out_ds:
+        assert isinstance(ds, Dataset)
+
+        variables = {k: (v.dims, v.data, v.attrs) for k, v
+                     in ds.data_vars.items()}
+
+        coords = {k: (v.dims, v.data, v.attrs) for k, v
+                  in ds.coords.items()}
+
+        xformed_out_ds.append(xr.Dataset(variables,
+                                         coords=coords,
+                                         attrs=ds.attrs))
+
+    if len(xformed_out_ds) == 0:
+        return xr.Dataset()
+    elif len(xformed_out_ds) == 1:
+        return xformed_out_ds[0]
+
+    return xformed_out_ds
 
 
 def xds_from_table(table_name, columns=None,
