@@ -12,6 +12,7 @@ from dask.base import normalize_token
 import numpy as np
 import pyrap.tables as pt
 from daskms.table_executor import Executor, STANDARD_EXECUTOR
+from daskms.utils import arg_hasher
 
 log = logging.getLogger(__name__)
 
@@ -133,22 +134,6 @@ def proxied_method_factory(method, locktype):
     return public_method
 
 
-def _hasher(args):
-    """ Recursively hash data structures -- handles list and dicts """
-    if isinstance(args, (tuple, list, set)):
-        return hash(tuple(_hasher(v) for v in args))
-    elif isinstance(args, dict):
-        return hash(tuple((k, _hasher(v)) for k, v in sorted(args.items())))
-    elif isinstance(args, np.ndarray):
-        # NOTE(sjperkins)
-        # https://stackoverflow.com/a/16592241/1611416
-        # Slowish, but we shouldn't be passing
-        # huge numpy arrays in the TableProxy constructor
-        return hash(args.tostring())
-    else:
-        return hash(args)
-
-
 class TableProxyMetaClass(type):
     """
     https://en.wikipedia.org/wiki/Multiton_pattern
@@ -162,7 +147,7 @@ class TableProxyMetaClass(type):
         return type.__new__(cls, name, bases, dct)
 
     def __call__(cls, *args, **kwargs):
-        key = _hasher((cls,) + args + (kwargs,))
+        key = arg_hasher((cls,) + args + (kwargs,))
 
         with _table_lock:
             try:
