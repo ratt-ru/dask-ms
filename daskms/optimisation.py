@@ -15,6 +15,7 @@ _key_cache_lock = Lock()
 
 
 class KeyMetaClass(type):
+    """ Ensures that Key objects are unique """
     def __call__(cls, key):
         with _key_cache_lock:
             try:
@@ -25,6 +26,11 @@ class KeyMetaClass(type):
 
 
 class Key(metaclass=KeyMetaClass):
+    """
+    Suitable for storing a tuple
+    (or other dask key type) in a WeakKeyDictionary.
+    Uniqueness ensured by KeyMetaClass
+    """
     __slots__ = ("key", "__weakref__")
 
     def __init__(self, key):
@@ -42,7 +48,7 @@ class Key(metaclass=KeyMetaClass):
     __str__ = __repr__
 
 
-def get_cache_entry(cache, key, task):
+def cache_entry(cache, key, task):
     with cache.lock:
         try:
             return cache.cache[key]
@@ -69,6 +75,9 @@ class ArrayCacheMetaClass(type):
 
 
 class ArrayCache(metaclass=ArrayCacheMetaClass):
+    """
+    Thread-safe array data cache. token makes this picklable
+    """
     def __init__(self, token):
         self.token = token
         self.cache = WeakKeyDictionary()
@@ -82,18 +91,27 @@ class ArrayCache(metaclass=ArrayCacheMetaClass):
 
 
 def cached_array(array):
+    """
+    Return a new array that functionally has the same values as array,
+    but flattens the underlying graph and introduces a cache lookup
+    when the individual array chunks are accessed.
+
+    Useful for caching data that can fit in-memory for the duration
+    of the graph's execution.
+    """
     dsk = dict(array.__dask_graph__())
     keys = set(flatten(array.__dask_keys__()))
 
-    # Inline + cull everything except the current array name
+    # Inline + cull everything except the current array
     inline_keys = set(dsk.keys() - keys)
     dsk2 = inline(dsk, inline_keys, inline_constants=True)
     dsk3, _ = cull(dsk2, keys)
 
+    # Create a cache used to store array values
     cache = ArrayCache(uuid.uuid4().hex)
 
     for k in keys:
-        dsk3[k] = (get_cache_entry, cache, Key(k), dsk3.pop(k))
+        dsk3[k] = (cache_entry, cache, Key(k), dsk3.pop(k))
 
     graph = HighLevelGraph.from_collections(array.name, dsk3, [])
 
@@ -101,19 +119,23 @@ def cached_array(array):
 
 
 def inlined_array(a, inline_arrays=None):
+    """ Flatten underlying graph """
+    agraph = a.__dask_graph__()
     akeys = set(flatten(a.__dask_keys__()))
 
-    # Inline arrays
+    # Inline everything except the output keys
     if inline_arrays is None:
-        inline_keys = set(a.__dask_graph__().keys()) - akeys
+        inline_keys = set(agraph.keys()) - akeys
+    # Inline specified array
     elif isinstance(inline_arrays, da.Array):
         inline_keys = set(flatten(inline_arrays.__dask_keys__()))
+    # Inline specified arrays
     elif isinstance(inline_arrays, (tuple, list)):
         inline_keys = set(flatten([a.__dask_keys__() for a in inline_arrays]))
     else:
         raise TypeError("Invalid inline_arrays")
 
-    dsk2 = inline(a.__dask_graph__(), keys=inline_keys, inline_constants=True)
+    dsk2 = inline(agraph, keys=inline_keys, inline_constants=True)
 
     # Remove everything except keys of A
     dsk3, _ = cull(dsk2, akeys)

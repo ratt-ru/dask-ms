@@ -9,7 +9,6 @@ from threading import Lock
 import weakref
 
 from dask.base import normalize_token
-import numpy as np
 import pyrap.tables as pt
 from daskms.table_executor import Executor, STANDARD_EXECUTOR
 from daskms.utils import arg_hasher
