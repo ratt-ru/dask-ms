@@ -1,36 +1,24 @@
 # -*- coding: utf-8 -*-
 
+import gc
+
 from numpy.testing import assert_array_almost_equal
 
 from daskms import xds_from_ms
-from daskms.optimisation import cached_array
+from daskms.optimisation import cached_array, _key_cache, _array_cache_cache
 
 
 def test_cached_array(ms):
-    ds = xds_from_ms(ms, group_cols=[], chunks={'row': 1})[0]
-
-    from pprint import pprint
-    from daskms.optimisation import _key_cache, _array_cache_cache
+    ds = xds_from_ms(ms, group_cols=[], chunks={'row': 1, 'chan': 4})[0]
 
     data = ds.DATA.data
-    print('='*80)
-    pprint(dict(data.__dask_graph__()))
+    assert_array_almost_equal(cached_array(data), data)
 
-    cached_data = cached_array(data)
+    assert len(_key_cache) > 0
+    assert len(_array_cache_cache) > 0
 
-    print('='*80)
-    pprint(dict(cached_data.__dask_graph__()))
-
-    print(len(_key_cache), len(_array_cache_cache))
-
-    assert_array_almost_equal(cached_data, data)
-
-    pprint(dict(_key_cache))
-    pprint(dict(_array_cache_cache))
-
-    del cached_data, data
-    import gc
+    del data, ds
     gc.collect()
 
-    pprint(dict(_key_cache))
-    pprint(dict(_array_cache_cache))
+    assert len(_key_cache) == 0
+    assert len(_array_cache_cache) == 0

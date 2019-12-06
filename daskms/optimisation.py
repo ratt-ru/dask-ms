@@ -82,8 +82,6 @@ class ArrayCache(metaclass=ArrayCacheMetaClass):
 
 
 def cached_array(array):
-    name = '-'.join(('cached', array.name))
-
     dsk = dict(array.__dask_graph__())
     keys = set(flatten(array.__dask_keys__()))
 
@@ -95,9 +93,29 @@ def cached_array(array):
     cache = ArrayCache(uuid.uuid4().hex)
 
     for k in keys:
-        new_key = (name,) + k[1:]
-        dsk3[new_key] = (get_cache_entry, cache, Key(new_key), dsk3.pop(k))
+        dsk3[k] = (get_cache_entry, cache, Key(k), dsk3.pop(k))
 
-    graph = HighLevelGraph.from_collections(name, dsk3, [])
+    graph = HighLevelGraph.from_collections(array.name, dsk3, [])
 
-    return da.Array(graph, name, array.chunks, array.dtype)
+    return da.Array(graph, array.name, array.chunks, array.dtype)
+
+
+def inlined_array(a, inline_arrays=None):
+    akeys = set(flatten(a.__dask_keys__()))
+
+    # Inline arrays
+    if inline_arrays is None:
+        inline_keys = set(a.__dask_graph__().keys()) - akeys
+    elif isinstance(inline_arrays, da.Array):
+        inline_keys = set(flatten(inline_arrays.__dask_keys__()))
+    elif isinstance(inline_arrays, (tuple, list)):
+        inline_keys = set(flatten([a.__dask_keys__() for a in inline_arrays]))
+    else:
+        raise TypeError("Invalid inline_arrays")
+
+    dsk2 = inline(a.__dask_graph__(), keys=inline_keys, inline_constants=True)
+
+    # Remove everything except keys of A
+    dsk3, _ = cull(dsk2, akeys)
+
+    return da.Array(dsk3, a.name, a.chunks, a.dtype)
