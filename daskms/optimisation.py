@@ -15,7 +15,10 @@ _key_cache_lock = Lock()
 
 
 class KeyMetaClass(type):
-    """ Ensures that Key objects are unique """
+    """
+    Ensures that Key identities are the same,
+    given the same constructor arguments
+    """
     def __call__(cls, key):
         with _key_cache_lock:
             try:
@@ -29,7 +32,7 @@ class Key(metaclass=KeyMetaClass):
     """
     Suitable for storing a tuple
     (or other dask key type) in a WeakKeyDictionary.
-    Uniqueness ensured by KeyMetaClass
+    Uniques of key identity guaranteed by KeyMetaClass
     """
     __slots__ = ("key", "__weakref__")
 
@@ -62,6 +65,10 @@ _array_cache_lock = Lock()
 
 
 class ArrayCacheMetaClass(type):
+    """
+    Ensures that Array Cache identities are the same,
+    given the same constructor arguments
+    """
     def __call__(cls, token):
         key = (cls, token)
 
@@ -76,7 +83,9 @@ class ArrayCacheMetaClass(type):
 
 class ArrayCache(metaclass=ArrayCacheMetaClass):
     """
-    Thread-safe array data cache. token makes this picklable
+    Thread-safe array data cache. token makes this picklable.
+
+    Cached on a WeakKeyDictionary with ``Key`` objects.
     """
     def __init__(self, token):
         self.token = token
