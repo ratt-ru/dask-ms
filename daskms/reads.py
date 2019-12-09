@@ -219,8 +219,10 @@ def _dataset_variable_factory(table_proxy, table_schema, select_cols,
         try:
             meta = column_metadata(column, table_proxy, table_schema,
                                    chunks, exemplar_row)
-        except ColumnMetadataError:
-            log.warning("Ignoring column: '%s'", column, exc_info=True)
+        except ColumnMetadataError as e:
+            exc_info = logging.DEBUG >= log.getEffectiveLevel()
+            log.warning("Ignoring '%s': %s", column, e,
+                        exc_info=exc_info)
             continue
 
         full_dims = ("row",) + meta.dims
