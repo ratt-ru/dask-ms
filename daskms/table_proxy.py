@@ -187,7 +187,7 @@ def taql_factory(query, style='Python', tables=[]):
     tables = [t._table_future.result() for t in tables]
 
     for t in tables:
-        t.lock()
+        t.lock(write=False)
 
     try:
         return pt.taql(query, style=style, tables=tables)
