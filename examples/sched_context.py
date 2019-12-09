@@ -17,6 +17,8 @@ def scheduler_context(args):
             dask.config.set(scheduler="threads")
             sched_info = {"type": "threaded"}
         elif args.scheduler in ("mp", "processes", "multiprocessing"):
+            raise ValueError("The Process Scheduler does not currently "
+                             "work with dask-ms")
             import dask.multiprocessing
             logging.info("Using multiprocessing scheduler")
             dask.config.set(scheduler="processes")
