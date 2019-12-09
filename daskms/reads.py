@@ -16,6 +16,7 @@ from daskms.columns import (column_metadata, ColumnMetadataError,
                             dim_extents_array)
 from daskms.ordering import (ordering_taql, row_ordering,
                              group_ordering_taql, group_row_ordering)
+from daskms.optimisation import inlined_array
 from daskms.dataset import Dataset
 from daskms.table_executor import executor_key
 from daskms.table import table_exists
@@ -233,6 +234,7 @@ def _dataset_variable_factory(table_proxy, table_schema, select_cols,
         # In that case, we can getcol, otherwise getcolslice is required
         if not all(len(c) == 1 for c in meta.chunks):
             for d, c in zip(meta.dims, meta.chunks):
+                # Create an array describing the dimension chunk extents
                 args.append(dim_extents_array(d, c))
                 args.append((d,))
 
@@ -258,6 +260,8 @@ def _dataset_variable_factory(table_proxy, table_schema, select_cols,
                                   name=name,
                                   new_axes=new_axes,
                                   dtype=meta.dtype)
+
+        dask_array = inlined_array(dask_array)
 
         # Assign into variable and dimension dataset
         dataset_vars[column] = (full_dims, dask_array)

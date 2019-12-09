@@ -11,6 +11,7 @@ from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 
 from daskms.query import select_clause, groupby_clause, orderby_clause
+from daskms.optimisation import cached_array
 from daskms.table_proxy import TableProxy, taql_factory
 
 
@@ -93,8 +94,10 @@ def row_ordering(taql_proxy, index_cols, chunks):
 
     graph = HighLevelGraph.from_collections(name, layers, [])
     rows = da.Array(graph, name, chunks=chunks, dtype=np.object)
+    rows = cached_array(rows)
     row_runs = rows.map_blocks(row_run_factory, sort_dir="read",
                                dtype=np.object)
+    row_runs = cached_array(row_runs)
 
     return rows, row_runs
 
@@ -140,6 +143,7 @@ def _group_ordering_arrays(taql_proxy, index_cols, group,
 
     graph = HighLevelGraph.from_collections(name, layers, [])
     group_rows = da.Array(graph, name, chunks, dtype=np.int32)
+    group_rows = cached_array(group_rows)
 
     try:
         shape = (group_nrows,)
@@ -158,6 +162,8 @@ def _group_ordering_arrays(taql_proxy, index_cols, group,
     group_rows = group_rows.rechunk(group_row_chunks)
     row_runs = group_rows.map_blocks(row_run_factory, sort_dir="read",
                                      dtype=np.object)
+
+    row_runs = cached_array(row_runs)
 
     return group_rows, row_runs
 

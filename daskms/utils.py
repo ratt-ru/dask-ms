@@ -8,7 +8,25 @@ import logging
 from pathlib import Path
 import time
 
+import numpy as np
+
 log = logging.getLogger(__name__)
+
+
+def arg_hasher(args):
+    """ Recursively hash data structures -- handles list and dicts """
+    if isinstance(args, (tuple, list, set)):
+        return hash(tuple(arg_hasher(v) for v in args))
+    elif isinstance(args, dict):
+        return hash(tuple((k, arg_hasher(v)) for k, v in sorted(args.items())))
+    elif isinstance(args, np.ndarray):
+        # NOTE(sjperkins)
+        # https://stackoverflow.com/a/16592241/1611416
+        # Slowish, but we shouldn't be passing
+        # huge numpy arrays in the TableProxy constructor
+        return hash(args.tostring())
+    else:
+        return hash(args)
 
 
 def promote_columns(columns, default):
