@@ -11,15 +11,17 @@ def scheduler_context(args):
     sched_info = {}
 
     try:
-        if args.scheduler in ("mt", "thread", "threaded", "threading"):
-            import dask.threaded
+        if args.scheduler in ("mt", "thread", "threads",
+                              "threaded", "threading"):
             logging.info("Using multithreaded scheduler")
-            dask.set_options(get=dask.threaded.get)
+            dask.config.set(scheduler="threads")
             sched_info = {"type": "threaded"}
-        elif args.scheduler in ("mp", "multiprocessing"):
+        elif args.scheduler in ("mp", "processes", "multiprocessing"):
+            raise ValueError("The Process Scheduler does not currently "
+                             "work with dask-ms")
             import dask.multiprocessing
             logging.info("Using multiprocessing scheduler")
-            dask.set_options(get=dask.multiprocessing.get)
+            dask.config.set(scheduler="processes")
             sched_info = {"type": "multiprocessing"}
         else:
             import distributed
@@ -39,7 +41,7 @@ def scheduler_context(args):
             logging.info("Using distributed scheduler "
                          "with address '{}'".format(address))
             client = distributed.Client(address)
-            dask.set_options(get=client.get)
+            dask.config.set(scheduler=client)
             client.restart()
             sched_info = {
                 "type": "distributed",

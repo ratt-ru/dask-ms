@@ -1,7 +1,3 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import argparse
 
 import dask
@@ -40,7 +36,7 @@ if __name__ == "__main__":
         # Get the antenna dataset
         ant_ds = list(xds_from_table(table_name['antenna']))
         assert len(ant_ds) == 1
-        ant_ds = ant_ds[0].rename({'row': 'antenna'}).drop('table_row')
+        ant_ds = ant_ds[0].rename({'row': 'antenna'})
 
         # Get datasets for DATA_DESCRIPTION, SPECTRAL_WINDOW
         # POLARIZATION and FIELD, partitioned by row
@@ -59,15 +55,15 @@ if __name__ == "__main__":
         for ms_ds in datasets:
             # Look up the Spectral Window and Polarization
             # datasets, given the Data Descriptor ID
-            field = field_ds[ms_ds.attrs['FIELD_ID']].drop('table_row')
-            ddid = ddid_ds[ms_ds.attrs['DATA_DESC_ID']].drop('table_row')
-            spw = spwds[ddid.SPECTRAL_WINDOW_ID.values].drop('table_row')
-            pol = pds[ddid.POLARIZATION_ID.values].drop('table_row')
+            field = field_ds[ms_ds.attrs['FIELD_ID']]
+            ddid = ddid_ds[ms_ds.attrs['DATA_DESC_ID']]
+            spw = spwds[ddid.SPECTRAL_WINDOW_ID.values[0]]
+            pol = pds[ddid.POLARIZATION_ID.values[0]]
 
             ms_ds = ms_ds.assign(ANTENNA_POSITION=ant_ds.POSITION,
-                                 PHASE_CENTRE=field.PHASE_DIR,
-                                 FREQUENCY=spw.CHAN_FREQ,
-                                 CORRELATION_TYPE=pol.CORR_TYPE,
-                                 CORRELATION_PRODUCT=pol.CORR_PRODUCT)
+                                 PHASE_CENTRE=field.PHASE_DIR[0],
+                                 FREQUENCY=spw.CHAN_FREQ[0],
+                                 CORRELATION_TYPE=pol.CORR_TYPE[0],
+                                 CORRELATION_PRODUCT=pol.CORR_PRODUCT[0])
 
             print(ms_ds)
