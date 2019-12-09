@@ -6,7 +6,7 @@ History
 ------------------
 * Optimise dask graphs produced by dask-ms such that each data access node
   no longer has common ancestors but is instead an independent
-  leaf node. This improves memory usage in case of the `predict
+  root node. This improves memory usage in case of the `predict
   <https://github.com/paoloserra/crystalball/issues/15#issuecomment-563170101>`_.
   (:pr:`75`)
 * Produce write datasets rather a single concatenated dask array
