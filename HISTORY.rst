@@ -4,6 +4,8 @@ History
 
 0.2.3 (YYYY-MM-DD)
 ------------------
+* Only log aggressively when the log level is DEBUG (:pr:`76`)
+* Read-lock TAQL row reference table by default (:pr:`74`)
 * Produce write datasets rather a single concatenated dask array
   (:pr:`70`, :pr:`72`)
 

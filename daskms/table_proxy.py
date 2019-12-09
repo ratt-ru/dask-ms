@@ -4,6 +4,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from itertools import zip_longest
 import logging
 from threading import Lock
 import weakref
@@ -87,8 +88,10 @@ def proxied_method_factory(method, locktype):
             try:
                 return getattr(table_future.result(), method)(*args, **kwargs)
             except Exception:
-                log.exception("Exception in %s", method)
+                if logging.DEBUG >= log.getEffectiveLevel():
+                    log.exception("Exception in %s", method)
                 raise
+
     elif locktype == READLOCK:
         def _impl(table_future, args, kwargs):
             table = table_future.result()
@@ -97,10 +100,12 @@ def proxied_method_factory(method, locktype):
             try:
                 return getattr(table, method)(*args, **kwargs)
             except Exception:
-                log.exception("Exception in %s", method)
+                if logging.DEBUG >= log.getEffectiveLevel():
+                    log.exception("Exception in %s", method)
                 raise
             finally:
                 table.unlock()
+
     elif locktype == WRITELOCK:
         def _impl(table_future, args, kwargs):
             table = table_future.result()
@@ -109,10 +114,12 @@ def proxied_method_factory(method, locktype):
             try:
                 return getattr(table, method)(*args, **kwargs)
             except Exception:
-                log.exception("Exception in %s", method)
+                if logging.DEBUG >= log.getEffectiveLevel():
+                    log.exception("Exception in %s", method)
                 raise
             finally:
                 table.unlock()
+
     else:
         raise ValueError("Invalid locktype %s" % locktype)
 
@@ -166,12 +173,20 @@ class MismatchedLocks(Exception):
     pass
 
 
-def taql_factory(query, style='Python', tables=[]):
+def taql_factory(query, style='Python', tables=(), readonly=True):
     """ Calls pt.taql, converting TableProxy's in tables to pyrap tables """
     tables = [t._table_future.result() for t in tables]
 
-    for t in tables:
-        t.lock()
+    if isinstance(readonly, (tuple, list)):
+        it = zip_longest(tables, readonly[:len(tables)],
+                         fillvalue=readonly[-1])
+    elif isinstance(readonly, bool):
+        it = zip(tables, (readonly,)*len(tables))
+    else:
+        raise TypeError("readonly must be a bool or list of bools")
+
+    for t, ro in it:
+        t.lock(write=ro is False)
 
     try:
         return pt.taql(query, style=style, tables=tables)
@@ -181,12 +196,11 @@ def taql_factory(query, style='Python', tables=[]):
 
 
 def _nolock_runner(table_future, fn, args, kwargs):
-    table = table_future.result()
-
     try:
-        return fn(table, *args, **kwargs)
+        return fn(table_future.result(), *args, **kwargs)
     except Exception:
-        log.exception("Exception in %s:", fn)
+        if logging.DEBUG >= log.getEffectiveLevel():
+            log.exception("Exception in %s", fn.__name__)
         raise
 
 
@@ -197,7 +211,8 @@ def _readlock_runner(table_future, fn, args, kwargs):
     try:
         return fn(table, *args, **kwargs)
     except Exception:
-        log.exception("Exception in %s:", fn)
+        if logging.DEBUG >= log.getEffectiveLevel():
+            log.exception("Exception in %s", fn.__name__)
         raise
     finally:
         table.unlock()
@@ -211,7 +226,8 @@ def _writelock_runner(table_future, fn, args, kwargs):
         result = fn(table, *args, **kwargs)
         table.flush()
     except Exception:
-        log.exception("Exception in %s:", fn)
+        if logging.DEBUG >= log.getEffectiveLevel():
+            log.exception("Exception in %s", fn.__name__)
         raise
     else:
         return result
