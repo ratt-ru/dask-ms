@@ -139,3 +139,38 @@ def test_proxy_dask_embedding(ms):
 
     # Cache's are now clear
     assert_liveness(0, 0)
+
+
+# TODO(sjperkins)
+# Figure out some way to figure out if actual read/write locking
+# is performed on the dependent tables in the query.
+# This really just tests
+# that the cases produce the right results.
+# This isn't likely a big deal as the taql_factory readonly kwarg
+# exists to fix https://github.com/ska-sa/dask-ms/issues/73
+@pytest.mark.parametrize("readonly", [
+    # Boolean version
+    True,
+    False,
+    # Single value, gets expanded
+    [True],
+    [False],
+    # Double values
+    [True, False],
+    [True, True],
+    # Too many values, truncated
+    [True, False, True],
+])
+def test_taql_factory(ms, ant_table, readonly):
+    """ Test that we can do a somewhat complicated taql query """
+    ms_proxy = TableProxy(pt.table, ms, ack=False, readonly=True)
+    ant_proxy = TableProxy(pt.table, ant_table, ack=False, readonly=True)
+    query = "SELECT [SELECT NAME FROM $2][ANTENNA1] AS NAME FROM $1 "
+    taql_proxy = TableProxy(taql_factory, query, tables=[ms_proxy, ant_proxy],
+                            readonly=readonly)
+
+    ant1 = ms_proxy.getcol("ANTENNA1").result()
+    actual_ant_row_names = taql_proxy.getcol("NAME").result()
+    expected_ant_row_names = ['ANTENNA-%d' % i for i in ant1]
+
+    assert_array_equal(actual_ant_row_names, expected_ant_row_names)
