@@ -2,7 +2,7 @@
 History
 =======
 
-0.2.3 (YYYY-MM-DD)
+0.2.3 (2019-12-09)
 ------------------
 * Remove \_\_future\_\_ import (:pr:`79`)
 * Update examples (:pr:`78`)
