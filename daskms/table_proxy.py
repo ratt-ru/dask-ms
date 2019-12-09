@@ -4,6 +4,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from itertools import zip_longest
 import logging
 from threading import Lock
 import weakref
@@ -182,12 +183,20 @@ class MismatchedLocks(Exception):
     pass
 
 
-def taql_factory(query, style='Python', tables=[]):
+def taql_factory(query, style='Python', tables=(), readonly=True):
     """ Calls pt.taql, converting TableProxy's in tables to pyrap tables """
     tables = [t._table_future.result() for t in tables]
 
-    for t in tables:
-        t.lock(write=False)
+    if isinstance(readonly, (tuple, list)):
+        it = zip_longest(tables, readonly[:len(tables)],
+                         fillvalue=readonly[-1])
+    elif isinstance(readonly, bool):
+        it = zip(tables, (readonly,)*len(tables))
+    else:
+        raise TypeError("readonly must be a bool or list of bools")
+
+    for t, ro in it:
+        t.lock(write=ro is False)
 
     try:
         return pt.taql(query, style=style, tables=tables)
