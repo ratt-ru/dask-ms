@@ -88,8 +88,10 @@ def proxied_method_factory(method, locktype):
             try:
                 return getattr(table_future.result(), method)(*args, **kwargs)
             except Exception:
-                log.exception("Exception in %s", method)
+                if logging.DEBUG >= log.getEffectiveLevel():
+                    log.exception("Exception in %s", method)
                 raise
+
     elif locktype == READLOCK:
         def _impl(table_future, args, kwargs):
             table = table_future.result()
@@ -98,10 +100,12 @@ def proxied_method_factory(method, locktype):
             try:
                 return getattr(table, method)(*args, **kwargs)
             except Exception:
-                log.exception("Exception in %s", method)
+                if logging.DEBUG >= log.getEffectiveLevel():
+                    log.exception("Exception in %s", method)
                 raise
             finally:
                 table.unlock()
+
     elif locktype == WRITELOCK:
         def _impl(table_future, args, kwargs):
             table = table_future.result()
@@ -110,10 +114,12 @@ def proxied_method_factory(method, locktype):
             try:
                 return getattr(table, method)(*args, **kwargs)
             except Exception:
-                log.exception("Exception in %s", method)
+                if logging.DEBUG >= log.getEffectiveLevel():
+                    log.exception("Exception in %s", method)
                 raise
             finally:
                 table.unlock()
+
     else:
         raise ValueError("Invalid locktype %s" % locktype)
 
@@ -206,12 +212,11 @@ def taql_factory(query, style='Python', tables=(), readonly=True):
 
 
 def _nolock_runner(table_future, fn, args, kwargs):
-    table = table_future.result()
-
     try:
-        return fn(table, *args, **kwargs)
+        return fn(table_future.result(), *args, **kwargs)
     except Exception:
-        log.exception("Exception in %s:", fn)
+        if logging.DEBUG >= log.getEffectiveLevel():
+            log.exception("Exception in %s", fn.__name__)
         raise
 
 
@@ -222,7 +227,8 @@ def _readlock_runner(table_future, fn, args, kwargs):
     try:
         return fn(table, *args, **kwargs)
     except Exception:
-        log.exception("Exception in %s:", fn)
+        if logging.DEBUG >= log.getEffectiveLevel():
+            log.exception("Exception in %s", fn.__name__)
         raise
     finally:
         table.unlock()
@@ -236,7 +242,8 @@ def _writelock_runner(table_future, fn, args, kwargs):
         result = fn(table, *args, **kwargs)
         table.flush()
     except Exception:
-        log.exception("Exception in %s:", fn)
+        if logging.DEBUG >= log.getEffectiveLevel():
+            log.exception("Exception in %s", fn.__name__)
         raise
     else:
         return result
