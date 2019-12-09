@@ -5,6 +5,11 @@ History
 0.2.3 (YYYY-MM-DD)
 ------------------
 * Only log aggressively when the log level is DEBUG (:pr:`76`)
+* Optimise dask graphs produced by dask-ms such that each data access node
+  no longer has common ancestors but is instead an independent
+  root node. This improves memory usage in case of the `predict
+  <https://github.com/paoloserra/crystalball/issues/15#issuecomment-563170101>`_.
+  (:pr:`75`)
 * Read-lock TAQL row reference table by default (:pr:`74`)
 * Produce write datasets rather a single concatenated dask array
   (:pr:`70`, :pr:`72`)
