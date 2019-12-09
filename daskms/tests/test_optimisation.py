@@ -18,9 +18,14 @@ from daskms.optimisation import (inlined_array,
                                  _array_cache_cache)
 
 
-def test_identity():
+def test_optimisation_identity():
+    # Test identity
     assert Key((0, 1, 2)) is Key((0, 1, 2))
     assert ArrayCache(1) is ArrayCache(1)
+
+    # Test pickling
+    assert pickle.loads(pickle.dumps(Key((0, 1, 2)))) is Key((0, 1, 2))
+    assert pickle.loads(pickle.dumps(ArrayCache(1))) is ArrayCache(1)
 
 
 def test_inlined_array():
