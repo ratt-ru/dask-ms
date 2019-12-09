@@ -4,6 +4,7 @@ History
 
 0.2.3 (YYYY-MM-DD)
 ------------------
+* Remove \_\_future\_\_ import (:pr:`79`)
 * Update examples (:pr:`78`)
 * Only log aggressively when the log level is DEBUG (:pr:`76`)
 * Optimise dask graphs produced by dask-ms such that each data access node

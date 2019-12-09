@@ -1,9 +1,5 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 
 from daskms.descriptors.builder import register_descriptor_builder
 from daskms.descriptors.ms import MSDescriptorBuilder
