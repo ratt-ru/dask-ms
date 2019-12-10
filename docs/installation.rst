@@ -51,7 +51,25 @@ The full list of packages are available here:
 - https://github.com/casacore/casacore#requirements
 - https://github.com/casacore/python-casacore#from-source
 
-casacore Measures data
-~~~~~~~~~~~~~~~~~~~~~~
+Updating casacore Measures data
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Please complete me
+python-casacore wraps an internal casacore Measurement system that is used
+to relate astronomical objects to each other in space and time.
+Measures data is frequently updated and casacore/python-casacore
+will complain if it is out of date.
+
+The measures data can be downloaded at the location specified here:
+
+- https://github.com/casacore/casacore#obtaining-measures-data
+
+Uncompress the measures data to some appropriate location, such
+as ``~/opt/casacore/data`` and point your python-casacore installation
+to it by creating a ``.casarc`` file in your home directory
+with the following contents:
+
+.. code-block::
+
+    measures.directory: ~/opt/casacore/data/
+
+
