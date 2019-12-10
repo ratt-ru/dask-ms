@@ -68,7 +68,7 @@ as ``~/opt/casacore/data`` and point your python-casacore installation
 to it by creating a ``.casarc`` file in your home directory
 with the following contents:
 
-.. code-block::
+.. code-block:: ini
 
     measures.directory: ~/opt/casacore/data/
 
