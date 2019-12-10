@@ -4,7 +4,7 @@ History
 
 0.2.4 (YYYY-MM-DD)
 ------------------
-* Document python-casacore install process (:pr:`80`)
+* Document python-casacore install process (:pr:`80`, :pr:`81`)
 
 0.2.3 (2019-12-09)
 ------------------
