@@ -2,6 +2,10 @@
 History
 =======
 
+0.2.4 (YYYY-MM-DD)
+------------------
+* Document python-casacore install process (:pr:`80`)
+
 0.2.3 (2019-12-09)
 ------------------
 * Remove \_\_future\_\_ import (:pr:`79`)
