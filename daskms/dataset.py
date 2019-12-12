@@ -15,7 +15,7 @@ import numpy as np
 try:
     import xarray as xr
 except ImportError:
-    xr is None
+    xr = None
 
 
 # This class duplicates xarray's Frozen class in
