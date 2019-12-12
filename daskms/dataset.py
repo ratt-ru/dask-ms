@@ -12,6 +12,11 @@ import dask.array as da
 from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 
+try:
+    import xarray as xr
+except ImportError:
+    xr = None
+
 
 # This class duplicates xarray's Frozen class in
 # https://github.com/pydata/xarray/blob/master/xarray/core/utils.py
@@ -196,6 +201,9 @@ def _convert_to_variable(k, v):
     """ Converts ``v`` to a :class:`daskms.dataset.Variable` """
     if isinstance(v, Variable):
         return v
+
+    if xr and isinstance(v, (xr.DataArray, xr.Variable)):
+        return as_variable((v.dims, v.data, v.attrs))
 
     if not isinstance(v, (tuple, list)):
         raise ValueError("'%s' must be a size 2 to 5 tuple of the form"

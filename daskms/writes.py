@@ -473,6 +473,10 @@ def _write_datasets(table, table_proxy, datasets, columns, descriptor,
                 full_dims = variable.dims
                 array = variable.data
 
+            if not isinstance(array, da.Array):
+                raise TypeError("%s on dataset %d is not a dask Array "
+                                "but a %s" % (column, di, type(array)))
+
             args = [row_order, ("row",)]
 
             # We only need to pass in dimension extent arrays if
