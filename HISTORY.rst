@@ -4,6 +4,8 @@ History
 
 0.2.4 (YYYY-MM-DD)
 ------------------
+* Re-introduce xarray handling in dataset.as_variable (:pr:`83`)
+* Explicitly require dask Arrays on write datasets (:pr:`83`)
 * Document python-casacore install process (:pr:`80`, :pr:`81`)
 
 0.2.3 (2019-12-09)
