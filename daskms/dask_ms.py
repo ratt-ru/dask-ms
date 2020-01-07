@@ -117,16 +117,17 @@ def xds_to_table(xds, table_name, columns, descriptor=None,
                             column_keywords=column_keywords,
                             table_proxy=table_proxy)
 
+    # No xarray available assume dask datasets
+    if xr is None:
+        return out_ds
+
+    # Unpack table proxy if it was requested
     if table_proxy is True:
         assert isinstance(out_ds, tuple)
         out_ds, tp = out_ds
         assert isinstance(tp, TableProxy)
     else:
         tp = None
-
-    # No xarray available assume dask datasets
-    if xr is None:
-        return out_ds
 
     if isinstance(out_ds, Dataset):
         out_ds = [out_ds]
@@ -155,6 +156,7 @@ def xds_to_table(xds, table_name, columns, descriptor=None,
     elif len(xformed_out_ds) == 1:
         xformed_out_ds = xformed_out_ds[0]
 
+    # Repack the Table Proxy
     if table_proxy is True:
         return xformed_out_ds, tp
 
