@@ -574,5 +574,3 @@ def write_datasets(table, datasets, columns, descriptor=None,
         return write_datasets, tp
 
     return write_datasets
-
-
