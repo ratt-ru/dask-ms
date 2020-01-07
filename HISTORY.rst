@@ -4,6 +4,7 @@ History
 
 0.2.4 (YYYY-MM-DD)
 ------------------
+* Optionally expose TableProxy objects in dataset read/write methods (:pr:`85`)
 * Upgrade to python-casacore 3.2 (:pr:`84`)
 * Re-introduce xarray handling in dataset.as_variable (:pr:`83`)
 * Explicitly require dask Arrays on write datasets (:pr:`83`)
