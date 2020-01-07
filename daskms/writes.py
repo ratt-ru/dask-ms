@@ -545,7 +545,8 @@ def _put_keywords(table, table_keywords, column_keywords):
 
 
 def write_datasets(table, datasets, columns, descriptor=None,
-                   table_keywords=None, column_keywords=None):
+                   table_keywords=None, column_keywords=None,
+                   table_proxy=False):
     # Promote datasets to list
     if isinstance(datasets, tuple):
         datasets = list(datasets)
@@ -560,11 +561,18 @@ def write_datasets(table, datasets, columns, descriptor=None,
             columns = list(sorted(set.union(*columns)))
 
     if not table_exists(table):
-        table_proxy = _create_table(table, datasets, columns, descriptor)
+        tp = _create_table(table, datasets, columns, descriptor)
     else:
-        table_proxy = _updated_table(table, datasets, columns, descriptor)
+        tp = _updated_table(table, datasets, columns, descriptor)
 
-    return _write_datasets(table, table_proxy, datasets, columns,
-                           descriptor=descriptor,
-                           table_keywords=table_keywords,
-                           column_keywords=column_keywords)
+    write_datasets = _write_datasets(table, tp, datasets, columns,
+                                     descriptor=descriptor,
+                                     table_keywords=table_keywords,
+                                     column_keywords=column_keywords)
+
+    if table_proxy:
+        return write_datasets, tp
+
+    return write_datasets
+
+

@@ -9,6 +9,7 @@ except ImportError:
     xr = None
 
 from daskms.dataset import Dataset
+from daskms.table_proxy import TableProxy
 from daskms.reads import DatasetFactory
 from daskms.writes import write_datasets
 from daskms.utils import promote_columns
@@ -20,7 +21,8 @@ log = logging.getLogger(__name__)
 
 
 def xds_to_table(xds, table_name, columns, descriptor=None,
-                 table_keywords=None, column_keywords=None):
+                 table_keywords=None, column_keywords=None,
+                 table_proxy=False):
     """
     Generates a list of Datasets representing a write operations from the
     specified arrays in :class:`xarray.Dataset`'s into
@@ -64,11 +66,16 @@ def xds_to_table(xds, table_name, columns, descriptor=None,
         column keywords.
         The operation is performed immediately, not lazily.
 
+    table_proxy : {False, True}
+        If True returns the table_proxy
+
     Returns
     -------
     write_datasets : list of :class:`xarray.Dataset`
         Datasets containing arrays representing write operations
         into a CASA Table
+    table_proxy : :class:`daskms.TableProxy`, optional
+        The Table Proxy associated with the datasets
     """
 
     # Promote dataset to a list
@@ -107,7 +114,15 @@ def xds_to_table(xds, table_name, columns, descriptor=None,
     out_ds = write_datasets(table_name, datasets, columns,
                             descriptor=descriptor,
                             table_keywords=table_keywords,
-                            column_keywords=column_keywords)
+                            column_keywords=column_keywords,
+                            table_proxy=table_proxy)
+
+    if table_proxy is True:
+        assert isinstance(out_ds, tuple)
+        out_ds, tp = out_ds
+        assert isinstance(tp, TableProxy)
+    else:
+        tp = None
 
     # No xarray available assume dask datasets
     if xr is None:
@@ -138,7 +153,10 @@ def xds_to_table(xds, table_name, columns, descriptor=None,
     if len(xformed_out_ds) == 0:
         return xr.Dataset()
     elif len(xformed_out_ds) == 1:
-        return xformed_out_ds[0]
+        xformed_out_ds = xformed_out_ds[0]
+
+    if table_proxy is True:
+        return xformed_out_ds, tp
 
     return xformed_out_ds
 
@@ -248,6 +266,9 @@ def xds_from_table(table_name, columns=None,
         If True return keywords for each column on the table
         Changes return type of the function into a tuple
 
+    table_proxy : {False, True}, optional
+        If True returns the Table Proxy associated with the Dataset
+
     taql_where : str, optional
         TAQL where clause. For example, to exclude auto-correlations
 
@@ -271,9 +292,12 @@ def xds_from_table(table_name, columns=None,
     datasets : list of :class:`xarray.Dataset`
         datasets for each group, each ordered by indexing columns
     table_keywords : dict, optional
-        Returned if ``table_keywords==True``
+        Returned if ``table_keywords is True``
     column_keywords : dict, optional
-        return if ``column_keywords==True``
+        Returned if ``column_keywords is True``
+    table_proxy : :class:`daskms.TableProxy`, optional
+        Returned if ``table_proxy is True``
+
 
     """
     columns = promote_columns(columns, [])
