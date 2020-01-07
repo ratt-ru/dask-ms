@@ -8,6 +8,11 @@ from daskms.example_data import example_ms
 from daskms.table_proxy import TableProxy
 from daskms import xds_to_table, xds_from_ms
 
+try:
+    from xarray import Dataset
+except ImportError:
+    from daskms.dataset import Dataset
+
 
 @pytest.fixture(scope='module')
 def keyword_ms():
@@ -48,6 +53,7 @@ def test_read_keywords(keyword_ms, table_kw, column_kw, table_proxy):
         if table_proxy is True:
             tp = ret[ret_pos]
             assert isinstance(tp, TableProxy)
+            assert tp.nrows().result() == 10
 
             ret_pos += 1
     else:
@@ -62,6 +68,7 @@ def test_write_keywords(ms):
 
     # Add to table keywords
     writes = xds_to_table([], ms, [], table_keywords={'bob': 'qux'})
+    assert isinstance(writes, Dataset)
     dask.compute(writes)
 
     with pt.table(ms, ack=False, readonly=True) as T:
@@ -70,6 +77,7 @@ def test_write_keywords(ms):
     # Add to column keywords
     writes = xds_to_table(datasets, ms, [],
                           column_keywords={'STATE_ID': {'bob': 'qux'}})
+    assert isinstance(writes, list) and isinstance(writes[0], Dataset)
     dask.compute(writes)
 
     with pt.table(ms, ack=False, readonly=True) as T:
@@ -80,6 +88,7 @@ def test_write_keywords(ms):
     writes = xds_to_table(datasets, ms, [],
                           table_keywords={'bob': DELKW},
                           column_keywords={'STATE_ID': {'bob': DELKW}})
+    assert isinstance(writes, list) and isinstance(writes[0], Dataset)
     dask.compute(writes)
 
     with pt.table(ms, ack=False, readonly=True) as T:
@@ -90,10 +99,11 @@ def test_write_keywords(ms):
 def test_write_table_proxy_keyword(ms):
     datasets = xds_from_ms(ms)
 
-    # Add to table keywords
+    # Test that we get a TableProxy if requested
     writes, tp = xds_to_table(datasets, ms, [], table_proxy=True)
+    assert isinstance(writes, list) and isinstance(writes[0], Dataset)
     assert isinstance(tp, TableProxy)
-    dask.compute(writes)
+    assert tp.nrows().result() == 10
 
     writes = xds_to_table(datasets, ms, [], table_proxy=False)
-    dask.compute(writes)
+    assert isinstance(writes, list) and isinstance(writes[0], Dataset)
