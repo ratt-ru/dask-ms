@@ -20,7 +20,7 @@ def keyword_ms():
 @pytest.mark.parametrize("table_kw", [True, False])
 @pytest.mark.parametrize("column_kw", [True, False])
 @pytest.mark.parametrize("table_proxy", [True, False])
-def test_keyword_read(keyword_ms, table_kw, column_kw, table_proxy):
+def test_read_keywords(keyword_ms, table_kw, column_kw, table_proxy):
     # Create an example MS
     with pt.table(keyword_ms, ack=False, readonly=True) as T:
         desc = T._getdesc(actual=True)
@@ -57,7 +57,7 @@ def test_keyword_read(keyword_ms, table_kw, column_kw, table_proxy):
         assert isinstance(ret, list)
 
 
-def test_keyword_write(ms):
+def test_write_keywords(ms):
     datasets = xds_from_ms(ms)
 
     # Add to table keywords
@@ -87,10 +87,13 @@ def test_keyword_write(ms):
         assert 'bob' not in T.getcolkeywords("STATE_ID")
 
 
-def test_table_proxy_keywords(ms):
+def test_write_table_proxy_keyword(ms):
     datasets = xds_from_ms(ms)
 
     # Add to table keywords
     writes, tp = xds_to_table(datasets, ms, [], table_proxy=True)
     assert isinstance(tp, TableProxy)
+    dask.compute(writes)
+
+    writes = xds_to_table(datasets, ms, [], table_proxy=False)
     dask.compute(writes)
