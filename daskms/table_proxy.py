@@ -235,6 +235,14 @@ def _iswriteable(table_future):
     return table_future.result().iswritable()
 
 
+def _table_close(table_future):
+    table_future.result().close()
+
+
+def _finaliser(ex, table_future):
+    ex.add_finaliser(_table_close, table_future)
+
+
 class TableProxy(object, metaclass=TableProxyMetaClass):
     """
     Proxies calls to a :class:`pyrap.tables.table` object via
@@ -276,6 +284,8 @@ class TableProxy(object, metaclass=TableProxyMetaClass):
 
         ex = Executor(key=self._ex_key)
         self._table_future = table = ex.impl.submit(factory, *args, **kwargs)
+
+        weakref.finalize(self, _finaliser, ex, table)
 
         # Store a reference to the Executor wrapper class
         # so that the Executor is retained while this TableProxy
