@@ -4,6 +4,7 @@ History
 
 0.2.4 (YYYY-MM-DD)
 ------------------
+* Pickle Executor key argument (:pr:`88`)
 * Deprecate Python 3.5 support and test on Python 3.7 (:pr:`87`)
 * Optionally expose TableProxy objects in dataset read/write methods (:pr:`85`)
 * Upgrade to python-casacore 3.2 (:pr:`84`)
