@@ -240,7 +240,7 @@ def _table_close(table_future):
 
 
 def _finaliser(ex, table_future):
-    ex.add_finaliser(_table_close, table_future)
+    ex.impl.submit(_table_close, table_future)
 
 
 class TableProxy(object, metaclass=TableProxyMetaClass):
@@ -282,15 +282,14 @@ class TableProxy(object, metaclass=TableProxyMetaClass):
         kwargs = kwargs.copy()
         self._ex_key = kwargs.pop("__executor_key__", STANDARD_EXECUTOR)
 
-        ex = Executor(key=self._ex_key)
+        # Store a reference to the Executor wrapper class
+        # so that the Executor is retained while this TableProxy
+        # still lives
+        self._ex_wrapper = ex = Executor(key=self._ex_key)
         self._table_future = table = ex.impl.submit(factory, *args, **kwargs)
 
         weakref.finalize(self, _finaliser, ex, table)
 
-        # Store a reference to the Executor wrapper class
-        # so that the Executor is retained while this TableProxy
-        # still lives
-        self._ex_wrapper = ex
         # Reference to the internal ThreadPoolExecutor
         self._ex = ex.impl
 

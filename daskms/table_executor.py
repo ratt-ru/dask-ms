@@ -30,31 +30,15 @@ class ExecutorMetaClass(type):
                 return instance
 
 
-def _finalise(tpe, lock, finalisers):
-    with lock:
-        cf.wait([tpe.submit(fn, *args, **kwargs) for
-                 (fn, args, kwargs) in finalisers])
-        tpe.shutdown(wait=True)
-
-
 class Executor(object, metaclass=ExecutorMetaClass):
     def __init__(self, key=STANDARD_EXECUTOR):
         # Initialise a single thread
         self.impl = impl = cf.ThreadPoolExecutor(1)
         self.key = key
-        self.lock = lock = Lock()
-        self.finalisers = finalisers = []
 
         # Register a finaliser shutting down the
         # ThreadPoolExecutor on garbage collection
-        weakref.finalize(self, _finalise, impl, lock, finalisers)
-
-    def add_finaliser(self, fn, *args, **kwargs):
-        with self.lock:
-            self.finalisers.append((fn, args, kwargs))
-
-    def shutdown(self, *args, **kwargs):
-        return self.impl.shutdown(*args, **kwargs)
+        weakref.finalize(self, impl.shutdown, wait=True)
 
     def __reduce__(self):
         return (Executor, (self.key,))
