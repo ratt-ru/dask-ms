@@ -57,6 +57,7 @@ def test_executor_keys():
 
     assert len(_executor_cache) == 0
 
+
 @pytest.mark.parametrize("key, result", [
     ('/home/moriarty/test.ms/', '/home/moriarty/test.ms'),
     ('/home/moriarty/test.ms', '/home/moriarty/test.ms'),
