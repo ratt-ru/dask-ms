@@ -59,7 +59,7 @@ class Executor(object, metaclass=ExecutorMetaClass):
         return self.impl.shutdown(*args, **kwargs)
 
     def __reduce__(self):
-        return (Executor, ())
+        return (Executor, (self.key,))
 
     def __repr__(self):
         return "Executor(%s)" % self.key

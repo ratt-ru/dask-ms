@@ -39,6 +39,24 @@ def test_executor():
     assert len(_executor_cache) == 0
 
 
+def test_executor_keys():
+    """ Test executor keys """
+    ex = Executor("foo")
+    ex2 = Executor("bar")
+    ex3 = Executor("foo")
+    ex4 = Executor()
+
+    assert len(_executor_cache) == 3
+
+    assert ex is not ex2
+    assert ex is ex3
+    assert pickle.loads(pickle.dumps(ex)) is ex3
+    assert pickle.loads(pickle.dumps(ex2)) is not ex3
+
+    del ex, ex2, ex3, ex4
+
+    assert len(_executor_cache) == 0
+
 @pytest.mark.parametrize("key, result", [
     ('/home/moriarty/test.ms/', '/home/moriarty/test.ms'),
     ('/home/moriarty/test.ms', '/home/moriarty/test.ms'),
