@@ -30,30 +30,16 @@ class ExecutorMetaClass(type):
                 return instance
 
 
-def executor_delete_reference(ex, threadpool_executor):
-    # http://pydev.blogspot.com/2015/01/creating-safe-cyclic-reference.html
-    # To avoid cyclic references, ex may not be used within _callback
-    def _callback(ref):
-        # This is possibly a bad idea because the ThreadPoolExecutor
-        # puts None on queues to signal to threads that they should
-        # exit. However, if the callback is called, nothing should be
-        # referring to the executor anymore so it should be OK (TM).
-        # For more information, please reread:
-        # https://codewithoutrules.com/2017/08/16/concurrency-python/
-        try:
-            threadpool_executor.shutdown(wait=True)
-        except Exception as e:
-            print("Error shutting down executor: %s" % str(e))
-
-    return weakref.ref(ex, _callback)
-
-
 class Executor(object, metaclass=ExecutorMetaClass):
     def __init__(self, key=STANDARD_EXECUTOR):
         # Initialise a single thread
         self.impl = impl = cf.ThreadPoolExecutor(1)
         self.key = key
-        self.__del_ref = executor_delete_reference(self, impl)
+        self.final_tasks = []
+
+        # Register a finalizer shutting down the
+        # ThreadPoolExecutor on garbage collection
+        weakref.finalize(self, impl.shutdown, wait=True)
 
     def shutdown(self, *args, **kwargs):
         return self.impl.shutdown(*args, **kwargs)
