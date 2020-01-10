@@ -12,9 +12,9 @@ WORKDIR /code
 # Test without xarray
 RUN python3.6 -m pip install .[testing]
 RUN python3.6 -m pip freeze
-RUN python3.6 -m pytest --flake8 -s -vvv /code/africanus
+RUN python3.6 -m pytest --flake8 -s -vvv /code/daskms
 
 # Test with xarray
 RUN python3.6 -m pip install .[testing, xarray]
 RUN python3.6 -m pip freeze
-RUN python3.6 -m pytest --flake8 -s -vvv /code/africanus
+RUN python3.6 -m pytest --flake8 -s -vvv /code/daskms
