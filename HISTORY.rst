@@ -4,6 +4,7 @@ History
 
 0.2.4 (YYYY-MM-DD)
 ------------------
+* Deprecate Python 3.5 support and test on Python 3.7 (:pr:`87`)
 * Optionally expose TableProxy objects in dataset read/write methods (:pr:`85`)
 * Upgrade to python-casacore 3.2 (:pr:`84`)
 * Re-introduce xarray handling in dataset.as_variable (:pr:`83`)

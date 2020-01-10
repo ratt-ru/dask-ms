@@ -53,5 +53,5 @@ setup(name='dask-ms',
       author='Simon Perkins',
       author_email='sperkins@ska.ac.za',
       packages=find_packages(),
-      python_requires=">=3.5",
+      python_requires=">=3.6",
       zip_safe=True)
