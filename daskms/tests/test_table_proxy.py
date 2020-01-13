@@ -182,7 +182,9 @@ R     R      R          D           I          I        X1,0
 """)  # noqa
 
 
-def test_proxy_finalization(tmpdir_factory):
+@pytest.mark.parametrize("epochs", [10])
+@pytest.mark.parametrize("iterations", [10])
+def test_proxy_finalization(tmpdir_factory, epochs, iterations):
     """
     Test that we can create many TableProxy objects
     associated with multiple Executors
@@ -203,11 +205,10 @@ def test_proxy_finalization(tmpdir_factory):
         return tp.result().getcol(column)
 
     with cf.ThreadPoolExecutor(8) as pool:
-        # Epoch
-        for e in range(5):
+        for e in range(epochs):
             # Iteration
-            for i in range(10):
-                path = data_path.join("CASA-%d.table" % i)
+            for i in range(iterations):
+                path = data_path.join("CASA-%d-%d.table" % (e, i))
 
                 tab_fut = pool.submit(TableProxy, pt.tablefromascii,
                                       str(path), str(ascii_desc), ack=False,
