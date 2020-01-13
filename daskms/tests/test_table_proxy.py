@@ -5,6 +5,8 @@ try:
 except ImportError:
     import pickle
 
+import concurrent.futures as cf
+
 from dask.base import tokenize
 from dask.highlevelgraph import HighLevelGraph
 import dask.array as da
@@ -170,3 +172,52 @@ def test_taql_factory(ms, ant_table, readonly):
     expected_ant_row_names = ['ANTENNA-%d' % i for i in ant1]
 
     assert_array_equal(actual_ant_row_names, expected_ant_row_names)
+
+
+ASCII_TABLE = (
+"""U     V      W         TIME        ANT1       ANT2      DATA
+R     R      R          D           I          I        X1,0
+124.011 54560.0  3477.1  43456789.0990    1      2        4.327 -0.1132
+34561.0 45629.3  3900.5  43456789.0990    1      3        5.398 0.4521
+""")  # noqa
+
+
+def test_proxy_finalization(tmpdir_factory):
+    """
+    Test that we can create many TableProxy objects
+    associated with multiple Executors
+    in multiple threads, get some data and that
+    they, as well as their associated executor are
+    correctly finalized
+    """
+
+    data_path = tmpdir_factory.mktemp('data')
+    ascii_desc = data_path.join('ascii.txt')
+
+    with open(str(ascii_desc), 'w') as f:
+        f.write(ASCII_TABLE)
+
+    futures = []
+
+    def _getcol(tp, column):
+        return tp.result().getcol(column)
+
+    with cf.ThreadPoolExecutor(8) as pool:
+        # Epoch
+        for e in range(5):
+            # Iteration
+            for i in range(10):
+                path = data_path.join("CASA-%d.table" % i)
+
+                tab_fut = pool.submit(TableProxy, pt.tablefromascii,
+                                      str(path), str(ascii_desc), ack=False,
+                                      __executor_key__="epoch-%d" % i)
+                data = pool.submit(_getcol, tab_fut, "DATA")
+                u = pool.submit(_getcol, tab_fut, "U")
+                futures.append(data)
+            futures.append(u)
+
+        futures, _ = cf.wait(futures)
+
+    del futures, data, u, tab_fut
+    assert_liveness(0, 0)

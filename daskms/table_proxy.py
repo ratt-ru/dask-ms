@@ -239,6 +239,16 @@ def _table_close(table_future):
     table_future.result().close()
 
 
+# This finalizer submits the table closing operation
+# on the Executor associated with the TableProxy
+# Note that this operation **must** happen before
+# shutdown is called on the Executor's internal
+# ThreadPoolExecutor object or deadlock can occur
+# See https://codewithoutrules.com/2017/08/16/concurrency-python/
+# for further insight.
+# The fact that the Executor is an argument to weakref.finalize implies
+# that the Executor's finalizer, and by further implication,
+# the ThreadPoolExecutor.shutdown has not yet been called.
 def _finaliser(ex, table_future):
     ex.impl.submit(_table_close, table_future)
 
