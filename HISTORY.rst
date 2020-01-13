@@ -4,6 +4,7 @@ History
 
 0.2.4 (YYYY-MM-DD)
 ------------------
+* Use weakref.finalize to cleanup TableProxy and Executor objects (:pr:`89`)
 * Pickle Executor key argument (:pr:`88`)
 * Deprecate Python 3.5 support and test on Python 3.7 (:pr:`87`)
 * Optionally expose TableProxy objects in dataset read/write methods (:pr:`85`)

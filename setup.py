@@ -6,12 +6,12 @@ except ImportError as e:
     raise ImportError("%s\nPlease install setuptools." % e)
 
 extras_require = {
-    'xarray': ["xarray > 0.12.0; python_version >= '3.5'"],
+    'xarray': ["xarray > 0.12.0"],
     'testing': ['pytest', 'pytest-flake8']
 }
 
 install_requires = [
-    "dask[array] >= 2.2.0; python_version >= '3.5'",
+    "dask[array] >= 2.2.0",
 ]
 
 # ==================
