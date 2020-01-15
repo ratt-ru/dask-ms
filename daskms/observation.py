@@ -160,6 +160,7 @@ def synthesize_uvw(antenna_positions, time, phase_dir,
             ant_uvw[ai] = dm.to_uvw(bl)["xyz"].get_value()[0:3]
 
         # Now calculate baseline UVW positions
+        # noting that ant1 - ant2 is the CASA convention
         base = ti*nbl
         uvw[base:base + nbl, :] = ant_uvw[ant1] - ant_uvw[ant2]
 
