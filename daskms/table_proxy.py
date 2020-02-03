@@ -40,6 +40,7 @@ _proxied_methods = [
     ("addcols", WRITELOCK),
     # Reads
     ("getcol", READLOCK),
+    ("getcolslice", READLOCK),
     ("getcolnp", READLOCK),
     ("getvarcol", READLOCK),
     ("getcell", READLOCK),
@@ -48,6 +49,7 @@ _proxied_methods = [
     ("getcolkeywords", READLOCK),
     # Writes
     ("putcol", WRITELOCK),
+    ("putcolslice", WRITELOCK),
     ("putcolnp", WRITELOCK),
     ("putvarcol", WRITELOCK),
     ("putcellslice", WRITELOCK),
