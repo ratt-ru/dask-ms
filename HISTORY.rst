@@ -4,6 +4,7 @@ History
 
 0.2.4 (YYYY-MM-DD)
 ------------------
+* Cache and inline row runs in write operations (:pr:`96`)
 * Support getcolslice and putcolslice in TableProxy (:pr:`91`)
 * Use weakref.finalize to cleanup TableProxy and Executor objects (:pr:`89`)
 * Pickle Executor key argument (:pr:`88`)
