@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 
-from functools import reduce
-from operator import mul
 import pickle
 import gc
 
 import dask.array as da
+from dask.core import flatten
 import numpy as np
 from numpy.testing import assert_array_almost_equal
 
@@ -33,12 +32,41 @@ def test_inlined_array():
     B = da.full((10, 10), np.float64(2), chunks=(2, 2))
     C = A + B
 
-    assert len(C.__dask_graph__().layers) == 3
-
     D = inlined_array(C)
+    assert len(C.__dask_graph__().layers) == 3
+    assert D.name == C.name
+    assert D.name in D.__dask_graph__().layers
+    assert A.name not in D.__dask_graph__().layers
+    assert B.name not in D.__dask_graph__().layers
+    graph_keys = set(flatten(D.__dask_graph__().keys()))
+    assert graph_keys == set(flatten(D.__dask_keys__()))
 
+    D = inlined_array(C, [A, B])
     assert len(D.__dask_graph__().layers) == 1
-    assert len(dict(D.__dask_graph__())) == reduce(mul, D.numblocks, 1)
+    assert D.name == C.name
+    assert D.name in D.__dask_graph__().layers
+    assert A.name not in D.__dask_graph__().layers
+    assert B.name not in D.__dask_graph__().layers
+    graph_keys = set(flatten(D.__dask_graph__().keys()))
+    assert graph_keys == set(flatten(D.__dask_keys__()))
+
+    D = inlined_array(C, [A])
+    assert len(D.__dask_graph__().layers) == 2
+    assert D.name == C.name
+    assert D.name in D.__dask_graph__().layers
+    assert A.name not in D.__dask_graph__().layers
+    assert B.name in D.__dask_graph__().layers
+    graph_keys = set(flatten(D.__dask_graph__().keys()))
+    assert graph_keys == set(flatten([a.__dask_keys__() for a in [D, B]]))
+
+    D = inlined_array(C, [B])
+    assert len(D.__dask_graph__().layers) == 2
+    assert D.name == C.name
+    assert D.name in D.__dask_graph__().layers
+    assert A.name in D.__dask_graph__().layers
+    assert B.name not in D.__dask_graph__().layers
+    graph_keys = set(flatten(D.__dask_graph__().keys()))
+    assert graph_keys == set(flatten([a.__dask_keys__() for a in [D, A]]))
 
 
 def test_cached_array(ms):
