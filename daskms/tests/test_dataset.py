@@ -325,6 +325,8 @@ def test_dataset_multidim_string_column(tmp_path, chunks):
     np_names = np.array(name_list, dtype=np.object)
     names = da.from_array(np_names, chunks=(chunks['row'], np_names.shape[1]))
 
+    print(names)
+
     ds = Dataset({"POLARIZATION_TYPE": (("row", "xyz"), names)})
     table_name = str(tmp_path / "test.table")
     writes = write_datasets(table_name, ds, ["POLARIZATION_TYPE"])
