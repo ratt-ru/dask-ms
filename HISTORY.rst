@@ -4,6 +4,7 @@ History
 
 0.2.4 (YYYY-MM-DD)
 ------------------
+* Warn if column is present in both group_cols and taql_where (:pr:`98`)
 * Cache and inline row runs in write operations (:pr:`96`)
 * Support getcolslice and putcolslice in TableProxy (:pr:`91`)
 * Use weakref.finalize to cleanup TableProxy and Executor objects (:pr:`89`)

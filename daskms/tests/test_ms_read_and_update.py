@@ -198,8 +198,6 @@ def test_group_cols_and_taql_where(ms, caplog):
             "both group_cols and taql_where") in caplog.text
 
 
-
-
 def _proc_map_fn(args):
     import dask.threaded as dt
 
