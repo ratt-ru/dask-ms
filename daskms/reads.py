@@ -295,6 +295,13 @@ class DatasetFactory(object):
         self.column_keywords = kwargs.pop('column_keywords', False)
         self.table_proxy = kwargs.pop('table_proxy', False)
 
+        for column in self.group_cols:
+            if column in self.taql_where:
+                log.warning("Column %s is present in both group_cols "
+                            "and taql_where. This is unsupported "
+                            "and will cause dask-ms to behave unexpectedly.",
+                            column)
+
         if len(kwargs) > 0:
             raise ValueError("Unhandled kwargs: %s" % kwargs)
 
