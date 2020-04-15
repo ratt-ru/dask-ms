@@ -190,13 +190,12 @@ def test_taql_where(ms, index_cols):
     assert_array_equal(fields, [0, 0, 0, 1, 1, 1, 1])
 
 
-def test_group_cols_and_taql_where(ms):
-    with pytest.raises(ValueError) as e:
-        xds_from_ms(ms, group_cols=["FIELD_ID", "DATA_DESC_ID"],
-                    taql_where="FIELD_ID > 0")
+def test_group_cols_and_taql_where(ms, caplog):
+    xds_from_ms(ms, group_cols=["FIELD_ID", "DATA_DESC_ID"],
+                taql_where="FIELD_ID > 0")
 
     assert ("Column FIELD_ID is present in "
-            "both group_cols and taql_where") in str(e.value)
+            "both group_cols and taql_where") in caplog.text
 
 
 def _proc_map_fn(args):
