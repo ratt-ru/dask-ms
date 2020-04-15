@@ -198,6 +198,24 @@ def test_group_cols_and_taql_where(ms, caplog):
             "both group_cols and taql_where") in caplog.text
 
 
+@pytest.mark.parametrize("group_cols, taql", [
+    [['DATA_DESC_ID'],
+     'ANTENNA1 == 1 || ANTENNA2 == 2'],
+    [['DATA_DESC_ID', 'ANTENNA1', 'ANTENNA2'],
+     'ANTENNA1 == 1 || ANTENNA2 == 2'],
+    [['DATA_DESC_ID', 'FIELD_ID'],
+     'FIELD_ID == 1'],
+    [['DATA_DESC_ID', 'ANTENNA1', 'ANTENNA2'],
+     'FIELD_ID == 1']
+], ids=lambda g: "%s" % g)
+def test_github_98(ms, group_cols, taql):
+    datasets = xds_from_ms(ms, columns=['DATA', 'ANTENNA1', 'ANTENNA2'],
+                           group_cols=group_cols, taql_where=taql)
+
+    for ds in datasets:
+        print(ds.dims['row'])
+
+
 def _proc_map_fn(args):
     import dask.threaded as dt
 
