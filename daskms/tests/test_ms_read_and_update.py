@@ -186,7 +186,7 @@ def test_taql_where(ms, index_cols):
 
     assert len(xds) == 2
 
-    # Check group id's
+    # Check group id's, no DATA_DESC_ID == 1 because 
     assert xds[0].DATA_DESC_ID == 0 and xds[0].FIELD_ID == 0
     assert xds[1].DATA_DESC_ID == 0 and xds[1].FIELD_ID == 1
 
@@ -199,32 +199,6 @@ def test_taql_where(ms, index_cols):
 
     fields = da.concatenate([ds.FIELD_ID.data for ds in xds])
     assert_array_equal(fields, [0, 0, 0, 1, 1, 1, 1])
-
-
-def test_group_cols_and_taql_where(ms, caplog):
-    xds_from_ms(ms, group_cols=["FIELD_ID", "DATA_DESC_ID"],
-                taql_where="FIELD_ID > 0")
-
-    assert ("Column FIELD_ID is present in "
-            "both group_cols and taql_where") in caplog.text
-
-
-@pytest.mark.parametrize("group_cols, taql", [
-    [['DATA_DESC_ID'],
-     'ANTENNA1 == 1 || ANTENNA2 == 2'],
-    [['DATA_DESC_ID', 'ANTENNA1', 'ANTENNA2'],
-     'ANTENNA1 == 1 || ANTENNA2 == 2'],
-    [['DATA_DESC_ID', 'FIELD_ID'],
-     'FIELD_ID == 1'],
-    [['DATA_DESC_ID', 'ANTENNA1', 'ANTENNA2'],
-     'FIELD_ID == 1']
-], ids=lambda g: "%s" % g)
-def test_github_98(ms, group_cols, taql):
-    datasets = xds_from_ms(ms, columns=None,
-                           group_cols=group_cols, taql_where=taql)
-
-    for ds in datasets:
-        print(ds.compute())
 
 
 def _proc_map_fn(args):
