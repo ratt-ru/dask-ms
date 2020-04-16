@@ -512,7 +512,7 @@ def _write_datasets(table, table_proxy, datasets, columns, descriptor,
 
             # Name of the dask array representing this column
             token = dask.base.tokenize(di, args)
-            name = "-".join((table_name, 'write', column, token))
+            name = "".join(("write~", column, "-", table_name, "-", token))
 
             write_col = da.blockwise(putter_wrapper, full_dims,
                                      *args,

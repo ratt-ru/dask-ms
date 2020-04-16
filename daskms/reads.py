@@ -177,7 +177,7 @@ def getter_wrapper(row_orders, *args):
 
 
 def _dataset_variable_factory(table_proxy, table_schema, select_cols,
-                              exemplar_row, orders, chunks, array_prefix):
+                              exemplar_row, orders, chunks, array_suffix):
     """
     Returns a dictionary of dask arrays representing
     a series of getcols on the appropriate table.
@@ -200,7 +200,7 @@ def _dataset_variable_factory(table_proxy, table_schema, select_cols,
         appropriate rows to extract from the table.
     chunks : dict
         Chunking strategy for the dataset.
-    array_prefix : str
+    array_suffix : str
         dask array string prefix
 
     Returns
@@ -248,7 +248,7 @@ def _dataset_variable_factory(table_proxy, table_schema, select_cols,
 
         # Name of the dask array representing this column
         token = dask.base.tokenize(args)
-        name = "-".join((array_prefix, column, token))
+        name = "~".join(("read", column, array_suffix)) + "-" + token
 
         # Construct the array
         dask_array = da.blockwise(getter_wrapper, full_dims,
@@ -352,7 +352,7 @@ class DatasetFactory(object):
 
             # Prefix d
             gid_str = ",".join(str(gid) for gid in group_id)
-            array_prefix = "%s-[%s]" % (short_table_name, gid_str)
+            array_suffix = "[%s]-%s" % (gid_str, short_table_name)
 
             # Create dataset variables
             group_var_dims = _dataset_variable_factory(table_proxy,
@@ -360,7 +360,7 @@ class DatasetFactory(object):
                                                        select_cols,
                                                        exemplar_row,
                                                        order, group_chunks,
-                                                       array_prefix)
+                                                       array_suffix)
 
             # Extract ROWID
             try:
