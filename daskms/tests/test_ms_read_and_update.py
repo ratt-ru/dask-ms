@@ -186,7 +186,8 @@ def test_taql_where(ms, index_cols):
 
     assert len(xds) == 2
 
-    # Check group id's, no DATA_DESC_ID == 1 because 
+    # Check group id's, no DATA_DESC_ID == 1 because it only
+    # contains FIELD_ID == 2
     assert xds[0].DATA_DESC_ID == 0 and xds[0].FIELD_ID == 0
     assert xds[1].DATA_DESC_ID == 0 and xds[1].FIELD_ID == 1
 

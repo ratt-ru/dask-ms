@@ -295,7 +295,6 @@ class DatasetFactory(object):
         self.column_keywords = kwargs.pop('column_keywords', False)
         self.table_proxy = kwargs.pop('table_proxy', False)
 
-
         if len(kwargs) > 0:
             raise ValueError("Unhandled kwargs: %s" % kwargs)
 
