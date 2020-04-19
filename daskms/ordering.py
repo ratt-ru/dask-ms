@@ -182,9 +182,9 @@ def group_ordering_taql(table_proxy, group_cols, index_cols, taql_where=''):
         select = select_clause(group_cols + index_group_cols)
 
         if taql_where != '':
-            taql_where = "\nHAVING\n\t%s" % taql_where
+            taql_where = "\nWHERE\n\t%s" % taql_where
 
-        query = "%s\nFROM\n\t$1\n%s%s" % (select, groupby, taql_where)
+        query = "%s\nFROM\n\t$1%s\n%s" % (select, taql_where, groupby)
 
         return TableProxy(taql_factory, query, tables=[table_proxy],
                           __executor_key__=table_proxy.executor_key)
