@@ -180,6 +180,18 @@ def test_taql_where(ms, index_cols):
     fields = da.concatenate([ds.FIELD_ID.data for ds in xds])
     assert_array_equal(fields, [0, 0, 1, 1, 0, 1, 1])
 
+    # Group columns case
+    xds = xds_from_table(ms, taql_where="FIELD_ID >= 0 AND FIELD_ID < 2",
+                         group_cols=["DATA_DESC_ID", "FIELD_ID"],
+                         columns=["FIELD_ID"])
+
+    assert len(xds) == 2
+
+    # Check group id's, no DATA_DESC_ID == 1 because it only
+    # contains FIELD_ID == 2
+    assert xds[0].DATA_DESC_ID == 0 and xds[0].FIELD_ID == 0
+    assert xds[1].DATA_DESC_ID == 0 and xds[1].FIELD_ID == 1
+
     # Group on each row
     xds = xds_from_table(ms, taql_where="FIELD_ID >= 0 AND FIELD_ID < 2",
                          group_cols=["__row__"],
