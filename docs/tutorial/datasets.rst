@@ -1,8 +1,8 @@
 Basic Dataset Manipulation
 --------------------------
 
-This section describes basic Dataset operations available on
-:class:`~daskms.Dataset` which exists to implement
+This section describes Dataset operations available on
+:class:`~daskms.Dataset` which exists to re-implement
 basic operations present on xarray Datasets.
 These should be sufficient for application developers.
 
