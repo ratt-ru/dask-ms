@@ -40,7 +40,7 @@ setup(name='dask-ms',
       url='http://github.com/ska-sa/dask-ms',
       classifiers=[
           "Programming Language :: Python :: 3",
-          "Development Status :: 3 - Alpha",
+          "Development Status :: 5 - Production/Stable",
           "Intended Audience :: Developers",
           "License :: OSI Approved :: BSD License",
           "Operating System :: OS Independent",
