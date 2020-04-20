@@ -4,6 +4,7 @@ History
 
 0.2.4 (YYYY-MM-DD)
 ------------------
+* Update LICENSE year (:pr:`105`)
 * Update license and production status in pypi classifiers (:pr:`104`)
 * Use WHERE rather than HAVING clause in group ordering TAQL (:pr:`98`)
 * Improve the dask task key names for clearer graph visualization (:pr:`102`)
