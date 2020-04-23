@@ -99,7 +99,7 @@ class ArrayCache(metaclass=ArrayCacheMetaClass):
         return "ArrayCache[%s]" % self.token
 
 
-def cached_array(array):
+def cached_array(array, name=None):
     """
     Return a new array that functionally has the same values as array,
     but flattens the underlying graph and introduces a cache lookup
@@ -111,13 +111,16 @@ def cached_array(array):
     dsk = dict(array.__dask_graph__())
     keys = set(flatten(array.__dask_keys__()))
 
+    if name is None:
+        name = uuid.uuid4().hex
+
     # Inline + cull everything except the current array
     inline_keys = set(dsk.keys() - keys)
     dsk2 = inline(dsk, inline_keys, inline_constants=True)
     dsk3, _ = cull(dsk2, keys)
 
     # Create a cache used to store array values
-    cache = ArrayCache(uuid.uuid4().hex)
+    cache = ArrayCache(name)
 
     for k in keys:
         dsk3[k] = (cache_entry, cache, Key(k), dsk3.pop(k))
