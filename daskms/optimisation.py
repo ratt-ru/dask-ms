@@ -99,7 +99,7 @@ class ArrayCache(metaclass=ArrayCacheMetaClass):
         return "ArrayCache[%s]" % self.token
 
 
-def cached_array(array, name=None):
+def cached_array(array, token=None):
     """
     Return a new array that functionally has the same values as array,
     but flattens the underlying graph and introduces a cache lookup
@@ -107,12 +107,20 @@ def cached_array(array, name=None):
 
     Useful for caching data that can fit in-memory for the duration
     of the graph's execution.
+
+    Parameters
+    ----------
+    array : :class:`dask.array.Array`
+        dask array to cache.
+    token : optional, str
+        A unique token for identifying the internal cache.
+        If None, it will be automatically generated.
     """
     dsk = dict(array.__dask_graph__())
     keys = set(flatten(array.__dask_keys__()))
 
-    if name is None:
-        name = uuid.uuid4().hex
+    if token is None:
+        token = uuid.uuid4().hex
 
     # Inline + cull everything except the current array
     inline_keys = set(dsk.keys() - keys)
@@ -120,7 +128,7 @@ def cached_array(array, name=None):
     dsk3, _ = cull(dsk2, keys)
 
     # Create a cache used to store array values
-    cache = ArrayCache(name)
+    cache = ArrayCache(token)
 
     for k in keys:
         dsk3[k] = (cache_entry, cache, Key(k), dsk3.pop(k))
