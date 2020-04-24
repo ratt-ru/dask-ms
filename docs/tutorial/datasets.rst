@@ -49,7 +49,7 @@ Next, create some dask arrays that we will place on our Dataset
 .. code-block:: python
 
     # Define a data descriptor array
-    ddid = da.ones(rows, chunks=chunks['row'])
+    ddid = da.ones(row, chunks=chunks['row'])
 
     # Define some visibilities
     vis_chunks = (chunks['row'], chunks['chan'], chunks['corr'])
