@@ -408,6 +408,26 @@ def add_row_order_factory(table_proxy, datasets):
     return row_add_ops
 
 
+def cached_row_order(rowid):
+    row_order = rowid.map_blocks(row_run_factory,
+                                 sort_dir="write",
+                                 dtype=np.object)
+
+    # There's an assumption here that row_order is an
+    # operation with minimal dependencies
+    # (i.e. derived from xds_from_{ms, table})
+    # Caching flattens the graph into a single layer
+    import pdb; pdb.set_trace()
+    if len(row_order.__dask_graph__().layers) > 1:
+        print("Caching an update row")
+        from pprint import pprint
+        pprint(dict(row_order.__dask_graph__()))
+        log.warning("Caching an update row ordering "
+                    "with more than one layer")
+
+    return cached_array(row_order)
+
+
 def _write_datasets(table, table_proxy, datasets, columns, descriptor,
                     table_keywords, column_keywords):
     _, table_name, subtable = table_path_split(table)
@@ -453,20 +473,8 @@ def _write_datasets(table, table_proxy, datasets, columns, descriptor,
         else:
             # Update operation
             # Generate row orderings from existing row IDs
-            row_order = rowid.map_blocks(row_run_factory,
-                                         sort_dir="write",
-                                         dtype=np.object)
+            row_order = cached_row_order(rowid)
 
-            # TODO(sjperkins)
-            # There's an assumption here that rowid is an
-            # operation with minimal dependencies
-            # (i.e. derived from xds_from_{ms, table})
-            # Caching flattens the graph into a single layer
-            if len(row_order.__dask_graph__().layers) > 1:
-                log.warning("Caching an update row ordering "
-                            "with more than one layer")
-
-            row_order = cached_array(row_order)
             # Inline the row ordering in the graph
             row_orders.append((True, row_order))
 
