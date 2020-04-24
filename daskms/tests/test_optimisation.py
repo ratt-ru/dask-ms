@@ -7,6 +7,7 @@ import dask.array as da
 from dask.core import flatten
 import numpy as np
 from numpy.testing import assert_array_almost_equal
+import pytest
 
 from daskms import xds_from_ms
 from daskms.optimisation import (inlined_array,
@@ -96,3 +97,18 @@ def test_cached_array(ms):
 
     assert len(_key_cache) == 0
     assert len(_array_cache_cache) == 0
+
+
+@pytest.mark.parametrize("token", ["0xdeadbeaf", None])
+def test_cached_data_token(token):
+    zeros = da.zeros(1000, chunks=100)
+    carray = cached_array(zeros, token)
+
+    dsk = dict(carray.__dask_graph__())
+    k, v = dsk.popitem()
+    cache = v[1]
+
+    if token is None:
+        assert cache.token is not None
+    else:
+        assert cache.token == token

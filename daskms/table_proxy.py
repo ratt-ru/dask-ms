@@ -38,6 +38,7 @@ _proxied_methods = [
     # Modification
     ("addrows", WRITELOCK),
     ("addcols", WRITELOCK),
+    ("setmaxcachesize", WRITELOCK),
     # Reads
     ("getcol", READLOCK),
     ("getcolslice", READLOCK),
