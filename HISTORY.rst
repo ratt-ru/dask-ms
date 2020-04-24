@@ -2,7 +2,7 @@
 History
 =======
 
-0.2.4 (YYYY-MM-DD)
+0.2.4 (2020-04-24)
 ------------------
 * Documentation updates (:pr:`110`)
 * Provide better warnings for unusual ROWID graphs during table updates (:pr:`108`)
