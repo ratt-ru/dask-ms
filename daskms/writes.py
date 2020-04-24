@@ -408,6 +408,75 @@ def add_row_order_factory(table_proxy, datasets):
     return row_add_ops
 
 
+def cached_row_order(rowid):
+    """
+    Produce a cached row_order array from the given rowid array.
+
+    There's an assumption here that rowid is an
+    operation with minimal dependencies
+    (i.e. derived from xds_from_{ms, table})
+    Caching flattens the graph into one or two layers
+    depending on whether standard or group ordering is requested
+
+    Therfore, this functions warns if the rowid graph looks unusual,
+    mostly because it'll be included in the cached row_order array,
+    so we don't want it's graph to be too big or unusual.
+
+    Parameters
+    ----------
+    rowid : :class:`dask.array.Array`
+        rowid array
+
+    Returns
+    -------
+    row_order : :class:`dask.array.Array`
+        A array of row order tuples
+    """
+    layers = rowid.__dask_graph__().layers
+
+    # daskms.ordering.row_ordering case
+    # or daskms.ordering.group_row_ordering case without rechunking
+    # Check for standard layer
+    if len(layers) == 1:
+        layer_name = list(layers.keys())[0]
+
+        if (not layer_name.startswith("row-") and
+                not layer_name.startswith("group-rows-")):
+
+            log.warning("Unusual ROWID layer %s. "
+                        "This is probably OK but "
+                        "could foreshadow incorrect "
+                        "behaviour.", layer_name)
+    # daskms.ordering.group_row_ordering case with rechunking
+    # Check for standard layers
+    elif len(layers) == 2:
+        layer_names = list(sorted(layers.keys()))
+
+        if not (layer_names[0].startswith('group-rows-') and
+                layer_names[1].startswith('rechunk-merge-')):
+
+            log.warning("Unusual ROWID layers %s for "
+                        "the group ordering case. "
+                        "This is probably OK but "
+                        "could foreshadow incorrect "
+                        "behaviour.", layer_names)
+    # ROWID has been extended or modified somehow, warn
+    else:
+        layer_names = list(sorted(layers.keys()))
+        log.warning("Unusual number of ROWID layers > 2 "
+                    "%s. This is probably OK but "
+                    "could foreshadow incorrect "
+                    "behaviour or sub-par performance if "
+                    "the ROWID graph is large.",
+                    layer_names)
+
+    row_order = rowid.map_blocks(row_run_factory,
+                                 sort_dir="write",
+                                 dtype=np.object)
+
+    return cached_array(row_order)
+
+
 def _write_datasets(table, table_proxy, datasets, columns, descriptor,
                     table_keywords, column_keywords):
     _, table_name, subtable = table_path_split(table)
@@ -453,20 +522,8 @@ def _write_datasets(table, table_proxy, datasets, columns, descriptor,
         else:
             # Update operation
             # Generate row orderings from existing row IDs
-            row_order = rowid.map_blocks(row_run_factory,
-                                         sort_dir="write",
-                                         dtype=np.object)
+            row_order = cached_row_order(rowid)
 
-            # TODO(sjperkins)
-            # There's an assumption here that rowid is an
-            # operation with minimal dependencies
-            # (i.e. derived from xds_from_{ms, table})
-            # Caching flattens the graph into a single layer
-            if len(row_order.__dask_graph__().layers) > 1:
-                log.warning("Caching an update row ordering "
-                            "with more than one layer")
-
-            row_order = cached_array(row_order)
             # Inline the row ordering in the graph
             row_orders.append((True, row_order))
 
