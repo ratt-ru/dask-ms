@@ -4,6 +4,11 @@ History
 
 0.2.4 (YYYY-MM-DD)
 ------------------
+* Provide better warnings for unusual ROWID graphs during table updates (:pr:`108`)
+* Work around casacore getcolslice caching (:pr:`107`)
+* Update LICENSE year (:pr:`105`)
+* Update license and production status in pypi classifiers (:pr:`104`)
+* Use WHERE rather than HAVING clause in group ordering TAQL (:pr:`98`)
 * Improve the dask task key names for clearer graph visualization (:pr:`102`)
 * Cache and inline row runs in write operations (:pr:`96`)
 * Support getcolslice and putcolslice in TableProxy (:pr:`91`)

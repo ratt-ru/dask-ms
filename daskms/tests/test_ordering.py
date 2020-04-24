@@ -40,11 +40,11 @@ def test_ordering_query_taql_where_strings(ms, group_cols, index_cols):
                     "    GROWID()[0] as __firstrow__\n"
                     "FROM\n"
                     "    $1\n"
+                    "WHERE\n"
+                    "    ANTENNA1 != ANTENNA2\n"
                     "GROUPBY\n"
                     "    FIELD_ID,\n"
-                    "    SCAN_NUMBER\n"
-                    "HAVING\n"
-                    "    ANTENNA1 != ANTENNA2")
+                    "    SCAN_NUMBER")
 
     taql = group_ordering_taql(table_proxy(ms), group_cols, index_cols)
     assert taql._args[0].replace("\t", " "*4) == (
