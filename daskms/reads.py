@@ -234,6 +234,11 @@ def _dataset_variable_factory(table_proxy, table_schema, select_cols,
                 args.append(dim_extents_array(d, c))
                 args.append((d,))
 
+            # Disable getcolslice caching
+            # https://github.com/ska-sa/dask-ms/issues/92
+            # https://github.com/casacore/casacore/issues/1018
+            table_proxy.setmaxcachesize(column, 1).result()
+
             new_axes = {}
         else:
             # We need to inform blockwise about the size of our
