@@ -130,6 +130,8 @@ def cached_array(array, token=None):
     # Create a cache used to store array values
     cache = ArrayCache(token)
 
+    assert len(dsk3) == len(keys)
+
     for k in keys:
         dsk3[k] = (cache_entry, cache, Key(k), dsk3.pop(k))
 
