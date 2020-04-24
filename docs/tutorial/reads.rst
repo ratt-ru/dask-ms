@@ -291,7 +291,7 @@ the Dataset arrays:
     >>> # Get Measurement Set datasets, grouped on DATA_DESC_ID and
     >>> # sorted on TIME, ANTENNA1 and ANTENNA2
     >>> ms = xds_from_ms("~/data/TEST.MS", group_cols=["DATA_DESC_ID"].
-    >>>                  index_cols=["SCAN_NUMBER", TIME", "ANTENNA1", "ANTENNA2"])
+    >>>                  index_cols=["SCAN_NUMBER", "TIME", "ANTENNA1", "ANTENNA2"])
 
 .. note::
 
