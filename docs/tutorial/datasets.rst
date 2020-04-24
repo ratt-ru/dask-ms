@@ -1,8 +1,8 @@
 Basic Dataset Manipulation
 --------------------------
 
-This section describes basic Dataset operations available on
-:class:`~daskms.Dataset` which exists to implement
+This section describes Dataset operations available on
+:class:`~daskms.Dataset` which exists to re-implement
 basic operations present on xarray Datasets.
 These should be sufficient for application developers.
 
@@ -49,7 +49,7 @@ Next, create some dask arrays that we will place on our Dataset
 .. code-block:: python
 
     # Define a data descriptor array
-    ddid = da.ones(rows, chunks=chunks['row'])
+    ddid = da.ones(row, chunks=chunks['row'])
 
     # Define some visibilities
     vis_chunks = (chunks['row'], chunks['chan'], chunks['corr'])
@@ -66,8 +66,10 @@ via the ``coords`` and ``attrs`` argument to the constructor.
 .. note::
 
     The ROWID coordinate is not normally assigned when creating
-    a Dataset from scratch and is shown here for the purposes
-    of illustration. See :ref:`update-append-rows` for further information.
+    a Dataset from scratch and is shown here for illustrating
+    how to set coordinates.
+    See :ref:`update-append-rows` for further information on
+    standard use of the ROWID array.
 
 .. code-block:: python
 

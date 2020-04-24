@@ -281,13 +281,28 @@ def xds_from_table(table_name, columns=None,
     chunks : list of dicts or dict, optional
         A :code:`{dim: chunk}` dictionary, specifying the chunking
         strategy of each dimension in the schema.
-        Defaults to :code:`{'row': 100000 }`.
+        Defaults to :code:`{'row': 100000 }` which will partition
+        the row dimension into chunks of 100000.
 
         * If a dict, the chunking strategy is applied to each group.
         * If a list of dicts, each element is applied
           to the associated group. The last element is
           extended over the remaining groups if there
           are insufficient elements.
+
+        It's also possible to specify the individual chunks for
+        multiple dimensions:
+
+        .. code-block:: python
+
+            {'row': (40000, 60000, 40000, 60000),
+             'chan': (16, 16, 16, 16),
+             'corr': (1, 2, 1)}
+
+        The above chunks a 200,000 row, 64 channel and 4 correlation
+        space into 4 x 4 x 3 = 48 chunks, but requires prior
+        knowledge of dimensionality, probably obtained with an
+        initial call to :func:`xds_from_table`.
 
     Returns
     -------

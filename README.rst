@@ -39,6 +39,17 @@ python package dependencies.
 
   $ pip install dask-ms
 
+
+Documentation
+=============
+
+https://dask-ms.readthedocs.io
+
+Gitter Page
+===========
+
+https://gitter.im/dask-ms/community
+
 Example Usage
 =============
 
@@ -88,12 +99,6 @@ Example Usage
    Attributes:
        FIELD_ID:      0
        DATA_DESC_ID:  0]
-
--------------
-Documentation
--------------
-
-https://dask-ms.readthedocs.io.
 
 -----------
 Limitations

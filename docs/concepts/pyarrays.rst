@@ -52,8 +52,8 @@ Specific row ranges can be requested:
 
 If we wish to arbitrarily access variably shaped data, such
 as can be present in the DATA column, `getcol` cannot be (simply)
-be used as it is not possible to return a single numpy array
-representing all of this data.
+be used as it is not possible to return a single, fixed shape,
+numpy array representing all of this data.
 
 Instead we must make a variably shaped data request via `getvarcol`.:
 
@@ -100,7 +100,7 @@ data with `getcol`:
     (6, 32, 2)
 
 
-Consult `python-casacore
+Consult the `python-casacore
 <https://github.com/casacore/python-casacore>`_ library for further
 information.
 

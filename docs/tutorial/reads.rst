@@ -291,7 +291,7 @@ the Dataset arrays:
     >>> # Get Measurement Set datasets, grouped on DATA_DESC_ID and
     >>> # sorted on TIME, ANTENNA1 and ANTENNA2
     >>> ms = xds_from_ms("~/data/TEST.MS", group_cols=["DATA_DESC_ID"].
-    >>>                  index_cols=["SCAN_NUMBER", TIME", "ANTENNA1", "ANTENNA2"])
+    >>>                  index_cols=["SCAN_NUMBER", "TIME", "ANTENNA1", "ANTENNA2"])
 
 .. note::
 
@@ -335,9 +335,9 @@ in the Dataset.
         ...
          DATA            (row, chan, corr) complex64 dask.array<shape=(6552, 64, 4), chunksize=(6552, 64, 4)>
 
-This array is related to the Sorting_ requested on the table and
-will generally be contiguous if no grouping or sorting is requested,
-or if the requested sorting represents a lexicographical ordering.
+This array is related to the Grouping_ and Sorting_ requested
+on the table and will generally be contiguous if the
+requested grouping and sorting represents a natural lexicographical ordering.
 
 For example a natural ordering:
 
@@ -352,7 +352,7 @@ vs a non-contiguous ordering:
 .. doctest::
 
 
-    >>> datasets = xds_from_ms("~/data/TEST.MS", index_cols["ANTENNA2", "ANTENNA1", "TIME"])
+    >>> datasets = xds_from_ms("~/data/TEST.MS", index_cols=["ANTENNA2", "ANTENNA1", "TIME"])
     >>> print(datasets[0].ROWID.data.compute())
     array([   0,   91,  182, ..., 6369, 6460, 6551])
 

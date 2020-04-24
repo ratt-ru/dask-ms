@@ -3,7 +3,8 @@ Writing Datasets
 
 Creating, Updating or Appending to a Table or Measurement Set is accomplished
 through the use of the :func:`~daskms.xds_to_table` and the presence
-of the ``ROWID`` coordinate on a Dataset (See :ref:`row-id-coordinates`).
+or absence of the ``ROWID`` coordinate on a
+Dataset (See :ref:`row-id-coordinates`).
 
 
 The pattern for writing a writing a dataset is as follows:
@@ -88,12 +89,12 @@ appends will always be added to the end of the table.
 Note that it may be also be desirable for appended rows to
 have an ordering similar to those of the updated rows, as described
 in :ref:`read-sorting`. It is currently the user's responsibility to
-do this.
+achieve this.
 
 Updating/Adding Columns
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-If a dataset array is present as a column in the dataset, it will be updated.
+If a dataset array is present as a column in the dataset, the column will be updated.
 By contrast, a missing column will lead cause :func:`~daskms.xds_to_table`
 to infer a CASA column descriptor, add the column to the table and then write
 the array to it.
