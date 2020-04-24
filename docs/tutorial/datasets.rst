@@ -66,8 +66,10 @@ via the ``coords`` and ``attrs`` argument to the constructor.
 .. note::
 
     The ROWID coordinate is not normally assigned when creating
-    a Dataset from scratch and is shown here for the purposes
-    of illustration. See :ref:`update-append-rows` for further information.
+    a Dataset from scratch and is shown here for illustrating
+    how to set coordinates.
+    See :ref:`update-append-rows` for further information on
+    standard use of the ROWID array.
 
 .. code-block:: python
 
