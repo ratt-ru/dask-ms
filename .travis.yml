@@ -3,6 +3,7 @@ matrix:
   include:
   - env: TARGET=python36
   - env: TARGET=python37
+  - env: TARGET=python38
 sudo: required
 services:
 - docker
