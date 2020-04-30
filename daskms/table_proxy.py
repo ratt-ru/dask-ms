@@ -230,16 +230,20 @@ def _nolock_runner(fn):
     @wraps(fn)
     def wrapper(table_future, *args, **kwargs):
         try:
+            wrapper.calls += 1
             start_time = time()
             result = fn(table_future.result(), *args, **kwargs)
             end_time = time()
+            run_time = end_time - start_time
+            _function_runs[fn.__name__] = (run_time, wrapper.calls)
             return result
         except Exception:
             if logging.DEBUG >= log.getEffectiveLevel():
                 log.exception("Exception in %s", fn.__name__)
             raise
 
-        return wrapper
+    wrapper.calls = 0
+    return wrapper
 
 
 def _readlock_runner(fn):
@@ -252,9 +256,12 @@ def _readlock_runner(fn):
         table.lock(write=False)
 
         try:
+            wrapper.calls += 1
             start_time = time()
             result = fn(table_future.result(), *args, **kwargs)
             end_time = time()
+            run_time = end_time - start_time
+            _function_runs[fn.__name__] = (run_time, wrapper.calls)
             return result
         except Exception:
             if logging.DEBUG >= log.getEffectiveLevel():
@@ -263,7 +270,8 @@ def _readlock_runner(fn):
         finally:
             table.unlock()
 
-        return wrapper
+    wrapper.calls = 0
+    return wrapper
 
 
 def _writelock_runner(fn):
@@ -276,10 +284,13 @@ def _writelock_runner(fn):
         table.lock(write=True)
 
         try:
+            wrapper.calls += 1
             start_time = time()
             result = fn(table_future.result(), *args, **kwargs)
-            table.flush()
             end_time = time()
+            run_time = end_time - start_time
+            _function_runs[fn.__name__] = (run_time, wrapper.calls)
+            return result
         except Exception:
             if logging.DEBUG >= log.getEffectiveLevel():
                 log.exception("Exception in %s", fn.__name__)
@@ -289,7 +300,8 @@ def _writelock_runner(fn):
         finally:
             table.unlock()
 
-        return wrapper
+    wrapper.calls = 0
+    return wrapper
 
 
 def _iswriteable(table_future):
