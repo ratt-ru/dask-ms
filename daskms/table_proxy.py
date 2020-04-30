@@ -85,8 +85,9 @@ def proxied_method_factory(method, locktype):
     on a concurrent.futures.ThreadPoolExecutor.
     """
 
+
     if locktype == NOLOCK:
-        def _impl(method):
+        def _impl(table_future, *args, **kwargs):
             @wraps(method)
             def wrapper(table_future, *args, **kwargs):
                 try:
@@ -102,7 +103,7 @@ def proxied_method_factory(method, locktype):
             return wrapper
 
     elif locktype == READLOCK:
-        def _impl(method):
+        def _impl(table_future, *args, **kwargs):
             @wraps(method)
             def wrapper(table_future, *args, **kwargs):
                 table = table_future.result()
@@ -123,7 +124,7 @@ def proxied_method_factory(method, locktype):
             return wrapper
 
     elif locktype == WRITELOCK:
-        def _impl(method):
+        def _impl(table_future, *args, **kwargs):
             @wraps(method)
             def wrapper(table_future, *args, **kwargs):
                 table = table_future.result()
@@ -133,7 +134,7 @@ def proxied_method_factory(method, locktype):
                     start_time = time()
                     result = getattr(table, method)(*args, **kwargs)
                     start_time = time()
-                    return = result
+                    return result
                 except Exception:
                     if logging.DEBUG >= log.getEffectiveLevel():
                         log.exception("Exception in %s", method)
@@ -143,6 +144,42 @@ def proxied_method_factory(method, locktype):
 
             return wrapper
 
+    if locktype == NOLOCK:
+        def _impl(table_future, args, kwargs):
+            try:
+                return getattr(table_future.result(), method)(*args, **kwargs)
+            except Exception:
+                if logging.DEBUG >= log.getEffectiveLevel():
+                    log.exception("Exception in %s", method)
+                raise
+
+    elif locktype == READLOCK:
+        def _impl(table_future, args, kwargs):
+            table = table_future.result()
+            table.lock(write=False)
+
+            try:
+                return getattr(table, method)(*args, **kwargs)
+            except Exception:
+                if logging.DEBUG >= log.getEffectiveLevel():
+                    log.exception("Exception in %s", method)
+                raise
+            finally:
+                table.unlock()
+
+    elif locktype == WRITELOCK:
+        def _impl(table_future, args, kwargs):
+            table = table_future.result()
+            table.lock(write=True)
+
+            try:
+                return getattr(table, method)(*args, **kwargs)
+            except Exception:
+                if logging.DEBUG >= log.getEffectiveLevel():
+                    log.exception("Exception in %s", method)
+                raise
+            finally:
+                table.unlock()
     else:
         raise ValueError("Invalid locktype %s" % locktype)
 
