@@ -5,6 +5,9 @@ import logging
 from threading import Lock
 import weakref
 
+from functools import wraps
+from time import time
+
 from dask.base import normalize_token
 import pyrap.tables as pt
 from daskms.table_executor import Executor, STANDARD_EXECUTOR
@@ -83,41 +86,62 @@ def proxied_method_factory(method, locktype):
     """
 
     if locktype == NOLOCK:
-        def _impl(table_future, args, kwargs):
-            try:
-                return getattr(table_future.result(), method)(*args, **kwargs)
-            except Exception:
-                if logging.DEBUG >= log.getEffectiveLevel():
-                    log.exception("Exception in %s", method)
-                raise
+        def _impl(method):
+            @wraps(method)
+            def wrapper(table_future, *args, **kwargs):
+                try:
+                    start_time = time()
+                    result = getattr(table_future.result(), method)(*args, **kwargs)
+                    end_time = time()
+                    return result
+                except Exception:
+                    if logging.DEBUG >= log.getEffectiveLevel():
+                        log.exception("Exception in %s", method)
+                    raise
+
+            return wrapper
 
     elif locktype == READLOCK:
-        def _impl(table_future, args, kwargs):
-            table = table_future.result()
-            table.lock(write=False)
+        def _impl(method):
+            @wraps(method)
+            def wrapper(table_future, *args, **kwargs):
+                table = table_future.result()
+                table.lock(write=False)
 
-            try:
-                return getattr(table, method)(*args, **kwargs)
-            except Exception:
-                if logging.DEBUG >= log.getEffectiveLevel():
-                    log.exception("Exception in %s", method)
-                raise
-            finally:
-                table.unlock()
+                try:
+                    start_time = time()
+                    result = getattr(table, method)(*args, **kwargs)
+                    end_time = time()
+                    return result
+                except Exception:
+                    if logging.DEBUG >= log.getEffectiveLevel():
+                        log.exception("Exception in %s", method)
+                        raise
+                finally:
+                    table.unlock()
+
+            return wrapper
 
     elif locktype == WRITELOCK:
-        def _impl(table_future, args, kwargs):
-            table = table_future.result()
-            table.lock(write=True)
+        def _impl(method):
+            @wraps(method)
+            def wrapper(table_future, *args, **kwargs):
+                table = table_future.result()
+                table.lock(write=True)
 
-            try:
-                return getattr(table, method)(*args, **kwargs)
-            except Exception:
-                if logging.DEBUG >= log.getEffectiveLevel():
-                    log.exception("Exception in %s", method)
-                raise
-            finally:
-                table.unlock()
+                try:
+                    start_time = time()
+                    result = getattr(table, method)(*args, **kwargs)
+                    start_time = time()
+                    return = result
+                except Exception:
+                    if logging.DEBUG >= log.getEffectiveLevel():
+                        log.exception("Exception in %s", method)
+                    raise
+                finally:
+                    table.unlock()
+
+            return wrapper
 
     else:
         raise ValueError("Invalid locktype %s" % locktype)
@@ -194,44 +218,73 @@ def taql_factory(query, style='Python', tables=(), readonly=True):
             t.unlock()
 
 
-def _nolock_runner(table_future, fn, args, kwargs):
-    try:
-        return fn(table_future.result(), *args, **kwargs)
-    except Exception:
-        if logging.DEBUG >= log.getEffectiveLevel():
-            log.exception("Exception in %s", fn.__name__)
-        raise
+def _nolock_runner(fn):
+    """
+    _nolock_runner wrapper with profiling
+    """
+    @wraps(fn)
+    def wrapper(table_future, *args, **kwargs):
+        try:
+            start_time = time()
+            result = fn(table_future.result(), *args, **kwargs)
+            end_time = time()
+            return result
+        except Exception:
+            if logging.DEBUG >= log.getEffectiveLevel():
+                log.exception("Exception in %s", fn.__name__)
+            raise
+
+        return wrapper
 
 
-def _readlock_runner(table_future, fn, args, kwargs):
-    table = table_future.result()
-    table.lock(write=False)
+def _readlock_runner(fn):
+    """
+    _readlock_runner wrapper with profiling
+    """
+    @wraps(fn)
+    def wrapper(table_future, *args, **kwargs):
+        table = table_future.result()
+        table.lock(write=False)
 
-    try:
-        return fn(table, *args, **kwargs)
-    except Exception:
-        if logging.DEBUG >= log.getEffectiveLevel():
-            log.exception("Exception in %s", fn.__name__)
-        raise
-    finally:
-        table.unlock()
+        try:
+            start_time = time()
+            result = fn(table_future.result(), *args, **kwargs)
+            end_time = time()
+            return result
+        except Exception:
+            if logging.DEBUG >= log.getEffectiveLevel():
+                log.exception("Exception in %s", fn.__name__)
+            raise
+        finally:
+            table.unlock()
+
+        return wrapper
 
 
-def _writelock_runner(table_future, fn, args, kwargs):
-    table = table_future.result()
-    table.lock(write=True)
+def _writelock_runner(fn):
+    """
+    _writelock_runner wrapper with profiling
+    """
+    @wraps(fn)
+    def wrapper(table_future, *args, **kwargs):
+        table = table_future.result()
+        table.lock(write=True)
 
-    try:
-        result = fn(table, *args, **kwargs)
-        table.flush()
-    except Exception:
-        if logging.DEBUG >= log.getEffectiveLevel():
-            log.exception("Exception in %s", fn.__name__)
-        raise
-    else:
-        return result
-    finally:
-        table.unlock()
+        try:
+            start_time = time()
+            result = fn(table_future.result(), *args, **kwargs)
+            table.flush()
+            end_time = time()
+        except Exception:
+            if logging.DEBUG >= log.getEffectiveLevel():
+                log.exception("Exception in %s", fn.__name__)
+            raise
+        else:
+            return result
+        finally:
+            table.unlock()
+
+        return wrapper
 
 
 def _iswriteable(table_future):
