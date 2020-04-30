@@ -18,6 +18,11 @@ log = logging.getLogger(__name__)
 _table_cache = weakref.WeakValueDictionary()
 _table_lock = Lock()
 
+# Dictionary to store runtimes
+# {function_name: list(execution_time, call_count)}
+# Storing execution_time and call_count is still a problem
+_function_runs = {}
+
 # CASA Table Locking Modes
 NOLOCK = 0
 READLOCK = 1
@@ -85,73 +90,21 @@ def proxied_method_factory(method, locktype):
     on a concurrent.futures.ThreadPoolExecutor.
     """
 
-
-    if locktype == NOLOCK:
-        def _impl(table_future, *args, **kwargs):
-            @wraps(method)
-            def wrapper(table_future, *args, **kwargs):
-                try:
-                    start_time = time()
-                    result = getattr(table_future.result(), method)(*args, **kwargs)
-                    end_time = time()
-                    return result
-                except Exception:
-                    if logging.DEBUG >= log.getEffectiveLevel():
-                        log.exception("Exception in %s", method)
-                    raise
-
-            return wrapper
-
-    elif locktype == READLOCK:
-        def _impl(table_future, *args, **kwargs):
-            @wraps(method)
-            def wrapper(table_future, *args, **kwargs):
-                table = table_future.result()
-                table.lock(write=False)
-
-                try:
-                    start_time = time()
-                    result = getattr(table, method)(*args, **kwargs)
-                    end_time = time()
-                    return result
-                except Exception:
-                    if logging.DEBUG >= log.getEffectiveLevel():
-                        log.exception("Exception in %s", method)
-                        raise
-                finally:
-                    table.unlock()
-
-            return wrapper
-
-    elif locktype == WRITELOCK:
-        def _impl(table_future, *args, **kwargs):
-            @wraps(method)
-            def wrapper(table_future, *args, **kwargs):
-                table = table_future.result()
-                table.lock(write=True)
-
-                try:
-                    start_time = time()
-                    result = getattr(table, method)(*args, **kwargs)
-                    start_time = time()
-                    return result
-                except Exception:
-                    if logging.DEBUG >= log.getEffectiveLevel():
-                        log.exception("Exception in %s", method)
-                    raise
-                finally:
-                    table.unlock()
-
-            return wrapper
-
     if locktype == NOLOCK:
         def _impl(table_future, args, kwargs):
             try:
-                return getattr(table_future.result(), method)(*args, **kwargs)
+                _impl.calls += 1
+                start_time = time()
+                result = getattr(table_future.result(), method)(*args, **kwargs)
+                end_time = time()
+                run_time = end_time - start_time
+                _function_runs[method] = (run_time, _impl.calls)
+                return result
             except Exception:
                 if logging.DEBUG >= log.getEffectiveLevel():
                     log.exception("Exception in %s", method)
                 raise
+        _impl.calls = 0
 
     elif locktype == READLOCK:
         def _impl(table_future, args, kwargs):
@@ -159,13 +112,20 @@ def proxied_method_factory(method, locktype):
             table.lock(write=False)
 
             try:
-                return getattr(table, method)(*args, **kwargs)
+                _impl.calls += 1
+                start_time = time()
+                result = getattr(table, method)(*args, **kwargs)
+                end_time = time()
+                run_time = end_time - start_time
+                _function_runs[method] = (run_time, _impl.calls)
+                return result
             except Exception:
                 if logging.DEBUG >= log.getEffectiveLevel():
                     log.exception("Exception in %s", method)
-                raise
+                    raise
             finally:
                 table.unlock()
+        _impl.calls = 0
 
     elif locktype == WRITELOCK:
         def _impl(table_future, args, kwargs):
@@ -173,13 +133,21 @@ def proxied_method_factory(method, locktype):
             table.lock(write=True)
 
             try:
-                return getattr(table, method)(*args, **kwargs)
+                _impl.calls += 1
+                start_time = time()
+                result = getattr(table, method)(*args, **kwargs)
+                start_time = time()
+                run_time = end_time - start_time
+                _function_runs[method] = (run_time, _impl.calls)
+                return result
             except Exception:
                 if logging.DEBUG >= log.getEffectiveLevel():
                     log.exception("Exception in %s", method)
                 raise
             finally:
                 table.unlock()
+        _impl.calls = 0
+
     else:
         raise ValueError("Invalid locktype %s" % locktype)
 
