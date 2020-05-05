@@ -238,24 +238,6 @@ def _iswriteable(table_future):
     return table_future.result().iswritable()
 
 
-def _table_close(table_future):
-    table_future.result().close()
-
-
-# This finalizer submits the table closing operation
-# on the Executor associated with the TableProxy
-# Note that this operation **must** happen before
-# shutdown is called on the Executor's internal
-# ThreadPoolExecutor object or deadlock can occur
-# See https://codewithoutrules.com/2017/08/16/concurrency-python/
-# for further insight.
-# The fact that the Executor is an argument to weakref.finalize implies
-# that the Executor's finalizer, and by further implication,
-# the ThreadPoolExecutor.shutdown has not yet been called.
-def _finaliser(ex, table_future):
-    ex.impl.submit(_table_close, table_future)
-
-
 class TableProxy(object, metaclass=TableProxyMetaClass):
     """
     Proxies calls to a :class:`pyrap.tables.table` object via
@@ -300,8 +282,6 @@ class TableProxy(object, metaclass=TableProxyMetaClass):
         # still lives
         self._ex_wrapper = ex = Executor(key=self._ex_key)
         self._table_future = table = ex.impl.submit(factory, *args, **kwargs)
-
-        weakref.finalize(self, _finaliser, ex, table)
 
         # Reference to the internal ThreadPoolExecutor
         self._ex = ex.impl
