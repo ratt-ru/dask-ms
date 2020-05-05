@@ -29,6 +29,9 @@ def test_table_proxy(ms):
     assert tp.nrows().result() == 10
     assert tq.nrows().result() == 3
 
+    # Add CASA Table methods testing for profiling
+    # --------------------------------------------
+
     # Different tokens
     assert tokenize(tp) != tokenize(tq)
 
