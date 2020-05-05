@@ -2,6 +2,10 @@
 History
 =======
 
+0.2.5 (YYYY-MM-DD)
+------------------
+* Remove TableProxy weakref.finalize (:pr:`113`)
+
 0.2.4 (2020-04-24)
 ------------------
 * Documentation updates (:pr:`110`)
