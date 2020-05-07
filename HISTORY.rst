@@ -2,6 +2,10 @@
 History
 =======
 
+0.2.5 (YYYY-MM-DD)
+------------------
+* Use python-casacore wheels for travis testing, instead of kernsuite packages (:pr:`115`)
+
 0.2.4 (2020-04-24)
 ------------------
 * Documentation updates (:pr:`110`)
