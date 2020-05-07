@@ -105,14 +105,13 @@ def proxied_method_factory(method, locktype):
                 start_time = time()
                 result = getattr(table_future.result(), method)(*args, **kwargs)
                 end_time = time()
-                run_time.append(end_time - start_time)
+                _impl.run_time.append(end_time - start_time)
                 return result
             except Exception:
                 if logging.DEBUG >= log.getEffectiveLevel():
                     log.exception("Exception in %s", method)
                 raise
-            finally:
-                _function_runs[method] = (_impl.run_time, _impl.calls)
+            _function_runs[method] = (_impl.run_time, _impl.calls)
         _impl.calls = 0
         _impl.run_time = []
 
@@ -134,7 +133,8 @@ def proxied_method_factory(method, locktype):
                     raise
             finally:
                 table.unlock()
-                _function_runs[method] = (_impl.run_time, _impl.calls)
+
+            _function_runs[method] = (_impl.run_time, _impl.calls)
         _impl.calls = 0
         _impl.run_time = []
 
@@ -156,7 +156,8 @@ def proxied_method_factory(method, locktype):
                 raise
             finally:
                 table.unlock()
-                _function_runs[method] = (_impl.run_time, _impl.calls)
+
+            _function_runs[method] = (_impl.run_time, _impl.calls)
         _impl.calls = 0
         _impl.run_time = []
 
@@ -234,91 +235,76 @@ def taql_factory(query, style='Python', tables=(), readonly=True):
         for t in tables:
             t.unlock()
 
-
-def _nolock_runner(fn):
+def _nolock_runner(table_future, fn, *args, **kwargs):
     """
     _nolock_runner wrapper with profiling
     """
-    @wraps(fn)
-    def wrapper(table_future, *args, **kwargs):
-        try:
-            wrapper.calls += 1
-            start_time = time()
-            result = fn(table_future.result(), *args, **kwargs)
-            end_time = time()
-            wrapper.run_time.append(end_time - start_time)
-            return result
-        except Exception:
-            if logging.DEBUG >= log.getEffectiveLevel():
-                log.exception("Exception in %s", fn.__name__)
-            raise
-        finally:
-            _function_runs[fn.__name__] = (wrapper.run_time, wrapper.calls)
-
-    wrapper.calls = 0
-    wrapper.run_time = []
-    return wrapper
+    try:
+        _nolock_runner.calls += 1
+        start_time = time()
+        result = fn(table_future.result(), *args, **kwargs)
+        end_time = time()
+        _nolock_runner.run_time.append(end_time - start_time)
+        _function_runs[fn.__name__] = (_nolock_runner.run_time, _nolock_runner.calls)
+        return result
+    except Exception:
+        if logging.DEBUG >= log.getEffectiveLevel():
+            log.exception("Exception in %s", fn.__name__)
+        raise
+_nolock_runner.calls = 0
+_nolock_runner.run_time = []
 
 
-def _readlock_runner(fn):
+def _readlock_runner(table_future, fn, args, kwargs):
     """
     _readlock_runner wrapper with profiling
     """
-    @wraps(fn)
-    def wrapper(table_future, *args, **kwargs):
-        table = table_future.result()
-        table.lock(write=False)
+    table = table_future.result()
+    table.lock(write=False)
 
-        try:
-            wrapper.calls += 1
-            start_time = time()
-            result = fn(table_future.result(), *args, **kwargs)
-            end_time = time()
-            wrapper.run_time.append(end_time - start_time)
-            return result
-        except Exception:
-            if logging.DEBUG >= log.getEffectiveLevel():
-                log.exception("Exception in %s", fn.__name__)
-            raise
-        finally:
-            table.unlock()
-            _function_runs[fn.__name__] = (wrapper.run_time, wrapper.calls)
+    try:
+        _readlock_runner.calls += 1
+        start_time = time()
+        result = fn(table_future.result(), *args, **kwargs)
+        end_time = time()
+        _readlock_runner.run_time.append(end_time - start_time)
+        _function_runs[fn.__name__] = (_readlock_runner.run_time, _readlock_runner.calls)
+        return result
+    except Exception:
+        if logging.DEBUG >= log.getEffectiveLevel():
+            log.exception("Exception in %s", fn.__name__)
+        raise
+    finally:
+        table.unlock()
 
-    wrapper.calls = 0
-    wrapper.run_time = []
-    return wrapper
+_readlock_runner.calls = 0
+_readlock_runner.run_time = []
 
-
-def _writelock_runner(fn):
+def _writelock_runner(table_future, fn, *args, **kwargs):
     """
     _writelock_runner wrapper with profiling
     """
-    @wraps(fn)
-    def wrapper(table_future, *args, **kwargs):
-        table = table_future.result()
-        table.lock(write=True)
+    table = table_future.result()
+    table.lock(write=True)
+    try:
+        _writelock_runner.calls += 1
+        start_time = time()
+        result = fn(table_future.result(), *args, **kwargs)
+        end_time = time()
+        _writelock_runner.append(end_time - start_time)
+        _function_runs[fn.__name__] = (_writelock_runner.run_time, _writelock_runner.calls)
+        return result
+    except Exception:
+        if logging.DEBUG >= log.getEffectiveLevel():
+            log.exception("Exception in %s", fn.__name__)
+        raise
+    else:
+        return result
+    finally:
+        table.unlock()
 
-        try:
-            wrapper.calls += 1
-            start_time = time()
-            result = fn(table_future.result(), *args, **kwargs)
-            end_time = time()
-            wrapper.append(end_time - start_time)
-            return result
-        except Exception:
-            if logging.DEBUG >= log.getEffectiveLevel():
-                log.exception("Exception in %s", fn.__name__)
-            raise
-        else:
-            return result
-        finally:
-            table.unlock()
-            _function_runs[fn.__name__] = (wrapper.run_time, wrapper.calls)
-
-    wrapper.calls = 0
-    wrapper.run_time = []
-    return wrapper
-
+_writelock_runner.calls = 0
+_writelock_runner.run_time = []
 
 def _iswriteable(table_future):
     return table_future.result().iswritable()
