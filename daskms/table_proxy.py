@@ -257,6 +257,35 @@ def _table_future_close(table_future):
 # that the Executor's finalizer, and by further implication,
 # the ThreadPoolExecutor.shutdown has not yet been called.
 def _table_future_finaliser(ex, table_future, args, kwargs):
+    """
+    Closes the table object in the thread it was created
+    on Python >= 3.7 and in the garbage collection thread
+    in Python 3.6.
+
+    Parameters
+    ----------
+    ex : :class:`daskms.table_executor.Executor`
+        Executor on which table operations should be performed
+    table_future : :class:`concurrent.futures.Future`
+        Future referring to the CASA table object. Should've
+        been created in ``ex``.
+    args : tuple
+        Arguments used to create the table future by
+        :class:`daskms.table_proxy.TableProxy`.
+    kwargs : kwargs
+        Keyword arguments used to create the table future by
+        :class:`daskms.table_proxy.TableProxy`.
+
+    Notes
+    -----
+    ``args`` and ``kwargs`` aren't used by the function but should
+    be passed through so that any dependencies are garbage collected
+    before the TableProxy is. Primarily this is to ensure that
+    taql_proxy's are garbage collected before their dependant
+    tables.
+
+    """
+
     if sys.version_info[0] == 3 and sys.version_info[1] >= 7:
         # ThreadPoolExecutor on Python 3.7 uses a SimpleQueue
         # which is re-entrant safe, so we can submit our table
