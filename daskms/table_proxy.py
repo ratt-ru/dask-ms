@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import sys
 from itertools import zip_longest
 import logging
 from threading import Lock
@@ -238,8 +239,11 @@ def _iswriteable(table_future):
     return table_future.result().iswritable()
 
 
-def _table_close(table_future):
-    table_future.result().close()
+def _table_future_close(table_future):
+    try:
+        table_future.result().close()
+    except BaseException as e:
+        print(str(e))
 
 
 # This finalizer submits the table closing operation
@@ -252,8 +256,52 @@ def _table_close(table_future):
 # The fact that the Executor is an argument to weakref.finalize implies
 # that the Executor's finalizer, and by further implication,
 # the ThreadPoolExecutor.shutdown has not yet been called.
-def _finaliser(ex, table_future):
-    ex.impl.submit(_table_close, table_future)
+def _table_future_finaliser(ex, table_future, args, kwargs):
+    """
+    Closes the table object in the thread it was created
+    on Python >= 3.7 and in the garbage collection thread
+    in Python 3.6.
+
+    Parameters
+    ----------
+    ex : :class:`daskms.table_executor.Executor`
+        Executor on which table operations should be performed
+    table_future : :class:`concurrent.futures.Future`
+        Future referring to the CASA table object. Should've
+        been created in ``ex``.
+    args : tuple
+        Arguments used to create the table future by
+        :class:`daskms.table_proxy.TableProxy`.
+    kwargs : kwargs
+        Keyword arguments used to create the table future by
+        :class:`daskms.table_proxy.TableProxy`.
+
+    Notes
+    -----
+    ``args`` and ``kwargs`` aren't used by the function but should
+    be passed through so that any dependencies are garbage collected
+    before the TableProxy is. Primarily this is to ensure that
+    taql_proxy's are garbage collected before their dependant
+    tables.
+
+    """
+
+    if sys.version_info[0] == 3 and sys.version_info[1] >= 7:
+        # ThreadPoolExecutor on Python 3.7 uses a SimpleQueue
+        # which is re-entrant safe, so we can submit our table
+        # close operation on the Thread Pool
+        ex.impl.submit(_table_future_close, table_future)
+    else:
+        # ThreadPoolExecutor on Python 3.6 uses Queue,
+        # which is not re-entrant safe,
+        # https://codewithoutrules.com/2017/08/16/concurrency-python/
+        # so we submit our table close operations in the
+        # garbage collection thread, which
+        # may not be the same thread in which the table was
+        # created. This should be OK with the flush operations
+        # we place after all our write operations in the
+        # Executor thread
+        _table_future_close(table_future)
 
 
 class TableProxy(object, metaclass=TableProxyMetaClass):
@@ -267,7 +315,7 @@ class TableProxy(object, metaclass=TableProxyMetaClass):
         Parameters
         ----------
         factory : callable
-            Function to call which creates the CASA table
+            Function which creates the CASA table
         *args : tuple
             Positional arguments passed to factory.
         **kwargs : dict
@@ -301,7 +349,8 @@ class TableProxy(object, metaclass=TableProxyMetaClass):
         self._ex_wrapper = ex = Executor(key=self._ex_key)
         self._table_future = table = ex.impl.submit(factory, *args, **kwargs)
 
-        weakref.finalize(self, _finaliser, ex, table)
+        weakref.finalize(self, _table_future_finaliser, ex, table,
+                         args, kwargs)
 
         # Reference to the internal ThreadPoolExecutor
         self._ex = ex.impl
