@@ -315,7 +315,7 @@ class TableProxy(object, metaclass=TableProxyMetaClass):
         Parameters
         ----------
         factory : callable
-            Function to call which creates the CASA table
+            Function which creates the CASA table
         *args : tuple
             Positional arguments passed to factory.
         **kwargs : dict
