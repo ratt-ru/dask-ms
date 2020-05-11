@@ -6,12 +6,12 @@ except ImportError as e:
     raise ImportError("%s\nPlease install setuptools." % e)
 
 extras_require = {
-    'xarray': ["xarray > 0.12.0; python_version >= '3.5'"],
+    'xarray': ["xarray > 0.12.0"],
     'testing': ['pytest', 'pytest-flake8']
 }
 
 install_requires = [
-    "dask[array] >= 2.2.0; python_version >= '3.5'",
+    "dask[array] >= 2.2.0",
 ]
 
 # ==================
@@ -34,15 +34,15 @@ def readme():
 
 
 setup(name='dask-ms',
-      version='0.2.3',
+      version='0.2.5',
       description='xarray Datasets from CASA Tables.',
       long_description=readme(),
       url='http://github.com/ska-sa/dask-ms',
       classifiers=[
           "Programming Language :: Python :: 3",
-          "Development Status :: 3 - Alpha",
+          "Development Status :: 5 - Production/Stable",
           "Intended Audience :: Developers",
-          "License :: Other/Proprietary License",
+          "License :: OSI Approved :: BSD License",
           "Operating System :: OS Independent",
           "Programming Language :: Python",
           "Topic :: Software Development :: Libraries :: Python Modules",
@@ -53,5 +53,5 @@ setup(name='dask-ms',
       author='Simon Perkins',
       author_email='sperkins@ska.ac.za',
       packages=find_packages(),
-      python_requires=">=3.5",
+      python_requires=">=3.6",
       zip_safe=True)

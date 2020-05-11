@@ -7,10 +7,11 @@ from numpy.testing import assert_array_equal
 import pyrap.tables as pt
 import pytest
 
-
 from daskms.query import orderby_clause, where_clause
+from dask.optimization import key_split
 from daskms.utils import (group_cols_str, index_cols_str,
-                          select_cols_str, assert_liveness)
+                          select_cols_str, assert_liveness,
+                          table_path_split)
 from daskms.table_proxy import TableProxy, taql_factory
 from daskms.dask_ms import (xds_from_ms,
                             xds_from_table,
@@ -179,6 +180,18 @@ def test_taql_where(ms, index_cols):
     fields = da.concatenate([ds.FIELD_ID.data for ds in xds])
     assert_array_equal(fields, [0, 0, 1, 1, 0, 1, 1])
 
+    # Group columns case
+    xds = xds_from_table(ms, taql_where="FIELD_ID >= 0 AND FIELD_ID < 2",
+                         group_cols=["DATA_DESC_ID", "FIELD_ID"],
+                         columns=["FIELD_ID"])
+
+    assert len(xds) == 2
+
+    # Check group id's, no DATA_DESC_ID == 1 because it only
+    # contains FIELD_ID == 2
+    assert xds[0].DATA_DESC_ID == 0 and xds[0].FIELD_ID == 0
+    assert xds[1].DATA_DESC_ID == 0 and xds[1].FIELD_ID == 1
+
     # Group on each row
     xds = xds_from_table(ms, taql_where="FIELD_ID >= 0 AND FIELD_ID < 2",
                          group_cols=["__row__"],
@@ -272,3 +285,29 @@ def test_column_promotion(ms):
     for ds in xds:
         assert "DATA" in ds.data_vars
         assert list(ds.attrs.keys()) == ["SCAN_NUMBER"]
+
+
+def test_read_array_names(ms):
+    _, short_name, _ = table_path_split(ms)
+    datasets = xds_from_ms(ms)
+
+    for ds in datasets:
+        for k, v in ds.data_vars.items():
+            product = ("~[" + str(ds.FIELD_ID) +
+                       "," + str(ds.DATA_DESC_ID) + "]")
+            prefix = "".join(("read~", k, product))
+            assert key_split(v.data.name) == prefix
+
+
+def test_write_array_names(ms, tmp_path):
+    _, short_name, _ = table_path_split(ms)
+    datasets = xds_from_ms(ms)
+
+    out_table = str(tmp_path / short_name)
+
+    writes = xds_to_table(datasets, out_table, "ALL")
+
+    for ds in writes:
+        for k, v in ds.data_vars.items():
+            prefix = "".join(("write~", k))
+            assert key_split(v.data.name) == prefix

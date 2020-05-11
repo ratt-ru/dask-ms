@@ -47,17 +47,16 @@ For example, an observation can be represented by the following table:
 
 Each row stores a measurement produced by an interferometer
 over 4096 channels and 4 correlations in the DATA column.
-The other columns identify attributes associated with each measurement.
+Other columns identify attributes associated with each measurement.
 
-Additionally, each measurement is uniquely identified by the:
+In the above example, each measurement is uniquely identified by the:
 
 - FIELD_ID: The ID of the observed FIELD
 - TIME: The time at which the measurement was taken.
 - ANTENNA1, ANTENNA2: The baseline along which the measurement was taken.
 
-Therefore, the (FIELD_ID, TIME, ANTENNA1, ANTENNA2) values
-uniquely identify a measurement and, in the Relational Model establish
-the *unique key* for the table.
+The (FIELD_ID, TIME, ANTENNA1, ANTENNA2) values therefore
+establish *unique key* for the table, in the Relational Model.
 
 Column Types and Shapes
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -69,7 +68,7 @@ highly constrained (all rows have a fixed shape)
 or highly variable (many rows have many shapes).
 
 For example, the DATA column in the table below
-contain measurements for
+contains measurements for
 FIELD 0 with 4096 channels and 4 correlations
 *and* measurements for
 FIELD 1 with 64 channels and 2 correlations.

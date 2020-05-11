@@ -23,8 +23,8 @@ def test_executor():
     assert len(_executor_cache) == 1
 
     assert ex.impl.submit(lambda x: x*2, 4).result() == 8
-    ex.shutdown(wait=True)
-    ex3.shutdown(wait=False)
+    ex.impl.shutdown(wait=True)
+    ex3.impl.shutdown(wait=False)
 
     # Executor should be shutdown at this point
     with pytest.raises(RuntimeError):
@@ -36,6 +36,25 @@ def test_executor():
     del ex, ex2, ex3
 
     # Check that callbacks
+    assert len(_executor_cache) == 0
+
+
+def test_executor_keys():
+    """ Test executor keys """
+    ex = Executor("foo")
+    ex2 = Executor("bar")
+    ex3 = Executor("foo")
+    ex4 = Executor()
+
+    assert len(_executor_cache) == 3
+
+    assert ex is not ex2
+    assert ex is ex3
+    assert pickle.loads(pickle.dumps(ex)) is ex3
+    assert pickle.loads(pickle.dumps(ex2)) is not ex3
+
+    del ex, ex2, ex3, ex4
+
     assert len(_executor_cache) == 0
 
 

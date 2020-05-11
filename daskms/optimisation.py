@@ -99,7 +99,7 @@ class ArrayCache(metaclass=ArrayCacheMetaClass):
         return "ArrayCache[%s]" % self.token
 
 
-def cached_array(array):
+def cached_array(array, token=None):
     """
     Return a new array that functionally has the same values as array,
     but flattens the underlying graph and introduces a cache lookup
@@ -107,9 +107,20 @@ def cached_array(array):
 
     Useful for caching data that can fit in-memory for the duration
     of the graph's execution.
+
+    Parameters
+    ----------
+    array : :class:`dask.array.Array`
+        dask array to cache.
+    token : optional, str
+        A unique token for identifying the internal cache.
+        If None, it will be automatically generated.
     """
     dsk = dict(array.__dask_graph__())
     keys = set(flatten(array.__dask_keys__()))
+
+    if token is None:
+        token = uuid.uuid4().hex
 
     # Inline + cull everything except the current array
     inline_keys = set(dsk.keys() - keys)
@@ -117,7 +128,9 @@ def cached_array(array):
     dsk3, _ = cull(dsk2, keys)
 
     # Create a cache used to store array values
-    cache = ArrayCache(uuid.uuid4().hex)
+    cache = ArrayCache(token)
+
+    assert len(dsk3) == len(keys)
 
     for k in keys:
         dsk3[k] = (cache_entry, cache, Key(k), dsk3.pop(k))
@@ -135,18 +148,44 @@ def inlined_array(a, inline_arrays=None):
     # Inline everything except the output keys
     if inline_arrays is None:
         inline_keys = set(agraph.keys()) - akeys
-    # Inline specified array
-    elif isinstance(inline_arrays, da.Array):
-        inline_keys = set(flatten(inline_arrays.__dask_keys__()))
+        dsk2 = inline(agraph, keys=inline_keys, inline_constants=True)
+        dsk3, _ = cull(dsk2, akeys)
+
+        graph = HighLevelGraph.from_collections(a.name, dsk3, [])
+        return da.Array(graph, a.name, a.chunks, dtype=a.dtype)
+
+    # We're given specific arrays to inline, promote to list
+    if isinstance(inline_arrays, da.Array):
+        inline_arrays = [inline_arrays]
+    elif isinstance(inline_arrays, tuple):
+        inline_arrays = list(inline_arrays)
+
+    if not isinstance(inline_arrays, list):
+        raise TypeError("Invalid inline_arrays, must be "
+                        "(None, list, tuple, dask.array.Array)")
+
+    layers = agraph.layers.copy()
+    deps = agraph.dependencies.copy()
+    inline_keys = set()
+    dsk = dict(layers[a.name])
+
     # Inline specified arrays
-    elif isinstance(inline_arrays, (tuple, list)):
-        inline_keys = set(flatten([a.__dask_keys__() for a in inline_arrays]))
-    else:
-        raise TypeError("Invalid inline_arrays")
+    for array in inline_arrays:
+        # Remove array from layers and dependencies
+        try:
+            dsk.update(layers.pop(array.name))
+            del deps[array.name]
+        except KeyError:
+            raise ValueError("%s is not a valid dependency of a"
+                             % array.name)
 
-    dsk2 = inline(agraph, keys=inline_keys, inline_constants=True)
+        # Record keys to inline
+        inline_keys.update(flatten(array.__dask_keys__()))
 
-    # Remove everything except keys of A
+    dsk2 = inline(dsk, keys=inline_keys, inline_constants=True)
     dsk3, _ = cull(dsk2, akeys)
 
-    return da.Array(dsk3, a.name, a.chunks, a.dtype)
+    layers[a.name] = dsk3
+    graph = HighLevelGraph(layers, deps)
+
+    return da.Array(graph, a.name, a.chunks, a.dtype)

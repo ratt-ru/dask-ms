@@ -4,6 +4,7 @@ import logging
 
 import dask
 import dask.array as da
+from daskms.optimisation import cached_array, inlined_array
 from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 import pyrap.tables as pt
@@ -407,6 +408,75 @@ def add_row_order_factory(table_proxy, datasets):
     return row_add_ops
 
 
+def cached_row_order(rowid):
+    """
+    Produce a cached row_order array from the given rowid array.
+
+    There's an assumption here that rowid is an
+    operation with minimal dependencies
+    (i.e. derived from xds_from_{ms, table})
+    Caching flattens the graph into one or two layers
+    depending on whether standard or group ordering is requested
+
+    Therfore, this functions warns if the rowid graph looks unusual,
+    mostly because it'll be included in the cached row_order array,
+    so we don't want it's graph to be too big or unusual.
+
+    Parameters
+    ----------
+    rowid : :class:`dask.array.Array`
+        rowid array
+
+    Returns
+    -------
+    row_order : :class:`dask.array.Array`
+        A array of row order tuples
+    """
+    layers = rowid.__dask_graph__().layers
+
+    # daskms.ordering.row_ordering case
+    # or daskms.ordering.group_row_ordering case without rechunking
+    # Check for standard layer
+    if len(layers) == 1:
+        layer_name = list(layers.keys())[0]
+
+        if (not layer_name.startswith("row-") and
+                not layer_name.startswith("group-rows-")):
+
+            log.warning("Unusual ROWID layer %s. "
+                        "This is probably OK but "
+                        "could foreshadow incorrect "
+                        "behaviour.", layer_name)
+    # daskms.ordering.group_row_ordering case with rechunking
+    # Check for standard layers
+    elif len(layers) == 2:
+        layer_names = list(sorted(layers.keys()))
+
+        if not (layer_names[0].startswith('group-rows-') and
+                layer_names[1].startswith('rechunk-merge-')):
+
+            log.warning("Unusual ROWID layers %s for "
+                        "the group ordering case. "
+                        "This is probably OK but "
+                        "could foreshadow incorrect "
+                        "behaviour.", layer_names)
+    # ROWID has been extended or modified somehow, warn
+    else:
+        layer_names = list(sorted(layers.keys()))
+        log.warning("Unusual number of ROWID layers > 2 "
+                    "%s. This is probably OK but "
+                    "could foreshadow incorrect "
+                    "behaviour or sub-par performance if "
+                    "the ROWID graph is large.",
+                    layer_names)
+
+    row_order = rowid.map_blocks(row_run_factory,
+                                 sort_dir="write",
+                                 dtype=np.object)
+
+    return cached_array(row_order)
+
+
 def _write_datasets(table, table_proxy, datasets, columns, descriptor,
                     table_keywords, column_keywords):
     _, table_name, subtable = table_path_split(table)
@@ -430,41 +500,45 @@ def _write_datasets(table, table_proxy, datasets, columns, descriptor,
         try:
             rowid = ds.ROWID.data
         except AttributeError:
+            # Add operation
             # No ROWID's, assume they're missing from the table
             # and remaining datasets. Generate addrows
             # NOTE(sjperkins)
             # This could be somewhat brittle, but exists to
-            # update of MS subtables once they've been
-            # created (empty) along with the main MS by a call to default_ms.
+            # update MS empty subtables once they've been
+            # created along with the main MS by a call to default_ms.
             # Users could also it to append rows to an existing table.
-            # An xds_append_to_table is probably the correct solution...
+            # An xds_append_to_table may be a better solution...
             last_datasets = datasets[di:]
             last_row_orders = add_row_order_factory(table_proxy, last_datasets)
-            row_orders.extend(last_row_orders)
+
+            # We don't inline the row ordering if it is derived
+            # from the row sizes of provided arrays.
+            # The range of possible dependencies are far too large to inline
+            row_orders.extend([(False, lro) for lro in last_row_orders])
             # We have established row orders for all datasets
             # at this point, quit the loop
             break
         else:
+            # Update operation
             # Generate row orderings from existing row IDs
-            row_order = rowid.map_blocks(row_run_factory,
-                                         sort_dir="write",
-                                         dtype=np.object)
-            row_orders.append(row_order)
+            row_order = cached_row_order(rowid)
+
+            # Inline the row ordering in the graph
+            row_orders.append((True, row_order))
 
     assert len(row_orders) == len(datasets)
 
     datasets = []
 
-    for (di, ds), row_order in zip(sorted_datasets, row_orders):
-        data_vars = ds.data_vars
-
+    for (di, ds), (inline, row_order) in zip(sorted_datasets, row_orders):
         # Hold the variables representing array writes
         write_vars = {}
 
         # Generate a dask array for each column
         for column in columns:
             try:
-                variable = data_vars[column]
+                variable = ds.data_vars[column]
             except KeyError:
                 log.warning("Ignoring '%s' not present "
                             "on dataset %d" % (column, di))
@@ -495,7 +569,7 @@ def _write_datasets(table, table_proxy, datasets, columns, descriptor,
 
             # Name of the dask array representing this column
             token = dask.base.tokenize(di, args)
-            name = "-".join((table_name, 'write', column, token))
+            name = "".join(("write~", column, "-", table_name, "-", token))
 
             write_col = da.blockwise(putter_wrapper, full_dims,
                                      *args,
@@ -506,7 +580,9 @@ def _write_datasets(table, table_proxy, datasets, columns, descriptor,
                                      align_arrays=False,
                                      dtype=np.bool)
 
-            # Writes for this column
+            if inline:
+                write_col = inlined_array(write_col, [row_order])
+
             write_vars[column] = (full_dims, write_col)
 
         # Append a dataset with the write operations
@@ -545,7 +621,8 @@ def _put_keywords(table, table_keywords, column_keywords):
 
 
 def write_datasets(table, datasets, columns, descriptor=None,
-                   table_keywords=None, column_keywords=None):
+                   table_keywords=None, column_keywords=None,
+                   table_proxy=False):
     # Promote datasets to list
     if isinstance(datasets, tuple):
         datasets = list(datasets)
@@ -560,11 +637,16 @@ def write_datasets(table, datasets, columns, descriptor=None,
             columns = list(sorted(set.union(*columns)))
 
     if not table_exists(table):
-        table_proxy = _create_table(table, datasets, columns, descriptor)
+        tp = _create_table(table, datasets, columns, descriptor)
     else:
-        table_proxy = _updated_table(table, datasets, columns, descriptor)
+        tp = _updated_table(table, datasets, columns, descriptor)
 
-    return _write_datasets(table, table_proxy, datasets, columns,
-                           descriptor=descriptor,
-                           table_keywords=table_keywords,
-                           column_keywords=column_keywords)
+    write_datasets = _write_datasets(table, tp, datasets, columns,
+                                     descriptor=descriptor,
+                                     table_keywords=table_keywords,
+                                     column_keywords=column_keywords)
+
+    if table_proxy:
+        return write_datasets, tp
+
+    return write_datasets

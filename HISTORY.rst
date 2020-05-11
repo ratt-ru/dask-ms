@@ -2,8 +2,26 @@
 History
 =======
 
-0.2.4 (YYYY-MM-DD)
+0.2.5 (2020-05-11)
 ------------------
+* Remove deadlock in TableProxy weakref.finalize on Python 3.6 (:pr:`113`)
+* Use python-casacore wheels for travis testing, instead of kernsuite packages (:pr:`115`)
+
+0.2.4 (2020-04-24)
+------------------
+* Documentation updates (:pr:`110`)
+* Provide better warnings for unusual ROWID graphs during table updates (:pr:`108`)
+* Work around casacore getcolslice caching (:pr:`107`)
+* Update LICENSE year (:pr:`105`)
+* Update license and production status in pypi classifiers (:pr:`104`)
+* Use WHERE rather than HAVING clause in group ordering TAQL (:pr:`98`)
+* Improve the dask task key names for clearer graph visualization (:pr:`102`)
+* Cache and inline row runs in write operations (:pr:`96`)
+* Support getcolslice and putcolslice in TableProxy (:pr:`91`)
+* Use weakref.finalize to cleanup TableProxy and Executor objects (:pr:`89`)
+* Pickle Executor key argument (:pr:`88`)
+* Deprecate Python 3.5 support and test on Python 3.7 (:pr:`87`)
+* Optionally expose TableProxy objects in dataset read/write methods (:pr:`85`)
 * Upgrade to python-casacore 3.2 (:pr:`84`)
 * Re-introduce xarray handling in dataset.as_variable (:pr:`83`)
 * Explicitly require dask Arrays on write datasets (:pr:`83`)
