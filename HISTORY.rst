@@ -4,7 +4,8 @@ History
 
 0.2.5 (YYYY-MM-DD)
 ------------------
-* Remove TableProxy weakref.finalize (:pr:`113`)
+* Remove potential deadlock in TableProxy weakref.finalize (:pr:`113`)
+* Use python-casacore wheels for travis testing, instead of kernsuite packages (:pr:`115`)
 
 0.2.4 (2020-04-24)
 ------------------
