@@ -2,6 +2,11 @@
 History
 =======
 
+0.2.6 (YYYY-MM-DD)
+------------------
+* Test on Python 3.8 (:pr:`116`)
+* Depend on python-casacore 3.3.1 (:pr:`116`)
+
 0.2.5 (2020-05-11)
 ------------------
 * Remove deadlock in TableProxy weakref.finalize on Python 3.6 (:pr:`113`)
