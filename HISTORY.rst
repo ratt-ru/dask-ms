@@ -4,7 +4,7 @@ History
 
 0.2.6 (YYYY-MM-DD)
 ------------------
-* Test on Python 3.8 and with Ubuntu 20.04 as base OS (:pr:`116`)
+* Test on Python 3.8 (:pr:`116`)
 * Depend on python-casacore 3.3.1 (:pr:`116`)
 
 0.2.5 (2020-05-11)
