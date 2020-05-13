@@ -24,7 +24,7 @@ on_rtd = os.environ.get('READTHEDOCS') == 'True'
 if not on_rtd:
     install_requires += [
         "numpy >= 1.14.0",
-        "python-casacore >= 3.2.0",
+        "python-casacore >= 3.3.1",
     ]
 
 
