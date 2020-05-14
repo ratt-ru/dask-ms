@@ -7,7 +7,7 @@ except ImportError as e:
 
 extras_require = {
     'xarray': ["xarray > 0.12.0"],
-    'testing': ['pytest', 'pytest-flake8']
+    'testing': ['pytest', 'pytest-flake8 >= 1.0.6']
 }
 
 install_requires = [
