@@ -6,7 +6,6 @@ from threading import Lock
 import weakref
 import os
 
-from functools import wraps
 from time import time
 
 from dask.base import normalize_token
@@ -147,7 +146,7 @@ def proxied_method_factory(method, locktype):
                 _impl.calls += 1
                 start_time = time()
                 result = getattr(table, method)(*args, **kwargs)
-                start_time = time()
+                end_time = time()
                 _impl.run_time.append(end_time - start_time)
                 return result
             except Exception:
@@ -291,7 +290,7 @@ def _writelock_runner(table_future, fn, *args, **kwargs):
         start_time = time()
         result = fn(table_future.result(), *args, **kwargs)
         end_time = time()
-        _writelock_runner.append(end_time - start_time)
+        _writelock_runner.run_time.append(end_time - start_time)
         _function_runs[fn.__name__] = (_writelock_runner.run_time, _writelock_runner.calls)
         return result
     except Exception:
