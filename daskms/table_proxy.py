@@ -98,6 +98,7 @@ def proxied_method_factory(method, locktype):
     """
 
     if locktype == NOLOCK:
+        print("NOLOCK -- called")
         def _impl(table_future, args, kwargs):
             try:
                 _impl.calls += 1
@@ -115,6 +116,7 @@ def proxied_method_factory(method, locktype):
         _impl.run_time = []
 
     elif locktype == READLOCK:
+        # print("READLOCK -- called")
         def _impl(table_future, args, kwargs):
             table = table_future.result()
             table.lock(write=False)
@@ -125,6 +127,8 @@ def proxied_method_factory(method, locktype):
                 result = getattr(table, method)(*args, **kwargs)
                 end_time = time()
                 _impl.run_time.append(end_time - start_time)
+                # print("result", result)
+                # print("_impl.run_rime",_impl.run_time)
                 return result
             except Exception:
                 if logging.DEBUG >= log.getEffectiveLevel():
@@ -132,12 +136,15 @@ def proxied_method_factory(method, locktype):
                     raise
             finally:
                 table.unlock()
+                _function_runs[method] = (_impl.run_time, _impl.calls)
 
-            _function_runs[method] = (_impl.run_time, _impl.calls)
+        # print("function_runs READLOCK", _function_runs)
         _impl.calls = 0
         _impl.run_time = []
 
     elif locktype == WRITELOCK:
+        # print("WRITELOCK -- called")
+        # _function_runs = {}
         def _impl(table_future, args, kwargs):
             table = table_future.result()
             table.lock(write=True)
@@ -155,8 +162,9 @@ def proxied_method_factory(method, locktype):
                 raise
             finally:
                 table.unlock()
+                _function_runs[method] = (_impl.run_time, _impl.calls)
 
-            _function_runs[method] = (_impl.run_time, _impl.calls)
+        # print("function_runs - WRITELOCK", _function_runs)
         _impl.calls = 0
         _impl.run_time = []
 

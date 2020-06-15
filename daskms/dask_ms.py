@@ -110,7 +110,7 @@ def xds_to_table(xds, table_name, columns, descriptor=None,
             else:
                 raise TypeError("Invalid Dataset type '%s'" % type(ds))
 
-    print("Table Keywords - dask_ms", type(table_keywords), table_keywords)
+    # print("Table Keywords - dask_ms", type(table_keywords), table_keywords)
     # Write the datasets
     out_ds = write_datasets(table_name, datasets, columns,
                             descriptor=descriptor,
