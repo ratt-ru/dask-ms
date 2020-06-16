@@ -102,6 +102,7 @@ def proxied_method_factory(method, locktype):
         def _impl(table_future, args, kwargs):
             try:
                 _impl.calls += 1
+                _impl.akwargs.append((args,kwargs))
                 start_time = time()
                 result = getattr(table_future.result(), method)(*args, **kwargs)
                 end_time = time()
@@ -111,24 +112,25 @@ def proxied_method_factory(method, locktype):
                 if logging.DEBUG >= log.getEffectiveLevel():
                     log.exception("Exception in %s", method)
                 raise
-            _function_runs[method] = (_impl.run_time, _impl.calls)
+            _function_runs[method] = (_impl.run_time, _impl.akwargs,
+                                        _impl.calls)
         _impl.calls = 0
+        _impl.akwargs = []
         _impl.run_time = []
 
+
     elif locktype == READLOCK:
-        # print("READLOCK -- called")
         def _impl(table_future, args, kwargs):
             table = table_future.result()
             table.lock(write=False)
 
             try:
                 _impl.calls += 1
+                _impl.akwargs.append((args, kwargs))
                 start_time = time()
                 result = getattr(table, method)(*args, **kwargs)
                 end_time = time()
                 _impl.run_time.append(end_time - start_time)
-                # print("result", result)
-                # print("_impl.run_rime",_impl.run_time)
                 return result
             except Exception:
                 if logging.DEBUG >= log.getEffectiveLevel():
@@ -136,21 +138,22 @@ def proxied_method_factory(method, locktype):
                     raise
             finally:
                 table.unlock()
-                _function_runs[method] = (_impl.run_time, _impl.calls)
+                _function_runs[method] = (_impl.run_time, _impl.akwargs,
+                                            _impl.calls)
 
-        # print("function_runs READLOCK", _function_runs)
         _impl.calls = 0
+        _impl.akwargs = []
         _impl.run_time = []
 
+
     elif locktype == WRITELOCK:
-        # print("WRITELOCK -- called")
-        # _function_runs = {}
         def _impl(table_future, args, kwargs):
             table = table_future.result()
             table.lock(write=True)
 
             try:
                 _impl.calls += 1
+                _impl.akwargs.append((args, _kwargs))
                 start_time = time()
                 result = getattr(table, method)(*args, **kwargs)
                 end_time = time()
@@ -162,10 +165,11 @@ def proxied_method_factory(method, locktype):
                 raise
             finally:
                 table.unlock()
-                _function_runs[method] = (_impl.run_time, _impl.calls)
+                _function_runs[method] = (_impl.run_time, _impl.akwargs,
+                                            _impl.calls)
 
-        # print("function_runs - WRITELOCK", _function_runs)
         _impl.calls = 0
+        _impl.akwargs = []
         _impl.run_time = []
 
     else:
@@ -248,17 +252,20 @@ def _nolock_runner(table_future, fn, *args, **kwargs):
     """
     try:
         _nolock_runner.calls += 1
+        _nolock_runner.akwargs.append((args, kwargs))
         start_time = time()
         result = fn(table_future.result(), *args, **kwargs)
         end_time = time()
         _nolock_runner.run_time.append(end_time - start_time)
-        _function_runs[fn.__name__] = (_nolock_runner.run_time, _nolock_runner.calls)
+        _function_runs[fn.__name__] = (_nolock_runner.run_time,
+                            _nolock_runner.akwargs, _nolock_runner.calls)
         return result
     except Exception:
         if logging.DEBUG >= log.getEffectiveLevel():
             log.exception("Exception in %s", fn.__name__)
         raise
 _nolock_runner.calls = 0
+_nolock_runner.akwargs = []
 _nolock_runner.run_time = []
 
 
@@ -271,11 +278,13 @@ def _readlock_runner(table_future, fn, args, kwargs):
 
     try:
         _readlock_runner.calls += 1
+        _readlock_runner.akwargs.append((args, kwargs))
         start_time = time()
         result = fn(table_future.result(), *args, **kwargs)
         end_time = time()
         _readlock_runner.run_time.append(end_time - start_time)
-        _function_runs[fn.__name__] = (_readlock_runner.run_time, _readlock_runner.calls)
+        _function_runs[fn.__name__] = (_readlock_runner.run_time,
+                            _readlock_runner.akwargs, _readlock_runner.calls)
         return result
     except Exception:
         if logging.DEBUG >= log.getEffectiveLevel():
@@ -285,6 +294,7 @@ def _readlock_runner(table_future, fn, args, kwargs):
         table.unlock()
 
 _readlock_runner.calls = 0
+_readlock_runner.akwargs = []
 _readlock_runner.run_time = []
 
 def _writelock_runner(table_future, fn, *args, **kwargs):
@@ -295,11 +305,13 @@ def _writelock_runner(table_future, fn, *args, **kwargs):
     table.lock(write=True)
     try:
         _writelock_runner.calls += 1
+        _writelock_runner.akwargs.append((args, kwargs))
         start_time = time()
         result = fn(table_future.result(), *args, **kwargs)
         end_time = time()
         _writelock_runner.run_time.append(end_time - start_time)
-        _function_runs[fn.__name__] = (_writelock_runner.run_time, _writelock_runner.calls)
+        _function_runs[fn.__name__] = (_writelock_runner.run_time,
+                            _writelock_runner.akwargs, _writelock_runner.calls)
         return result
     except Exception:
         if logging.DEBUG >= log.getEffectiveLevel():
@@ -311,6 +323,7 @@ def _writelock_runner(table_future, fn, *args, **kwargs):
         table.unlock()
 
 _writelock_runner.calls = 0
+_writelock_runner.akwargs = []
 _writelock_runner.run_time = []
 
 def _iswriteable(table_future):
