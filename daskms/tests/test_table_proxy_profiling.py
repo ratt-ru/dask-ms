@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from pprint import pprint
 
 import dask
 from dask.base import tokenize
@@ -108,43 +109,7 @@ def test_readlock_profiling(ms, group_cols, index_cols, select_cols):
             dask_data = ds.data_vars[c].data.compute(scheduler='single-threaded')
             assert_array_equal(column_data[c], dask_data)
 
-    # print(count)
-    # print(ds.data_vars)
-    # Read _function_runs (display)
-    # print(_function_runs['getcol'])
-    from pprint import pprint
-    pprint(_function_runs['getcol'])
-
-    # print("group", len(group_cols))
-    # print("index", len(index_cols))
-    # print("select", len(select_cols))
-
-    attributes = xds[0].attrs
-    # print(attributes)
-    attrs_list = []
-    # Read the Xarray Dataset
-    # They are sorted
-    for ds in xds:
-        # print(ds.attrs)
-        # [print(ds.attrs[a]) for a in group_cols]
-        for a in group_cols:
-            val = ds.attrs[a]
-            # print(val, a)
-            # attributes[key] = a
-            # attributes.update(key = a)
-
-        # print(ds.data_vars)
-        # print(ds.coords)
-    # print(attributes)
-    # Get the number of FIELD_ID's
-    # print("xds", len(xds))
-
-    # getcol = len(xds) * (len(select_cols) + len(group_cols))
-    # getcoldesc = len(xds) * len(select_cols)
-    # getcellslice = None
-
-    # print("getcol", getcol)
-    # print("getcoldesc", getcoldesc)
+    pprint(_function_runs)
 
 
 
