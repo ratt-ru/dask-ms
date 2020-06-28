@@ -167,10 +167,11 @@ def putter_wrapper(row_orders, *args):
         # array metadata is plainly incorrect as a dict isn't a valid
         # numpy array representation, so we heuristically guess the
         # output shape here.
-        # Dimension slicing is also not supported
-        # (putvarcol doesn't support it in any case).
+        # Dimension slicing is also not supported as
+        # putvarcol doesn't support it in any case.
         if nextent_args > 0:
-            raise ValueError("Extents unsupported for dictionary writes")
+            raise ValueError("Chunked writes for secondary dimensions "
+                             "unsupported for dictionary data")
 
         out_shape = (1,) * max(len(v.shape) for v in data.values())
         dict_data = True

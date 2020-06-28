@@ -9,7 +9,7 @@ import dask.array as da
 from dask.array.core import normalize_chunks
 from dask.highlevelgraph import HighLevelGraph
 import numpy as np
-from numpy.testing import assert_array_equal
+from numpy.testing import assert_array_equal, assert_array_almost_equal
 import pyrap.tables as pt
 import pytest
 
@@ -419,7 +419,7 @@ def test_write_dict_data(tmp_path, chunks, dtype):
     shapes = {k: sum(c) for k, c in chunks.items()}
     row_sum += shapes['row']
 
-    assert len(chunks['chan']) == 1
+    # assert len(chunks['chan']) == 1
     assert len(chunks['corr']) == 1
 
     # Make some visibilities
@@ -429,13 +429,13 @@ def test_write_dict_data(tmp_path, chunks, dtype):
 
     nchunks = (len(chunks[d]) for d in dims)
     keys = product((name,), *(range(c) for c in nchunks))
+    chunk_sizes = product(*(chunks[d] for d in dims))
 
-    layer = {key: {'r%d' % (i + 1): _vis_factory(chan, corr)
-                   for i in range(row)}
-             for key in keys}
+    layer = {k: {'r%d' % (i + 1): _vis_factory(chan, corr)
+                 for i in range(r)}
+             for k, (r, _, _) in zip(keys, chunk_sizes)}
 
     hlg = HighLevelGraph.from_collections(name, layer, [])
-
     chunks = tuple(chunks[d] for d in dims)
     meta = np.empty((0,)*len(chunks), dtype=np.complex128)
     vis = da.Array(hlg, name, chunks, meta=meta)
@@ -447,11 +447,25 @@ def test_write_dict_data(tmp_path, chunks, dtype):
                                          # No fixed shape columns
                                          descriptor="ms(False)")
 
-    dask.compute(writes, scheduler='single-threaded')
+    dask.compute(writes)
 
-    data = table_proxy.getvarcol("DATA").result()  # noqa: F841
+    data = table_proxy.getvarcol("DATA").result()
 
-    # assert data.keys() == layer.values()
+    # First row chunk
+    assert_array_almost_equal(layer[(name, 0, 0, 0)]['r1'], data['r1'])
+    assert_array_almost_equal(layer[(name, 0, 0, 0)]['r2'], data['r2'])
+    assert_array_almost_equal(layer[(name, 0, 0, 0)]['r3'], data['r3'])
+    assert_array_almost_equal(layer[(name, 0, 0, 0)]['r4'], data['r4'])
+    assert_array_almost_equal(layer[(name, 0, 0, 0)]['r5'], data['r5'])
+
+    # Second row chunk
+    assert_array_almost_equal(layer[(name, 1, 0, 0)]['r1'], data['r6'])
+    assert_array_almost_equal(layer[(name, 1, 0, 0)]['r2'], data['r7'])
+    assert_array_almost_equal(layer[(name, 1, 0, 0)]['r3'], data['r8'])
+
+    # Third row chunk
+    assert_array_almost_equal(layer[(name, 2, 0, 0)]['r1'], data['r9'])
+    assert_array_almost_equal(layer[(name, 2, 0, 0)]['r2'], data['r10'])
 
 
 def test_dataset_computes_and_values(ms):
