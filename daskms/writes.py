@@ -43,7 +43,7 @@ def ndarray_putcol(row_runs, table_future, column, data):
         table.unlock()
 
 
-def multdim_str_putcol(row_runs, table_future, column, data):
+def multidim_str_putcol(row_runs, table_future, column, data):
     """ Put multidimensional string data into the table """
     table = table_future.result()
     putcol = table.putcol
@@ -86,7 +86,7 @@ def ndarray_putcolslice(row_runs, blc, trc, table_future, column, data):
         table.unlock()
 
 
-def multdim_str_putcolslice(row_runs, blc, trc, table_future, column, data):
+def multidim_str_putcolslice(row_runs, blc, trc, table_future, column, data):
     """ Put multidimensional string data into the table """
     table = table_future.result()
     putcol = table.putcol
@@ -108,10 +108,37 @@ def multdim_str_putcolslice(row_runs, blc, trc, table_future, column, data):
         table.unlock()
 
 
+def multidim_dict_putvarcol(row_runs, blc, trc, table_future, column, data):
+    """ Put data into the table """
+    if row_runs.shape[0] != 1:
+        raise ValueError("Row runs unsupported for dictionary data")
+
+    table = table_future.result()
+    putvarcol = table.putvarcol
+    table.lock(write=True)
+
+    try:
+        putvarcol(column, data, startrow=row_runs[0, 0], nrow=row_runs[0, 1])
+        table.flush()
+    finally:
+        table.unlock()
+
+
+def dict_putvarcol(row_runs, table_future, column, data):
+    return multidim_dict_putvarcol(row_runs, None, None,
+                                   table_future, column, data)
+
+
 def putter_wrapper(row_orders, *args):
     """
     Wrapper which should run I/O operations within
     the table_proxy's associated executor
+
+    Returns
+    -------
+    success : :class:`numpy.ndarray`
+        singleton array containing True,
+        having the same dimensionality as the input data.
     """
     # Infer number of shape arguments
     nextent_args = len(args) - 3
@@ -120,15 +147,9 @@ def putter_wrapper(row_orders, *args):
 
     # Handle dask compute_meta gracefully
     if len(row_orders) == 0:
-        return np.empty((0,)*len(data.shape), dtype=np.bool)
+        return np.empty((0,) * nextent_args, dtype=np.bool)
 
     row_runs, resort = row_orders
-
-    if resort is not None:
-        data = data[resort]
-
-    # Infer output shape before possible list conversion
-    out_shape = (1,) * len(data.shape)
 
     # NOTE(sjperkins)
     # python-casacore wants to put lists of objects, but
@@ -137,24 +158,59 @@ def putter_wrapper(row_orders, *args):
     # Without this conversion python-casacore can segfault
     # See https://github.com/ska-sa/dask-ms/issues/42
     multidim_str = False
+    dict_data = False
 
-    if data.dtype == np.object:
-        # Multi-dimensional strings, we need to pass dicts through
-        if data.ndim > 1:
-            multidim_str = True
-        # We can just pass dictionaries through
-        else:
-            data = data.tolist()
+    if isinstance(data, dict):
+        # NOTE(sjperkins)
+        # Here we're trying to reconcile the internal returned shape
+        # with the returned shape expected by dask. The external dask
+        # array metadata is plainly incorrect as a dict isn't a valid
+        # numpy array representation, so we heuristically guess the
+        # output shape here.
+        # Dimension slicing is also not supported
+        # (putvarcol doesn't support it in any case).
+        if nextent_args > 0:
+            raise ValueError("Extents unsupported for dictionary writes")
+
+        out_shape = (1,) * max(len(v.shape) for v in data.values())
+        dict_data = True
+
+        if resort is not None:
+            data = {"r%d" % (i+1): data["r%d" % (s+1)]
+                    for i, s in enumerate(resort)}
+
+    elif isinstance(data, np.ndarray):
+        # Infer output shape
+        out_shape = (1,) * len(data.shape)
+
+        if resort is not None:
+            data = data[resort]
+
+        # NOTE(sjperkins)
+        # The convention here is that an object dtype implies an
+        # array of string objects
+        if data.dtype == np.object:
+            if data.ndim > 1:
+                # Multi-dimensional strings,
+                # we need to pass dicts through
+                multidim_str = True
+            else:
+                # We can just a list of string through
+                data = data.tolist()
 
     # There are other dimensions beside row
     if nextent_args > 0:
         blc, trc = zip(*args[:nextent_args])
-        fn = multdim_str_putcolslice if multidim_str else ndarray_putcolslice
+        fn = (multidim_str_putcolslice if multidim_str else
+              multidim_dict_putvarcol if dict_data else
+              ndarray_putcolslice)
         table_proxy._ex.submit(fn, row_runs, blc, trc,
                                table_proxy._table_future,
                                column, data).result()
     else:
-        fn = multdim_str_putcol if multidim_str else ndarray_putcol
+        fn = (multidim_str_putcol if multidim_str else
+              dict_putvarcol if dict_data else
+              ndarray_putcol)
         table_proxy._ex.submit(fn, row_runs,
                                table_proxy._table_future,
                                column, data).result()
@@ -297,10 +353,11 @@ def add_row_orders(data, table_proxy, prev=None):
 
     Parameters
     ----------
-    data : :class:`numpy.ndarray`
-        numpy array from which the number of rows will be derived.
-        The first dimension :code:`data.shape[0]`
+    data : :class:`numpy.ndarray` or dict
+        If a numpy array the first dimension :code:`data.shape[0]`
         should contain the number of rows.
+        If a dict, the number of rows is
+        set to the length of the dict.
     table_proxy : :class:`daskms.table_proxy.TableProxy`
         Table Proxy object
     prev : tuple or None
@@ -326,7 +383,12 @@ def add_row_orders(data, table_proxy, prev=None):
     None
         Indicate that row resorting should not occur by default
     """
-    rows = data.shape[0]
+    if isinstance(data, np.ndarray):
+        rows = data.shape[0]
+    elif isinstance(data, dict):
+        rows = len(data)
+    else:
+        raise TypeError("data %s must be a numpy array or dict" % type(data))
 
     # This is the first link in the chain
     if prev is None:

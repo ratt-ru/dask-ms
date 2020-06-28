@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 
+from itertools import product
 import os
+import uuid
 
 import dask
 import dask.array as da
 from dask.array.core import normalize_chunks
+from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 from numpy.testing import assert_array_equal
 import pyrap.tables as pt
@@ -397,6 +400,58 @@ def test_dataset_create_table(tmp_path, dataset_chunks, dtype):
                   lockoptions='auto', ack=False) as T:
         assert T.nrows() == 1
         assert_array_equal(T.getcol("FREQ")[0], freq)
+
+
+@pytest.mark.parametrize("chunks", [
+    {'row': (5, 3, 2), 'chan': (16,), 'corr': (4,)},
+])
+@pytest.mark.parametrize("dtype", [np.complex128, np.float32])
+def test_write_dict_data(tmp_path, chunks, dtype):
+    rs = np.random.RandomState(42)
+    row_sum = 0
+
+    def _vis_factory(chan, corr):
+        # Variably sized-channels per row, as in BDA data
+        nchan = rs.randint(chan)
+        return (rs.normal(size=(1, nchan, corr)) +
+                rs.normal(size=(1, nchan, corr))*1j)
+
+    shapes = {k: sum(c) for k, c in chunks.items()}
+    row_sum += shapes['row']
+
+    assert len(chunks['chan']) == 1
+    assert len(chunks['corr']) == 1
+
+    # Make some visibilities
+    dims = ("row", "chan", "corr")
+    row, chan, corr = (shapes[d] for d in dims)
+    name = "vis-data-" + uuid.uuid4().hex
+
+    nchunks = (len(chunks[d]) for d in dims)
+    keys = product((name,), *(range(c) for c in nchunks))
+
+    layer = {key: {'r%d' % (i + 1): _vis_factory(chan, corr)
+                   for i in range(row)}
+             for key in keys}
+
+    hlg = HighLevelGraph.from_collections(name, layer, [])
+
+    chunks = tuple(chunks[d] for d in dims)
+    meta = np.empty((0,)*len(chunks), dtype=np.complex128)
+    vis = da.Array(hlg, name, chunks, meta=meta)
+    ds = Dataset({"DATA": (dims, vis)})
+
+    table_name = os.path.join(str(tmp_path), 'test.table')
+    writes, table_proxy = write_datasets(table_name, ds, ["DATA"],
+                                         table_proxy=True,
+                                         # No fixed shape columns
+                                         descriptor="ms(False)")
+
+    dask.compute(writes, scheduler='single-threaded')
+
+    data = table_proxy.getvarcol("DATA").result()  # noqa: F841
+
+    # assert data.keys() == layer.values()
 
 
 def test_dataset_computes_and_values(ms):
