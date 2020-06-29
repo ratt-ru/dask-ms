@@ -4,6 +4,7 @@ History
 
 0.2.6 (YYYY-MM-DD)
 ------------------
+* Support dictionary writes via putvarcol (:pr:`119`)
 * Update to pytest-flake8 1.0.6 (:pr:`117`)
 * Test on Python 3.8 (:pr:`116`)
 * Depend on python-casacore 3.3.1 (:pr:`116`)
