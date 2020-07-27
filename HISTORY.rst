@@ -4,6 +4,7 @@ History
 
 0.2.6 (YYYY-MM-DD)
 ------------------
+* Use getcell instead of getcellslice in sorted orderings (:pr:`120`)
 * Update to pytest-flake8 1.0.6 (:pr:`117`)
 * Test on Python 3.8 (:pr:`116`)
 * Depend on python-casacore 3.3.1 (:pr:`116`)
