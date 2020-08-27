@@ -112,8 +112,7 @@ def _sorted_group_rows(taql_proxy, group, index_cols):
         return rows
 
     # Sort rows according to group indexing columns
-    sort_columns = [taql_proxy.getcellslice("GROUP_" + c, group,
-                                            (-1,), (-1,))
+    sort_columns = [taql_proxy.getcell("GROUP_" + c, group)
                     for c in reversed(index_cols)]
 
     # Return sorted rows
