@@ -8,7 +8,12 @@ import pyrap.tables as pt
 import pytest
 
 from daskms.query import orderby_clause, where_clause
-from dask.optimization import key_split
+
+try:
+    from dask.optimization import key_split
+except ImportError:
+    from dask.utils import key_split
+
 from daskms.utils import (group_cols_str, index_cols_str,
                           select_cols_str, assert_liveness,
                           table_path_split)
