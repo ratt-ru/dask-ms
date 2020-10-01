@@ -6,7 +6,7 @@ import gc
 import dask.array as da
 from dask.core import flatten
 import numpy as np
-from numpy.testing import assert_array_almost_equal
+from numpy.testing import assert_array_almost_equal, assert_array_equal
 import pytest
 
 from daskms import xds_from_ms
@@ -50,6 +50,7 @@ def test_inlined_array():
     assert B.name not in D.__dask_graph__().layers
     graph_keys = set(flatten(D.__dask_graph__().keys()))
     assert graph_keys == set(flatten(D.__dask_keys__()))
+    assert_array_equal(D, C)
 
     D = inlined_array(C, [A])
     assert len(D.__dask_graph__().layers) == 2
@@ -59,6 +60,7 @@ def test_inlined_array():
     assert B.name in D.__dask_graph__().layers
     graph_keys = set(flatten(D.__dask_graph__().keys()))
     assert graph_keys == set(flatten([a.__dask_keys__() for a in [D, B]]))
+    assert_array_equal(D, C)
 
     D = inlined_array(C, [B])
     assert len(D.__dask_graph__().layers) == 2
@@ -68,6 +70,7 @@ def test_inlined_array():
     assert B.name not in D.__dask_graph__().layers
     graph_keys = set(flatten(D.__dask_graph__().keys()))
     assert graph_keys == set(flatten([a.__dask_keys__() for a in [D, A]]))
+    assert_array_equal(D, C)
 
 
 def test_cached_array(ms):

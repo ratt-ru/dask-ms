@@ -5,6 +5,7 @@ History
 0.2.6 (YYYY-MM-DD)
 ------------------
 * Remove table close in ThreadPool for the last time (:pr:`122`)
+* Respect the High Level Graph specification better during inline array creation (:pr:`123`)
 * Support dictionary writes via putvarcol (:pr:`119`)
 * Use getcell instead of getcellslice in sorted orderings (:pr:`120`)
 * Update to pytest-flake8 1.0.6 (:pr:`117`)
