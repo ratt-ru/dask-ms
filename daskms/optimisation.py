@@ -165,7 +165,7 @@ def inlined_array(a, inline_arrays=None):
                         "(None, list, tuple, dask.array.Array)")
 
     layers = agraph.layers.copy()
-    deps = agraph.dependencies.copy()
+    deps = {k: v.copy() for k, v in agraph.dependencies.items()}
     inline_keys = set()
     dsk = dict(layers[a.name])
 
@@ -175,9 +175,10 @@ def inlined_array(a, inline_arrays=None):
         try:
             dsk.update(layers.pop(array.name))
             del deps[array.name]
+            deps[a.name].discard(array.name)
         except KeyError:
-            raise ValueError("%s is not a valid dependency of a"
-                             % array.name)
+            raise ValueError(f"{array.name} is not a "
+                             f"valid dependency of {a.name}")
 
         # Record keys to inline
         inline_keys.update(flatten(array.__dask_keys__()))
