@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-import sys
 from itertools import zip_longest
 import logging
 from threading import Lock
@@ -285,23 +284,7 @@ def _table_future_finaliser(ex, table_future, args, kwargs):
     tables.
 
     """
-
-    if sys.version_info[0] == 3 and sys.version_info[1] >= 7:
-        # ThreadPoolExecutor on Python 3.7 uses a SimpleQueue
-        # which is re-entrant safe, so we can submit our table
-        # close operation on the Thread Pool
-        ex.impl.submit(_table_future_close, table_future)
-    else:
-        # ThreadPoolExecutor on Python 3.6 uses Queue,
-        # which is not re-entrant safe,
-        # https://codewithoutrules.com/2017/08/16/concurrency-python/
-        # so we submit our table close operations in the
-        # garbage collection thread, which
-        # may not be the same thread in which the table was
-        # created. This should be OK with the flush operations
-        # we place after all our write operations in the
-        # Executor thread
-        _table_future_close(table_future)
+    _table_future_close(table_future)
 
 
 class TableProxy(object, metaclass=TableProxyMetaClass):
