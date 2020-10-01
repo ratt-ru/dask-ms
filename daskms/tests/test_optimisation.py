@@ -29,8 +29,8 @@ def test_optimisation_identity():
 
 
 def test_inlined_array():
-    A = da.ones((10, 10), chunks=(5, 5), dtype=np.float64)
-    B = da.full((10, 10), np.float64(2), chunks=(5, 5))
+    A = da.ones((10, 10), chunks=(2, 2), dtype=np.float64)
+    B = da.full((10, 10), np.float64(2), chunks=(2, 2))
     C = A + B
 
     D = inlined_array(C)
