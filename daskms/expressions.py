@@ -55,7 +55,7 @@ class Visitor(ast.NodeTransformer):
                                 f"like a valid Dataset Array")
             else:
                 if dims != ("row", "chan", "corr"):
-                    raise ValueError(f"{xarray} does not look "
+                    raise ValueError(f"{xdarray} does not look "
                                      f"like a valid DATA array. "
                                      f"Should have (row, chan, corr) dims"
                                      f"Instead has {dims}")
@@ -65,7 +65,24 @@ class Visitor(ast.NodeTransformer):
         return columns
 
 
-def expr(expression, datasets):
+def data_column_expr(expression, datasets):
+    """
+    Produces a list of new datasets with a
+    ``DASK_EXPRESSION`` variable set to the result of the
+    supplied expression:
+
+    .. code-block:: python
+
+        datasets = data_column_expr("DATA / (DIR1_DATA + DIR2_DATA)", datasets)
+
+    Parameters
+    ----------
+    expression : str
+        :code:`DATA / (DIR1_DATA + DIR2_DATA + DIR3_DATA)`.
+        Can contain data column names as well as numeric literal values.
+    datasets : list of Datasets or Dataset
+        Datasets containing the DATA columns referenced in the expression
+    """
     if isinstance(datasets, (list, tuple)):
         promoted_datasets = list(datasets)
     else:
