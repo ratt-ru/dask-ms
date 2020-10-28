@@ -108,9 +108,9 @@ def data_column_expr(statement, datasets):
 
     .. code-block:: python
 
-        ds = data_column_expr("EXPR = DATA / (DIR1_DATA + DIR2_DATA)",
+        ds = data_column_expr("FLAG_DATA = DATA / (DIR1_DATA + DIR2_DATA)",
                               datasets)
-        ds[0].EXPR.data + 1
+        flag(ds[0].FLAG_DATA.data)
 
     Parameters
     ----------
