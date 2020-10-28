@@ -43,3 +43,8 @@ TableProxies
 
 .. autoclass:: daskms.TableProxy
     :members:
+
+Data Column Expressions
+-----------------------
+
+.. autofunction:: daskms.expressions.data_column_expr
