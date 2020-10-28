@@ -2,6 +2,11 @@
 History
 =======
 
+0.2.7 (YYYY-MM-DD)
+------------------
+* Support DATA Column Expressions (:pr:`124`)
+
+
 0.2.6 (2020-10-20)
 ------------------
 * Remove table close in ThreadPool for the last time (:pr:`122`)
