@@ -15,6 +15,7 @@ operators = {
 
 class Visitor(ast.NodeTransformer):
     def __init__(self, datasets):
+        assert type(datasets) is list
         self.datasets = datasets
 
     if sys.version_info[1] >= 8:
@@ -23,6 +24,24 @@ class Visitor(ast.NodeTransformer):
     else:
         def visit_Num(self, node):
             return node.n
+
+    def visit_Assign(self, node):
+        if len(node.targets) != 1:
+            raise ValueError("Multiple assignment targets unsupported")
+
+        var_name = node.targets[0].id
+        values = self.visit(node.value)
+
+        if type(values) is not list:
+            raise TypeError("Expression did not result in a list of values")
+
+        if len(self.datasets) != len(values):
+            raise ValueError("len(datasets) != len(values)")
+
+        dim = ("row", "chan", "corr")
+
+        return [ds.assign(**{var_name: (dim, v)})
+                for ds, v in zip(self.datasets, values)]
 
     def visit_UnaryOp(self, node):
         try:
@@ -81,49 +100,44 @@ class Visitor(ast.NodeTransformer):
         return columns
 
 
-def data_column_expr(expression, datasets):
+def data_column_expr(statement, datasets):
     """
     Produces a list of new datasets with a
-    ``DASK_EXPRESSION`` variable set to the result of the
-    supplied expression:
+    variable set to the result of the
+    supplied assignment statement:
 
     .. code-block:: python
 
-        datasets = data_column_expr("DATA / (DIR1_DATA + DIR2_DATA)", datasets)
+        ds = data_column_expr("EXPR = DATA / (DIR1_DATA + DIR2_DATA)",
+                              datasets)
+        ds[0].EXPR.data + 1
 
     Parameters
     ----------
-    expression : str
+    statement : str
         :code:`DATA / (DIR1_DATA + DIR2_DATA + DIR3_DATA)`.
         Can contain data column names as well as numeric literal values.
     datasets : list of Datasets or Dataset
-        Datasets containing the DATA columns referenced in the expression
+        Datasets containing the DATA columns referenced in the statement
     """
     if isinstance(datasets, (list, tuple)):
         promoted_datasets = list(datasets)
     else:
         promoted_datasets = [datasets]
 
-    mod = ast.parse(expression)
+    mod = ast.parse(statement)
     assert isinstance(mod, ast.Module)
 
     if len(mod.body) != 1:
-        raise ValueError("Single Expression Only")
+        raise ValueError("Single Assignment Statement Only")
 
     expr = mod.body[0]
 
-    if not isinstance(expr, ast.Expr):
-        raise ValueError("Single Expression Only")
+    if not isinstance(expr, ast.Assign):
+        raise ValueError("Single Assignment Statement Only")
 
     v = Visitor(promoted_datasets)
-    node = v.visit(expr)
-
-    new_datasets = []
-
-    for i, ds in enumerate(datasets):
-        nds = ds.assign(DATA_EXPRESSION=(("row", "chan", "corr"),
-                                         node.value[i]))
-        new_datasets.append(nds)
+    new_datasets = v.visit(expr)
 
     if not isinstance(promoted_datasets, (tuple, list)):
         return new_datasets[0]
