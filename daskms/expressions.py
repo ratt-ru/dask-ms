@@ -115,7 +115,7 @@ def data_column_expr(statement, datasets):
     Parameters
     ----------
     statement : str
-        :code:`DATA / (DIR1_DATA + DIR2_DATA + DIR3_DATA)`.
+        For example, :code:`EXPR = DATA / (DIR1_DATA + DIR2_DATA + DIR3_DATA)`.
         Can contain data column names as well as numeric literal values.
     datasets : list of Datasets or Dataset
         Datasets containing the DATA columns referenced in the statement
