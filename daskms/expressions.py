@@ -34,9 +34,9 @@ class Visitor(ast.NodeTransformer):
 
         if ltype is list and rtype is list:
             assert len(left) == len(right)
-            return [op(l, r) for l, r in zip(left, right)]
+            return [op(l, r) for l, r in zip(left, right)]  # noqa: E741
         elif ltype is list:
-            return [op(l, right) for l in left]
+            return [op(l, right) for l in left]  # noqa: E741
         elif rtype is list:
             return [op(left, r) for r in right]
         else:

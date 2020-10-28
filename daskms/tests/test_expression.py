@@ -8,9 +8,10 @@ def test_expressions(ms):
     datasets = xds_from_ms(ms)
 
     for i, ds in enumerate(datasets):
-        datasets[i] = ds.assign(DIR1_DATA=ds.DATA,
-                                DIR2_DATA=ds.DATA,
-                                DIR3_DATA=ds.DATA)
+        dims = ds.DATA.dims
+        datasets[i] = ds.assign(DIR1_DATA=(dims, ds.DATA.data),
+                                DIR2_DATA=(dims, ds.DATA.data),
+                                DIR3_DATA=(dims, ds.DATA.data))
 
     results = [
         ds.DATA.data / (
