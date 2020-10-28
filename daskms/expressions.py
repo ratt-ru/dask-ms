@@ -1,4 +1,5 @@
 import ast
+import sys
 
 import dask.array as da
 
@@ -15,11 +16,12 @@ class Visitor(ast.NodeTransformer):
     def __init__(self, datasets):
         self.datasets = datasets
 
-    def visit_Constant(self, node):
-        pass
-
-    def visit_Num(self, node):
-        return node.n
+    if sys.version_info[1] >= 8:
+        def visit_Constant(self, node):
+            return node.n
+    else:
+        def visit_Num(self, node):
+            return node.n
 
     def visit_BinOp(self, node):
         try:
