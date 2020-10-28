@@ -6,6 +6,7 @@ import dask.array as da
 operators = {
     ast.Mult: da.multiply,
     ast.Div: da.divide,
+    ast.FloorDiv: da.floor_divide,
     ast.Add: da.add,
     ast.Sub: da.subtract,
     ast.USub: da.negative
@@ -22,6 +23,19 @@ class Visitor(ast.NodeTransformer):
     else:
         def visit_Num(self, node):
             return node.n
+
+    def visit_UnaryOp(self, node):
+        try:
+            op = operators[type(node.op)]
+        except KeyError:
+            raise ValueError(f"Unsupported operator {type(node.op)}")
+
+        value = self.visit(node.operand)
+
+        if type(value) is list:
+            return [op(v) for v in value]
+        else:
+            return op(value)
 
     def visit_BinOp(self, node):
         try:

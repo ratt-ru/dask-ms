@@ -15,13 +15,13 @@ def test_expressions(ms):
 
     results = [
         ds.DATA.data / (
-            ds.DIR1_DATA.data +
+            -ds.DIR1_DATA.data +
             ds.DIR2_DATA.data +
             ds.DIR3_DATA.data) * 4
         for ds in datasets
     ]
 
-    string = "DATA / (DIR1_DATA + DIR2_DATA + DIR3_DATA)*4"
+    string = "DATA / (-DIR1_DATA + DIR2_DATA + DIR3_DATA)*4"
     datasets = data_column_expr(string, datasets)
 
     for i, ds in enumerate(datasets):
