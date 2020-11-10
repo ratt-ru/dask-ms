@@ -180,7 +180,6 @@ def inlined_array(a, inline_arrays=None):
             dsk.update(layers[array.name])
             deps.pop(array.name, None)
             deps[layer_name].discard(array.name)
-#            inline_keys.update(flatten(array.__dask_keys__()))
             inline_keys.update(layers[array.name].keys())
 
         dsk2 = inline(dsk, keys=inline_keys, inline_constants=True)
@@ -190,8 +189,4 @@ def inlined_array(a, inline_arrays=None):
     for inline_name in inline_names:
         layers.pop(inline_name)
 
-    # Record keys to inline
-
-    graph = HighLevelGraph(layers, deps)
-
-    return da.Array(graph, a.name, a.chunks, a.dtype)
+    return da.Array(HighLevelGraph(layers, deps), a.name, a.chunks, a.dtype)
