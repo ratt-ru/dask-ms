@@ -164,29 +164,29 @@ def inlined_array(a, inline_arrays=None):
         raise TypeError("Invalid inline_arrays, must be "
                         "(None, list, tuple, dask.array.Array)")
 
+    inline_names = set(a.name for a in inline_arrays)
     layers = agraph.layers.copy()
     deps = {k: v.copy() for k, v in agraph.dependencies.items()}
-    inline_keys = set()
-    dsk = dict(layers[a.name])
+    # We want to inline layers that depend on the inlined arrays
+    inline_layers = set(k for k, v in deps.items()
+                        if len(inline_names.intersection(v)) > 0)
 
-    # Inline specified arrays
-    for array in inline_arrays:
-        # Remove array from layers and dependencies
-        try:
-            dsk.update(layers.pop(array.name))
-            del deps[array.name]
-            deps[a.name].discard(array.name)
-        except KeyError:
-            raise ValueError(f"{array.name} is not a "
-                             f"valid dependency of {a.name}")
+    for layer_name in inline_layers:
+        dsk = dict(layers[layer_name])
+        layer_keys = set(dsk.keys())
+        inline_keys = set()
 
-        # Record keys to inline
-        inline_keys.update(flatten(array.__dask_keys__()))
+        for array in inline_arrays:
+            dsk.update(layers[array.name])
+            deps.pop(array.name, None)
+            deps[layer_name].discard(array.name)
+            inline_keys.update(layers[array.name].keys())
 
-    dsk2 = inline(dsk, keys=inline_keys, inline_constants=True)
-    dsk3, _ = cull(dsk2, akeys)
+        dsk2 = inline(dsk, keys=inline_keys, inline_constants=True)
+        layers[layer_name], _ = cull(dsk2, layer_keys)
 
-    layers[a.name] = dsk3
-    graph = HighLevelGraph(layers, deps)
+    # Remove layers containing the inlined arrays
+    for inline_name in inline_names:
+        layers.pop(inline_name)
 
-    return da.Array(graph, a.name, a.chunks, a.dtype)
+    return da.Array(HighLevelGraph(layers, deps), a.name, a.chunks, a.dtype)
