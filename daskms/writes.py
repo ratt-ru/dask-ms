@@ -619,10 +619,15 @@ def _write_datasets(table, table_proxy, datasets, columns, descriptor,
             # We only need to pass in dimension extent arrays if
             # there is more than one chunk in any of the non-row columns.
             # In that case, we can putcol, otherwise putcolslice is required
+
+            inlinable_arrays = [row_order]
+
             if not all(len(c) == 1 for c in array.chunks[1:]):
                 # Add extent arrays
                 for d, c in zip(full_dims[1:], array.chunks[1:]):
-                    args.append(dim_extents_array(d, c))
+                    extent_array = dim_extents_array(d, c)
+                    args.append(extent_array)
+                    inlinable_arrays.append(extent_array)
                     args.append((d,))
 
             # Add other variables
@@ -644,7 +649,7 @@ def _write_datasets(table, table_proxy, datasets, columns, descriptor,
                                      dtype=np.bool)
 
             if inline:
-                write_col = inlined_array(write_col, [row_order])
+                write_col = inlined_array(write_col, inlinable_arrays)
 
             write_vars[column] = (full_dims, write_col)
 
