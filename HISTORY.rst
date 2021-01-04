@@ -4,7 +4,8 @@ History
 
 0.2.7 (YYYY-MM-DD)
 ------------------
-* Fix array inlining for writes (:pr:`126`) 
+* Test data fix (:pr:`128`)
+* Fix array inlining for writes (:pr:`126`)
 * Allow Multi-Layer Inlining (:pr:`125`)
 * Support DATA Column Expressions (:pr:`124`)
 
