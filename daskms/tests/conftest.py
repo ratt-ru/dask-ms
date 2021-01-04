@@ -48,7 +48,7 @@ def big_ms(tmp_path_factory, request):
         ant1, ant2 = (a.astype(np.int32) for a in np.triu_indices(ant, 1))
         bl = ant1.shape[0]
         ant1 = np.repeat(ant1, (row + bl - 1) // bl)
-        ant2 = np.repeat(ant1, (row + bl - 1) // bl)
+        ant2 = np.repeat(ant2, (row + bl - 1) // bl)
 
         zeros = np.zeros(row, np.int32)
 
