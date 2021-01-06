@@ -23,20 +23,15 @@ def mark_in_pytest(in_pytest=True):
 
 def requires(msg, *import_errors):
     if any(isinstance(e, ImportError) for e in import_errors):
-        if in_pytest():
-            def decorator(fn):
-                import pytest
-
-                def wrapper(*args, **kwargs):
+        def decorator(fn):
+            def wrapper(*args, **kwargs):
+                if in_pytest():
+                    import pytest
                     pytest.skip(msg)
-
-                return wrapper
-        else:
-            def decorator(fn):
-                def wrapper(*args, **kwargs):
+                else:
                     raise ImportError(msg)
 
-                return wrapper
+            return wrapper
     else:
         def decorator(fn):
             print(fn)
