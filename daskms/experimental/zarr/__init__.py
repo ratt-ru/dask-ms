@@ -7,13 +7,10 @@ import dask.array as da
 from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 
-from daskms.utils import arg_hasher
-from daskms.testing import requires
+from daskms.utils import arg_hasher, requires
 from daskms.dataset import Dataset
-from daskms.descriptors.ms import MSDescriptorBuilder
 from daskms.optimisation import inlined_array
 
-_INDEX_COLS = set(MSDescriptorBuilder.INDEX_COLS)
 _DATASET_TYPES = (Dataset,)
 _DATASET_TYPE = Dataset
 

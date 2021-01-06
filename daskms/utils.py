@@ -6,6 +6,8 @@ import time
 
 import numpy as np
 
+from daskms.testing import in_pytest
+
 log = logging.getLogger(__name__)
 
 
@@ -135,3 +137,22 @@ def log_call(fn):
             log.info("%s() done at %s", fn.__name__, time.clock())
 
     return _wrapper
+
+
+def requires(msg, *import_errors):
+    if any(isinstance(e, ImportError) for e in import_errors):
+        def decorator(fn):
+            def wrapper(*args, **kwargs):
+                if in_pytest():
+                    import pytest
+                    pytest.skip(msg)
+                else:
+                    raise ImportError(msg)
+
+            return wrapper
+    else:
+        def decorator(fn):
+            print(fn)
+            return fn
+
+    return decorator
