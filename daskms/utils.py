@@ -9,18 +9,6 @@ import numpy as np
 log = logging.getLogger(__name__)
 
 
-def requires(msg, *import_errors):
-    if any(isinstance(e, ImportError) for e in import_errors):
-        def decorator(fn):
-            def wrapper(*args, **kwargs):
-                raise ImportError(msg)
-    else:
-        def decorator(fn):
-            return fn
-
-    return decorator
-
-
 def arg_hasher(args):
     """ Recursively hash data structures -- handles list and dicts """
     if isinstance(args, (tuple, list, set)):

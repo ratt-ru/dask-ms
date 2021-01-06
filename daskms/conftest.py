@@ -7,6 +7,16 @@ import numpy as np
 import pyrap.tables as pt
 import pytest
 
+from daskms.testing import mark_in_pytest
+
+# content of conftest.py
+def pytest_configure(config):
+    mark_in_pytest(True)
+
+
+def pytest_unconfigure(config):
+    mark_in_pytest(False)
+
 
 @pytest.fixture(autouse=True)
 def xms_always_gc():

@@ -1,11 +1,8 @@
 import dask
 from numpy.testing import assert_array_equal
-import pytest
 
 from daskms import xds_from_ms
 from daskms.experimental.zarr import xds_from_zarr, xds_to_zarr
-
-zarr = pytest.importorskip("zarr")
 
 
 def test_xds_to_zarr(ms, tmp_path_factory):

@@ -7,7 +7,8 @@ import dask.array as da
 from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 
-from daskms.utils import arg_hasher, requires
+from daskms.utils import arg_hasher
+from daskms.testing import requires
 from daskms.dataset import Dataset
 from daskms.descriptors.ms import MSDescriptorBuilder
 from daskms.optimisation import inlined_array

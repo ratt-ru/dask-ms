@@ -3,9 +3,6 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-zarr = pytest.importorskip("zarr")
-
-
 @pytest.fixture(scope="session", params=[
     {"row": 1000, "chan": 4096, "corr": 4, "ant": 7},
 ])
@@ -38,6 +35,7 @@ def zarr_store(tmp_path_factory, request):
     # Column we'll write to
     state = [0,   0,   0,   0,   0,   0,   0,   0,   0,   0]
 
+    zarr = pytest.importorskip("zarr")
     store = zarr.DirectoryStore(tmp_path_factory.mktemp("zarr_test"))
 
     with zarr.group(store=store, overwrite=True) as root:
