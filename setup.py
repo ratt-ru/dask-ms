@@ -7,9 +7,14 @@ except ImportError as e:
 
 extras_require = {
     'arrow': ["pyarrow >= 2.0.0"],
-    'xarray': ["xarray > 0.12.0"],
-    'testing': ['pytest', 'pytest-flake8 >= 1.0.6']
+    "xarray": ["xarray > 0.12.0"],
+    "zarr": ["zarr >= 2.6.1"],
+    "testing": ["pytest", "pytest-flake8 >= 1.0.6"]
 }
+
+extras_require["complete"] = set([r for k, v in extras_require.items()
+                                  if k != "testing"
+                                  for r in v])
 
 install_requires = [
     "dask[array] >= 2.2.0",
