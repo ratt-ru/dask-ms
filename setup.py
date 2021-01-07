@@ -6,7 +6,7 @@ except ImportError as e:
     raise ImportError("%s\nPlease install setuptools." % e)
 
 extras_require = {
-    'arrow': ["pyarrow >= 2.0.0"],
+    "arrow": ["pyarrow >= 2.0.0"],
     "xarray": ["xarray > 0.12.0"],
     "zarr": ["zarr >= 2.6.1"],
     "testing": ["pytest", "pytest-flake8 >= 1.0.6"]
