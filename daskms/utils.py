@@ -167,7 +167,7 @@ def requires(*args):
             msg = "\n".join(lines)
 
             def wrapper(*args, **kwargs):
-                if False and in_pytest():
+                if in_pytest():
                     import pytest
                     pytest.skip(msg)
                 else:
