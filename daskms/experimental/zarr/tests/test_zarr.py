@@ -17,7 +17,3 @@ def test_xds_to_zarr(ms, tmp_path_factory):
     for ms_ds, zarr_ds in zip(ms_datasets, zarr_datasets):
         for name, var in ms_ds.data_vars.items():
             assert_array_equal(var.data, getattr(zarr_ds, name).data)
-
-
-def test_xds_from_zarr(zarr_store):
-    zms = xds_from_zarr(zarr_store)  # noqa
