@@ -6,7 +6,7 @@ import platform
 
 import pytest
 
-from daskms.utils import promote_columns, table_path_split
+from daskms.utils import promote_columns, table_path_split, requires
 
 
 @pytest.mark.parametrize("columns", [["TIME", "ANTENNA1"]])
@@ -50,3 +50,21 @@ _root_path = Path("C:/" if platform.system() == "Windows" else os.sep,
 ])
 def test_table_path_split(path, root, table, subtable):
     assert (root, table, subtable) == table_path_split(path)
+
+
+def test_requires():
+    def fn(*args, **kwargs):
+        return 1
+
+    decorator = requires(ImportError("foo"), ImportError("bar"),
+                         "need foo", "need bar")(fn)
+
+    with pytest.raises(ImportError) as e:
+        decorator()
+
+    assert "1. foo" in e.value.msg
+    assert "2. bar" in e.value.msg
+    assert "need foo" in e.value.msg
+    assert "need bar" in e.value.msg
+
+    assert requires("need foo", 1, None)(fn)() == 1

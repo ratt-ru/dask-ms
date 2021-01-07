@@ -4,7 +4,10 @@ import logging
 from pathlib import Path
 import time
 
+from dask.utils import funcname
 import numpy as np
+
+from daskms.testing import in_pytest
 
 log = logging.getLogger(__name__)
 
@@ -135,3 +138,45 @@ def log_call(fn):
             log.info("%s() done at %s", fn.__name__, time.clock())
 
     return _wrapper
+
+
+def requires(*args):
+    import_errors = []
+    msgs = []
+
+    for a in args:
+        if isinstance(a, ImportError):
+            import_errors.append(a)
+        elif isinstance(a, str):
+            msgs.append(a)
+
+    if import_errors:
+        # Required dependencies are missing
+        def decorator(fn):
+            lines = [f"Optional extras required by "
+                     f"{funcname(fn)} are missing due to "
+                     f"the following ImportErrors:"]
+
+            for i, e in enumerate(import_errors, 1):
+                lines.append(f"{i}. {str(e)}")
+
+            if msgs:
+                lines.append("")
+                lines.extend(msgs)
+
+            msg = "\n".join(lines)
+
+            def wrapper(*args, **kwargs):
+                if in_pytest():
+                    import pytest
+                    pytest.skip(msg)
+                else:
+                    raise ImportError(msg) from import_errors[0]
+
+            return wrapper
+    else:
+        # Return original function as is
+        def decorator(fn):
+            return fn
+
+    return decorator
