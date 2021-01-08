@@ -24,11 +24,13 @@ def test_parquet(tmp_path_factory):
     ncorr = 4
     shape = (nrow, nchan, ncorr)
     data = np.random.random(shape) + np.random.random(shape)*1j
+    uvw = np.random.random((nrow, 3))
 
     columns = {
         "TIME": time,
         "ANTENNA1": ant1,
         "ANTENNA2": ant2,
+        "UVW": uvw,
         "DATA": data
     }
 
