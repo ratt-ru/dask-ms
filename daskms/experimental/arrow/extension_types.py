@@ -1,3 +1,10 @@
+# Adapted from https://github.com/apache/arrow/pull/8510
+# to handle Tensors of Complex Numbers. Could be removed
+# if the following are addressed
+# https://issues.apache.org/jira/browse/ARROW-638
+# https://issues.apache.org/jira/browse/ARROW-1614
+
+
 from ast import literal_eval
 
 import numpy as np
@@ -16,7 +23,7 @@ else:
 def _tensor_to_array(obj, dtype):
     batch_size = obj.shape[0]
     element_shape = obj.shape[1:]
-    total_num_elements = obj.size
+    total_elements = obj.size
     num_elements = 1 if len(obj.shape) == 1 else np.prod(element_shape)
 
     if isinstance(dtype, ComplexType):
@@ -25,17 +32,19 @@ def _tensor_to_array(obj, dtype):
         child_array = pa.ExtensionArray.from_storage(dtype, storage)
     else:
         child_buf = pa.py_buffer(obj)
-        child_array = pa.Array.from_buffers(
-            dtype, total_num_elements, [None, child_buf])
+        child_array = pa.Array.from_buffers(dtype,
+                                            total_elements,
+                                            [None, child_buf])
 
     offset_buf = pa.py_buffer(
         np.int32([i * num_elements for i in range(batch_size + 1)]))
 
     storage = pa.Array.from_buffers(pa.list_(dtype), batch_size,
-                                    [None, offset_buf], children=[child_array])
+                                    [None, offset_buf],
+                                    children=[child_array])
 
-    typ = TensorType(element_shape, dtype)
-    return pa.ExtensionArray.from_storage(typ, storage)
+    tensor_type = TensorType(element_shape, dtype)
+    return pa.ExtensionArray.from_storage(tensor_type, storage)
 
 
 class TensorType(ExtensionType):
@@ -60,10 +69,8 @@ class TensorType(ExtensionType):
     @classmethod
     def __arrow_ext_deserialize__(cls, storage_type, serialized):
         parts = serialized.decode().split("=")
-        assert len(parts) == 2
-        shape = literal_eval(parts[1])
-
-        return TensorType(shape, storage_type.value_type)
+        assert parts[0] == "shape" and len(parts) == 2
+        return TensorType(literal_eval(parts[1]), storage_type.value_type)
 
     def __arrow_ext_class__(self):
         return TensorArray
