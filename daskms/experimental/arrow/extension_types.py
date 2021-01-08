@@ -20,30 +20,29 @@ else:
     ExtensionType = pa.ExtensionType
 
 
-def _tensor_to_array(obj, dtype):
+def _tensor_to_array(obj, pa_dtype):
     batch_size = obj.shape[0]
     element_shape = obj.shape[1:]
     total_elements = obj.size
     num_elements = 1 if len(obj.shape) == 1 else np.prod(element_shape)
 
-    if isinstance(dtype, ComplexType):
+    if isinstance(pa_dtype, ComplexType):
         flat_array = obj.view(obj.real.dtype).ravel()
         storage = pa.FixedSizeListArray.from_arrays(flat_array, 2)
-        child_array = pa.ExtensionArray.from_storage(dtype, storage)
+        child_array = pa.ExtensionArray.from_storage(pa_dtype, storage)
     else:
         child_buf = pa.py_buffer(obj)
-        child_array = pa.Array.from_buffers(dtype,
-                                            total_elements,
+        child_array = pa.Array.from_buffers(pa_dtype, total_elements,
                                             [None, child_buf])
 
-    offset_buf = pa.py_buffer(
-        np.int32([i * num_elements for i in range(batch_size + 1)]))
+    offsets = np.int32([i * num_elements for i in range(batch_size + 1)])
+    offset_buf = pa.py_buffer(offsets)
 
-    storage = pa.Array.from_buffers(pa.list_(dtype), batch_size,
+    storage = pa.Array.from_buffers(pa.list_(pa_dtype), batch_size,
                                     [None, offset_buf],
                                     children=[child_array])
 
-    tensor_type = TensorType(element_shape, dtype)
+    tensor_type = TensorType(element_shape, pa_dtype)
     return pa.ExtensionArray.from_storage(tensor_type, storage)
 
 
@@ -85,8 +84,7 @@ class TensorArray(ExtensionArray):
             obj = np.ascontiguousarray(obj)
 
         if np.iscomplexobj(obj):
-            real_dt = pa.from_numpy_dtype(obj.real.dtype)
-            dtype = ComplexType(real_dt)
+            dtype = ComplexType(pa.from_numpy_dtype(obj.real.dtype))
         else:
             dtype = pa.from_numpy_dtype(obj.dtype)
 
@@ -115,7 +113,7 @@ class TensorArray(ExtensionArray):
 
 class ComplexArray(ExtensionArray):
     def to_numpy_array(self):
-        return self.storage.flatten().to_numpy()
+        return self.storage.to_numpy()
 
 
 class ComplexType(ExtensionType):
@@ -124,24 +122,17 @@ class ComplexType(ExtensionType):
             subtype = pa.type_for_alias(str(subtype))
 
         self._subtype = subtype
-        storage_type = pa.list_(subtype, 2)
-        pa.ExtensionType.__init__(self, storage_type, "daskms.complex")
+        pa.ExtensionType.__init__(self, pa.list_(subtype, 2), "daskms.complex")
 
     def to_pandas_dtype(self):
-        return np.result_type(self.subtype.to_pandas_dtype(), np.complex64)
-
-    @property
-    def subtype(self):
-        return self._subtype
+        return np.result_type(self._subtype.to_pandas_dtype(), np.complex64)
 
     def __arrow_ext_serialize__(self):
-        return f"dtype={self.subtype}".encode()
+        return b""
 
     @classmethod
     def __arrow_ext_deserialize__(cls, storage_type, serialized):
-        bits = serialized.decode().split("=")
-        assert len(bits) == 2 and bits[0] == "dtype"
-        return ComplexType(pa.type_for_alias(bits[1]))
+        return ComplexType(storage_type.value_type)
 
     def __arrow_ext_class__(self):
         return ComplexArray
