@@ -1,3 +1,6 @@
+# TODO(sjperkins): remove this
+# flake8: noqa
+
 from daskms.dataset import Variable
 
 try:
@@ -11,7 +14,6 @@ except ImportError:
     VariableTypes = (Variable,)
 else:
     VariableTypes = (Variable, xVariable)
-
 
 
 def variable_column_schema(column, variable):
