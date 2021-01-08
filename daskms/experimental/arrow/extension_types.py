@@ -63,13 +63,12 @@ class TensorType(ExtensionType):
         return self._element_shape
 
     def __arrow_ext_serialize__(self):
-        return f"shape={self._element_shape}".encode()
+        return str(self._element_shape).encode()
 
     @classmethod
     def __arrow_ext_deserialize__(cls, storage_type, serialized):
-        parts = serialized.decode().split("=")
-        assert parts[0] == "shape" and len(parts) == 2
-        return TensorType(literal_eval(parts[1]), storage_type.value_type)
+        return TensorType(literal_eval(serialized.decode()),
+                          storage_type.value_type)
 
     def __arrow_ext_class__(self):
         return TensorArray
