@@ -1,4 +1,7 @@
 from ast import literal_eval
+import base64
+import pickle
+
 import numpy as np
 
 try:
@@ -54,19 +57,15 @@ class TensorType(ExtensionType):
         return self._element_shape
 
     def __arrow_ext_serialize__(self):
-        return (f"shape={self._element_shape};"
-                f"dtype={self.storage_type.value_type}".encode())
+        return f"shape={self._element_shape}".encode()
 
     @classmethod
     def __arrow_ext_deserialize__(cls, storage_type, serialized):
-        parts = serialized.decode().split(";")
+        parts = serialized.decode().split("=")
         assert len(parts) == 2
-        shape_bits = parts[0].split("=")
-        dtype_bits = parts[1].split("=")
-        assert len(shape_bits) == 2 and shape_bits[0] == "shape"
-        assert len(dtype_bits) == 2 and dtype_bits[0] == "dtype"
+        shape = literal_eval(parts[1])
 
-        return TensorType(literal_eval(shape_bits[1]), dtype_bits[1])
+        return TensorType(shape, storage_type.value_type)
 
     def __arrow_ext_class__(self):
         return TensorArray

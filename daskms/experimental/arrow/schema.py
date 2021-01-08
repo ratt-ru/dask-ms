@@ -4,9 +4,9 @@
 from daskms.dataset import Variable
 
 try:
-    import pyarrow
+    import pyarrow as pa
 except ImportError:
-    pyarrow = None
+    pa = None
 
 try:
     from xarray import Variable as xVariable
