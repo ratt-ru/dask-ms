@@ -5,10 +5,10 @@ import pytest
 from daskms.experimental.arrow.extension_types import TensorArray
 
 pa = pytest.importorskip("pyarrow")
+pq = pytest.importorskip("pyarrow.parquet")
 
 
 def test_parquet(tmp_path_factory):
-    pq = pytest.importorskip("pyarrow.parquet")
     time = np.linspace(0, 1.0, 10)
     ant1, ant2 = (a.astype(np.int32) for a in np.triu_indices(7, 1))
 
