@@ -53,7 +53,7 @@ class TensorType(ExtensionType):
 
         self._element_shape = tuple(element_shape)
         pa.ExtensionType.__init__(self, pa.list_(pyarrow_dtype),
-                                  "daskms.tensor_type")
+                                  "dask-ms.tensor_type")
 
     def __reduce__(self):
         return TensorType, (self._element_shape, self.storage_type.value_type)
@@ -121,7 +121,8 @@ class ComplexType(ExtensionType):
             subtype = pa.type_for_alias(str(subtype))
 
         self._subtype = subtype
-        pa.ExtensionType.__init__(self, pa.list_(subtype, 2), "daskms.complex")
+        pa.ExtensionType.__init__(self, pa.list_(subtype, 2),
+                                  "dask-ms.complex")
 
     def to_pandas_dtype(self):
         return np.result_type(self._subtype.to_pandas_dtype(), np.complex64)
