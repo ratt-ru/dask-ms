@@ -8,7 +8,7 @@ pa = pytest.importorskip("pyarrow")
 pq = pytest.importorskip("pyarrow.parquet")
 
 
-def test_parquet(tmp_path_factory):
+def test_parquet_roundtrip(tmp_path_factory):
     """ Test round-trip via parquet file with custom Extension Types """
     time = np.linspace(0, 1.0, 10)
     ant1, ant2 = (a.astype(np.int32) for a in np.triu_indices(7, 1))
