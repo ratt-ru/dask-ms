@@ -5,7 +5,7 @@
 # https://issues.apache.org/jira/browse/ARROW-1614
 
 
-from ast import literal_eval
+import json
 
 import numpy as np
 
@@ -51,7 +51,7 @@ class TensorType(ExtensionType):
         if not isinstance(pyarrow_dtype, pa.DataType):
             pyarrow_dtype = pa.type_for_alias(str(pyarrow_dtype))
 
-        self._element_shape = element_shape
+        self._element_shape = tuple(element_shape)
         pa.ExtensionType.__init__(self, pa.list_(pyarrow_dtype),
                                   "daskms.tensor_type")
 
@@ -63,11 +63,11 @@ class TensorType(ExtensionType):
         return self._element_shape
 
     def __arrow_ext_serialize__(self):
-        return str(self._element_shape).encode()
+        return json.dumps({"shape": self._element_shape}).encode()
 
     @classmethod
     def __arrow_ext_deserialize__(cls, storage_type, serialized):
-        return TensorType(literal_eval(serialized.decode()),
+        return TensorType(json.loads(serialized)["shape"],
                           storage_type.value_type)
 
     def __arrow_ext_class__(self):
