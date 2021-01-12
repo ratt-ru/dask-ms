@@ -1,12 +1,18 @@
-# TODO(sjperkins): remove this
-# flake8: noqa
+from collections import defaultdict
+import json
 
 from daskms.dataset import Variable
+from daskms.utils import requires
+from daskms.experimental.arrow.extension_types import TensorArray
+
+import numpy as np
 
 try:
     import pyarrow as pa
-except ImportError:
-    pa = None
+except ImportError as e:
+    pyarrow_import_error = e
+else:
+    pyarrow_import_error = None
 
 try:
     from xarray import Variable as xVariable
@@ -15,8 +21,10 @@ except ImportError:
 else:
     VariableTypes = (Variable, xVariable)
 
+DASKMS_METADATA = "__daskms_metadata__"
 
-def variable_column_schema(column, variable):
+
+def variable_field(column, variable):
     if isinstance(variable, VariableTypes):
         variable = [variable]
     elif not isinstance(variable, (tuple, list)):
@@ -25,41 +33,55 @@ def variable_column_schema(column, variable):
     if len(variable) == 0:
         return {}
 
+    dims = set()
     dtypes = set()
     ndims = set()
     shapes = set()
 
     for v in variable:
+        dims.add(v.dims)
         dtypes.add(v.dtype)
         ndims.add(v.ndim)
-        shapes.add(v.shape)
+        shapes.add(v.shape[1:])
 
-    if len(dtypes) == 0:
-        raise ValueError(f"No dtypes discovered for {column}")
-    elif len(dtypes) > 1:
+    if len(dtypes) > 1:
         raise ValueError(f"Multiple dtypes {dtypes} in {column}. "
                          f"Please cast your variables to the same dtype")
     else:
         dtype = dtypes.pop()
 
-    if len(ndims) == 0:
-        raise ValueError(f"No ndims discovered for {column}")
-    elif len(ndims) > 1:
-        raise ValueError(f"Multiple ndims {ndims} discovered for {column}. "
+    if len(ndims) > 1:
+        raise ValueError(f"Multiple dimensions {ndims} "
+                         f"discovered for {column}. "
                          f"This is not currently supported.")
     else:
         ndim = ndims.pop()
 
-    if len(shapes) == 0:
-        raise ValueError(f"No shapes discovered for {column}")
+    if len(shapes) > 1:
+        raise ValueError(f"Multiple shapes {shapes} discovered for {column}. "
+                         f"This is not currently supported.")
+
+    if len(dims) > 1:
+        raise ValueError(f"Multiple dimension schema {dims} "
+                         f"discovered for {column}. "
+                         f"This is not currently supported.")
     else:
-        for shape in shapes:
-            if len(shape) == ndim:
-                continue
+        dims = dims.pop()
 
-            raise ValueError(f"Shape lengths don't not match ndim {ndim}.")
+    factory = pa.array if ndim == 1 else TensorArray.from_numpy
+    pa_type = factory(np.empty((0,)*ndim, dtype)).type
+    metadata = {DASKMS_METADATA: json.dumps({"dims": dims})}
+
+    return pa.field(column, pa_type, metadata=metadata, nullable=False)
 
 
+@requires("pip install dask-ms[arrow] for arrow support",
+          pyarrow_import_error)
 def dataset_schema(datasets):
+    dataset_vars = defaultdict(list)
+
     for ds in datasets:
-        pass
+        for c, v in ds.data_vars.items():
+            dataset_vars[c].append(v)
+
+    return pa.schema([variable_field(c, v) for c, v in dataset_vars.items()])
