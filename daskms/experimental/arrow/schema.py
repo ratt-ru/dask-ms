@@ -22,9 +22,10 @@ else:
     VariableTypes = (Variable, xVariable)
 
 DASKMS_METADATA = "__daskms_metadata__"
+DASKMS_PARQUET_VERSION = "0.0.1"
 
 
-def variable_field(column, variable):
+def variable_schema(column, variable):
     if isinstance(variable, VariableTypes):
         variable = [variable]
     elif not isinstance(variable, (tuple, list)):
@@ -45,7 +46,8 @@ def variable_field(column, variable):
         shapes.add(v.shape[1:])
 
     if len(dtypes) > 1:
-        raise ValueError(f"Multiple dtypes {dtypes} in {column}. "
+        raise ValueError(f"Multiple dtypes {dtypes} "
+                         f"discovered for {column}. "
                          f"Please cast your variables to the same dtype")
     else:
         dtype = dtypes.pop()
@@ -57,10 +59,6 @@ def variable_field(column, variable):
     else:
         ndim = ndims.pop()
 
-    if len(shapes) > 1:
-        raise ValueError(f"Multiple shapes {shapes} discovered for {column}. "
-                         f"This is not currently supported.")
-
     if len(dims) > 1:
         raise ValueError(f"Multiple dimension schema {dims} "
                          f"discovered for {column}. "
@@ -68,20 +66,40 @@ def variable_field(column, variable):
     else:
         dims = dims.pop()
 
-    factory = pa.array if ndim == 1 else TensorArray.from_numpy
-    pa_type = factory(np.empty((0,)*ndim, dtype)).type
-    metadata = {DASKMS_METADATA: json.dumps({"dims": dims})}
+    if len(shapes) > 1:
+        dim_shapes = tuple({d: s for d, s in zip(dims, shape)}
+                           for shape in shapes)
 
-    return pa.field(column, pa_type, metadata=metadata, nullable=False)
+        raise ValueError(f"Multiple shapes {dim_shapes} "
+                         f"discovered for {column}. "
+                         f"This is not currently supported.")
+
+    return (column, ndim, dtype, {"dims": dims})
 
 
-@requires("pip install dask-ms[arrow] for arrow support",
-          pyarrow_import_error)
-def dataset_schema(datasets):
+def dict_dataset_schema(datasets):
     dataset_vars = defaultdict(list)
 
     for ds in datasets:
         for c, v in ds.data_vars.items():
             dataset_vars[c].append(v)
 
-    return pa.schema([variable_field(c, v) for c, v in dataset_vars.items()])
+    var_schemas = [variable_schema(c, v) for c, v in dataset_vars.items()]
+    return (var_schemas, {"version": DASKMS_PARQUET_VERSION})
+
+
+@requires("pip install dask-ms[arrow] for arrow support",
+          pyarrow_import_error)
+def dataset_schema(schema):
+    var_schemas, table_metadata = schema
+    fields = []
+
+    for (column, ndim, dtype, metadata) in var_schemas:
+        factory = pa.array if ndim == 1 else TensorArray.from_numpy
+        pa_type = factory(np.empty((0,)*ndim, dtype)).type
+        metadata = {DASKMS_METADATA: json.dumps(metadata)}
+        field = pa.field(column, pa_type, metadata=metadata, nullable=False)
+        fields.append(field)
+
+    table_metadata = {DASKMS_METADATA: json.dumps(table_metadata)}
+    return pa.schema(fields, metadata=table_metadata)
