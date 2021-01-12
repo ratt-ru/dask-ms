@@ -58,6 +58,9 @@ class TensorType(ExtensionType):
     def __reduce__(self):
         return TensorType, (self._element_shape, self.storage_type.value_type)
 
+    def to_pandas_dtype(self):
+        return self.storage_type.value_type.to_pandas_dtype()
+
     @property
     def shape(self):
         return self._element_shape
