@@ -94,6 +94,7 @@ def ms(tmp_path_factory):
     DATA_DESC_ID I4,
     SCAN_NUMBER I4,
     STATE_ID I4,
+    UVW R8 [NDIM=1, SHAPE=[3]],
     TIME R8,
     DATA C8 [NDIM=2, SHAPE=[16, 4]]]
     LIMIT 10
@@ -115,6 +116,7 @@ def ms(tmp_path_factory):
     rs = np.random.RandomState(42)
     data_shape = (len(state), 16, 4)
     data = rs.random_sample(data_shape) + rs.random_sample(data_shape)*1j
+    uvw = rs.random_sample((len(state), 3)).astype(np.float64)
 
     # Create the table
     with pt.taql(create_table_query) as ms:
@@ -124,6 +126,7 @@ def ms(tmp_path_factory):
         ms.putcol("ANTENNA2", ant2)
         ms.putcol("SCAN_NUMBER", scan)
         ms.putcol("STATE_ID", state)
+        ms.putcol("UVW", uvw)
         ms.putcol("TIME", time)
         ms.putcol("DATA", data)
 
