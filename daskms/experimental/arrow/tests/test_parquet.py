@@ -2,7 +2,9 @@ import numpy as np
 from numpy.testing import assert_array_equal
 import pytest
 
+from daskms import xds_from_ms
 from daskms.experimental.arrow.extension_types import TensorArray
+from daskms.experimental.arrow.write import xds_to_parquet
 
 pa = pytest.importorskip("pyarrow")
 pq = pytest.importorskip("pyarrow.parquet")
@@ -37,7 +39,7 @@ def test_parquet_roundtrip(tmp_path_factory):
 
     arrow_columns = {k: TensorArray.from_numpy(v) for k, v in columns.items()}
     table = pa.table(arrow_columns)
-    filename = tmp_path_factory.mktemp("test_parquest") / "test.parquet"
+    filename = tmp_path_factory.mktemp("parquet_store") / "test.parquet"
     pq.write_table(table, filename)
 
     read_table = pq.read_table(filename)
@@ -47,3 +49,9 @@ def test_parquet_roundtrip(tmp_path_factory):
         assert isinstance(pqc, pa.ChunkedArray) and pqc.num_chunks == 1
         parquet_array = next(iter(pqc.iterchunks())).to_numpy()
         assert_array_equal(v, parquet_array)
+
+
+def test_xds_to_parquet(ms, tmp_path_factory):
+    store = tmp_path_factory.mktemp("parquet_store") / "out.parquet"
+    datasets = xds_from_ms(ms)
+    writes = xds_to_parquet(datasets, store)

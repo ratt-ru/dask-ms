@@ -2,17 +2,13 @@ from pathlib import Path
 from threading import Lock
 from weakref import WeakValueDictionary
 
-import dask
 import dask.array as da
-from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 
 from daskms.utils import arg_hasher, requires
 from daskms.dataset import Dataset
+from daskms.experimental.util import encode_attr, extent_args
 from daskms.optimisation import inlined_array
-
-_DATASET_TYPES = (Dataset,)
-_DATASET_TYPE = Dataset
 
 DATASET_PREFIX = "__daskms_dataset__"
 DASKMS_ATTR_KEY = "__daskms_zarr_attr__"
@@ -23,6 +19,9 @@ except ImportError as e:
     zarr_import_error = e
 else:
     zarr_import_error = None
+
+_DATASET_TYPES = (Dataset,)
+_DATASET_TYPE = Dataset
 
 try:
     import xarray as xr
@@ -35,21 +34,6 @@ else:
 
 _store_cache = WeakValueDictionary()
 _store_lock = Lock()
-
-
-def encode_attr(a):
-    if isinstance(a, tuple):
-        return tuple(encode_attr(v) for v in a)
-    elif isinstance(a, list):
-        return list(encode_attr(v) for v in a)
-    elif isinstance(a, dict):
-        return {k: encode_attr(v) for k, v in a.items()}
-    elif isinstance(a, np.ndarray):
-        return a.tolist()
-    elif isinstance(a, np.generic):
-        return a.item()
-    else:
-        return a
 
 
 class ZarrDatasetFactoryMetaClass(type):
@@ -152,27 +136,6 @@ def zarr_schema_factory(di, data_vars):
         schema[name] = (var.dims, var.shape, tuple(zarr_chunks), var.dtype)
 
     return schema
-
-
-def extent_args(dims, chunks):
-    args = []
-    meta = np.empty((1,), dtype=np.int32)
-
-    for dim, chunks in zip(dims, chunks):
-        name = "-".join((dim, dask.base.tokenize(chunks)))
-        layers = {}
-        start = 0
-
-        for i, c in enumerate(chunks):
-            end = start + c
-            layers[(name, i)] = (start, end)
-            start = end
-
-        graph = HighLevelGraph.from_collections(name, layers, [])
-        args.append(da.Array(graph, name, chunks=(chunks,), meta=meta))
-        args.append((dim,))
-
-    return args
 
 
 def _setter_wrapper(data, name, factory, *extents):
