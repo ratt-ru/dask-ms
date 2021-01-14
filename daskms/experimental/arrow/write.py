@@ -149,7 +149,7 @@ def xds_to_parquet(xds, path, partition=()):
                 raise ValueError(f"Column {column} dimensions "
                                  f"{variable.dims} don't start with 'row'")
 
-            args.extend((column, None, variable, variable.dims))
+            args.extend((column, None, variable.data, variable.dims))
 
             for dim, chunk in zip(variable.dims, variable.data.chunks):
                 if len(chunk) != 1:
