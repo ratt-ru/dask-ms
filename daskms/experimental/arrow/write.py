@@ -6,10 +6,10 @@ import weakref
 import dask.array as da
 import numpy as np
 
-from daskms.dataset import Dataset
 from daskms.experimental.arrow.schema import (dict_dataset_schema,
                                               DASKMS_METADATA)
 from daskms.experimental.arrow.extension_types import TensorArray
+from daskms.experimental.utils import DATASET_TYPES, DATASET_TYPE
 from daskms.optimisation import inlined_array
 from daskms.utils import freeze
 
@@ -26,19 +26,6 @@ except ImportError as e:
     pyarrow_import_error = e
 else:
     pyarrow_import_error = None
-
-
-_DATASET_TYPES = (Dataset,)
-_DATASET_TYPE = Dataset
-
-try:
-    import xarray as xr
-except ImportError as e:
-    xarray_import_error = e
-else:
-    xarray_import_error = None
-    _DATASET_TYPES += (xr.Dataset,)
-    _DATASET_TYPE = xr.Dataset
 
 
 _dataset_cache = weakref.WeakValueDictionary()
@@ -119,10 +106,10 @@ def xds_to_parquet(xds, path, partition=()):
     if not isinstance(path, Path):
         path = Path(path)
 
-    if isinstance(xds, _DATASET_TYPES):
+    if isinstance(xds, DATASET_TYPES):
         xds = [xds]
     elif isinstance(xds, (tuple, list)):
-        if not all(isinstance(ds, _DATASET_TYPES) for ds in xds):
+        if not all(isinstance(ds, DATASET_TYPES) for ds in xds):
             raise TypeError("xds must be a Dataset or list of Datasets")
     else:
         raise TypeError("xds must be a Dataset or list of Datasets")
@@ -163,6 +150,6 @@ def xds_to_parquet(xds, path, partition=()):
 
         writes = inlined_array(writes, chunk_ids)
 
-        datasets.append(_DATASET_TYPE({"WRITE": (("row",), writes)}))
+        datasets.append(DATASET_TYPE({"WRITE": (("row",), writes)}))
 
     return datasets

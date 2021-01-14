@@ -6,8 +6,10 @@ import dask.array as da
 import numpy as np
 
 from daskms.utils import arg_hasher, requires
-from daskms.dataset import Dataset
-from daskms.experimental.util import encode_attr, extent_args
+from daskms.experimental.utils import (encode_attr,
+                                       extent_args,
+                                       DATASET_TYPE,
+                                       DATASET_TYPES)
 from daskms.optimisation import inlined_array
 
 DATASET_PREFIX = "__daskms_dataset__"
@@ -19,18 +21,6 @@ except ImportError as e:
     zarr_import_error = e
 else:
     zarr_import_error = None
-
-_DATASET_TYPES = (Dataset,)
-_DATASET_TYPE = Dataset
-
-try:
-    import xarray as xr
-except ImportError as e:
-    xarray_import_error = e
-else:
-    xarray_import_error = None
-    _DATASET_TYPES += (xr.Dataset,)
-    _DATASET_TYPE = xr.Dataset
 
 _store_cache = WeakValueDictionary()
 _store_lock = Lock()
@@ -154,10 +144,10 @@ def xds_to_zarr(xds, store):
     if not isinstance(store, str):
         raise TypeError(f"store '{store}' must be Path or str")
 
-    if isinstance(xds, _DATASET_TYPES):
+    if isinstance(xds, DATASET_TYPES):
         xds = [xds]
     elif isinstance(xds, (tuple, list)):
-        if not all(isinstance(ds, _DATASET_TYPES) for ds in xds):
+        if not all(isinstance(ds, DATASET_TYPES) for ds in xds):
             raise TypeError("xds must be a Dataset or list of Datasets")
     else:
         raise TypeError("xds must be a Dataset or list of Datasets")
@@ -185,7 +175,7 @@ def xds_to_zarr(xds, store):
             write = inlined_array(write, ext_args[::2])
             data_vars[name] = (var.dims, write, var.attrs)
 
-        write_datasets.append(_DATASET_TYPE(data_vars))
+        write_datasets.append(DATASET_TYPE(data_vars))
 
     return write_datasets
 
@@ -248,6 +238,6 @@ def xds_from_zarr(store, chunks=None):
             read = inlined_array(read, ext_args[::2])
             data_vars[name] = (dims, read, attrs)
 
-        datasets.append(_DATASET_TYPE(data_vars, attrs=group_attrs))
+        datasets.append(DATASET_TYPE(data_vars, attrs=group_attrs))
 
     return datasets
