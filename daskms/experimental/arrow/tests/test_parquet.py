@@ -58,8 +58,7 @@ def test_xds_to_parquet(ms, tmp_path_factory):
     writes = xds_to_parquet(datasets, store, ["DATA_DESC_ID", "FIELD_ID"])
     dask.compute(writes)
 
-    pq_dataset = pq.ParquetDataset(store)
-    record_batches = pq_dataset.read().to_batches()
+    record_batches = pq.ParquetDataset(store).read().to_batches()
 
     for ds, batch in zip(datasets, record_batches):
         for column, array in zip(batch.schema.names, batch.columns):
