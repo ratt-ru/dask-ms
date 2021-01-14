@@ -59,7 +59,10 @@ def test_xds_to_parquet(ms, tmp_path_factory):
     dask.compute(writes)
 
     pq_dataset = pq.ParquetDataset(store)
-    table = pq_dataset.read()
-    for ds, chunk in zip(datasets, table.column("DATA").iterchunks()):
-        assert type(chunk) is TensorArray
-        assert_array_equal(ds.DATA.data, chunk.to_numpy())
+    record_batches = pq_dataset.read().to_batches()
+
+    for ds, batch in zip(datasets, record_batches):
+        for column, array in zip(batch.schema.names, batch.columns):
+            var = getattr(ds, column).data
+            assert isinstance(array, TensorArray if var.ndim > 1 else pa.Array)
+            assert_array_equal(var, array.to_numpy())
