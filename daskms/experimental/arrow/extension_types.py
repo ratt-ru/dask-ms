@@ -61,6 +61,11 @@ class TensorType(ExtensionType):
     def to_pandas_dtype(self):
         return self.storage_type.value_type.to_pandas_dtype()
 
+    def __eq__(self, other):
+        return (isinstance(other, TensorType) and
+                self._element_shape == other._element_shape and
+                self.storage_type == other.storage_type)
+
     @property
     def shape(self):
         return self._element_shape
@@ -129,6 +134,10 @@ class ComplexType(ExtensionType):
 
     def to_pandas_dtype(self):
         return np.result_type(self._subtype.to_pandas_dtype(), np.complex64)
+
+    def __eq__(self, other):
+        return (isinstance(other, ComplexType) and
+                self._subtype == other._subtype)
 
     def __arrow_ext_serialize__(self):
         return b""

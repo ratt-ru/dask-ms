@@ -4,20 +4,22 @@ from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 
 
-def encode_attr(a):
-    """ Convert a into something acceptable to json """
-    if isinstance(a, tuple):
-        return tuple(encode_attr(v) for v in a)
-    elif isinstance(a, list):
-        return list(encode_attr(v) for v in a)
-    elif isinstance(a, dict):
-        return {k: encode_attr(v) for k, v in a.items()}
-    elif isinstance(a, np.ndarray):
-        return a.tolist()
-    elif isinstance(a, np.generic):
-        return a.item()
+def encode_attr(arg):
+    """ Convert arg into something acceptable to json """
+    if isinstance(arg, tuple):
+        return tuple(map(encode_attr, arg))
+    elif isinstance(arg, list):
+        return list(map(encode_attr, arg))
+    elif isinstance(arg, set):
+        return list(map(encode_attr, sorted(arg)))
+    elif isinstance(arg, dict):
+        return {k: encode_attr(v) for k, v in arg.items()}
+    elif isinstance(arg, np.ndarray):
+        return arg.tolist()
+    elif isinstance(arg, np.generic):
+        return arg.item()
     else:
-        return a
+        return arg
 
 
 def extent_args(dims, chunks):

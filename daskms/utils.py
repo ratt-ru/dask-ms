@@ -28,6 +28,19 @@ def arg_hasher(args):
         return hash(args)
 
 
+def freeze(arg):
+    if isinstance(arg, set):
+        return tuple(map(freeze, sorted(arg)))
+    elif isinstance(arg, (tuple, list)):
+        return tuple(map(freeze, arg))
+    elif isinstance(arg, dict):
+        return frozenset((k, freeze(v)) for k, v in sorted(arg.items()))
+    elif isinstance(arg, np.ndarray):
+        return freeze(arg.tolist())
+    else:
+        return arg
+
+
 def promote_columns(columns, default):
     """
     Promotes `columns` to a list of columns.

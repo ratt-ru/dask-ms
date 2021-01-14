@@ -1,3 +1,4 @@
+import dask
 import numpy as np
 from numpy.testing import assert_array_equal
 import pytest
@@ -54,4 +55,11 @@ def test_parquet_roundtrip(tmp_path_factory):
 def test_xds_to_parquet(ms, tmp_path_factory):
     store = tmp_path_factory.mktemp("parquet_store") / "out.parquet"
     datasets = xds_from_ms(ms)
-    writes = xds_to_parquet(datasets, store)
+    writes = xds_to_parquet(datasets, store, ["DATA_DESC_ID", "FIELD_ID"])
+    dask.compute(writes)
+
+    pq_dataset = pq.ParquetDataset(store)
+    table = pq_dataset.read()
+    for ds, chunk in zip(datasets, table.column("DATA").iterchunks()):
+        assert type(chunk) is TensorArray
+        assert_array_equal(ds.DATA.data, chunk.to_numpy())
