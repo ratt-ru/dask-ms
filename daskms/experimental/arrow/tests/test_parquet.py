@@ -4,8 +4,9 @@ from numpy.testing import assert_array_equal
 import pytest
 
 from daskms import xds_from_ms
+from daskms.reads import PARTITION_KEY
 from daskms.experimental.arrow.extension_types import TensorArray
-from daskms.experimental.arrow.reads import xds_from_parquet
+from daskms.experimental.arrow.reads import xds_from_parquet, DASKMS_METADATA
 from daskms.experimental.arrow.writes import xds_to_parquet
 
 pa = pytest.importorskip("pyarrow")
@@ -74,3 +75,11 @@ def test_xds_to_parquet(ms, tmp_path_factory):
         for column, var in ds.data_vars.items():
             pq_var = getattr(pq_ds, column)
             assert_array_equal(var.data, pq_var.data)
+            assert var.dims == pq_var.dims
+
+        partitions = ds.attrs[PARTITION_KEY]
+        pq_partitions = pq_ds.attrs[PARTITION_KEY]
+        assert partitions == pq_partitions
+
+        for field, dtype in partitions:
+            assert getattr(ds, field) == getattr(pq_ds, field)

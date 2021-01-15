@@ -5,6 +5,7 @@ from pathlib import Path
 import dask.array as da
 import numpy as np
 
+from daskms.reads import PARTITION_KEY
 from daskms.experimental.utils import DATASET_TYPE
 from daskms.experimental.arrow.writes import DASKMS_METADATA
 from daskms.experimental.arrow.extension_types import TensorType
@@ -43,6 +44,24 @@ def _column_getter(table, column):
     return chunks[0].to_numpy()
 
 
+def _partition_values(partition_strings, partition_meta):
+    assert len(partition_strings) == len(partition_meta)
+    partitions = []
+
+    for ps, (pf, dt) in zip(partition_strings, partition_meta):
+        field, value = (s.strip() for s in ps.split("="))
+
+        if field != pf:
+            raise ValueError(f"Column name {field} in partition string "
+                             f"{partition_strings} does not match "
+                             f"metadata column name {pf}")
+
+        assert field == pf
+        partitions.append((field, np.dtype(dt).type(value)))
+
+    return tuple(partitions)
+
+
 def xds_from_parquet(store, chunks=None):
     if not isinstance(store, Path):
         store = Path(store)
@@ -53,23 +72,32 @@ def xds_from_parquet(store, chunks=None):
     fragments = store.rglob("*.parquet")
     ds_cfg = defaultdict(list)
 
-    for fragment in sorted(fragments):
+    # Iterate over all parquet files in the directory tree
+    # and group them by partition
+    partition_schemas = set()
+
+    for fragment in fragments:
         *partitions, parquet_file = fragment.relative_to(store).parts
         fragment_meta = pq.read_metadata(fragment)
         metadata = json.loads(fragment_meta.metadata[DASKMS_METADATA.encode()])
-        types = [np.dtype(dt).type for _, dt in metadata["partition"]]
-
-        partitions = [tuple(p.split("=")) for p in partitions]
-        assert len(partitions) == len(types)
-        partitions = tuple((p, dt(v)) for (p, v), dt in zip(partitions, types))
-
+        partition_meta = metadata[PARTITION_KEY]
+        partition_meta = tuple(tuple((f, v)) for f, v in partition_meta)
+        partitions = _partition_values(partitions, partition_meta)
+        partition_schemas.add(partition_meta)
         ds_cfg[partitions].append((fragment, fragment_meta))
 
+    # Sanity check partition schemas of all parquet files
+    if len(partition_schemas) != 1:
+        raise ValueError(f"Multiple partitions discovered {partition_schemas}")
+
+    partition_schemas = partition_schemas.pop()
     datasets = []
 
-    for partition, values in ds_cfg.items():
+    # Now create a dataset per partition
+    for partition, values in sorted(ds_cfg.items()):
         column_arrays = defaultdict(list)
 
+        # For each parquet file in this partition
         for fragment, fragment_meta in values:
             table = da.blockwise(pq.read_table, (),
                                  fragment, None,
@@ -79,7 +107,7 @@ def xds_from_parquet(store, chunks=None):
             schema = fragment_meta.schema.to_arrow_schema()
 
             for column in schema.names:
-                field = schema.field_by_name(column)
+                field = schema.field(column)
                 field_metadata = field.metadata[DASKMS_METADATA.encode()]
                 field_metadata = json.loads(field_metadata)
                 dims = tuple(field_metadata["dims"])
@@ -114,6 +142,8 @@ def xds_from_parquet(store, chunks=None):
 
             data_vars[column] = (array_dims.pop(), da.concatenate(arrays))
 
-        datasets.append(DATASET_TYPE(data_vars))
+        attrs = dict(partition)
+        attrs[PARTITION_KEY] = partition_schemas
+        datasets.append(DATASET_TYPE(data_vars, attrs=attrs))
 
     return datasets

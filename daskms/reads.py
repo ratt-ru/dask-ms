@@ -21,7 +21,7 @@ from daskms.table_schemas import lookup_table_schema
 from daskms.utils import table_path_split
 
 _DEFAULT_ROW_CHUNKS = 10000
-PARTITION_KEY = "__daskms_partitition__"
+PARTITION_KEY = "__daskms_partitition_schema__"
 
 log = logging.getLogger(__name__)
 

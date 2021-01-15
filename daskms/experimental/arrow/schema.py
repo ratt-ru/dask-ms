@@ -97,7 +97,7 @@ def dict_dataset_schema(datasets):
 
     var_schemas = [variable_schema(c, v) for c, v in dataset_vars.items()]
     return (var_schemas, {"version": DASKMS_PARQUET_VERSION,
-                          "partition": partition_exemplar})
+                          PARTITION_KEY: partition_exemplar})
 
 
 @requires("pip install dask-ms[arrow] for arrow support",
