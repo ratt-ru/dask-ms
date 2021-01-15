@@ -89,6 +89,8 @@ def xds_from_parquet(store, chunks=None):
                 else:
                     shape = (rows,)
 
+                assert len(shape) == len(dims)
+
                 meta = np.empty((0,)*len(dims), field.type.to_pandas_dtype())
                 new_axes = {d: s for d, s in zip(dims, shape)}
 
@@ -104,11 +106,13 @@ def xds_from_parquet(store, chunks=None):
 
         for column, values in column_arrays.items():
             arrays, array_dims = zip(*values)
+            array_dims = set(array_dims)
 
-            if not len(set(array_dims)) == 1:
-                raise ValueError(f"{array_dims} don't match for {column}")
+            if not len(array_dims) == 1:
+                raise ValueError(f"Inconsistent array dimensions "
+                                 f"{array_dims} for {column}")
 
-            data_vars[column] = (dims, da.concatenate(arrays))
+            data_vars[column] = (array_dims.pop(), da.concatenate(arrays))
 
         datasets.append(DATASET_TYPE(data_vars))
 
