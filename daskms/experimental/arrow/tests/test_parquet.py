@@ -5,8 +5,8 @@ import pytest
 
 from daskms import xds_from_ms
 from daskms.experimental.arrow.extension_types import TensorArray
-from daskms.experimental.arrow.read import xds_from_parquet
-from daskms.experimental.arrow.write import xds_to_parquet
+from daskms.experimental.arrow.reads import xds_from_parquet
+from daskms.experimental.arrow.writes import xds_to_parquet
 
 pa = pytest.importorskip("pyarrow")
 pq = pytest.importorskip("pyarrow.parquet")
