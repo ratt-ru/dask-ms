@@ -21,6 +21,7 @@ from daskms.table_schemas import lookup_table_schema
 from daskms.utils import table_path_split
 
 _DEFAULT_ROW_CHUNKS = 10000
+PARTITION_KEY = "__daskms_partitition__"
 
 log = logging.getLogger(__name__)
 
@@ -329,7 +330,9 @@ class DatasetFactory(object):
         else:
             coords = {"ROWID": rowid}
 
-        return Dataset(variables, coords=coords)
+        attrs = {PARTITION_KEY: ()}
+
+        return Dataset(variables, coords=coords, attrs=attrs)
 
     def _group_datasets(self, table_proxy, groups, exemplar_rows, orders):
         _, t, s = table_path_split(self.canonical_name)
@@ -378,6 +381,7 @@ class DatasetFactory(object):
             # Assign values for the dataset's grouping columns
             # as attributes
             attrs = dict(zip(self.group_cols, group_id))
+            attrs[PARTITION_KEY] = tuple(self.group_cols)
 
             datasets.append(Dataset(group_var_dims, attrs=attrs,
                                     coords=coords))

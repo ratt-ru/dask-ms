@@ -5,7 +5,7 @@ import numpy as np
 
 from daskms.dataset import Dataset
 
-# TODO(sjpekrins)
+# TODO(sjperkins)
 # Integrate this into the CASA Table functionality at some point
 DATASET_TYPES = (Dataset,)
 DATASET_TYPE = Dataset

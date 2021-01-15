@@ -11,6 +11,7 @@ from daskms.experimental.arrow.schema import (dict_dataset_schema,
 from daskms.experimental.arrow.extension_types import TensorArray
 from daskms.experimental.utils import DATASET_TYPES, DATASET_TYPE
 from daskms.optimisation import inlined_array
+from daskms.reads import PARTITION_KEY
 from daskms.utils import freeze
 
 try:
@@ -102,7 +103,7 @@ class ParquetFragment(metaclass=ParquetFragmentMetaClass):
         return np.array([True], np.bool)
 
 
-def xds_to_parquet(xds, path, partition=()):
+def xds_to_parquet(xds, path):
     if not isinstance(path, Path):
         path = Path(path)
 
@@ -118,10 +119,12 @@ def xds_to_parquet(xds, path, partition=()):
     datasets = []
 
     for i, ds in enumerate(xds):
+        partition = ds.attrs.get(PARTITION_KEY, None)
+
         if not partition:
             ds_partition = (("DATASET", i),)
         else:
-            ds_partition = tuple((k, getattr(ds, k)) for k in partition)
+            ds_partition = tuple((p, getattr(ds, p)) for p in partition)
 
         fragment = ParquetFragment(path, schema, ds_partition)
         chunk_ids = da.arange(len(ds.chunks["row"]), chunks=1)

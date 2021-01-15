@@ -5,6 +5,7 @@ import pytest
 
 from daskms import xds_from_ms
 from daskms.experimental.arrow.extension_types import TensorArray
+from daskms.experimental.arrow.read import xds_from_parquet
 from daskms.experimental.arrow.write import xds_to_parquet
 
 pa = pytest.importorskip("pyarrow")
@@ -55,7 +56,7 @@ def test_parquet_roundtrip(tmp_path_factory):
 def test_xds_to_parquet(ms, tmp_path_factory):
     store = tmp_path_factory.mktemp("parquet_store") / "out.parquet"
     datasets = xds_from_ms(ms)
-    writes = xds_to_parquet(datasets, store, ["DATA_DESC_ID", "FIELD_ID"])
+    writes = xds_to_parquet(datasets, store)
     dask.compute(writes)
 
     record_batches = pq.ParquetDataset(store).read().to_batches()
@@ -65,3 +66,5 @@ def test_xds_to_parquet(ms, tmp_path_factory):
             var = getattr(ds, column).data
             assert isinstance(array, TensorArray if var.ndim > 1 else pa.Array)
             assert_array_equal(var, array.to_numpy())
+
+    xds_from_parquet(store)
