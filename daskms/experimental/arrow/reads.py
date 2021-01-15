@@ -19,7 +19,7 @@ else:
     pyarrow_import_error = None
 
 
-def xds_from_parquet(store):
+def xds_from_parquet(store, chunks=None):
     if not isinstance(store, Path):
         store = Path(store)
 

@@ -9,7 +9,7 @@ import numpy as np
 import pyrap.tables as pt
 
 from daskms.columns import (column_metadata, ColumnMetadataError,
-                            dim_extents_array)
+                            dim_extents_array, infer_dtype)
 from daskms.ordering import (ordering_taql, row_ordering,
                              group_ordering_taql, group_row_ordering)
 from daskms.optimisation import inlined_array
@@ -381,7 +381,8 @@ class DatasetFactory(object):
             # Assign values for the dataset's grouping columns
             # as attributes
             attrs = dict(zip(self.group_cols, group_id))
-            attrs[PARTITION_KEY] = tuple(self.group_cols)
+            attrs[PARTITION_KEY] = tuple((c, g.dtype.name) for c, g
+                                          in zip(self.group_cols, group_id))
 
             datasets.append(Dataset(group_var_dims, attrs=attrs,
                                     coords=coords))
@@ -427,7 +428,12 @@ class DatasetFactory(object):
             orders = group_row_ordering(order_taql, self.group_cols,
                                         self.index_cols, self.chunks)
 
-            groups = [order_taql.getcol(g).result() for g in self.group_cols]
+            groups = [order_taql.getcol(g).result()
+                      for g in self.group_cols]
+            # Cast to actual column dtype
+            group_types = [infer_dtype(c, table_proxy.getcoldesc(c).result())
+                           for c in self.group_cols]
+            groups = [g.astype(t) for g, t in zip(groups, group_types)]
             exemplar_rows = order_taql.getcol("__firstrow__").result()
             assert len(orders) == len(exemplar_rows)
 

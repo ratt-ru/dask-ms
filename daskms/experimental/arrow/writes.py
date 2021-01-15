@@ -124,7 +124,7 @@ def xds_to_parquet(xds, path):
         if not partition:
             ds_partition = (("DATASET", i),)
         else:
-            ds_partition = tuple((p, getattr(ds, p)) for p in partition)
+            ds_partition = tuple((p, getattr(ds, p)) for p, _ in partition)
 
         fragment = ParquetFragment(path, schema, ds_partition)
         chunk_ids = da.arange(len(ds.chunks["row"]), chunks=1)
