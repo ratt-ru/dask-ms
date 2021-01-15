@@ -382,7 +382,7 @@ class DatasetFactory(object):
             # as attributes
             attrs = dict(zip(self.group_cols, group_id))
             attrs[PARTITION_KEY] = tuple((c, g.dtype.name) for c, g
-                                          in zip(self.group_cols, group_id))
+                                         in zip(self.group_cols, group_id))
 
             datasets.append(Dataset(group_var_dims, attrs=attrs,
                                     coords=coords))

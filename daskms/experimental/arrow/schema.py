@@ -2,6 +2,7 @@ from collections import defaultdict
 import json
 
 from daskms.dataset import Variable
+from daskms.reads import PARTITION_KEY
 from daskms.utils import requires
 from daskms.experimental.arrow.extension_types import TensorArray
 
@@ -80,12 +81,23 @@ def variable_schema(column, variable):
 def dict_dataset_schema(datasets):
     dataset_vars = defaultdict(list)
 
+    try:
+        partition_exemplar = next(iter(datasets)).attrs[PARTITION_KEY]
+    except StopIteration:
+        pass
+    except KeyError:
+        raise ValueError("Datasets don't contain partitioning information")
+
     for ds in datasets:
         for c, v in ds.data_vars.items():
             dataset_vars[c].append(v)
 
+        if partition_exemplar != ds.attrs.get(PARTITION_KEY, None):
+            raise ValueError("Partitioning is not consistent across datasets")
+
     var_schemas = [variable_schema(c, v) for c, v in dataset_vars.items()]
-    return (var_schemas, {"version": DASKMS_PARQUET_VERSION})
+    return (var_schemas, {"version": DASKMS_PARQUET_VERSION,
+                          "partition": partition_exemplar})
 
 
 @requires("pip install dask-ms[arrow] for arrow support",

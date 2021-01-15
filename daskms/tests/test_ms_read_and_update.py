@@ -291,7 +291,7 @@ def test_column_promotion(ms):
     for ds in xds:
         assert "DATA" in ds.data_vars
         assert "SCAN_NUMBER" in ds.attrs
-        assert ds.attrs[PARTITION_KEY] == ("SCAN_NUMBER",)
+        assert ds.attrs[PARTITION_KEY] == (("SCAN_NUMBER", "int32"),)
 
 
 def test_read_array_names(ms):
