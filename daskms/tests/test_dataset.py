@@ -72,7 +72,7 @@ def test_dataset(ms, select_cols, group_cols, index_cols, shapes, chunks):
         assert chunks["chan"] == echunks['chan']
         assert chunks["corr"] == echunks['corr']
 
-        dims = ds.dims
+        dims = dict(ds.dims)
         dims.pop('row')  # row changes
         assert dims == {"chan": shapes['chan'],
                         "corr": shapes['corr']}
