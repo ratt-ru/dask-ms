@@ -210,14 +210,10 @@ def test_dataset_assign(ms):
 
     # Assign on an existing column is easier because we can
     # infer the dimension schema from it
-    nds = ds.assign(TIME=ds.TIME.data + 1)
+    nds = ds.assign(TIME=(ds.TIME.dims, ds.TIME.data + 1))
     assert ds.DATA.data is nds.DATA.data
     assert ds.TIME.data is not nds.TIME.data
     assert_array_equal(nds.TIME.data, ds.TIME.data + 1)
-
-    # This doesn't work for new columns
-    with pytest.raises(ValueError, match="Couldn't find existing dimension"):
-        ds.assign(ANTENNA3=ds.ANTENNA1.data + 3)
 
     # We have to explicitly supply a dimension schema
     nds = ds.assign(ANTENNA3=(("row",), ds.ANTENNA1.data + 3))
@@ -226,7 +222,7 @@ def test_dataset_assign(ms):
     dims = ds.dims
     chunks = ds.chunks
 
-    with pytest.raises(ValueError, match="size 9 for dimension 'row'"):
+    with pytest.raises(ValueError, match="'row': length 9 on 'ANTENNA4'"):
         array = da.zeros(dims['row'] - 1, chunks['row'])
         nds = ds.assign(ANTENNA4=(("row",),  array))
         nds.dims

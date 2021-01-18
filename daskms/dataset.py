@@ -317,20 +317,7 @@ if xr is None:
             data_vars = self._data_vars.copy()
 
             for k, v in kwargs.items():
-                if not isinstance(v, (list, tuple)):
-                    try:
-                        current_var = data_vars[k]
-                    except KeyError:
-                        raise ValueError("Couldn't find existing dimension "
-                                         "schema during assignment of "
-                                         "variable '%s'. "
-                                         "Supply a full "
-                                         "(dims, array[, attrs]) "
-                                         "tuple." % k)
-                    else:
-                        data_vars[k] = (current_var.dims, v, current_var.attrs)
-                else:
-                    data_vars[k] = v
+                data_vars[k] = v
 
             return Dataset(data_vars,
                            attrs=self._attrs.copy(),
