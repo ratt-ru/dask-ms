@@ -79,7 +79,7 @@ def test_xds_to_parquet(ms, tmp_path_factory):
             assert isinstance(array, TensorArray if var.ndim > 1 else pa.Array)
             assert_array_equal(var, array.to_numpy())
 
-    pq_datasets = xds_from_parquet(store)
+    pq_datasets = xds_from_parquet(store, chunks={"row": 1})
     assert len(datasets) == len(pq_datasets)
 
     for ds, pq_ds in zip(datasets, pq_datasets):

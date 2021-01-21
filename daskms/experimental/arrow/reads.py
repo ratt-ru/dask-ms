@@ -88,10 +88,10 @@ class ParquetFileProxy(metaclass=ParquetFileProxyMetaClass):
     def metadata(self):
         return self.file.metadata
 
-    def read_column(self, column, offset=None, length=None):
+    def read_column(self, column, start=None, end=None):
         chunks = self.file.read(columns=[column]).column(column).chunks
         assert len(chunks) == 1
-        return chunks[0].to_numpy()
+        return chunks[0].to_numpy()[start:end]
 
 
 def _partition_values(partition_strings, partition_meta):
@@ -214,10 +214,9 @@ def xds_from_parquet(store, chunks=None):
     for p, (partition, fragments) in enumerate(sorted(ds_cfg.items())):
         column_arrays = defaultdict(list)
         fragment_rows = [f.metadata.num_rows for f in fragments]
-        partition_chunks = partition_chunking(p, fragment_rows, chunks)
 
-        # For each parquet file in this partition
-        for fragment in fragments:
+        for (f, (start, end)) in partition_chunking(p, fragment_rows, chunks):
+            fragment = fragments[f]
             fragment_meta = fragment.metadata
             rows = fragment_meta.num_rows
             schema = fragment_meta.schema.to_arrow_schema()
@@ -240,6 +239,8 @@ def xds_from_parquet(store, chunks=None):
 
                 read = da.blockwise(fragment.read_column, dims,
                                     column, None,
+                                    start, None,
+                                    end, None,
                                     new_axes=new_axes,
                                     meta=meta)
 
