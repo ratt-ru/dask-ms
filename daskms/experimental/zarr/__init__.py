@@ -2,17 +2,17 @@ from pathlib import Path
 from threading import Lock
 from weakref import WeakValueDictionary
 
-import dask
 import dask.array as da
-from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 
 from daskms.utils import arg_hasher, requires
-from daskms.dataset import Dataset
+from daskms.experimental.utils import (encode_attr,
+                                       extent_args,
+                                       column_iterator,
+                                       promote_columns,
+                                       DATASET_TYPE,
+                                       DATASET_TYPES)
 from daskms.optimisation import inlined_array
-
-_DATASET_TYPES = (Dataset,)
-_DATASET_TYPE = Dataset
 
 DATASET_PREFIX = "__daskms_dataset__"
 DASKMS_ATTR_KEY = "__daskms_zarr_attr__"
@@ -24,32 +24,8 @@ except ImportError as e:
 else:
     zarr_import_error = None
 
-try:
-    import xarray as xr
-except ImportError as e:
-    xarray_import_error = e
-else:
-    xarray_import_error = None
-    _DATASET_TYPES += (xr.Dataset,)
-    _DATASET_TYPE = xr.Dataset
-
 _store_cache = WeakValueDictionary()
 _store_lock = Lock()
-
-
-def encode_attr(a):
-    if isinstance(a, tuple):
-        return tuple(encode_attr(v) for v in a)
-    elif isinstance(a, list):
-        return list(encode_attr(v) for v in a)
-    elif isinstance(a, dict):
-        return {k: encode_attr(v) for k, v in a.items()}
-    elif isinstance(a, np.ndarray):
-        return a.tolist()
-    elif isinstance(a, np.generic):
-        return a.item()
-    else:
-        return a
 
 
 class ZarrDatasetFactoryMetaClass(type):
@@ -154,27 +130,6 @@ def zarr_schema_factory(di, data_vars):
     return schema
 
 
-def extent_args(dims, chunks):
-    args = []
-    meta = np.empty((1,), dtype=np.int32)
-
-    for dim, chunks in zip(dims, chunks):
-        name = "-".join((dim, dask.base.tokenize(chunks)))
-        layers = {}
-        start = 0
-
-        for i, c in enumerate(chunks):
-            end = start + c
-            layers[(name, i)] = (start, end)
-            start = end
-
-        graph = HighLevelGraph.from_collections(name, layers, [])
-        args.append(da.Array(graph, name, chunks=(chunks,), meta=meta))
-        args.append((dim,))
-
-    return args
-
-
 def _setter_wrapper(data, name, factory, *extents):
     zarray = getattr(factory.group, name)
     selection = tuple(slice(start, end) for start, end in extents)
@@ -184,17 +139,19 @@ def _setter_wrapper(data, name, factory, *extents):
 
 @requires("pip install dask-ms[zarr] for zarr support",
           zarr_import_error)
-def xds_to_zarr(xds, store):
+def xds_to_zarr(xds, store, columns=None):
     if isinstance(store, Path):
         store = str(store)
 
     if not isinstance(store, str):
         raise TypeError(f"store '{store}' must be Path or str")
 
-    if isinstance(xds, _DATASET_TYPES):
+    columns = promote_columns(columns)
+
+    if isinstance(xds, DATASET_TYPES):
         xds = [xds]
     elif isinstance(xds, (tuple, list)):
-        if not all(isinstance(ds, _DATASET_TYPES) for ds in xds):
+        if not all(isinstance(ds, DATASET_TYPES) for ds in xds):
             raise TypeError("xds must be a Dataset or list of Datasets")
     else:
         raise TypeError("xds must be a Dataset or list of Datasets")
@@ -208,7 +165,7 @@ def xds_to_zarr(xds, store):
         factory = ZarrDatasetFactory(store, di, schema, attrs)
         data_vars = {}
 
-        for name, var in ds.data_vars.items():
+        for name, var in column_iterator(ds.data_vars, columns):
             ext_args = extent_args(var.dims, var.chunks)
 
             write = da.blockwise(_setter_wrapper, var.dims,
@@ -222,7 +179,7 @@ def xds_to_zarr(xds, store):
             write = inlined_array(write, ext_args[::2])
             data_vars[name] = (var.dims, write, var.attrs)
 
-        write_datasets.append(_DATASET_TYPE(data_vars))
+        write_datasets.append(DATASET_TYPE(data_vars))
 
     return write_datasets
 
@@ -233,12 +190,14 @@ def _getter_wrapper(zarray, *extents):
 
 @requires("pip install dask-ms[zarr] for zarr support",
           zarr_import_error)
-def xds_from_zarr(store, chunks=None):
+def xds_from_zarr(store, columns="ALL", chunks=None):
     if isinstance(store, Path):
         store = str(store)
 
     if not isinstance(store, str):
         raise TypeError("store must be a Path, str")
+
+    columns = promote_columns(columns)
 
     if chunks is None:
         pass
@@ -268,7 +227,7 @@ def xds_from_zarr(store, chunks=None):
 
         data_vars = {}
 
-        for name, zarray in group.items():
+        for name, zarray in column_iterator(group, columns):
             attrs = dict(zarray.attrs[DASKMS_ATTR_KEY])
             dims = attrs.pop("dims")
             array_chunks = tuple(group_chunks.get(d, s) for d, s
@@ -285,6 +244,6 @@ def xds_from_zarr(store, chunks=None):
             read = inlined_array(read, ext_args[::2])
             data_vars[name] = (dims, read, attrs)
 
-        datasets.append(_DATASET_TYPE(data_vars, attrs=group_attrs))
+        datasets.append(DATASET_TYPE(data_vars, attrs=group_attrs))
 
     return datasets
