@@ -1,4 +1,3 @@
-import logging
 from pathlib import Path
 from threading import Lock
 from weakref import WeakValueDictionary
@@ -27,8 +26,6 @@ else:
 
 _store_cache = WeakValueDictionary()
 _store_lock = Lock()
-
-log = logging.getLogger(__name__)
 
 
 class ZarrDatasetFactoryMetaClass(type):

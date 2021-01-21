@@ -1,5 +1,4 @@
 import json
-import logging
 from pathlib import Path
 from threading import Lock
 import weakref
@@ -32,8 +31,6 @@ except ImportError as e:
 else:
     pyarrow_import_error = None
 
-
-log = logging.getLogger(__name__)
 
 _dataset_cache = weakref.WeakValueDictionary()
 _dataset_lock = Lock()
