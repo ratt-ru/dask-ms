@@ -7,6 +7,7 @@ from daskms import xds_from_ms
 from daskms.reads import PARTITION_KEY
 from daskms.experimental.arrow.extension_types import TensorArray
 from daskms.experimental.arrow.reads import xds_from_parquet
+from daskms.experimental.arrow.reads import partition_chunking
 from daskms.experimental.arrow.writes import xds_to_parquet
 
 pa = pytest.importorskip("pyarrow")
@@ -52,6 +53,16 @@ def test_parquet_roundtrip(tmp_path_factory):
         assert isinstance(pqc, pa.ChunkedArray) and pqc.num_chunks == 1
         parquet_array = next(iter(pqc.iterchunks())).to_numpy()
         assert_array_equal(v, parquet_array)
+
+
+@pytest.mark.parametrize("row_chunks", [[2, 3, 4]])
+@pytest.mark.parametrize("user_chunks", [{"row": 2, "chan": 4}])
+def test_partition_chunks(row_chunks, user_chunks):
+    expected = [(0, (0, 2)),
+                (1, (0, 2)), (1, (2, 3)),
+                (2, (0, 1)), (2, (1, 3)), (2, (3, 4))]
+
+    assert partition_chunking(0, row_chunks, [user_chunks]) == expected
 
 
 def test_xds_to_parquet(ms, tmp_path_factory):
