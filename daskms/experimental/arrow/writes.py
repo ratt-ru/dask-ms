@@ -10,7 +10,10 @@ import numpy as np
 from daskms.experimental.arrow.schema import (dict_dataset_schema,
                                               DASKMS_METADATA)
 from daskms.experimental.arrow.extension_types import TensorArray
-from daskms.experimental.utils import DATASET_TYPES, DATASET_TYPE
+from daskms.experimental.utils import (DATASET_TYPES,
+                                       DATASET_TYPE,
+                                       promote_columns,
+                                       column_iterator)
 from daskms.optimisation import inlined_array
 from daskms.reads import PARTITION_KEY
 from daskms.utils import freeze
@@ -110,9 +113,7 @@ def xds_to_parquet(xds, path, columns=None):
     if not isinstance(path, Path):
         path = Path(path)
 
-    if columns is not None:
-        log.warning("%s columns arguments supplied, "
-                    "but not yet supported", columns)
+    columns = promote_columns(columns)
 
     if isinstance(xds, DATASET_TYPES):
         xds = [xds]
@@ -137,7 +138,7 @@ def xds_to_parquet(xds, path, columns=None):
         chunk_ids = da.arange(len(ds.chunks["row"]), chunks=1)
         args = [chunk_ids, ("row",)]
 
-        for column, variable in ds.data_vars.items():
+        for column, variable in column_iterator(ds.data_vars, columns):
             if not isinstance(variable.data, da.Array):
                 raise ValueError(f"Column {column} does not "
                                  f"contain a dask Array")

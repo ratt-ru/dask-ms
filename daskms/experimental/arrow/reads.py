@@ -9,7 +9,9 @@ import dask.array as da
 from dask.array.core import normalize_chunks
 import numpy as np
 
-from daskms.experimental.utils import DATASET_TYPE
+from daskms.experimental.utils import (DATASET_TYPE,
+                                       promote_columns,
+                                       column_iterator)
 from daskms.experimental.arrow.writes import DASKMS_METADATA
 from daskms.experimental.arrow.extension_types import TensorType
 from daskms.reads import PARTITION_KEY
@@ -175,9 +177,7 @@ def xds_from_parquet(store, columns=None, chunks=None):
     if not isinstance(store, Path):
         store = Path(store)
 
-    if columns is not None:
-        log.warning("%s columns arguments supplied, "
-                    "but not yet supported", columns)
+    columns = promote_columns(columns)
 
     if chunks is None:
         pass
@@ -224,9 +224,9 @@ def xds_from_parquet(store, columns=None, chunks=None):
             fragment_meta = fragment.metadata
             rows = fragment_meta.num_rows
             schema = fragment_meta.schema.to_arrow_schema()
+            fields = {n: schema.field(n) for n in schema.names}
 
-            for column in schema.names:
-                field = schema.field(column)
+            for column, field in column_iterator(fields, columns):
                 field_metadata = field.metadata[DASKMS_METADATA.encode()]
                 field_metadata = json.loads(field_metadata)
                 dims = tuple(field_metadata["dims"])

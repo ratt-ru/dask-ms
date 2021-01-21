@@ -9,6 +9,8 @@ import numpy as np
 from daskms.utils import arg_hasher, requires
 from daskms.experimental.utils import (encode_attr,
                                        extent_args,
+                                       column_iterator,
+                                       promote_columns,
                                        DATASET_TYPE,
                                        DATASET_TYPES)
 from daskms.optimisation import inlined_array
@@ -147,9 +149,7 @@ def xds_to_zarr(xds, store, columns=None):
     if not isinstance(store, str):
         raise TypeError(f"store '{store}' must be Path or str")
 
-    if columns is not None:
-        log.warning("%s columns arguments supplied, "
-                    "but not yet supported", columns)
+    columns = promote_columns(columns)
 
     if isinstance(xds, DATASET_TYPES):
         xds = [xds]
@@ -168,7 +168,7 @@ def xds_to_zarr(xds, store, columns=None):
         factory = ZarrDatasetFactory(store, di, schema, attrs)
         data_vars = {}
 
-        for name, var in ds.data_vars.items():
+        for name, var in column_iterator(ds.data_vars, columns):
             ext_args = extent_args(var.dims, var.chunks)
 
             write = da.blockwise(_setter_wrapper, var.dims,
@@ -193,16 +193,14 @@ def _getter_wrapper(zarray, *extents):
 
 @requires("pip install dask-ms[zarr] for zarr support",
           zarr_import_error)
-def xds_from_zarr(store, columns=None, chunks=None):
+def xds_from_zarr(store, columns="ALL", chunks=None):
     if isinstance(store, Path):
         store = str(store)
 
     if not isinstance(store, str):
         raise TypeError("store must be a Path, str")
 
-    if columns is not None:
-        log.warning("%s columns arguments supplied, "
-                    "but not yet supported", columns)
+    columns = promote_columns(columns)
 
     if chunks is None:
         pass
@@ -232,7 +230,7 @@ def xds_from_zarr(store, columns=None, chunks=None):
 
         data_vars = {}
 
-        for name, zarray in group.items():
+        for name, zarray in column_iterator(group, columns):
             attrs = dict(zarray.attrs[DASKMS_ATTR_KEY])
             dims = attrs.pop("dims")
             array_chunks = tuple(group_chunks.get(d, s) for d, s
