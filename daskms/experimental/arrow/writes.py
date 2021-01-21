@@ -1,4 +1,5 @@
 import json
+import logging
 from pathlib import Path
 from threading import Lock
 import weakref
@@ -28,6 +29,8 @@ except ImportError as e:
 else:
     pyarrow_import_error = None
 
+
+log = logging.getLogger(__name__)
 
 _dataset_cache = weakref.WeakValueDictionary()
 _dataset_lock = Lock()
@@ -103,9 +106,13 @@ class ParquetFragment(metaclass=ParquetFragmentMetaClass):
         return np.array([True], np.bool)
 
 
-def xds_to_parquet(xds, path):
+def xds_to_parquet(xds, path, columns=None):
     if not isinstance(path, Path):
         path = Path(path)
+
+    if columns is not None:
+        log.warning("%s columns arguments supplied, "
+                    "but not yet supported", columns)
 
     if isinstance(xds, DATASET_TYPES):
         xds = [xds]

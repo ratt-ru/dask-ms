@@ -171,9 +171,13 @@ def partition_chunking(partition, fragment_rows, chunks):
     return ranges
 
 
-def xds_from_parquet(store, chunks=None):
+def xds_from_parquet(store, columns=None, chunks=None):
     if not isinstance(store, Path):
         store = Path(store)
+
+    if columns is not None:
+        log.warning("%s columns arguments supplied, "
+                    "but not yet supported", columns)
 
     if chunks is None:
         pass

@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from threading import Lock
 from weakref import WeakValueDictionary
@@ -24,6 +25,8 @@ else:
 
 _store_cache = WeakValueDictionary()
 _store_lock = Lock()
+
+log = logging.getLogger(__name__)
 
 
 class ZarrDatasetFactoryMetaClass(type):
@@ -137,12 +140,16 @@ def _setter_wrapper(data, name, factory, *extents):
 
 @requires("pip install dask-ms[zarr] for zarr support",
           zarr_import_error)
-def xds_to_zarr(xds, store):
+def xds_to_zarr(xds, store, columns=None):
     if isinstance(store, Path):
         store = str(store)
 
     if not isinstance(store, str):
         raise TypeError(f"store '{store}' must be Path or str")
+
+    if columns is not None:
+        log.warning("%s columns arguments supplied, "
+                    "but not yet supported", columns)
 
     if isinstance(xds, DATASET_TYPES):
         xds = [xds]
@@ -186,12 +193,16 @@ def _getter_wrapper(zarray, *extents):
 
 @requires("pip install dask-ms[zarr] for zarr support",
           zarr_import_error)
-def xds_from_zarr(store, chunks=None):
+def xds_from_zarr(store, columns=None, chunks=None):
     if isinstance(store, Path):
         store = str(store)
 
     if not isinstance(store, str):
         raise TypeError("store must be a Path, str")
+
+    if columns is not None:
+        log.warning("%s columns arguments supplied, "
+                    "but not yet supported", columns)
 
     if chunks is None:
         pass
