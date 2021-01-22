@@ -4,7 +4,7 @@ History
 
 0.2.7 (YYYY-MM-DD)
 ------------------
-* Experimental arrow support (:pr:`130`)
+* Experimental arrow support (:pr:`130`, :pr:`132`)
 * Experimental zarr support (:pr:`129`)
 * Test data fix (:pr:`128`)
 * Fix array inlining for writes (:pr:`126`)
