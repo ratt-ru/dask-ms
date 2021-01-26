@@ -9,7 +9,7 @@ History
 * Test data fix (:pr:`128`)
 * Fix array inlining for writes (:pr:`126`)
 * Allow Multi-Layer Inlining (:pr:`125`)
-* Support DATA Column Expressions (:pr:`124`)
+* Support DATA Column Expressions (:pr:`124`, :pr:`134`)
 
 
 0.2.6 (2020-10-20)
