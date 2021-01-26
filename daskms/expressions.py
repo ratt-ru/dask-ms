@@ -14,9 +14,8 @@ operators = {
 
 
 class Visitor(ast.NodeTransformer):
-    def __init__(self, datasets):
-        assert type(datasets) is list
-        self.datasets = datasets
+    def __init__(self, dataset):
+        self.dataset = dataset
 
     if sys.version_info[1] >= 8:
         def visit_Constant(self, node):
@@ -30,18 +29,9 @@ class Visitor(ast.NodeTransformer):
             raise ValueError("Multiple assignment targets unsupported")
 
         var_name = node.targets[0].id
-        values = self.visit(node.value)
-
-        if type(values) is not list:
-            raise TypeError("Expression did not result in a list of values")
-
-        if len(self.datasets) != len(values):
-            raise ValueError("len(datasets) != len(values)")
-
+        value = self.visit(node.value)
         dim = ("row", "chan", "corr")
-
-        return [ds.assign(**{var_name: (dim, v)})
-                for ds, v in zip(self.datasets, values)]
+        return self.dataset.assign(**{var_name: (dim, value)})
 
     def visit_UnaryOp(self, node):
         try:
@@ -49,12 +39,7 @@ class Visitor(ast.NodeTransformer):
         except KeyError:
             raise ValueError(f"Unsupported operator {type(node.op)}")
 
-        value = self.visit(node.operand)
-
-        if type(value) is list:
-            return [op(v) for v in value]
-        else:
-            return op(value)
+        return op(self.visit(node.operand))
 
     def visit_BinOp(self, node):
         try:
@@ -62,42 +47,24 @@ class Visitor(ast.NodeTransformer):
         except KeyError:
             raise ValueError(f"Unsupported operator {type(node.op)}")
 
-        left = self.visit(node.left)
-        right = self.visit(node.right)
-        rtype = type(right)
-        ltype = type(left)
-
-        if ltype is list and rtype is list:
-            assert len(left) == len(right)
-            return [op(l, r) for l, r in zip(left, right)]  # noqa: E741
-        elif ltype is list:
-            return [op(l, right) for l in left]  # noqa: E741
-        elif rtype is list:
-            return [op(left, r) for r in right]
-        else:
-            return op(left, right)
+        return op(self.visit(node.left), self.visit(node.right))
 
     def visit_Name(self, node):
-        columns = []
+        xdarray = getattr(self.dataset, node.id)
 
-        for i, ds in enumerate(self.datasets):
-            xdarray = getattr(ds, node.id)
+        try:
+            dims = xdarray.dims
+        except AttributeError:
+            raise TypeError(f"{type(xdarray)} does not look "
+                            f"like a valid Dataset Array")
 
-            try:
-                dims = xdarray.dims
-            except AttributeError:
-                raise TypeError(f"{type(xdarray)} does not look "
-                                f"like a valid Dataset Array")
-            else:
-                if dims != ("row", "chan", "corr"):
-                    raise ValueError(f"{xdarray} does not look "
-                                     f"like a valid DATA array. "
-                                     f"Should have (row, chan, corr) dims"
-                                     f"Instead has {dims}")
+        if dims != ("row", "chan", "corr"):
+            raise ValueError(f"{xdarray} does not look "
+                             f"like a valid DATA array. "
+                             f"Should have (row, chan, corr) dims"
+                             f"Instead has {dims}")
 
-            columns.append(xdarray.data)
-
-        return columns
+        return xdarray.data
 
 
 def data_column_expr(statement, datasets):
@@ -136,10 +103,12 @@ def data_column_expr(statement, datasets):
     if not isinstance(expr, ast.Assign):
         raise ValueError("Single Assignment Statement Only")
 
-    v = Visitor(promoted_datasets)
-    new_datasets = v.visit(expr)
+    new_datasets = []
 
-    if not isinstance(promoted_datasets, (tuple, list)):
+    for ds in promoted_datasets:
+        new_datasets.append(Visitor(ds).visit(expr))
+
+    if isinstance(datasets, (list, tuple)):
+        return new_datasets
+    else:
         return new_datasets[0]
-
-    return new_datasets
