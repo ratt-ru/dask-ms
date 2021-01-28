@@ -75,9 +75,13 @@ def test_xds_to_parquet(ms, tmp_path_factory):
 
     for ds, batch in zip(datasets, record_batches):
         for column, array in zip(batch.schema.names, batch.columns):
-            var = getattr(ds, column).data
-            assert isinstance(array, TensorArray if var.ndim > 1 else pa.Array)
-            assert_array_equal(var, array.to_numpy())
+            if column in ds.attrs:
+                assert_array_equal(getattr(ds, column), array.to_numpy())
+            else:
+                var = getattr(ds, column).data
+                expected_patype = TensorArray if var.ndim > 1 else pa.Array
+                assert isinstance(array, expected_patype)
+                assert_array_equal(var, array.to_numpy())
 
     pq_datasets = xds_from_parquet(store, chunks={"row": 1})
     assert len(datasets) == len(pq_datasets)

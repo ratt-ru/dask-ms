@@ -380,9 +380,12 @@ class DatasetFactory(object):
 
             # Assign values for the dataset's grouping columns
             # as attributes
-            attrs = dict(zip(self.group_cols, group_id))
-            attrs[PARTITION_KEY] = tuple((c, g.dtype.name) for c, g
-                                         in zip(self.group_cols, group_id))
+            attrs = {PARTITION_KEY: tuple((c, g.dtype.name) for c, g
+                                          in zip(self.group_cols, group_id))}
+
+            # Use python types which are json serializable
+            group_id = [gid.item() for gid in group_id]
+            attrs.update(zip(self.group_cols, group_id))
 
             datasets.append(Dataset(group_var_dims, attrs=attrs,
                                     coords=coords))
