@@ -21,8 +21,23 @@ try:
     import pyarrow as pa
 except ImportError as e:
     pyarrow_import_error = e
+    _UNHANDLED_TYPES = ()
 else:
     pyarrow_import_error = None
+
+    _UNHANDLED_TYPES = (
+        pa.DictionaryType,
+        pa.ListType,
+        pa.MapType,
+        pa.StructType,
+        pa.UnionType,
+        pa.TimestampType,
+        pa.Time32Type,
+        pa.Time64Type,
+        pa.FixedSizeBinaryType,
+        pa.Decimal128Type,
+    )
+
 
 try:
     import pyarrow.parquet as pq
@@ -31,18 +46,6 @@ except ImportError as e:
 else:
     pyarrow_import_error = None
 
-_UNHANDLED_TYPES = (
-    pa.DictionaryType,
-    pa.ListType,
-    pa.MapType,
-    pa.StructType,
-    pa.UnionType,
-    pa.TimestampType,
-    pa.Time32Type,
-    pa.Time64Type,
-    pa.FixedSizeBinaryType,
-    pa.Decimal128Type,
-)
 
 _parquet_table_lock = Lock()
 _parquet_table_cache = weakref.WeakValueDictionary()
