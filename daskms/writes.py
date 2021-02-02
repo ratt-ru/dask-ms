@@ -546,6 +546,7 @@ def _write_datasets(table, table_proxy, datasets, columns, descriptor,
     table_name = '::'.join((table_name, subtable)) if subtable else table_name
     row_orders = []
 
+    # print("Table Keywords - _write_datasets", type(table_keywords), table_keywords)
     # Put table and column keywords
     table_proxy.submit(_put_keywords, WRITELOCK,
                        table_keywords, column_keywords).result()
@@ -670,7 +671,8 @@ DELKW = object()
 
 
 def _put_keywords(table, table_keywords, column_keywords):
-    if table_keywords is not None:
+    # print("Table Keywords - _put_keywords", type(table_keywords), table_keywords)
+    if not all(item is None for item in table_keywords):
         for k, v in table_keywords.items():
             if v == DELKW:
                 table.removekeyword(k)
@@ -709,6 +711,7 @@ def write_datasets(table, datasets, columns, descriptor=None,
     else:
         tp = _updated_table(table, datasets, columns, descriptor)
 
+    # print("Table Keywords - write_datasets", type(table_keywords), table_keywords)
     write_datasets = _write_datasets(table, tp, datasets, columns,
                                      descriptor=descriptor,
                                      table_keywords=table_keywords,
