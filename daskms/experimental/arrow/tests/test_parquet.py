@@ -38,7 +38,7 @@ def test_parquet_roundtrip(tmp_path_factory):
         "ANTENNA1": ant1,
         "ANTENNA2": ant2,
         "UVW": uvw,
-        "DATA": data
+        "DATA": data,
     }
 
     arrow_columns = {k: TensorArray.from_numpy(v) for k, v in columns.items()}
