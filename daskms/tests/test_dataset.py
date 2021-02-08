@@ -13,6 +13,7 @@ from numpy.testing import assert_array_equal, assert_array_almost_equal
 import pyrap.tables as pt
 import pytest
 
+from daskms import xds_from_ms
 from daskms.dataset import Dataset, Variable
 from daskms.reads import read_datasets
 from daskms.writes import write_datasets
@@ -482,6 +483,12 @@ def test_dataset_computes_and_values(ms):
         assert_array_equal(v.values, ds.data_vars[k].data)
 
 
+@pytest.mark.xfail(reason="https://github.com/pydata/xarray/issues/4882")
+def test_dataset_xarray(ms):
+    datasets = xds_from_ms(ms)
+    datasets = dask.persist(datasets)
+
+
 def test_dataset_dask(ms):
     datasets = read_datasets(ms, [], [], [])
     assert len(datasets) == 1
@@ -502,13 +509,17 @@ def test_dataset_dask(ms):
 
         # Now have numpy array in the graph
         assert len(v3.data.__dask_keys__()) == 1
-        assert isinstance(v3.data.__dask_graph__().values()[0], np.ndarray)
+        data = next(iter(v3.__dask_graph__().values()))
+        assert isinstance(data, np.ndarray)
+        assert_array_equal(v2.data, v3.data)
 
     # Test compute
     nds = dask.compute(ds)[0]
 
     for k, v in nds.data_vars.items():
         assert isinstance(v.data, np.ndarray)
+        cdata = getattr(ds, k).data
+        assert_array_equal(cdata, v.data)
 
     # Test persist
     nds = dask.persist(ds)[0]
@@ -518,4 +529,8 @@ def test_dataset_dask(ms):
 
         # Now have numpy array iin the graph
         assert len(v.data.__dask_keys__()) == 1
-        assert isinstance(v.data.__dask_graph__().values()[0], np.ndarray)
+        data = next(iter(v.data.__dask_graph__().values()))
+        assert isinstance(data, np.ndarray)
+
+        cdata = getattr(ds, k).data
+        assert_array_equal(cdata, v.data)

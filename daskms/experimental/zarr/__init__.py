@@ -1,18 +1,20 @@
+import itertools
 from pathlib import Path
 from threading import Lock
 from weakref import WeakValueDictionary
 
-import dask
 import dask.array as da
-from dask.highlevelgraph import HighLevelGraph
 import numpy as np
+import numcodecs
 
 from daskms.utils import arg_hasher, requires
-from daskms.dataset import Dataset
+from daskms.experimental.utils import (encode_attr,
+                                       extent_args,
+                                       column_iterator,
+                                       promote_columns,
+                                       DATASET_TYPE,
+                                       DATASET_TYPES)
 from daskms.optimisation import inlined_array
-
-_DATASET_TYPES = (Dataset,)
-_DATASET_TYPE = Dataset
 
 DATASET_PREFIX = "__daskms_dataset__"
 DASKMS_ATTR_KEY = "__daskms_zarr_attr__"
@@ -24,32 +26,8 @@ except ImportError as e:
 else:
     zarr_import_error = None
 
-try:
-    import xarray as xr
-except ImportError as e:
-    xarray_import_error = e
-else:
-    xarray_import_error = None
-    _DATASET_TYPES += (xr.Dataset,)
-    _DATASET_TYPE = xr.Dataset
-
 _store_cache = WeakValueDictionary()
 _store_lock = Lock()
-
-
-def encode_attr(a):
-    if isinstance(a, tuple):
-        return tuple(encode_attr(v) for v in a)
-    elif isinstance(a, list):
-        return list(encode_attr(v) for v in a)
-    elif isinstance(a, dict):
-        return {k: encode_attr(v) for k, v in a.items()}
-    elif isinstance(a, np.ndarray):
-        return a.tolist()
-    elif isinstance(a, np.generic):
-        return a.item()
-    else:
-        return a
 
 
 class ZarrDatasetFactoryMetaClass(type):
@@ -109,12 +87,17 @@ class ZarrDatasetFactory(metaclass=ZarrDatasetFactoryMetaClass):
                 ds_group = group.require_group(group_name)
                 ds_group.attrs.update(encode_attr(self.attrs))
 
-                for name, (dims, shape, chunks, dtype) in self.schema.items():
+                for name, v in self.schema.items():
+                    dims, shape, chunks, dtype, coord = v
+                    codec = numcodecs.Pickle() if dtype == np.object else None
+
                     array = ds_group.require_dataset(name, shape,
                                                      chunks=chunks,
                                                      dtype=dtype,
+                                                     object_codec=codec,
                                                      exact=True)
-                    array.attrs[DASKMS_ATTR_KEY] = {"dims": dims}
+                    array.attrs[DASKMS_ATTR_KEY] = {"dims": dims,
+                                                    "coordinate": coord}
 
                 self._group = ds_group
                 return ds_group
@@ -124,10 +107,14 @@ class ZarrDatasetFactory(metaclass=ZarrDatasetFactoryMetaClass):
                 (self.store, self.dataset_id, self.schema, self.attrs))
 
 
-def zarr_schema_factory(di, data_vars):
+def zarr_schema_factory(di, dataset):
     schema = {}
 
-    for name, var in data_vars.items():
+    data_vars = ((k, v, False) for k, v in dataset.data_vars.items())
+    coords = ((k, v, True) for k, v in dataset.coords.items())
+    variables = itertools.chain(data_vars, coords)
+
+    for name, var, is_coord in variables:
         # Determine schema for backing zarr arrays
         zarr_chunks = []
 
@@ -149,30 +136,10 @@ def zarr_schema_factory(di, data_vars):
                                  f"except for the last chunk in a "
                                  f"dimension. Rechunk your {name}.")
 
-        schema[name] = (var.dims, var.shape, tuple(zarr_chunks), var.dtype)
+        zarr_chunks = tuple(zarr_chunks)
+        schema[name] = (var.dims, var.shape, zarr_chunks, var.dtype, is_coord)
 
     return schema
-
-
-def extent_args(dims, chunks):
-    args = []
-    meta = np.empty((1,), dtype=np.int32)
-
-    for dim, chunks in zip(dims, chunks):
-        name = "-".join((dim, dask.base.tokenize(chunks)))
-        layers = {}
-        start = 0
-
-        for i, c in enumerate(chunks):
-            end = start + c
-            layers[(name, i)] = (start, end)
-            start = end
-
-        graph = HighLevelGraph.from_collections(name, layers, [])
-        args.append(da.Array(graph, name, chunks=(chunks,), meta=meta))
-        args.append((dim,))
-
-    return args
 
 
 def _setter_wrapper(data, name, factory, *extents):
@@ -184,31 +151,27 @@ def _setter_wrapper(data, name, factory, *extents):
 
 @requires("pip install dask-ms[zarr] for zarr support",
           zarr_import_error)
-def xds_to_zarr(xds, store):
+def xds_to_zarr(xds, store, columns=None):
     if isinstance(store, Path):
         store = str(store)
 
     if not isinstance(store, str):
         raise TypeError(f"store '{store}' must be Path or str")
 
-    if isinstance(xds, _DATASET_TYPES):
+    columns = promote_columns(columns)
+
+    if isinstance(xds, DATASET_TYPES):
         xds = [xds]
     elif isinstance(xds, (tuple, list)):
-        if not all(isinstance(ds, _DATASET_TYPES) for ds in xds):
+        if not all(isinstance(ds, DATASET_TYPES) for ds in xds):
             raise TypeError("xds must be a Dataset or list of Datasets")
     else:
         raise TypeError("xds must be a Dataset or list of Datasets")
 
     write_datasets = []
 
-    for di, ds in enumerate(xds):
-        schema = zarr_schema_factory(di, ds.data_vars)
-        attrs = dict(ds.attrs)
-        attrs[DASKMS_ATTR_KEY] = {"chunks": dict(ds.chunks)}
-        factory = ZarrDatasetFactory(store, di, schema, attrs)
-        data_vars = {}
-
-        for name, var in ds.data_vars.items():
+    def _gen_reads(variables, columns):
+        for name, var in column_iterator(variables, columns):
             ext_args = extent_args(var.dims, var.chunks)
 
             write = da.blockwise(_setter_wrapper, var.dims,
@@ -220,9 +183,18 @@ def xds_to_zarr(xds, store):
                                  meta=np.empty((1,)*len(var.dims), np.bool))
 
             write = inlined_array(write, ext_args[::2])
-            data_vars[name] = (var.dims, write, var.attrs)
+            yield name, (var.dims, write, var.attrs)
 
-        write_datasets.append(_DATASET_TYPE(data_vars))
+    for di, ds in enumerate(xds):
+        schema = zarr_schema_factory(di, ds)
+        attrs = dict(ds.attrs)
+        attrs[DASKMS_ATTR_KEY] = {"chunks": dict(ds.chunks)}
+        factory = ZarrDatasetFactory(store, di, schema, attrs)
+
+        data_vars = dict(_gen_reads(ds.data_vars, columns))
+        coords = dict(_gen_reads(ds.coords, columns))
+
+        write_datasets.append(DATASET_TYPE(data_vars, coords=coords))
 
     return write_datasets
 
@@ -233,12 +205,14 @@ def _getter_wrapper(zarray, *extents):
 
 @requires("pip install dask-ms[zarr] for zarr support",
           zarr_import_error)
-def xds_from_zarr(store, chunks=None):
+def xds_from_zarr(store, columns="ALL", chunks=None):
     if isinstance(store, Path):
         store = str(store)
 
     if not isinstance(store, str):
         raise TypeError("store must be a Path, str")
+
+    columns = promote_columns(columns)
 
     if chunks is None:
         pass
@@ -267,10 +241,12 @@ def xds_from_zarr(store, chunks=None):
                 pass
 
         data_vars = {}
+        coords = {}
 
-        for name, zarray in group.items():
+        for name, zarray in column_iterator(group, columns):
             attrs = dict(zarray.attrs[DASKMS_ATTR_KEY])
             dims = attrs.pop("dims")
+            coordinate = attrs.pop("coordinate", False)
             array_chunks = tuple(group_chunks.get(d, s) for d, s
                                  in zip(dims, zarray.shape))
 
@@ -283,8 +259,14 @@ def xds_from_zarr(store, chunks=None):
                                 meta=np.empty((0,)*zarray.ndim, zarray.dtype))
 
             read = inlined_array(read, ext_args[::2])
-            data_vars[name] = (dims, read, attrs)
 
-        datasets.append(_DATASET_TYPE(data_vars, attrs=group_attrs))
+            if coordinate:
+                coords[name] = (dims, read, attrs)
+            else:
+                data_vars[name] = (dims, read, attrs)
+
+        datasets.append(DATASET_TYPE(data_vars,
+                                     coords=coords,
+                                     attrs=group_attrs))
 
     return datasets
