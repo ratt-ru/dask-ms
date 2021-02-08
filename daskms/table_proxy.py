@@ -82,7 +82,7 @@ def proxied_method_factory(method, locktype):
     on a concurrent.futures.ThreadPoolExecutor.
     """
 
-    if locktype == NOLOCK:
+    if locktype in (NOLOCK, READLOCK):
         def _impl(table_future, args, kwargs):
             try:
                 return getattr(table_future.result(), method)(*args, **kwargs)
@@ -90,21 +90,6 @@ def proxied_method_factory(method, locktype):
                 if logging.DEBUG >= log.getEffectiveLevel():
                     log.exception("Exception in %s", method)
                 raise
-
-    elif locktype == READLOCK:
-        def _impl(table_future, args, kwargs):
-            table = table_future.result()
-            table.lock(write=False)
-
-            try:
-                return getattr(table, method)(*args, **kwargs)
-            except Exception:
-                if logging.DEBUG >= log.getEffectiveLevel():
-                    log.exception("Exception in %s", method)
-                raise
-            finally:
-                table.unlock()
-
     elif locktype == WRITELOCK:
         def _impl(table_future, args, kwargs):
             table = table_future.result()
@@ -201,20 +186,6 @@ def _nolock_runner(table_future, fn, args, kwargs):
         if logging.DEBUG >= log.getEffectiveLevel():
             log.exception("Exception in %s", fn.__name__)
         raise
-
-
-def _readlock_runner(table_future, fn, args, kwargs):
-    table = table_future.result()
-    table.lock(write=False)
-
-    try:
-        return fn(table, *args, **kwargs)
-    except Exception:
-        if logging.DEBUG >= log.getEffectiveLevel():
-            log.exception("Exception in %s", fn.__name__)
-        raise
-    finally:
-        table.unlock()
 
 
 def _writelock_runner(table_future, fn, args, kwargs):
@@ -391,11 +362,8 @@ class TableProxy(object, metaclass=TableProxyMetaClass):
         future : :class:`concurrent.futures.Future`
             Future containing the result of :code:`fn(table, *args, **kwargs)`
         """
-        if locktype == NOLOCK:
+        if locktype in (NOLOCK, READLOCK):
             return self._ex.submit(_nolock_runner, self._table_future,
-                                   fn, args, kwargs)
-        elif locktype == READLOCK:
-            return self._ex.submit(_readlock_runner, self._table_future,
                                    fn, args, kwargs)
         elif locktype == WRITELOCK:
             return self._ex.submit(_writelock_runner, self._table_future,
