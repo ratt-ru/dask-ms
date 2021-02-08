@@ -8,7 +8,7 @@ from daskms.experimental.zarr import xds_from_zarr, xds_to_zarr
 def test_xds_to_zarr(ms, tmp_path_factory):
     zarr_store = tmp_path_factory.mktemp("zarr_store") / "test.zarr"
 
-    ms_datasets = dask.persist(xds_from_ms(ms))[0]
+    ms_datasets = xds_from_ms(ms)
     writes = xds_to_zarr(ms_datasets, zarr_store)
     dask.compute(writes)
 

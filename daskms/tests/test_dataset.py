@@ -13,6 +13,7 @@ from numpy.testing import assert_array_equal, assert_array_almost_equal
 import pyrap.tables as pt
 import pytest
 
+from daskms import xds_from_ms
 from daskms.dataset import Dataset, Variable
 from daskms.reads import read_datasets
 from daskms.writes import write_datasets
@@ -484,6 +485,12 @@ def test_dataset_computes_and_values(ms):
         assert isinstance(v.data, np.ndarray)
         assert_array_equal(v.data, ds.data_vars[k].data)
         assert_array_equal(v.values, ds.data_vars[k].data)
+
+
+@pytest.mark.xfail(reason="https://github.com/pydata/xarray/issues/4882")
+def test_dataset_xarray(ms):
+    datasets = xds_from_ms(ms)
+    datasets = dask.persist(datasets)
 
 
 def test_dataset_dask(ms):

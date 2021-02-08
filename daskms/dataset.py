@@ -127,7 +127,9 @@ class Variable(object):
 
     def __dask_postcompute__(self):
         fn, args = self.data.__dask_postcompute__()
-        args = (fn, args, self.data.name, self.dims, self.attrs)
+
+        name = (self.data.name if isinstance(self.data, da.Array) else None)
+        args = (fn, args, name, self.dims, self.attrs)
         return (self.finalize_compute, args)
 
     @staticmethod
