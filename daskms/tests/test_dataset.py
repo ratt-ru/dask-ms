@@ -21,7 +21,7 @@ from daskms.utils import (select_cols_str, group_cols_str,
                           index_cols_str, assert_liveness)
 
 try:
-    import xarray  # noqa
+    import xarray as xr
 except ImportError:
     have_xarray = False
 else:
@@ -507,7 +507,7 @@ def test_dataset_xarray(ms):
     datasets = dask.persist(datasets)
 
 
-@pytest.mark.skipif(have_xarray, reason="only applies to custom datasets")
+@pytest.mark.skipif(have_xarray, reason="https://github.com/pydata/xarray/issues/4860")
 def test_dataset_dask(ms):
     datasets = read_datasets(ms, [], [], [])
     assert len(datasets) == 1
@@ -519,12 +519,12 @@ def test_dataset_dask(ms):
 
         # Test variable compute
         v2 = dask.compute(v)[0]
-        assert isinstance(v2, Variable)
+        assert isinstance(v2, xr.DataArray if have_xarray else Variable)
         assert isinstance(v2.data, np.ndarray)
 
         # Test variable persists
         v3 = dask.persist(v)[0]
-        assert isinstance(v3, Variable)
+        assert isinstance(v3, xr.DataArray if have_xarray else Variable)
 
         # Now have numpy array in the graph
         assert len(v3.data.__dask_keys__()) == 1
