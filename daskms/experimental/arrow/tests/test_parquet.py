@@ -32,13 +32,15 @@ def test_parquet_roundtrip(tmp_path_factory):
     shape = (nrow, nchan, ncorr)
     data = np.random.random(shape) + np.random.random(shape)*1j
     uvw = np.random.random((nrow, 3))
+    names = np.array(["row-%d" % r for r in range(nrow)], dtype=np.object)
 
     columns = {
         "TIME": time,
         "ANTENNA1": ant1,
         "ANTENNA2": ant2,
         "UVW": uvw,
-        "DATA": data
+        "DATA": data,
+        "NAMES": names,
     }
 
     arrow_columns = {k: TensorArray.from_numpy(v) for k, v in columns.items()}
