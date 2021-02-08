@@ -121,7 +121,7 @@ if xr is None:
         def __repr__(self):
             return '%s(%r)' % (type(self).__name__, self.mapping)
 
-    class Variable(object):
+    class Variable:
         """
         Replicates a minimal subset of `xarray Variable
         <http://xarray.pydata.org/en/stable/generated/xarray.Variable.html>`_'s

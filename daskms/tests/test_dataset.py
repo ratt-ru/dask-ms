@@ -20,6 +20,12 @@ from daskms.writes import write_datasets
 from daskms.utils import (select_cols_str, group_cols_str,
                           index_cols_str, assert_liveness)
 
+try:
+    import xarray
+except ImportError:
+    have_xarray = False
+else:
+    have_xarray = True
 
 @pytest.mark.parametrize("group_cols", [
     ["FIELD_ID", "SCAN_NUMBER"],
@@ -223,14 +229,25 @@ def test_dataset_assign(ms):
     dims = ds.dims
     chunks = ds.chunks
 
-    with pytest.raises(ValueError, match="'row': length 9 on 'ANTENNA4'"):
+    if have_xarray:
+        match = "'row': length 9 on 'ANTENNA4'"
+    else:
+        match = ("Existing dimension size 9 for dimension 'row' "
+                 "is inconsistent with same dimension 10 of array ANTENNA4")
+
+    with pytest.raises(ValueError, match=match):
         array = da.zeros(dims['row'] - 1, chunks['row'])
         nds = ds.assign(ANTENNA4=(("row",),  array))
         nds.dims
 
     assert chunks['row'] == (10,)
 
-    with pytest.raises(ValueError, match=r"chunking \(4, 4, 2\) for dim"):
+    if have_xarray:
+        match = "Object has inconsistent chunks along dimension row."
+    else:
+        match = r"chunking \(4, 4, 2\) for dim"
+
+    with pytest.raises(ValueError, match=match):
         array = da.zeros(dims['row'], chunks=4)
         nds = ds.assign(ANTENNA4=(("row",),  array))
         nds.chunks
@@ -489,6 +506,7 @@ def test_dataset_xarray(ms):
     datasets = dask.persist(datasets)
 
 
+@pytest.mark.skipif(have_xarray, reason="only applies to custom datasets")
 def test_dataset_dask(ms):
     datasets = read_datasets(ms, [], [], [])
     assert len(datasets) == 1

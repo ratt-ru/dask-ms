@@ -7,11 +7,7 @@ import pytest
 from daskms.example_data import example_ms
 from daskms.table_proxy import TableProxy
 from daskms import xds_to_table, xds_from_ms
-
-try:
-    from xarray import Dataset
-except ImportError:
-    from daskms.dataset import Dataset
+from daskms.dataset import Dataset
 
 
 @pytest.fixture(scope='module')
@@ -68,7 +64,7 @@ def test_write_keywords(ms):
 
     # Add to table keywords
     writes = xds_to_table([], ms, [], table_keywords={'bob': 'qux'})
-    assert isinstance(writes, Dataset)
+    assert all(isinstance(w, Dataset) for w in writes)
     dask.compute(writes)
 
     with pt.table(ms, ack=False, readonly=True) as T:
@@ -77,7 +73,8 @@ def test_write_keywords(ms):
     # Add to column keywords
     writes = xds_to_table(datasets, ms, [],
                           column_keywords={'STATE_ID': {'bob': 'qux'}})
-    assert isinstance(writes, list) and isinstance(writes[0], Dataset)
+    assert isinstance(writes, list)
+    assert all(isinstance(w, Dataset) for w in writes)
     dask.compute(writes)
 
     with pt.table(ms, ack=False, readonly=True) as T:
@@ -88,7 +85,8 @@ def test_write_keywords(ms):
     writes = xds_to_table(datasets, ms, [],
                           table_keywords={'bob': DELKW},
                           column_keywords={'STATE_ID': {'bob': DELKW}})
-    assert isinstance(writes, list) and isinstance(writes[0], Dataset)
+    assert isinstance(writes, list)
+    assert all(isinstance(w, Dataset) for w in writes)
     dask.compute(writes)
 
     with pt.table(ms, ack=False, readonly=True) as T:
@@ -101,9 +99,11 @@ def test_write_table_proxy_keyword(ms):
 
     # Test that we get a TableProxy if requested
     writes, tp = xds_to_table(datasets, ms, [], table_proxy=True)
-    assert isinstance(writes, list) and isinstance(writes[0], Dataset)
+    assert isinstance(writes, list)
+    assert all(isinstance(w, Dataset) for w in writes)
     assert isinstance(tp, TableProxy)
     assert tp.nrows().result() == 10
 
     writes = xds_to_table(datasets, ms, [], table_proxy=False)
-    assert isinstance(writes, list) and isinstance(writes[0], Dataset)
+    assert isinstance(writes, list)
+    assert all(isinstance(w, Dataset) for w in writes)
