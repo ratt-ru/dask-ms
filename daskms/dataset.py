@@ -122,21 +122,25 @@ class Variable(object):
         return self.data.__dask_scheduler__
 
     @staticmethod
-    def finalize_compute(results, fn, args, dims, attrs):
+    def finalize_compute(results, fn, args, name, dims, attrs):
         return Variable(dims, fn(results, *args), attrs=attrs)
 
     def __dask_postcompute__(self):
         fn, args = self.data.__dask_postcompute__()
-        return (self.finalize_compute, (fn, args, self.dims, self.attrs))
+
+        name = (self.data.name if isinstance(self.data, da.Array) else None)
+        args = (fn, args, name, self.dims, self.attrs)
+        return (self.finalize_compute, args)
 
     @staticmethod
-    def finalize_persist(results, fn, args, dims, attrs):
-        results = {k: v for k, v in results.items() if k[0] == args[0]}
+    def finalize_persist(results, fn, args, name, dims, attrs):
+        results = {k: v for k, v in results.items() if k[0] == name}
         return Variable(dims, fn(results, *args), attrs=attrs)
 
     def __dask_postpersist__(self):
         fn, args = self.data.__dask_postpersist__()
-        return (self.finalize_persist, (fn, args, self.dims, self.attrs))
+        args = (fn, args, self.data.name, self.dims, self.attrs)
+        return (self.finalize_persist, args)
 
 
 class DimensionInferenceError(ValueError):
