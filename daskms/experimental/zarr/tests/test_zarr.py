@@ -38,5 +38,12 @@ def test_xds_to_zarr(ms, tmp_path_factory):
     zarr_datasets = xds_from_zarr(zarr_store, chunks={"row": 1})
 
     for ms_ds, zarr_ds in zip(ms_datasets, zarr_datasets):
+        assert ms_ds.data_vars, "MS Dataset has no variables"
+
         for name, var in ms_ds.data_vars.items():
+            assert_array_equal(var.data, getattr(zarr_ds, name).data)
+
+        assert ms_ds.coords, "MS Dataset has no coordinates"
+
+        for name, var in ms_ds.coords.items():
             assert_array_equal(var.data, getattr(zarr_ds, name).data)
