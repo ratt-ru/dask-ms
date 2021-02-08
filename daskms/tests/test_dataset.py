@@ -21,11 +21,12 @@ from daskms.utils import (select_cols_str, group_cols_str,
                           index_cols_str, assert_liveness)
 
 try:
-    import xarray
+    import xarray  # noqa
 except ImportError:
     have_xarray = False
 else:
     have_xarray = True
+
 
 @pytest.mark.parametrize("group_cols", [
     ["FIELD_ID", "SCAN_NUMBER"],
