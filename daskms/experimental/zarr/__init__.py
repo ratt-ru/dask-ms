@@ -170,7 +170,7 @@ def xds_to_zarr(xds, store, columns=None):
 
     write_datasets = []
 
-    def _gen_reads(variables, columns):
+    def _gen_writes(variables, columns):
         for name, var in column_iterator(variables, columns):
             ext_args = extent_args(var.dims, var.chunks)
 
@@ -191,8 +191,8 @@ def xds_to_zarr(xds, store, columns=None):
         attrs[DASKMS_ATTR_KEY] = {"chunks": dict(ds.chunks)}
         factory = ZarrDatasetFactory(store, di, schema, attrs)
 
-        data_vars = dict(_gen_reads(ds.data_vars, columns))
-        coords = dict(_gen_reads(ds.coords, columns))
+        data_vars = dict(_gen_writes(ds.data_vars, columns))
+        coords = dict(_gen_writes(ds.coords, columns))
 
         write_datasets.append(DATASET_TYPE(data_vars, coords=coords))
 
