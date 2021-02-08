@@ -4,6 +4,7 @@ from weakref import WeakValueDictionary
 
 import dask.array as da
 import numpy as np
+import numcodecs
 
 from daskms.utils import arg_hasher, requires
 from daskms.experimental.utils import (encode_attr,
@@ -86,9 +87,12 @@ class ZarrDatasetFactory(metaclass=ZarrDatasetFactoryMetaClass):
                 ds_group.attrs.update(encode_attr(self.attrs))
 
                 for name, (dims, shape, chunks, dtype) in self.schema.items():
+                    codec = numcodecs.Pickle() if dtype == np.object else None
+
                     array = ds_group.require_dataset(name, shape,
                                                      chunks=chunks,
                                                      dtype=dtype,
+                                                     object_codec=codec,
                                                      exact=True)
                     array.attrs[DASKMS_ATTR_KEY] = {"dims": dims}
 
