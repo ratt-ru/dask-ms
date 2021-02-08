@@ -192,9 +192,10 @@ def xds_to_zarr(xds, store, columns=None):
         factory = ZarrDatasetFactory(store, di, schema, attrs)
 
         data_vars = dict(_gen_writes(ds.data_vars, columns))
-        coords = dict(_gen_writes(ds.coords, columns))
+        # Include coords in the write dataset so they're reified
+        data_vars.update(dict(_gen_writes(ds.coords, columns)))
 
-        write_datasets.append(DATASET_TYPE(data_vars, coords=coords))
+        write_datasets.append(DATASET_TYPE(data_vars))
 
     return write_datasets
 
