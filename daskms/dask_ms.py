@@ -100,7 +100,7 @@ def xds_to_table(xds, table_name, columns, descriptor=None,
     elif isinstance(out_ds, (tuple, list)):
         pass
     else:
-        raise TypeError("Invalid Dataset type '%s'" % type(out_ds))
+        raise TypeError(f"Invalid Dataset type '{type(out_ds)}'")
 
     # Repack the Table Proxy
     if table_proxy is True:
