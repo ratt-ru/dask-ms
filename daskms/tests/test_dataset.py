@@ -506,13 +506,17 @@ def test_dataset_dask(ms):
 
         # Now have numpy array in the graph
         assert len(v3.data.__dask_keys__()) == 1
-        assert isinstance(v3.data.__dask_graph__().values()[0], np.ndarray)
+        data = next(iter(v3.__dask_graph__().values()))
+        assert isinstance(data, np.ndarray)
+        assert_array_equal(v2.data, v3.data)
 
     # Test compute
     nds = dask.compute(ds)[0]
 
     for k, v in nds.data_vars.items():
         assert isinstance(v.data, np.ndarray)
+        cdata = getattr(ds, k).data
+        assert_array_equal(cdata, v.data)
 
     # Test persist
     nds = dask.persist(ds)[0]
@@ -522,4 +526,8 @@ def test_dataset_dask(ms):
 
         # Now have numpy array iin the graph
         assert len(v.data.__dask_keys__()) == 1
-        assert isinstance(v.data.__dask_graph__().values()[0], np.ndarray)
+        data = next(iter(v.data.__dask_graph__().values()))
+        assert isinstance(data, np.ndarray)
+
+        cdata = getattr(ds, k).data
+        assert_array_equal(cdata, v.data)
