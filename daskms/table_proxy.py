@@ -162,21 +162,18 @@ def taql_factory(query, style='Python', tables=(), readonly=True):
     tables = [t._table_future.result() for t in tables]
 
     if isinstance(readonly, (tuple, list)):
-        it = zip_longest(tables, readonly[:len(tables)],
-                         fillvalue=readonly[-1])
+        it = list(zip_longest(tables, readonly[:len(tables)],
+                              fillvalue=readonly[-1]))
     elif isinstance(readonly, bool):
-        it = zip(tables, (readonly,)*len(tables))
+        it = list(zip(tables, (readonly,)*len(tables)))
     else:
         raise TypeError("readonly must be a bool or list of bools")
 
-    for t, ro in it:
-        t.lock(write=ro is False)
+    if any(ro is False for ro in it):
+        log.error("write-locking requested for '%s' but "
+                  "locking has been removed!", query)
 
-    try:
-        return pt.taql(query, style=style, tables=tables)
-    finally:
-        for t in tables:
-            t.unlock()
+    return pt.taql(query, style=style, tables=tables)
 
 
 def _nolock_runner(table_future, fn, args, kwargs):

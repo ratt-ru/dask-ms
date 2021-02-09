@@ -16,7 +16,7 @@ from daskms.utils import group_cols_str, index_cols_str, assert_liveness
 
 def table_proxy(ms):
     return TableProxy(pt.table, ms, ack=False,
-                      lockoptions='user', readonly=True)
+                      lockoptions='usernoread', readonly=True)
 
 
 @pytest.mark.parametrize("group_cols", [
