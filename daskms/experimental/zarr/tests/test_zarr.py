@@ -49,6 +49,11 @@ def test_xds_to_zarr(ms, tmp_path_factory):
         for name, var in ms_ds.data_vars.items():
             assert_array_equal(var.data, getattr(zarr_ds, name).data)
 
+        assert ms_ds.coords, "MS Datset has no coordinates"
+
+        for name, var in ms_ds.coords.items():
+            assert_array_equal(var.data, getattr(zarr_ds, name).data)
+
 
 @pytest.mark.optional
 @pytest.mark.skipif(xarray is None, reason="depends on xarray")
