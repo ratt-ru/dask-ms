@@ -8,12 +8,11 @@ import numpy as np
 import numcodecs
 
 from daskms.utils import arg_hasher, requires
+from daskms.dataset import Dataset
 from daskms.experimental.utils import (encode_attr,
                                        extent_args,
                                        column_iterator,
-                                       promote_columns,
-                                       DATASET_TYPE,
-                                       DATASET_TYPES)
+                                       promote_columns)
 from daskms.optimisation import inlined_array
 
 DATASET_PREFIX = "__daskms_dataset__"
@@ -160,10 +159,10 @@ def xds_to_zarr(xds, store, columns=None):
 
     columns = promote_columns(columns)
 
-    if isinstance(xds, DATASET_TYPES):
+    if isinstance(xds, Dataset):
         xds = [xds]
     elif isinstance(xds, (tuple, list)):
-        if not all(isinstance(ds, DATASET_TYPES) for ds in xds):
+        if not all(isinstance(ds, Dataset) for ds in xds):
             raise TypeError("xds must be a Dataset or list of Datasets")
     else:
         raise TypeError("xds must be a Dataset or list of Datasets")
@@ -195,7 +194,7 @@ def xds_to_zarr(xds, store, columns=None):
         # Include coords in the write dataset so they're reified
         data_vars.update(dict(_gen_writes(ds.coords, columns)))
 
-        write_datasets.append(DATASET_TYPE(data_vars))
+        write_datasets.append(Dataset(data_vars))
 
     return write_datasets
 
@@ -260,14 +259,10 @@ def xds_from_zarr(store, columns="ALL", chunks=None):
                                 meta=np.empty((0,)*zarray.ndim, zarray.dtype))
 
             read = inlined_array(read, ext_args[::2])
+            (coords if coordinate else data_vars)[name] = (dims, read, attrs)
 
-            if coordinate:
-                coords[name] = (dims, read, attrs)
-            else:
-                data_vars[name] = (dims, read, attrs)
+            data_vars[name] = (dims, read, attrs)
 
-        datasets.append(DATASET_TYPE(data_vars,
-                                     coords=coords,
-                                     attrs=group_attrs))
+        datasets.append(Dataset(data_vars, attrs=group_attrs))
 
     return datasets

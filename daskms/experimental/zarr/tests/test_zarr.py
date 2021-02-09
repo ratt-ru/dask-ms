@@ -14,7 +14,7 @@ except ImportError:
     xarray = None
 
 
-def test_string_array(tmp_path_factory):
+def test_zarr_string_array(tmp_path_factory):
     zarr_store = tmp_path_factory.mktemp("string-arrays") / "test.zarr"
 
     data = ["hello", "this", "strange new world",
@@ -47,11 +47,6 @@ def test_xds_to_zarr(ms, tmp_path_factory):
         assert ms_ds.data_vars, "MS Dataset has no variables"
 
         for name, var in ms_ds.data_vars.items():
-            assert_array_equal(var.data, getattr(zarr_ds, name).data)
-
-        assert ms_ds.coords, "MS Dataset has no coordinates"
-
-        for name, var in ms_ds.coords.items():
             assert_array_equal(var.data, getattr(zarr_ds, name).data)
 
 

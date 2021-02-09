@@ -64,7 +64,7 @@ def test_write_keywords(ms):
 
     # Add to table keywords
     writes = xds_to_table([], ms, [], table_keywords={'bob': 'qux'})
-    assert all(isinstance(w, Dataset) for w in writes)
+    assert isinstance(writes, Dataset)
     dask.compute(writes)
 
     with pt.table(ms, ack=False, readonly=True) as T:

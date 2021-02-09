@@ -2,7 +2,6 @@
 
 import logging
 
-from daskms.dataset import Dataset
 from daskms.table_proxy import TableProxy
 from daskms.reads import DatasetFactory
 from daskms.writes import write_datasets
@@ -94,13 +93,6 @@ def xds_to_table(xds, table_name, columns, descriptor=None,
         assert isinstance(tp, TableProxy)
     else:
         tp = None
-
-    if isinstance(out_ds, Dataset):
-        out_ds = [out_ds]
-    elif isinstance(out_ds, (tuple, list)):
-        pass
-    else:
-        raise TypeError(f"Invalid Dataset type '{type(out_ds)}'")
 
     # Repack the Table Proxy
     if table_proxy is True:
