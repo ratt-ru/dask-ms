@@ -1,14 +1,7 @@
 # -*- coding: utf-8 -*-
 
-import collections
 import logging
 
-try:
-    import xarray as xr
-except ImportError:
-    xr = None
-
-from daskms.dataset import Dataset
 from daskms.table_proxy import TableProxy
 from daskms.reads import DatasetFactory
 from daskms.writes import write_datasets
@@ -86,40 +79,12 @@ def xds_to_table(xds, table_name, columns, descriptor=None,
         if columns != "ALL":
             columns = [columns]
 
-    datasets = []
-
-    # No xarray available, assume dask datasets
-    if xr is None:
-        datasets = xds
-    else:
-        for ds in xds:
-            if isinstance(ds, Dataset):
-                # Already a dask dataset
-                datasets.append(ds)
-            elif isinstance(ds, xr.Dataset):
-                # Produce a list of internal variable and dataset types
-                # from the xarray Dataset
-                variables = {k: (v.dims, v.data, v.attrs) for k, v
-                             in ds.data_vars.items()}
-
-                coords = {k: (v.dims, v.data, v.attrs) for k, v
-                          in ds.coords.items()}
-
-                dds = Dataset(variables, attrs=ds.attrs, coords=coords)
-                datasets.append(dds)
-            else:
-                raise TypeError("Invalid Dataset type '%s'" % type(ds))
-
     # Write the datasets
-    out_ds = write_datasets(table_name, datasets, columns,
+    out_ds = write_datasets(table_name, xds, columns,
                             descriptor=descriptor,
                             table_keywords=table_keywords,
                             column_keywords=column_keywords,
                             table_proxy=table_proxy)
-
-    # No xarray available assume dask datasets
-    if xr is None:
-        return out_ds
 
     # Unpack table proxy if it was requested
     if table_proxy is True:
@@ -129,38 +94,11 @@ def xds_to_table(xds, table_name, columns, descriptor=None,
     else:
         tp = None
 
-    if isinstance(out_ds, Dataset):
-        out_ds = [out_ds]
-    elif isinstance(out_ds, (tuple, list)):
-        pass
-    else:
-        raise TypeError("Invalid Dataset type '%s'" % type(out_ds))
-
-    xformed_out_ds = []
-
-    for ds in out_ds:
-        assert isinstance(ds, Dataset)
-
-        variables = {k: (v.dims, v.data, v.attrs) for k, v
-                     in ds.data_vars.items()}
-
-        coords = {k: (v.dims, v.data, v.attrs) for k, v
-                  in ds.coords.items()}
-
-        xformed_out_ds.append(xr.Dataset(variables,
-                                         coords=coords,
-                                         attrs=ds.attrs))
-
-    if len(xformed_out_ds) == 0:
-        return xr.Dataset()
-    elif len(xformed_out_ds) == 1:
-        xformed_out_ds = xformed_out_ds[0]
-
     # Repack the Table Proxy
     if table_proxy is True:
-        return xformed_out_ds, tp
+        return out_ds, tp
 
-    return xformed_out_ds
+    return out_ds
 
 
 def xds_from_table(table_name, columns=None,
@@ -321,42 +259,9 @@ def xds_from_table(table_name, columns=None,
     index_cols = promote_columns(index_cols, [])
     group_cols = promote_columns(group_cols, [])
 
-    dask_datasets = DatasetFactory(table_name, columns,
-                                   group_cols, index_cols,
-                                   **kwargs).datasets()
-
-    # Return dask datasets if xarray is not available
-    if xr is None:
-        return dask_datasets
-
-    xarray_datasets = []
-
-    # Extract dataset list in case of table_keyword and column_keyword returns
-    if isinstance(dask_datasets, tuple):
-        extra = dask_datasets[1:]
-        dask_datasets = dask_datasets[0]
-    else:
-        extra = ()
-
-    # Convert each dask dataset into an xarray dataset
-    for ds in dask_datasets:
-        data_vars = collections.OrderedDict()
-        coords = collections.OrderedDict()
-
-        for k, v in sorted(ds.data_vars.items()):
-            data_vars[k] = xr.DataArray(v.data, dims=v.dims, attrs=v.attrs)
-
-        for k, v in sorted(ds.coords.items()):
-            coords[k] = xr.DataArray(v.data, dims=v.dims, attrs=v.attrs)
-
-        xarray_datasets.append(xr.Dataset(data_vars,
-                                          attrs=dict(ds.attrs),
-                                          coords=coords))
-
-    if len(extra) > 0:
-        return (xarray_datasets,) + extra
-
-    return xarray_datasets
+    return DatasetFactory(table_name, columns,
+                          group_cols, index_cols,
+                          **kwargs).datasets()
 
 
 def xds_from_ms(ms, columns=None, index_cols=None, group_cols=None, **kwargs):

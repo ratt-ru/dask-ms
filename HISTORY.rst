@@ -4,6 +4,7 @@ History
 
 0.2.7 (YYYY-MM-DD)
 ------------------
+* Consolidate Dataset Types into daskms.dataset (:pr:`143`)
 * Correct dataset persistence issues (:pr:`140`)
 * Experimental arrow support (:pr:`130`, :pr:`132`, :pr:`133`, :pr:`135`, :pr:`136`, :pr:`138`)
 * Experimental zarr support (:pr:`129`, :pr:`133`, :pr:`139`)

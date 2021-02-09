@@ -9,8 +9,8 @@ import dask.array as da
 from dask.array.core import normalize_chunks
 import numpy as np
 
-from daskms.experimental.utils import (DATASET_TYPE,
-                                       promote_columns,
+from daskms.dataset import Dataset
+from daskms.experimental.utils import (promote_columns,
                                        column_iterator)
 from daskms.experimental.arrow.writes import DASKMS_METADATA
 from daskms.experimental.arrow.extension_types import TensorType
@@ -267,6 +267,6 @@ def xds_from_parquet(store, columns=None, chunks=None):
 
         attrs = dict(partition)
         attrs[PARTITION_KEY] = partition_schemas
-        datasets.append(DATASET_TYPE(data_vars, attrs=attrs))
+        datasets.append(Dataset(data_vars, attrs=attrs))
 
     return datasets

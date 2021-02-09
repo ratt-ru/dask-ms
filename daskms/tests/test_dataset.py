@@ -20,6 +20,13 @@ from daskms.writes import write_datasets
 from daskms.utils import (select_cols_str, group_cols_str,
                           index_cols_str, assert_liveness)
 
+try:
+    import xarray as xr
+except ImportError:
+    have_xarray = False
+else:
+    have_xarray = True
+
 
 @pytest.mark.parametrize("group_cols", [
     ["FIELD_ID", "SCAN_NUMBER"],
@@ -73,7 +80,7 @@ def test_dataset(ms, select_cols, group_cols, index_cols, shapes, chunks):
         assert chunks["chan"] == echunks['chan']
         assert chunks["corr"] == echunks['corr']
 
-        dims = ds.dims
+        dims = dict(ds.dims)
         dims.pop('row')  # row changes
         assert dims == {"chan": shapes['chan'],
                         "corr": shapes['corr']}
@@ -211,14 +218,10 @@ def test_dataset_assign(ms):
 
     # Assign on an existing column is easier because we can
     # infer the dimension schema from it
-    nds = ds.assign(TIME=ds.TIME.data + 1)
+    nds = ds.assign(TIME=(ds.TIME.dims, ds.TIME.data + 1))
     assert ds.DATA.data is nds.DATA.data
     assert ds.TIME.data is not nds.TIME.data
     assert_array_equal(nds.TIME.data, ds.TIME.data + 1)
-
-    # This doesn't work for new columns
-    with pytest.raises(ValueError, match="Couldn't find existing dimension"):
-        ds.assign(ANTENNA3=ds.ANTENNA1.data + 3)
 
     # We have to explicitly supply a dimension schema
     nds = ds.assign(ANTENNA3=(("row",), ds.ANTENNA1.data + 3))
@@ -227,14 +230,25 @@ def test_dataset_assign(ms):
     dims = ds.dims
     chunks = ds.chunks
 
-    with pytest.raises(ValueError, match="size 9 for dimension 'row'"):
+    if have_xarray:
+        match = "'row': length 9 on 'ANTENNA4'"
+    else:
+        match = ("Existing dimension size 9 for dimension 'row' "
+                 "is inconsistent with same dimension 10 of array ANTENNA4")
+
+    with pytest.raises(ValueError, match=match):
         array = da.zeros(dims['row'] - 1, chunks['row'])
         nds = ds.assign(ANTENNA4=(("row",),  array))
         nds.dims
 
     assert chunks['row'] == (10,)
 
-    with pytest.raises(ValueError, match=r"chunking \(4, 4, 2\) for dim"):
+    if have_xarray:
+        match = "Object has inconsistent chunks along dimension row."
+    else:
+        match = r"chunking \(4, 4, 2\) for dim"
+
+    with pytest.raises(ValueError, match=match):
         array = da.zeros(dims['row'], chunks=4)
         nds = ds.assign(ANTENNA4=(("row",),  array))
         nds.chunks
@@ -493,6 +507,9 @@ def test_dataset_xarray(ms):
     datasets = dask.persist(datasets)
 
 
+@pytest.mark.skipif(
+    have_xarray,
+    reason="https://github.com/pydata/xarray/issues/4860")
 def test_dataset_dask(ms):
     datasets = read_datasets(ms, [], [], [])
     assert len(datasets) == 1
@@ -504,12 +521,12 @@ def test_dataset_dask(ms):
 
         # Test variable compute
         v2 = dask.compute(v)[0]
-        assert isinstance(v2, Variable)
+        assert isinstance(v2, xr.DataArray if have_xarray else Variable)
         assert isinstance(v2.data, np.ndarray)
 
         # Test variable persists
         v3 = dask.persist(v)[0]
-        assert isinstance(v3, Variable)
+        assert isinstance(v3, xr.DataArray if have_xarray else Variable)
 
         # Now have numpy array in the graph
         assert len(v3.data.__dask_keys__()) == 1
@@ -538,3 +555,58 @@ def test_dataset_dask(ms):
 
         cdata = getattr(ds, k).data
         assert_array_equal(cdata, v.data)
+
+
+def test_dataset_numpy(ms):
+    datasets = read_datasets(ms, [], [], [])
+    assert len(datasets) == 1
+    ds = datasets[0]
+
+    row, chan, corr = (ds.dims[d] for d in ("row", "chan", "corr"))
+
+    cdata = np.random.random((row, chan, corr)).astype(np.complex64)
+    row_coord = np.arange(row)
+    chan_coord = np.arange(chan)
+    corr_coord = np.arange(corr)
+
+    ds = ds.assign(**{"CORRECTED_DATA": (("row", "chan", "corr"), cdata)})
+
+    ds = ds.assign_coords(**{
+        "row": ("row", row_coord),
+        "chan": ("chan", chan_coord),
+        "corr": ("corr", corr_coord),
+    })
+
+    assert isinstance(ds.CORRECTED_DATA.data, np.ndarray)
+    assert_array_equal(ds.CORRECTED_DATA.values, cdata)
+
+    assert isinstance(ds.row.data, np.ndarray)
+    assert_array_equal(ds.row.values, row_coord)
+    assert isinstance(ds.chan.data, np.ndarray)
+    assert_array_equal(ds.chan.values, chan_coord)
+    assert isinstance(ds.corr.data, np.ndarray)
+    assert_array_equal(ds.corr.values, corr_coord)
+
+    nds = ds.compute()
+
+    for k, v in nds.data_vars.items():
+        assert_array_equal(v.data, getattr(ds, k).data)
+
+    for k, v in nds.coords.items():
+        assert_array_equal(v.data, getattr(ds, k).data)
+
+    nds, = dask.compute(ds)
+
+    for k, v in nds.data_vars.items():
+        assert_array_equal(v.data, getattr(ds, k).data)
+
+    for k, v in nds.coords.items():
+        assert_array_equal(v.data, getattr(ds, k).data)
+
+    nds, = dask.persist(ds)
+
+    for k, v in nds.data_vars.items():
+        assert_array_equal(v.data, getattr(ds, k).data)
+
+    for k, v in nds.coords.items():
+        assert_array_equal(v.data, getattr(ds, k).data)

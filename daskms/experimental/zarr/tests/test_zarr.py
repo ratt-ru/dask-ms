@@ -2,10 +2,16 @@ import dask
 import dask.array as da
 import numpy as np
 from numpy.testing import assert_array_equal
+import pytest
 
 from daskms import xds_from_ms
 from daskms.dataset import Dataset
 from daskms.experimental.zarr import xds_from_zarr, xds_to_zarr
+
+try:
+    import xarray
+except ImportError:
+    xarray = None
 
 
 def test_string_array(tmp_path_factory):
@@ -40,3 +46,24 @@ def test_xds_to_zarr(ms, tmp_path_factory):
     for ms_ds, zarr_ds in zip(ms_datasets, zarr_datasets):
         for name, var in ms_ds.data_vars.items():
             assert_array_equal(var.data, getattr(zarr_ds, name).data)
+
+
+@pytest.mark.optional
+@pytest.mark.skipif(xarray is None, reason="depends on xarray")
+def test_xarray_to_zarr(ms, tmp_path_factory):
+    store = tmp_path_factory.mktemp("zarr_store")
+    datasets = xds_from_ms(ms)
+
+    for i, ds in enumerate(datasets):
+        chunks = ds.chunks
+        row = sum(chunks["row"])
+        chan = sum(chunks["chan"])
+        corr = sum(chunks["corr"])
+
+        datasets[i] = ds.assign_coords(
+            row=np.arange(row),
+            chan=np.arange(chan),
+            corr=np.arange(corr))
+
+    for i, ds in enumerate(datasets):
+        ds.to_zarr(str(store / f"ds-{i}.zarr"))
