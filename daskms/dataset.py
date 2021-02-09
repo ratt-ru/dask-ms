@@ -383,6 +383,7 @@ if xr is None:
 
         def __dask_graph__(self):
             graphs = {k: v.__dask_graph__() for k, v in self.data_vars.items()}
+            # Excise anything that is not a dask collection
             graphs = {k: v for k, v in graphs.items() if v is not None}
 
             if len(graphs) > 0:
