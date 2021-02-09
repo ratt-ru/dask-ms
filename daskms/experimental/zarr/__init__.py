@@ -264,3 +264,5 @@ def xds_from_zarr(store, columns="ALL", chunks=None):
         datasets.append(Dataset(data_vars, coords=coords, attrs=group_attrs))
 
     return datasets
+
+a = None
