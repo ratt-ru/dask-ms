@@ -261,8 +261,6 @@ def xds_from_zarr(store, columns="ALL", chunks=None):
             read = inlined_array(read, ext_args[::2])
             (coords if coordinate else data_vars)[name] = (dims, read, attrs)
 
-            data_vars[name] = (dims, read, attrs)
-
-        datasets.append(Dataset(data_vars, attrs=group_attrs))
+        datasets.append(Dataset(data_vars, coords=coords, attrs=group_attrs))
 
     return datasets
