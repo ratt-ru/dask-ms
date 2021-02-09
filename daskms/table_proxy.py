@@ -169,9 +169,10 @@ def taql_factory(query, style='Python', tables=(), readonly=True):
     else:
         raise TypeError("readonly must be a bool or list of bools")
 
+    # See https://github.com/ska-sa/dask-ms/pull/141
     if any(ro is False for ro in it):
-        log.error("write-locking requested for '%s' but "
-                  "locking has been removed!", query)
+        raise ValueError(f"write-locking requested for '{query}'"
+                         f"but locking has been removed!")
 
     return pt.taql(query, style=style, tables=tables)
 
