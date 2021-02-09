@@ -507,7 +507,9 @@ def test_dataset_xarray(ms):
     datasets = dask.persist(datasets)
 
 
-@pytest.mark.skipif(have_xarray, reason="https://github.com/pydata/xarray/issues/4860")
+@pytest.mark.skipif(
+    have_xarray,
+    reason="https://github.com/pydata/xarray/issues/4860")
 def test_dataset_dask(ms):
     datasets = read_datasets(ms, [], [], [])
     assert len(datasets) == 1
@@ -553,3 +555,58 @@ def test_dataset_dask(ms):
 
         cdata = getattr(ds, k).data
         assert_array_equal(cdata, v.data)
+
+
+def test_dataset_numpy(ms):
+    datasets = read_datasets(ms, [], [], [])
+    assert len(datasets) == 1
+    ds = datasets[0]
+
+    row, chan, corr = (ds.dims[d] for d in ("row", "chan", "corr"))
+
+    cdata = np.random.random((row, chan, corr)).astype(np.complex64)
+    row_coord = np.arange(row)
+    chan_coord = np.arange(chan)
+    corr_coord = np.arange(corr)
+
+    ds = ds.assign(**{"CORRECTED_DATA": (("row", "chan", "corr"), cdata)})
+
+    ds = ds.assign_coords(**{
+        "row": ("row", row_coord),
+        "chan": ("chan", chan_coord),
+        "corr": ("corr", corr_coord),
+    })
+
+    assert isinstance(ds.CORRECTED_DATA.data, np.ndarray)
+    assert_array_equal(ds.CORRECTED_DATA.values, cdata)
+
+    assert isinstance(ds.row.data, np.ndarray)
+    assert_array_equal(ds.row.values, row_coord)
+    assert isinstance(ds.chan.data, np.ndarray)
+    assert_array_equal(ds.chan.values, chan_coord)
+    assert isinstance(ds.corr.data, np.ndarray)
+    assert_array_equal(ds.corr.values, corr_coord)
+
+    nds = ds.compute()
+
+    for k, v in nds.data_vars.items():
+        assert_array_equal(v.data, getattr(ds, k).data)
+
+    for k, v in nds.coords.items():
+        assert_array_equal(v.data, getattr(ds, k).data)
+
+    nds, = dask.compute(ds)
+
+    for k, v in nds.data_vars.items():
+        assert_array_equal(v.data, getattr(ds, k).data)
+
+    for k, v in nds.coords.items():
+        assert_array_equal(v.data, getattr(ds, k).data)
+
+    nds, = dask.persist(ds)
+
+    for k, v in nds.data_vars.items():
+        assert_array_equal(v.data, getattr(ds, k).data)
+
+    for k, v in nds.coords.items():
+        assert_array_equal(v.data, getattr(ds, k).data)

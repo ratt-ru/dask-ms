@@ -65,6 +65,9 @@ def data_var_chunks(data_vars):
 
 
 def as_variable(args):
+    if not isinstance(args, tuple):
+        raise TypeError(f"args ({type(args)}) must be a tuple")
+
     try:
         return Variable(*args)
     except TypeError as e:
@@ -92,7 +95,9 @@ def _convert_to_variable(k, v):
     return as_variable(v)
 
 
-if xr is None:
+if xr is not None:
+    from xarray import Dataset, Variable
+else:
     # This class duplicates xarray's Frozen class in
     # https://github.com/pydata/xarray/blob/master/xarray/core/utils.py
     # See https://github.com/pydata/xarray/blob/master/LICENSE
@@ -119,7 +124,7 @@ if xr is None:
             return key in self.mapping
 
         def __repr__(self):
-            return '%s(%r)' % (type(self).__name__, self.mapping)
+            return f"{type(self).__name__}({self.mapping})"
 
     class Variable:
         """
@@ -461,6 +466,3 @@ if xr is None:
                         data_info,
                         self._coords,
                         self._attrs)
-
-else:
-    from xarray import Dataset, Variable

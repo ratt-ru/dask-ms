@@ -55,7 +55,7 @@ def test_xds_to_zarr(ms, tmp_path_factory):
             assert_array_equal(var.data, getattr(zarr_ds, name).data)
 
 
-
+@pytest.mark.optional
 @pytest.mark.skipif(xarray is None, reason="depends on xarray")
 def test_xarray_to_zarr(ms, tmp_path_factory):
     store = tmp_path_factory.mktemp("zarr_store")
@@ -72,11 +72,5 @@ def test_xarray_to_zarr(ms, tmp_path_factory):
             chan=np.arange(chan),
             corr=np.arange(corr))
 
-
     for i, ds in enumerate(datasets):
         ds.to_zarr(str(store / f"ds-{i}.zarr"))
-
-
-
-
-
