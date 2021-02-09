@@ -6,16 +6,15 @@ import weakref
 import dask.array as da
 import numpy as np
 
-from daskms.experimental.arrow.schema import (dict_dataset_schema,
-                                              DASKMS_METADATA)
-from daskms.experimental.arrow.extension_types import TensorArray
-from daskms.experimental.utils import (DATASET_TYPES,
-                                       DATASET_TYPE,
-                                       promote_columns,
-                                       column_iterator)
+from daskms.dataset import Dataset
 from daskms.optimisation import inlined_array
 from daskms.reads import PARTITION_KEY
 from daskms.utils import freeze
+from daskms.experimental.arrow.schema import (dict_dataset_schema,
+                                              DASKMS_METADATA)
+from daskms.experimental.arrow.extension_types import TensorArray
+from daskms.experimental.utils import (promote_columns,
+                                       column_iterator)
 
 try:
     import pyarrow as pa
@@ -112,10 +111,10 @@ def xds_to_parquet(xds, path, columns=None):
 
     columns = promote_columns(columns)
 
-    if isinstance(xds, DATASET_TYPES):
+    if isinstance(xds, Dataset):
         xds = [xds]
     elif isinstance(xds, (tuple, list)):
-        if not all(isinstance(ds, DATASET_TYPES) for ds in xds):
+        if not all(isinstance(ds, Dataset) for ds in xds):
             raise TypeError("xds must be a Dataset or list of Datasets")
     else:
         raise TypeError("xds must be a Dataset or list of Datasets")
@@ -158,6 +157,6 @@ def xds_to_parquet(xds, path, columns=None):
 
         writes = inlined_array(writes, chunk_ids)
 
-        datasets.append(DATASET_TYPE({"WRITE": (("row",), writes)}))
+        datasets.append(Dataset({"WRITE": (("row",), writes)}))
 
     return datasets
