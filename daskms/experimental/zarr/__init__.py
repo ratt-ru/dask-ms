@@ -173,6 +173,25 @@ def _setter_wrapper(data, name, factory, *extents):
 @requires("pip install dask-ms[zarr] for zarr support",
           zarr_import_error)
 def xds_to_zarr(xds, store, columns=None):
+    """
+    Stores a dataset of list of datasets defined by `xds` in
+    file location `store`.
+
+    Parameters
+    ----------
+    xds : Dataset or list of Datasets
+        Data
+    store : str or Path
+        Path to store the data
+    columns : list of str or str or None
+        Columns to store. `None` or `"ALL"` stores all columns on each dataset.
+        Otherwise, a list of columns should be supplied.
+
+    Returns
+    -------
+    writes : Dataset
+        A Dataset representing the write operations
+    """
     if isinstance(store, Path):
         store = str(store)
 
@@ -239,7 +258,28 @@ def _getter_wrapper(zarray, *extents):
 
 @requires("pip install dask-ms[zarr] for zarr support",
           zarr_import_error)
-def xds_from_zarr(store, columns="ALL", chunks=None):
+def xds_from_zarr(store, columns=None, chunks=None):
+
+    """
+    Reads the zarr data store in `store` and returns list of
+    Dataset's containing the data.
+
+    Parameters
+    ----------
+    store : str or Path
+        Path containing the data
+    columns : list of str or str or None
+        Columns to read. `None` or `"ALL"` stores all columns on each dataset.
+        Otherwise, a list of columns should be supplied.
+    chunks: dict or list of dicts
+        chunking schema for each dataset
+
+    Returns
+    -------
+    writes : Dataset
+        A Dataset representing the write operations
+    """
+
     if isinstance(store, Path):
         store = str(store)
 
