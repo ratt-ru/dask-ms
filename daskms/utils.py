@@ -91,15 +91,15 @@ def table_path_split(path):
 
 
 def group_cols_str(group_cols):
-    return "group_cols=%s" % group_cols
+    return f"group_cols={group_cols}"
 
 
 def index_cols_str(index_cols):
-    return "index_cols=%s" % index_cols
+    return f"index_cols={index_cols}"
 
 
 def select_cols_str(select_cols):
-    return "select_cols=%s" % select_cols
+    return f"select_cols={select_cols}"
 
 
 def assert_liveness(table_proxies, executors, collect=True):
@@ -122,7 +122,7 @@ def assert_liveness(table_proxies, executors, collect=True):
                          "the following objects" % (i, v))
 
             for r in gc.get_referrers(v):
-                lines.append("\t%s" % str(r))
+                lines.append(f"\t{str(r)}")
 
         raise ValueError("\n".join(lines))
 
@@ -134,7 +134,7 @@ def assert_liveness(table_proxies, executors, collect=True):
                          "the following objects" % (i, v))
 
             for r in gc.get_referrers(v):
-                lines.append("\t%s" % str(r))
+                lines.append(f"\t{str(r)}")
 
         raise ValueError("\n".join(lines))
 

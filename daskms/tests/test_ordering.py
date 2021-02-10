@@ -150,7 +150,7 @@ def test_ordering_multiple_groups(ms, group_cols, index_cols):
     {'row': 2},
     {'row': (2, 3, 4, 1)},
     {'row': (5, 3, 2)}],
-    ids=lambda c: 'chunks=%s' % (c,))
+    ids=lambda c: f'chunks={c}')
 def test_row_ordering_no_group(ms, index_cols, chunks):
     order_taql = ordering_taql(table_proxy(ms), index_cols)
     assert_liveness(2, 1)
@@ -182,7 +182,7 @@ def test_row_ordering_no_group(ms, index_cols, chunks):
     [{'row': (3, 4)}, {'row': 3}],
     [{'row': (2, 3, 2)}, {'row': (2, 1)}],
     [{'row': 2}]],
-    ids=lambda c: 'chunks=%s' % (c,))
+    ids=lambda c: f'chunks={c}')
 def test_row_ordering_multiple_groups(ms, group_cols,
                                       index_cols, chunks):
     group_taql = group_ordering_taql(table_proxy(ms), group_cols, index_cols)

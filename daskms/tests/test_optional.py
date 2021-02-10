@@ -29,7 +29,7 @@ def test_variable_column_dimensions(tmp_path, column, dtype):
 
     # Column descriptor
     desc = {'desc': {'_c_order': True,
-                     'comment': '%s column' % column,
+                     'comment': f'{column} column',
                      'dataManagerGroup': '',
                      'dataManagerType': '',
                      'keywords': {},
@@ -69,7 +69,7 @@ def test_variable_column_shapes(tmp_path, column, dtype):
 
     # Column descriptor
     desc = {'desc': {'_c_order': True,
-                     'comment': '%s column' % column,
+                     'comment': f'{column} column',
                      'dataManagerGroup': '',
                      'dataManagerType': '',
                      'keywords': {},
@@ -110,7 +110,7 @@ def test_fixed_column_shapes(tmp_path, column, dtype):
 
     # Column descriptor
     desc = {'desc': {'_c_order': True,
-                     'comment': '%s column' % column,
+                     'comment': f'{column} column',
                      'dataManagerGroup': '',
                      'dataManagerType': '',
                      'keywords': {},
@@ -149,7 +149,7 @@ def test_only_row_shape(tmp_path, column, dtype):
 
     # Column descriptor
     desc = {'desc': {'_c_order': True,
-                     'comment': '%s column' % column,
+                     'comment': f'{column} column',
                      'dataManagerGroup': '',
                      'dataManagerType': '',
                      'keywords': {},
@@ -187,7 +187,7 @@ def test_scalar_ndim(tmp_path, column, dtype):
 
     # Column descriptor
     desc = {'desc': {'_c_order': True,
-                     'comment': '%s column' % column,
+                     'comment': f'{column} column',
                      'dataManagerGroup': '',
                      'dataManagerType': '',
                      'keywords': {},
@@ -218,7 +218,7 @@ def test_tiledstman(tmp_path, column, row, shape, dtype):
 
     # Column descriptor
     desc = {'desc': {'_c_order': True,
-                     'comment': '%s column' % column,
+                     'comment': f'{column} column',
                      'dataManagerGroup': 'BAZ-GROUP',
                      'dataManagerType': 'TiledColumnStMan',
                      'keywords': {},
@@ -262,7 +262,7 @@ def test_tiledstman_addcols(tmp_path, column, row, shape, dtype):
 
     # Column descriptor
     desc = {'desc': {'_c_order': True,
-                     'comment': '%s column' % column,
+                     'comment': f'{column} column',
                      'dataManagerGroup': 'BAZ_GROUP',
                      'dataManagerType': 'TiledColumnStMan',
                      'keywords': {},

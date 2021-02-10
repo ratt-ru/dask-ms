@@ -150,8 +150,8 @@ def lookup_table_schema(table_name, lookup_str):
         try:
             return _ALL_SCHEMAS[table_type]
         except KeyError:
-            raise ValueError("No schema registered for "
-                             "table type '%s'" % table_type)
+            raise ValueError(f"No schema registered "
+                             f"for table type '{table_type}'")
 
     if not isinstance(lookup_str, (tuple, list)):
         lookup_str = [lookup_str]
@@ -165,6 +165,6 @@ def lookup_table_schema(table_name, lookup_str):
         elif isinstance(ls, str):
             table_schema.update(_ALL_SCHEMAS.get(ls, {}))
         else:
-            raise TypeError("Invalid lookup_str type '%s'" % type(ls))
+            raise TypeError(f"Invalid lookup_str type '{type(ls)}'")
 
     return table_schema

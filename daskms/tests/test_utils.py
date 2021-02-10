@@ -33,19 +33,19 @@ _root_path = Path("C:/" if platform.system() == "Windows" else os.sep,
     # Table access
     (_root_path / "test.ms",
      _root_path, "test.ms", ""),
-    (_root_path / "test.ms{s}".format(s=os.sep),
+    (_root_path / f"test.ms{os.sep}",
      _root_path, "test.ms", ""),
     (_root_path / "test.ms{s}{s}".format(s=os.sep),
      _root_path, "test.ms", ""),
     # Indirect subtable access
     (_root_path / "test.ms::SOURCE",
      _root_path, "test.ms", "SOURCE"),
-    (_root_path / "test.ms::SOURCE{s}".format(s=os.sep),
+    (_root_path / f"test.ms::SOURCE{os.sep}",
      _root_path, "test.ms", "SOURCE"),
     # Direct subtable access
     (_root_path / "test.ms" / "SOURCE",
      _root_path / "test.ms", "SOURCE", ""),
-    (_root_path / "test.ms" / "SOURCE{s}".format(s=os.sep),
+    (_root_path / "test.ms" / f"SOURCE{os.sep}",
      _root_path / "test.ms", "SOURCE", "")
 ])
 def test_table_path_split(path, root, table, subtable):

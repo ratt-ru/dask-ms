@@ -37,7 +37,7 @@ def big_ms(tmp_path_factory, request):
     corr = 4
     ant = 7
 
-    create_table_query = """
+    create_table_query = f"""
     CREATE TABLE {fn}
     [FIELD_ID I4,
     TIME R8,
@@ -48,7 +48,7 @@ def big_ms(tmp_path_factory, request):
     STATE_ID I4,
     DATA C8 [NDIM=2, SHAPE=[{chan}, {corr}]]]
     LIMIT {row}
-    """.format(fn=fn, row=row, chan=chan, corr=corr)
+    """
 
     rs = np.random.RandomState(42)
     data_shape = (row, chan, corr)
@@ -86,8 +86,8 @@ def ms(tmp_path_factory):
     msdir = tmp_path_factory.mktemp("msdir", numbered=True)
     fn = os.path.join(str(msdir), "test.ms")
 
-    create_table_query = """
-    CREATE TABLE %s
+    create_table_query = f"""
+    CREATE TABLE {fn}
     [FIELD_ID I4,
     ANTENNA1 I4,
     ANTENNA2 I4,
@@ -98,7 +98,7 @@ def ms(tmp_path_factory):
     TIME R8,
     DATA C8 [NDIM=2, SHAPE=[16, 4]]]
     LIMIT 10
-    """ % fn
+    """
 
     # Common grouping columns
     field = [0,   0,   0,   1,   1,   1,   1,   2,   2,   2]

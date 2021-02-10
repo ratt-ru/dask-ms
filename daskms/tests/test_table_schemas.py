@@ -16,7 +16,7 @@ from daskms.table_schemas import (lookup_table_schema,
 
 
 @pytest.mark.parametrize("filename, schema", [
-    (pjoin("bob", "qux", "FRED.MS%s" % os.sep), MS_SCHEMA),
+    (pjoin("bob", "qux", f"FRED.MS{os.sep}"), MS_SCHEMA),
     ("test.ms", MS_SCHEMA),
     ("test.ms::ANTENNA", ANTENNA_SCHEMA),
     ("test.ms::FEED", FEED_SCHEMA),

@@ -40,12 +40,12 @@ else:
     ids=select_cols_str)
 @pytest.mark.parametrize("shapes", [
     {"row": 10, "chan": 16, "corr": 4}],
-    ids=lambda s: "shapes=%s" % s)
+    ids=lambda s: f"shapes={s}")
 @pytest.mark.parametrize("chunks", [
     {"row": 2},
     {"row": 3, "chan": 4, "corr": 1},
     {"row": 3, "chan": (4, 4, 4, 4), "corr": (2, 2)}],
-    ids=lambda c: "chunks=%s" % c)
+    ids=lambda c: f"chunks={c}")
 def test_dataset(ms, select_cols, group_cols, index_cols, shapes, chunks):
     """ Test dataset creation """
     datasets = read_datasets(ms, select_cols, group_cols,
@@ -101,12 +101,12 @@ def test_dataset(ms, select_cols, group_cols, index_cols, shapes, chunks):
     ids=select_cols_str)
 @pytest.mark.parametrize("shapes", [
     {"row": 10, "chan": 16, "corr": 4}],
-    ids=lambda s: "shapes=%s" % s)
+    ids=lambda s: f"shapes={s}")
 @pytest.mark.parametrize("chunks", [
     {"row": 2},
     {"row": 3, "chan": 4, "corr": 1},
     {"row": 3, "chan": (4, 4, 4, 4), "corr": (2, 2)}],
-    ids=lambda c: "chunks=%s" % c)
+    ids=lambda c: f"chunks={c}")
 def test_dataset_updates(ms, select_cols,
                          group_cols, index_cols,
                          shapes, chunks):

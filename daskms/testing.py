@@ -16,6 +16,6 @@ def in_pytest():
 def mark_in_pytest(in_pytest=True):
     """ Mark if we're in a pytest run """
     if type(in_pytest) is not bool:
-        raise TypeError('in_pytest %s is not a boolean' % in_pytest)
+        raise TypeError(f'in_pytest {in_pytest} is not a boolean')
 
     __pytest_run_marker__['in_pytest'] = in_pytest
