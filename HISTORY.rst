@@ -4,6 +4,7 @@ History
 
 0.2.7 (YYYY-MM-DD)
 ------------------
+* Convert code-base to f-strings with flynt (:pr:`144`)
 * Consolidate Dataset Types into daskms.dataset (:pr:`143`)
 * Correct Dataset persistence issues (:pr:`140`)
 * Experimental arrow support (:pr:`130`, :pr:`132`, :pr:`133`, :pr:`135`, :pr:`136`, :pr:`138`)
