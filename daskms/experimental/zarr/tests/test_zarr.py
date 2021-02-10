@@ -14,7 +14,7 @@ except ImportError:
     xarray = None
 
 
-def test_string_array(tmp_path_factory):
+def test_zarr_string_array(tmp_path_factory):
     zarr_store = tmp_path_factory.mktemp("string-arrays") / "test.zarr"
 
     data = ["hello", "this", "strange new world",
@@ -38,14 +38,42 @@ def test_xds_to_zarr(ms, tmp_path_factory):
     zarr_store = tmp_path_factory.mktemp("zarr_store") / "test.zarr"
 
     ms_datasets = xds_from_ms(ms)
+
+    for i, ds in enumerate(ms_datasets):
+        dims = ds.dims
+        row, chan, corr = (dims[d] for d in ("row", "chan", "corr"))
+
+        ms_datasets[i] = ds.assign_coords(**{
+            "chan": (("chan",), np.arange(chan)),
+            "corr": (("corr",), np.arange(corr)),
+        })
+
     writes = xds_to_zarr(ms_datasets, zarr_store)
     dask.compute(writes)
 
     zarr_datasets = xds_from_zarr(zarr_store, chunks={"row": 1})
 
     for ms_ds, zarr_ds in zip(ms_datasets, zarr_datasets):
+        # Check data variables
+        assert ms_ds.data_vars, "MS Dataset has no variables"
+
         for name, var in ms_ds.data_vars.items():
-            assert_array_equal(var.data, getattr(zarr_ds, name).data)
+            zdata = getattr(zarr_ds, name).data
+            assert type(zdata) is type(var.data)  # noqa
+            assert_array_equal(var.data, zdata)
+
+        # Check coordinates
+        assert ms_ds.coords, "MS Datset has no coordinates"
+
+        for name, var in ms_ds.coords.items():
+            zdata = getattr(zarr_ds, name).data
+            assert type(zdata) is type(var.data)  # noqa
+            assert_array_equal(var.data, zdata)
+
+        # Check dataset attributes
+        for k, v in ms_ds.attrs.items():
+            zattr = getattr(zarr_ds, k)
+            assert_array_equal(zattr, v)
 
 
 @pytest.mark.optional

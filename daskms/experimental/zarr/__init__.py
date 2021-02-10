@@ -1,13 +1,15 @@
+import itertools
 from pathlib import Path
 from threading import Lock
 from weakref import WeakValueDictionary
 
+import dask
 import dask.array as da
 import numpy as np
 import numcodecs
 
 from daskms.utils import arg_hasher, requires
-from daskms.dataset import Dataset
+from daskms.dataset import Dataset, Variable
 from daskms.experimental.utils import (encode_attr,
                                        extent_args,
                                        column_iterator,
@@ -85,15 +87,22 @@ class ZarrDatasetFactory(metaclass=ZarrDatasetFactoryMetaClass):
                 ds_group = group.require_group(group_name)
                 ds_group.attrs.update(encode_attr(self.attrs))
 
-                for name, (dims, shape, chunks, dtype) in self.schema.items():
-                    codec = numcodecs.Pickle() if dtype == np.object else None
+                for name, schema in self.schema.items():
+                    if schema["dtype"] == np.object:
+                        codec = numcodecs.Pickle()
+                    else:
+                        codec = None
 
-                    array = ds_group.require_dataset(name, shape,
-                                                     chunks=chunks,
-                                                     dtype=dtype,
+                    array = ds_group.require_dataset(name, schema["shape"],
+                                                     chunks=schema["chunks"],
+                                                     dtype=schema["dtype"],
                                                      object_codec=codec,
                                                      exact=True)
-                    array.attrs[DASKMS_ATTR_KEY] = {"dims": dims}
+                    array.attrs[DASKMS_ATTR_KEY] = {
+                        "dims": schema["dims"],
+                        "coordinate": schema["coordinate"],
+                        "array_type": schema["type"]
+                    }
 
                 self._group = ds_group
                 return ds_group
@@ -103,14 +112,21 @@ class ZarrDatasetFactory(metaclass=ZarrDatasetFactoryMetaClass):
                 (self.store, self.dataset_id, self.schema, self.attrs))
 
 
-def zarr_schema_factory(di, data_vars):
+def zarr_schema_factory(di, dataset):
     schema = {}
 
-    for name, var in data_vars.items():
+    data_vars = ((k, v, False) for k, v in dataset.data_vars.items())
+    coords = ((k, v, True) for k, v in dataset.coords.items())
+    variables = itertools.chain(data_vars, coords)
+    chunks = dataset.chunks
+
+    for name, var, is_coord in variables:
         # Determine schema for backing zarr arrays
         zarr_chunks = []
 
-        for d, dim_chunks in enumerate(var.data.chunks):
+        for d in var.dims:
+            dim_chunks = chunks[d]
+
             if any(dc == np.nan for dc in dim_chunks):
                 raise NotImplementedError("nan chunks not yet supported.")
 
@@ -126,9 +142,23 @@ def zarr_schema_factory(di, data_vars):
                                  f"array {name} dimension {var.dims[d]}. "
                                  f"zarr requires homogenous chunk sizes "
                                  f"except for the last chunk in a "
-                                 f"dimension. Rechunk your {name}.")
+                                 f"dimension. Rechunk {name}.")
 
-        schema[name] = (var.dims, var.shape, tuple(zarr_chunks), var.dtype)
+        if isinstance(var.data, da.Array):
+            array_type = "dask"
+        elif isinstance(var.data, np.ndarray):
+            array_type = "numpy"
+        else:
+            raise NotImplementedError(f"{type(var.data)} not supported")
+
+        schema[name] = {
+            "dims": var.dims,
+            "shape": var.shape,
+            "chunks": tuple(zarr_chunks),
+            "dtype": var.dtype,
+            "coordinate": is_coord,
+            "type": array_type,
+        }
 
     return schema
 
@@ -143,6 +173,25 @@ def _setter_wrapper(data, name, factory, *extents):
 @requires("pip install dask-ms[zarr] for zarr support",
           zarr_import_error)
 def xds_to_zarr(xds, store, columns=None):
+    """
+    Stores a dataset of list of datasets defined by `xds` in
+    file location `store`.
+
+    Parameters
+    ----------
+    xds : Dataset or list of Datasets
+        Data
+    store : str or Path
+        Path to store the data
+    columns : list of str or str or None
+        Columns to store. `None` or `"ALL"` stores all columns on each dataset.
+        Otherwise, a list of columns should be supplied.
+
+    Returns
+    -------
+    writes : Dataset
+        A Dataset representing the write operations
+    """
     if isinstance(store, Path):
         store = str(store)
 
@@ -161,26 +210,42 @@ def xds_to_zarr(xds, store, columns=None):
 
     write_datasets = []
 
-    for di, ds in enumerate(xds):
-        schema = zarr_schema_factory(di, ds.data_vars)
-        attrs = dict(ds.attrs)
-        attrs[DASKMS_ATTR_KEY] = {"chunks": dict(ds.chunks)}
-        factory = ZarrDatasetFactory(store, di, schema, attrs)
-        data_vars = {}
-
-        for name, var in column_iterator(ds.data_vars, columns):
-            ext_args = extent_args(var.dims, var.chunks)
+    def _gen_writes(variables, chunks, columns):
+        for name, var in column_iterator(variables, columns):
+            if isinstance(var.data, da.Array):
+                ext_args = extent_args(var.dims, var.chunks)
+                var_data = var.data
+            elif isinstance(var.data, np.ndarray):
+                var_chunks = tuple(chunks[d] for d in var.dims)
+                ext_args = extent_args(var.dims, var_chunks)
+                var_data = da.from_array(var.data, chunks=var_chunks,
+                                         inline_array=True, name=False,)
+            else:
+                raise NotImplementedError(f"Writing {type(var.data)} "
+                                          f"unsupported")
 
             write = da.blockwise(_setter_wrapper, var.dims,
-                                 var.data, var.dims,
+                                 var_data, var.dims,
                                  name, None,
                                  factory, None,
                                  *ext_args,
                                  adjust_chunks={d: 1 for d in var.dims},
+                                 concatenate=False,
                                  meta=np.empty((1,)*len(var.dims), np.bool))
-
             write = inlined_array(write, ext_args[::2])
-            data_vars[name] = (var.dims, write, var.attrs)
+
+            yield name, (var.dims, write, var.attrs)
+
+    for di, ds in enumerate(xds):
+        schema = zarr_schema_factory(di, ds)
+        attrs = dict(ds.attrs)
+        attrs[DASKMS_ATTR_KEY] = {"chunks": dict(ds.chunks)}
+        factory = ZarrDatasetFactory(store, di, schema, attrs)
+        chunks = ds.chunks
+
+        data_vars = dict(_gen_writes(ds.data_vars, chunks, columns))
+        # Include coords in the write dataset so they're reified
+        data_vars.update(dict(_gen_writes(ds.coords, chunks, columns)))
 
         write_datasets.append(Dataset(data_vars))
 
@@ -193,7 +258,28 @@ def _getter_wrapper(zarray, *extents):
 
 @requires("pip install dask-ms[zarr] for zarr support",
           zarr_import_error)
-def xds_from_zarr(store, columns="ALL", chunks=None):
+def xds_from_zarr(store, columns=None, chunks=None):
+
+    """
+    Reads the zarr data store in `store` and returns list of
+    Dataset's containing the data.
+
+    Parameters
+    ----------
+    store : str or Path
+        Path containing the data
+    columns : list of str or str or None
+        Columns to read. `None` or `"ALL"` stores all columns on each dataset.
+        Otherwise, a list of columns should be supplied.
+    chunks: dict or list of dicts
+        chunking schema for each dataset
+
+    Returns
+    -------
+    writes : Dataset
+        A Dataset representing the write operations
+    """
+
     if isinstance(store, Path):
         store = str(store)
 
@@ -214,6 +300,7 @@ def xds_from_zarr(store, columns="ALL", chunks=None):
 
     root = zarr.open(store)
     datasets = []
+    numpy_vars = []
 
     for g, (group_name, group) in enumerate(sorted(root.groups())):
         assert group_name.startswith(DATASET_PREFIX)
@@ -229,10 +316,13 @@ def xds_from_zarr(store, columns="ALL", chunks=None):
                 pass
 
         data_vars = {}
+        coords = {}
 
         for name, zarray in column_iterator(group, columns):
             attrs = dict(zarray.attrs[DASKMS_ATTR_KEY])
             dims = attrs.pop("dims")
+            coordinate = attrs.pop("coordinate", False)
+            array_type = attrs.pop("array_type")
             array_chunks = tuple(group_chunks.get(d, s) for d, s
                                  in zip(dims, zarray.shape))
 
@@ -242,11 +332,25 @@ def xds_from_zarr(store, columns="ALL", chunks=None):
             read = da.blockwise(_getter_wrapper, dims,
                                 zarray, None,
                                 *ext_args,
+                                concatenate=False,
                                 meta=np.empty((0,)*zarray.ndim, zarray.dtype))
 
             read = inlined_array(read, ext_args[::2])
-            data_vars[name] = (dims, read, attrs)
+            var = Variable(dims, read, attrs)
+            (coords if coordinate else data_vars)[name] = var
 
-        datasets.append(Dataset(data_vars, attrs=group_attrs))
+            # Save numpy arrays for reification
+            if array_type == "dask":
+                pass
+            elif array_type == "numpy":
+                numpy_vars.append(var)
+            else:
+                raise TypeError(f"Unhandled array type {array_type}")
+
+        datasets.append(Dataset(data_vars, coords=coords, attrs=group_attrs))
+
+    # Reify any numpy arrays directly into their variables
+    for v, a in zip(numpy_vars, dask.compute(v.data for v in numpy_vars)[0]):
+        v.data = a
 
     return datasets
