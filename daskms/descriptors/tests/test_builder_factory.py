@@ -20,16 +20,16 @@ _root = Path("C:/" if platform.system() == "Windows" else os.sep,
 
 @pytest.mark.parametrize("filename, builder_cls", [
     (_root / "test.ms", MSDescriptorBuilder),
-    (_root / "test.ms{s}".format(s=os.sep), MSDescriptorBuilder),
+    (_root / f"test.ms{os.sep}", MSDescriptorBuilder),
     (_root / "test.ms{s}{s}".format(s=os.sep), MSDescriptorBuilder),
     # Indirectly accessed subtable correctly identified
     (_root / "test.ms::SOURCE", MSSubTableDescriptorBuilder),
-    (_root / "test.ms::SOURCE{s}".format(s=os.sep),
+    (_root / f"test.ms::SOURCE{os.sep}",
      MSSubTableDescriptorBuilder),
     # Directly accessed subtable not identified
     (_root / "test.ms" / "SOURCE",
      DefaultDescriptorBuilder),
-    (_root / "test.ms" / "SOURCE{s}".format(s=os.sep),
+    (_root / "test.ms" / f"SOURCE{os.sep}",
      DefaultDescriptorBuilder),
     # Default Table
     (_root / "test.table", DefaultDescriptorBuilder),

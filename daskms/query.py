@@ -26,5 +26,5 @@ def where_clause(group_cols, group_vals):
     if len(group_cols) == 0:
         return ""
 
-    assign_str = ["%s=%s" % (c, v) for c, v in zip(group_cols, group_vals)]
+    assign_str = [f"{c}={v}" for c, v in zip(group_cols, group_vals)]
     return "\n\t".join(("WHERE", " AND\n\t".join(assign_str)))

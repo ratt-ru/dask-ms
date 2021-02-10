@@ -120,7 +120,7 @@ def proxied_method_factory(method, locktype):
                 table.unlock()
 
     else:
-        raise ValueError("Invalid locktype %s" % locktype)
+        raise ValueError(f"Invalid locktype {locktype}")
 
     _impl.__name__ = method + "_impl"
     _impl.__doc__ = ("Calls table.%s, wrapped in a %s." %
@@ -401,7 +401,7 @@ class TableProxy(object, metaclass=TableProxyMetaClass):
             return self._ex.submit(_writelock_runner, self._table_future,
                                    fn, args, kwargs)
         else:
-            raise ValueError("Invalid locktype %s" % locktype)
+            raise ValueError(f"Invalid locktype {locktype}")
 
     def __repr__(self):
         return "TableProxy[%s](%s, %s, %s)" % (

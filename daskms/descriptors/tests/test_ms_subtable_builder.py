@@ -25,7 +25,7 @@ def test_ms_subtable_builder(tmp_path, table):
     required_cols = {k for k in pt.required_ms_desc(table).keys()
                      if not k.startswith('_')}
 
-    filename = str(tmp_path / ("%s.table" % table))
+    filename = str(tmp_path / (f"{table}.table"))
 
     with pt.table(filename, tab_desc, dminfo=dminfo, ack=False) as T:
         T.addrows(10)

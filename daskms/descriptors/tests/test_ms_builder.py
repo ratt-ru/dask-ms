@@ -16,7 +16,7 @@ from daskms.descriptors.ms import MSDescriptorBuilder
      ("MODEL_DATA", ("row", "chan", "corr"), np.complex128)],
     [("IMAGING_WEIGHT", ("row", "chan"), np.float32),
      ("SIGMA_SPECTRUM", ("row", "chan", "corr"), np.float)],
-], ids=lambda v: "variables=%s" % v)
+], ids=lambda v: f"variables={v}")
 @pytest.mark.parametrize("chunks", [
     {"row": (2, 2, 2, 2, 2),
      "chan": (4, 4, 4, 4),

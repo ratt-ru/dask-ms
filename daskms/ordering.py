@@ -43,7 +43,7 @@ def row_run_factory(rows, sort='auto', sort_dir="read"):
             inv_argsort[argsort] = np.arange(argsort.size, dtype=dtype)
             resort = inv_argsort
         else:
-            raise ValueError("Invalid sort_dir '%s'" % sort_dir)
+            raise ValueError(f"Invalid sort_dir '{sort_dir}'")
 
         # Use sorted rows for creating row runs
         rows = sorted_rows
@@ -68,9 +68,9 @@ def ordering_taql(table_proxy, index_cols, taql_where=''):
     orderby = "\n" + orderby_clause(index_cols)
 
     if taql_where != '':
-        taql_where = "\nWHERE\n\t%s" % taql_where
+        taql_where = f"\nWHERE\n\t{taql_where}"
 
-    query = "%s\nFROM\n\t$1%s%s" % (select, taql_where, orderby)
+    query = f"{select}\nFROM\n\t$1{taql_where}{orderby}"
 
     return TableProxy(taql_factory, query, tables=[table_proxy],
                       __executor_key__=table_proxy.executor_key)
@@ -168,7 +168,7 @@ def group_ordering_taql(table_proxy, group_cols, index_cols, taql_where=''):
         raise ValueError("group_ordering_taql requires "
                          "len(group_cols) > 0")
     else:
-        index_group_cols = ["GAGGR(%s) as GROUP_%s" % (c, c)
+        index_group_cols = [f"GAGGR({c}) as GROUP_{c}"
                             for c in index_cols]
         # Group Row ID's
         index_group_cols.append("GROWID() AS __tablerow__")
@@ -181,9 +181,9 @@ def group_ordering_taql(table_proxy, group_cols, index_cols, taql_where=''):
         select = select_clause(group_cols + index_group_cols)
 
         if taql_where != '':
-            taql_where = "\nWHERE\n\t%s" % taql_where
+            taql_where = f"\nWHERE\n\t{taql_where}"
 
-        query = "%s\nFROM\n\t$1%s\n%s" % (select, taql_where, groupby)
+        query = f"{select}\nFROM\n\t$1{taql_where}\n{groupby}"
 
         return TableProxy(taql_factory, query, tables=[table_proxy],
                           __executor_key__=table_proxy.executor_key)
@@ -208,8 +208,8 @@ def group_row_ordering(group_order_taql, group_cols, index_cols, chunks):
             # Extract row chunking scheme
             group_row_chunks = group_chunks['row']
         except KeyError:
-            raise ValueError("No row chunking scheme "
-                             "found in %s!" % group_chunks)
+            raise ValueError(f"No row chunking scheme "
+                             f"found in {group_chunks}!")
 
         ordering_arrays.append(_group_ordering_arrays(group_order_taql,
                                                       index_cols, g, nrow,

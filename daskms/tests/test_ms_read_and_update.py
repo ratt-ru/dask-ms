@@ -52,7 +52,7 @@ def test_ms_read(ms, group_cols, index_cols, select_cols):
             assert "ROWID" in ds.coords
             group_col_values = [ds.attrs[a] for a in group_cols]
             where = where_clause(group_cols, group_col_values)
-            query = "SELECT * FROM $1 %s %s" % (where, order)
+            query = f"SELECT * FROM $1 {where} {order}"
 
             with TableProxy(taql_factory, query, tables=[T]) as Q:
                 column_data = {c: Q.getcol(c).result() for c in select_cols}

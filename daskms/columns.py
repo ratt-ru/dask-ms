@@ -184,8 +184,8 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
             shape = (len(exemplar),)
             assert dtype == object
         else:
-            raise ColumnMetadataError("Unhandled exemplar "
-                                      "type '%s'" % type(exemplar))
+            raise ColumnMetadataError(f"Unhandled exemplar type "
+                                      f"'{type(exemplar)}'")
 
         # NOTE(sjperkins)
         # -1 implies each row can be any shape whatsoever

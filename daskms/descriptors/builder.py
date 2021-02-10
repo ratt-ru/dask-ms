@@ -16,7 +16,7 @@ descriptor_builders = {}
 
 def is_valid_variable_name(name):
     try:
-        parse('{} = None'.format(name))
+        parse(f'{name} = None')
         return True
     except (SyntaxError, ValueError, TypeError):
         return False
@@ -25,12 +25,11 @@ def is_valid_variable_name(name):
 def register_descriptor_builder(name):
     def decorator(cls):
         if name in descriptor_builders:
-            raise ValueError("'%s' already registered as a "
-                             "descriptor builder" % name)
+            raise ValueError(f"'{name}' already registered as "
+                             f"a descriptor builder")
 
         if not is_valid_variable_name(name):
-            raise ValueError("'%s' is not a valid "
-                             "Python variable name." % name)
+            raise ValueError(f"'{name}' is not a valid Python variable name.")
 
         descriptor_builders[name] = cls
         return cls
@@ -155,7 +154,7 @@ def variable_column_descriptor(column, variable):
     casa_type = infer_casa_type(dtypes.pop())
 
     desc = {'_c_order': True,
-            'comment': '%s column' % column,
+            'comment': f'{column} column',
             'dataManagerGroup': 'StandardStMan',
             'dataManagerType': 'StandardStMan',
             'keywords': {},

@@ -279,7 +279,7 @@ def _col_keyword_getter(table):
 class DatasetFactory(object):
     def __init__(self, table, select_cols, group_cols, index_cols, **kwargs):
         if not table_exists(table):
-            raise ValueError("'%s' does not appear to be a CASA Table" % table)
+            raise ValueError(f"'{table}' does not appear to be a CASA Table")
 
         chunks = kwargs.pop('chunks', [{'row': _DEFAULT_ROW_CHUNKS}])
 
@@ -302,7 +302,7 @@ class DatasetFactory(object):
         self.table_proxy = kwargs.pop('table_proxy', False)
 
         if len(kwargs) > 0:
-            raise ValueError("Unhandled kwargs: %s" % kwargs)
+            raise ValueError(f"Unhandled kwargs: {kwargs}")
 
     def _table_proxy_factory(self):
         return TableProxy(pt.table, self.table_path, ack=False,
@@ -360,7 +360,7 @@ class DatasetFactory(object):
 
             # Prefix d
             gid_str = ",".join(str(gid) for gid in group_id)
-            array_suffix = "[%s]-%s" % (gid_str, short_table_name)
+            array_suffix = f"[{gid_str}]-{short_table_name}"
 
             # Create dataset variables
             group_var_dims = _dataset_variable_factory(table_proxy,

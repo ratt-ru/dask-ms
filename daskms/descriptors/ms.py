@@ -36,7 +36,7 @@ class MSDescriptorBuilder(AbstractDescriptorBuilder):
         # Imaging DATA columns
         desc.update({column: {
             '_c_order': True,
-            'comment': 'The Visibility %s Column' % column,
+            'comment': f'The Visibility {column} Column',
             'dataManagerGroup': 'StandardStMan',
             'dataManagerType': 'StandardStMan',
             'keywords': {'UNIT': 'Jy'},
@@ -85,7 +85,7 @@ class MSDescriptorBuilder(AbstractDescriptorBuilder):
         try:
             desc = {k: default_desc[k] for k in self.REQUIRED_FIELDS}
         except KeyError as e:
-            raise RuntimeError("'%s' not in REQUIRED_FIELDS" % str(e))
+            raise RuntimeError(f"'{str(e)}' not in REQUIRED_FIELDS")
 
         # Put indexing columns into an Incremental Storage Manager by default
         for column in self.INDEX_COLS:
@@ -139,7 +139,7 @@ class MSDescriptorBuilder(AbstractDescriptorBuilder):
         col_desc['shape'] = shape
         col_desc['ndim'] = len(shape)
         col_desc['option'] |= 4
-        col_desc['dataManagerGroup'] = "%s_GROUP" % column
+        col_desc['dataManagerGroup'] = f"{column}_GROUP"
         col_desc['dataManagerType'] = "TiledColumnStMan"
 
     def fix_columns(self, variables, desc, dim_sizes):
@@ -195,14 +195,14 @@ class MSDescriptorBuilder(AbstractDescriptorBuilder):
         try:
             shape = desc['shape']
         except KeyError:
-            raise ValueError("No shape in descriptor %s" % desc)
+            raise ValueError(f"No shape in descriptor {desc}")
         else:
             rev_shape = tuple(reversed(shape))
 
         try:
             casa_type = desc['valueType']
         except KeyError:
-            raise ValueError("No valueType in descriptor %s" % desc)
+            raise ValueError(f"No valueType in descriptor {desc}")
         else:
             dtype = infer_dtype(casa_type, desc)
             nbytes = np.dtype(dtype).itemsize

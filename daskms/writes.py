@@ -389,7 +389,7 @@ def add_row_orders(data, table_proxy, prev=None):
     elif isinstance(data, dict):
         rows = len(data)
     else:
-        raise TypeError("data %s must be a numpy array or dict" % type(data))
+        raise TypeError(f"data {type(data)} must be a numpy array or dict")
 
     # This is the first link in the chain
     if prev is None:

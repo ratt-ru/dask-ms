@@ -3,7 +3,7 @@ import os
 try:
     from setuptools import setup, find_packages
 except ImportError as e:
-    raise ImportError("%s\nPlease install setuptools." % e)
+    raise ImportError(f"{e}\nPlease install setuptools.")
 
 extras_require = {
     "arrow": ["pyarrow >= 3.0.0"],

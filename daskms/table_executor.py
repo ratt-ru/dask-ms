@@ -44,7 +44,7 @@ class Executor(object, metaclass=ExecutorMetaClass):
         return (Executor, (self.key,))
 
     def __repr__(self):
-        return "Executor(%s)" % self.key
+        return f"Executor({self.key})"
 
     __str__ = __repr__
 

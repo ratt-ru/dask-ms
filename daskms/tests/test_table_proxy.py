@@ -22,7 +22,7 @@ from daskms.utils import assert_liveness
 def test_table_proxy(ms):
     """ Base table proxy test """
     tp = TableProxy(pt.table, ms, ack=False, readonly=False)
-    tq = TableProxy(pt.taql, "SELECT UNIQUE ANTENNA1 FROM '%s'" % ms)
+    tq = TableProxy(pt.taql, f"SELECT UNIQUE ANTENNA1 FROM '{ms}'")
 
     assert_liveness(2, 1)
 
@@ -55,7 +55,7 @@ def test_table_proxy_pickling(ms):
 
 def test_taql_proxy_pickling(ms):
     """ Test taql pickling """
-    proxy = TableProxy(pt.taql, "SELECT UNIQUE ANTENNA1 FROM '%s'" % ms)
+    proxy = TableProxy(pt.taql, f"SELECT UNIQUE ANTENNA1 FROM '{ms}'")
     proxy2 = pickle.loads(pickle.dumps(proxy))
 
     assert_liveness(1, 1)

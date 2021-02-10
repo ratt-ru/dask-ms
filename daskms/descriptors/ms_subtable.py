@@ -11,8 +11,8 @@ from daskms.table_schemas import SUBTABLES
 class MSSubTableDescriptorBuilder(AbstractDescriptorBuilder):
     def __init__(self, subtable):
         if subtable not in SUBTABLES:
-            raise ValueError("'%s' is not a valid Measurement Set "
-                             "sub-table" % subtable)
+            raise ValueError(f"'{subtable}' is not a valid "
+                             f"Measurement Set sub-table")
 
         self.subtable = subtable
         self.DEFAULT_TABLE_DESC = pt.required_ms_desc(subtable)
@@ -25,7 +25,7 @@ class MSSubTableDescriptorBuilder(AbstractDescriptorBuilder):
         try:
             desc = {k: default_desc[k] for k in self.REQUIRED_FIELDS}
         except KeyError as e:
-            raise RuntimeError("'%s' is not in REQUIRED_FIELDS" % str(e))
+            raise RuntimeError(f"'{str(e)}' is not in REQUIRED_FIELDS")
 
         # Now copy/create descriptors for supplied variables
         for k, v in variables.items():

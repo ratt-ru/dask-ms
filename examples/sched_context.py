@@ -38,8 +38,7 @@ def scheduler_context(args):
                 with open(args.scheduler, 'r') as f:
                     address = json.load(f)['address']
 
-            logging.info("Using distributed scheduler "
-                         "with address '{}'".format(address))
+            logging.info(f"Using distributed scheduler with address '{address}'")
             client = distributed.Client(address)
             dask.config.set(scheduler=client)
             client.restart()

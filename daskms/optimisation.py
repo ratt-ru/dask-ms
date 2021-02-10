@@ -43,7 +43,7 @@ class Key(metaclass=KeyMetaClass):
         return hash(self.key)
 
     def __repr__(self):
-        return "Key%s" % (self.key,)
+        return f"Key{self.key}"
 
     def __reduce__(self):
         return (Key, (self.key,))
@@ -96,7 +96,7 @@ class ArrayCache(metaclass=ArrayCacheMetaClass):
         return (ArrayCache, (self.token,))
 
     def __repr__(self):
-        return "ArrayCache[%s]" % self.token
+        return f"ArrayCache[{self.token}]"
 
 
 def cached_array(array, token=None):

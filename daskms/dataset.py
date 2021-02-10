@@ -378,7 +378,7 @@ else:
             try:
                 return self._attrs[name]
             except KeyError:
-                raise AttributeError("Invalid Attribute %s" % name)
+                raise AttributeError(f"Invalid Attribute {name}")
 
         def copy(self):
             """ Returns a copy of the Dataset """
