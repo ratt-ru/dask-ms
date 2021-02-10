@@ -1,3 +1,6 @@
+from multiprocessing import Pool
+import os
+
 import dask
 import dask.array as da
 import numpy as np
@@ -95,3 +98,41 @@ def test_xarray_to_zarr(ms, tmp_path_factory):
 
     for i, ds in enumerate(datasets):
         ds.to_zarr(str(store / f"ds-{i}.zarr"))
+
+
+def _fasteners_runner(lockfile):
+    fasteners = pytest.importorskip("fasteners")
+    from pathlib import Path
+    import json
+
+    lock = fasteners.InterProcessLock(lockfile)
+
+    root = Path(lockfile).parents[0]
+    metafile = root / "metadata.json"
+
+    metadata = {"tables": ["MAIN", "SPECTRAL_WINDOW"]}
+
+    with lock:
+        if metafile.exists():
+            exists = True
+
+            with open(metafile, "r") as f:
+                assert json.loads(f.read()) == metadata
+        else:
+            exists = False
+
+            with open(metafile, "w") as f:
+                f.write(json.dumps(metadata))
+
+        return os.getpid(), exists
+
+
+def test_fasteners(ms, tmp_path_factory):
+    lockfile = tmp_path_factory.mktemp("fasteners-") / "dir" / ".lock"
+
+    from pprint import pprint
+
+    with Pool(4) as pool:
+        results = [pool.apply_async(_fasteners_runner, (lockfile,))
+                   for _ in range(4)]
+        pprint([r.get() for r in results])

@@ -1,3 +1,4 @@
+import importlib
 import itertools
 from pathlib import Path
 from threading import Lock
@@ -144,10 +145,9 @@ def zarr_schema_factory(di, dataset):
                                  f"except for the last chunk in a "
                                  f"dimension. Rechunk {name}.")
 
-        if isinstance(var.data, da.Array):
-            array_type = "dask"
-        elif isinstance(var.data, np.ndarray):
-            array_type = "numpy"
+        if isinstance(var.data, (da.Array, np.ndarray)):
+            typ = type(var.data)
+            array_type = ".".join((typ.__module__, typ.__name__))
         else:
             raise NotImplementedError(f"{type(var.data)} not supported")
 
@@ -322,7 +322,9 @@ def xds_from_zarr(store, columns=None, chunks=None):
             attrs = dict(zarray.attrs[DASKMS_ATTR_KEY])
             dims = attrs.pop("dims")
             coordinate = attrs.pop("coordinate", False)
-            array_type = attrs.pop("array_type")
+            mod, typ = attrs.pop("array_type").rsplit(".", 1)
+            mod = importlib.import_module(mod)
+            typ = getattr(mod, typ)
             array_chunks = tuple(group_chunks.get(d, s) for d, s
                                  in zip(dims, zarray.shape))
 
@@ -340,12 +342,8 @@ def xds_from_zarr(store, columns=None, chunks=None):
             (coords if coordinate else data_vars)[name] = var
 
             # Save numpy arrays for reification
-            if array_type == "dask":
-                pass
-            elif array_type == "numpy":
+            if isinstance(typ, np.ndarray):
                 numpy_vars.append(var)
-            else:
-                raise TypeError(f"Unhandled array type {array_type}")
 
         datasets.append(Dataset(data_vars, coords=coords, attrs=group_attrs))
 
