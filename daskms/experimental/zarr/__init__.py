@@ -11,8 +11,8 @@ import numcodecs
 
 from daskms.utils import arg_hasher, requires
 from daskms.dataset import Dataset, Variable
-from daskms.experimental.utils import (encode_attr,
-                                       extent_args,
+from daskms.utils import encode_attr
+from daskms.experimental.utils import (extent_args,
                                        column_iterator,
                                        promote_columns)
 from daskms.optimisation import inlined_array

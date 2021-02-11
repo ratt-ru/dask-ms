@@ -7,10 +7,14 @@ except ImportError:
 
 from collections import OrderedDict
 
+import importlib
+
 import dask
 import dask.array as da
 from dask.highlevelgraph import HighLevelGraph
 import numpy as np
+
+from daskms.utils import encode_attr
 
 try:
     import xarray as xr
@@ -466,3 +470,72 @@ else:
                         data_info,
                         self._coords,
                         self._attrs)
+
+
+# Encoding
+
+def encode_type(typ):
+    return ".".join((typ.__module__, typ.__name__))
+
+
+_ALLOWED_PACKAGES = {"numpy", "dask"}
+
+
+def decode_type(typ_str):
+    pkg, _ = typ_str.split(".", 1)
+
+    if pkg not in _ALLOWED_PACKAGES:
+        raise ImportError(f"Import of '{typ_str}' denied")
+
+    mod_str, typ_str = typ_str.rsplit(".", 1)
+    mod = importlib.import_module(mod_str)
+
+    try:
+        return getattr(mod, typ_str)
+    except AttributeError:
+        raise ValueError(f"{typ_str} is not an "
+                         f"attribute of {mod_str}")
+
+
+def encode_column(column, var):
+    return {
+        "type": encode_type(type(var.data)),
+        "dims": var.dims,
+        "dtype": var.dtype.name,
+        "chunks": var.chunks,
+        "shape": var.shape,
+    }
+
+
+def decode_column(column):
+    chunks = column["chunks"]
+
+    return {
+        "chunks": tuple(map(tuple, chunks)) if chunks else None,
+        "type": decode_type(column["type"]),
+        "dims": tuple(column["dims"]),
+        "dtype": np.dtype(column["dtype"]),
+        "shape": column["shape"]
+    }
+
+
+def encode_schema(dataset):
+    data_vars = {c: encode_column(c, v) for c, v in dataset.data_vars.items()}
+    coords = {c: encode_column(c, v) for c, v in dataset.coords.items()}
+
+    return {
+        "data_vars": data_vars,
+        "coordinates": coords,
+        "attributes": encode_attr(dataset.attrs),
+    }
+
+
+def decode_schema(schema):
+    data_vars = {k: decode_column(v) for k, v in schema["data_vars"].items()}
+    coords = {k: decode_column(v) for k, v in schema["coordinates"].items()}
+
+    return {
+        "data_vars": data_vars,
+        "coordinates": coords,
+        "attributes": schema["attributes"],
+    }

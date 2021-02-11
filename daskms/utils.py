@@ -41,6 +41,24 @@ def freeze(arg):
         return arg
 
 
+def encode_attr(arg):
+    """ Convert arg into something acceptable to json """
+    if isinstance(arg, tuple):
+        return tuple(map(encode_attr, arg))
+    elif isinstance(arg, list):
+        return list(map(encode_attr, arg))
+    elif isinstance(arg, set):
+        return list(map(encode_attr, sorted(arg)))
+    elif isinstance(arg, dict):
+        return {k: encode_attr(v) for k, v in sorted(arg.items())}
+    elif isinstance(arg, np.ndarray):
+        return arg.tolist()
+    elif isinstance(arg, np.generic):
+        return arg.item()
+    else:
+        return arg
+
+
 def promote_columns(columns, default):
     """
     Promotes `columns` to a list of columns.
