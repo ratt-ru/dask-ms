@@ -44,21 +44,7 @@ class Visitor(ast.NodeTransformer):
         return op(self.visit(node.left), self.visit(node.right))
 
     def visit_Name(self, node):
-        xdarray = getattr(self.dataset, node.id)
-
-        try:
-            dims = xdarray.dims
-        except AttributeError:
-            raise TypeError(f"{type(xdarray)} does not look "
-                            f"like a valid Dataset Array")
-
-        if dims != ("row", "chan", "corr"):
-            raise ValueError(f"{xdarray} does not look "
-                             f"like a valid DATA array. "
-                             f"Should have (row, chan, corr) dims"
-                             f"Instead has {dims}")
-
-        return xdarray.data
+        return getattr(self.dataset, node.id).data
 
 
 def data_column_expr(statement, datasets):
