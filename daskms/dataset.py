@@ -522,11 +522,12 @@ def decode_column(column):
 def encode_schema(dataset):
     data_vars = {c: encode_column(c, v) for c, v in dataset.data_vars.items()}
     coords = {c: encode_column(c, v) for c, v in dataset.coords.items()}
+    attrs = encode_attr(dict(dataset.attrs))
 
     return {
         "data_vars": data_vars,
         "coordinates": coords,
-        "attributes": encode_attr(dataset.attrs),
+        "attributes": attrs,
     }
 
 
