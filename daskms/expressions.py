@@ -47,6 +47,10 @@ class Visitor(ast.NodeTransformer):
         return getattr(self.dataset, node.id).data
 
 
+class DataColumnParseError(SyntaxError):
+    pass
+
+
 def data_column_expr(statement, datasets):
     """
     Produces a list of new datasets with a
@@ -91,7 +95,10 @@ def data_column_expr(statement, datasets):
     expressions = []
 
     for ds in promoted_datasets:
-        expressions.append(Visitor(ds).visit(expr))
+        try:
+            expressions.append(Visitor(ds).visit(expr))
+        except SyntaxError:
+            raise DataColumnParseError(f"Error parsing '{expr}'")
 
     if isinstance(datasets, (list, tuple)):
         return expressions
