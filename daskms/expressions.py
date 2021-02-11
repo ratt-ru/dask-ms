@@ -24,14 +24,8 @@ class Visitor(ast.NodeTransformer):
         def visit_Num(self, node):
             return node.n
 
-    def visit_Assign(self, node):
-        if len(node.targets) != 1:
-            raise ValueError("Multiple assignment targets unsupported")
-
-        var_name = node.targets[0].id
-        value = self.visit(node.value)
-        dim = ("row", "chan", "corr")
-        return self.dataset.assign(**{var_name: (dim, value)})
+    def visit_Expr(self, node):
+        return self.visit(node.value)
 
     def visit_UnaryOp(self, node):
         try:
@@ -71,21 +65,26 @@ def data_column_expr(statement, datasets):
     """
     Produces a list of new datasets with a
     variable set to the result of the
-    supplied assignment statement:
+    supplied expression:
 
     .. code-block:: python
 
-        ds = data_column_expr("FLAG_DATA = DATA / (DIR1_DATA + DIR2_DATA)",
+        ds = data_column_expr("DATA / (DIR1_DATA + DIR2_DATA)",
                               datasets)
         flag(ds[0].FLAG_DATA.data)
 
     Parameters
     ----------
-    statement : str
-        For example, :code:`EXPR = DATA / (DIR1_DATA + DIR2_DATA + DIR3_DATA)`.
+    expression : str
+        For example, :code:`DATA / (DIR1_DATA + DIR2_DATA + DIR3_DATA)`.
         Can contain data column names as well as numeric literal values.
     datasets : list of Datasets or Dataset
         Datasets containing the DATA columns referenced in the statement
+
+    Returns
+    -------
+    arrays : :class:`dask.array.Array` or list of :class:`dask.array.Array`
+        list of expression results
     """
     if isinstance(datasets, (list, tuple)):
         promoted_datasets = list(datasets)
@@ -96,19 +95,19 @@ def data_column_expr(statement, datasets):
     assert isinstance(mod, ast.Module)
 
     if len(mod.body) != 1:
-        raise ValueError("Single Assignment Statement Only")
+        raise ValueError("Single Expression Only")
 
     expr = mod.body[0]
 
-    if not isinstance(expr, ast.Assign):
-        raise ValueError("Single Assignment Statement Only")
+    if not isinstance(expr, ast.Expr):
+        raise ValueError("Single Expression Only")
 
-    new_datasets = []
+    expressions = []
 
     for ds in promoted_datasets:
-        new_datasets.append(Visitor(ds).visit(expr))
+        expressions.append(Visitor(ds).visit(expr))
 
     if isinstance(datasets, (list, tuple)):
-        return new_datasets
+        return expressions
     else:
-        return new_datasets[0]
+        return expressions[0]

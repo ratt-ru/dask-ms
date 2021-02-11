@@ -21,8 +21,8 @@ def test_expressions(ms):
         for ds in datasets
     ]
 
-    string = "EXPR = DATA / (-DIR1_DATA + DIR2_DATA + DIR3_DATA)*4"
-    datasets = data_column_expr(string, datasets)
+    string = "DATA / (-DIR1_DATA + DIR2_DATA + DIR3_DATA)*4"
+    expressions = data_column_expr(string, datasets)
 
-    for i, ds in enumerate(datasets):
-        assert_array_equal(results[i], ds.EXPR.data)
+    for i, (ds, expr) in enumerate(zip(datasets, expressions)):
+        assert_array_equal(results[i], expr)
