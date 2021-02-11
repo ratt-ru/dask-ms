@@ -342,8 +342,12 @@ def xds_from_zarr(store, columns=None, chunks=None):
             (coords if coordinate else data_vars)[name] = var
 
             # Save numpy arrays for reification
-            if isinstance(typ, np.ndarray):
+            if typ is np.ndarray:
                 numpy_vars.append(var)
+            elif typ is da.Array:
+                pass
+            else:
+                raise TypeError(f"Unknown {typ}")
 
         datasets.append(Dataset(data_vars, coords=coords, attrs=group_attrs))
 
