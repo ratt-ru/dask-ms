@@ -1,4 +1,5 @@
 import itertools
+import os
 from pathlib import Path
 from threading import Lock
 from weakref import WeakValueDictionary
@@ -17,10 +18,13 @@ from daskms.experimental.utils import (encode_attr,
 from daskms.optimisation import inlined_array
 
 DATASET_PREFIX = "__daskms_dataset__"
+DATASET_LOCK = ".zarr-dataset-lock"
+DATASET_PID = ".zarr-dataset-pid"
 DASKMS_ATTR_KEY = "__daskms_zarr_attr__"
 
 try:
     import zarr
+    from fasteners import InterProcessReaderWriterLock as ProcessRWLock
 except ImportError as e:
     zarr_import_error = e
 else:
@@ -52,60 +56,93 @@ class ZarrDatasetFactoryMetaClass(type):
 
 class ZarrDatasetFactory(metaclass=ZarrDatasetFactoryMetaClass):
     def __init__(self, store, dataset_id, schema, attrs):
-        assert isinstance(store, str)
+        assert isinstance(store, (str, Path))
         assert isinstance(dataset_id, int)
         assert isinstance(schema, dict)
         assert isinstance(attrs, dict)
 
-        self.store = store
+        self.store = Path(store)
         self.dataset_id = dataset_id
         self.schema = schema
         self.attrs = attrs
 
-        self.lock = Lock()
+        self.thread_lock = Lock()
+
+    def _create_group(self, dir_store, group_name):
+        try:
+            # Open in read/write, must exist
+            group = zarr.open_group(store=dir_store, mode="r+")
+        except zarr.errors.GroupNotFoundError:
+            # Create, must not exist
+            group = zarr.open_group(store=dir_store, mode="w-")
+
+        ds_group = group.require_group(group_name)
+        ds_group.attrs.update(encode_attr(self.attrs))
+
+        for name, schema in self.schema.items():
+            if schema["dtype"] == np.object:
+                codec = numcodecs.Pickle()
+            else:
+                codec = None
+
+            array = ds_group.require_dataset(name, schema["shape"],
+                                             chunks=schema["chunks"],
+                                             dtype=schema["dtype"],
+                                             object_codec=codec,
+                                             exact=True)
+            array.attrs[DASKMS_ATTR_KEY] = {
+                "dims": schema["dims"],
+                "coordinate": schema["coordinate"],
+                "array_type": schema["type"]
+            }
+
+        return ds_group
 
     @property
     def group(self):
-        with self.lock:
+        try:
+            return self._group
+        except AttributeError:
+            pass
+
+        with self.thread_lock:
             try:
                 return self._group
             except AttributeError:
-                dir_store = zarr.DirectoryStore(self.store)
+                pass
+
+            lockfile = self.store / DATASET_LOCK
+            pidfile = self.store / DATASET_PID
+            file_lock = ProcessRWLock(lockfile)
+            dir_store = zarr.DirectoryStore(self.store)
+            group_name = f"{DATASET_PREFIX}{self.dataset_id:08d}"
+
+            try:
+                file_lock.acquire_write_lock(blocking=True)
 
                 try:
-                    # Open in read/write, must exist
-                    group = zarr.open_group(store=dir_store, mode="r+")
-                except zarr.errors.GroupNotFoundError:
-                    try:
-                        # Create, must not exist
-                        group = zarr.open_group(store=dir_store, mode="w-")
-                    except zarr.errors.ContainsGroupError:
-                        # Open in read/write, must exist
-                        group = zarr.open_group(store=dir_store, mode="r+")
+                    with open(pidfile, "r") as f:
+                        pid = f.read()
+                except FileNotFoundError:
+                    pid = False
 
-                group_name = f"{DATASET_PREFIX}{self.dataset_id:08d}"
-                ds_group = group.require_group(group_name)
-                ds_group.attrs.update(encode_attr(self.attrs))
+                if not pid:
+                    self._group = self._create_group(dir_store, group_name)
 
-                for name, schema in self.schema.items():
-                    if schema["dtype"] == np.object:
-                        codec = numcodecs.Pickle()
-                    else:
-                        codec = None
+                    with open(pidfile, "w") as f:
+                        f.write(str(os.getpid()))
+                else:
+                    root = zarr.open_group(store=dir_store, mode="r+")
+                    self._group = root.require_group(group_name)
+                    #self._group = root[group_name]
 
-                    array = ds_group.require_dataset(name, schema["shape"],
-                                                     chunks=schema["chunks"],
-                                                     dtype=schema["dtype"],
-                                                     object_codec=codec,
-                                                     exact=True)
-                    array.attrs[DASKMS_ATTR_KEY] = {
-                        "dims": schema["dims"],
-                        "coordinate": schema["coordinate"],
-                        "array_type": schema["type"]
-                    }
+            finally:
+                file_lock.release_write_lock()
 
-                self._group = ds_group
-                return ds_group
+        from pprint import pprint
+        pprint(self._group)
+
+        return self._group
 
     def __reduce__(self):
         return (ZarrDatasetFactory,
@@ -210,7 +247,7 @@ def xds_to_zarr(xds, store, columns=None):
 
     write_datasets = []
 
-    def _gen_writes(variables, chunks, columns):
+    def _gen_writes(variables, chunks, columns, factory):
         for name, var in column_iterator(variables, columns):
             if isinstance(var.data, da.Array):
                 ext_args = extent_args(var.dims, var.chunks)
@@ -243,9 +280,9 @@ def xds_to_zarr(xds, store, columns=None):
         factory = ZarrDatasetFactory(store, di, schema, attrs)
         chunks = ds.chunks
 
-        data_vars = dict(_gen_writes(ds.data_vars, chunks, columns))
+        data_vars = dict(_gen_writes(ds.data_vars, chunks, columns, factory))
         # Include coords in the write dataset so they're reified
-        data_vars.update(dict(_gen_writes(ds.coords, chunks, columns)))
+        data_vars.update(dict(_gen_writes(ds.coords, chunks, columns, factory)))
 
         write_datasets.append(Dataset(data_vars))
 
