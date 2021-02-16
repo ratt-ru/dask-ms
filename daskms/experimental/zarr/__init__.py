@@ -170,6 +170,33 @@ def _setter_wrapper(data, name, factory, *extents):
     return np.full((1,)*len(extents), True)
 
 
+def _gen_writes(variables, chunks, columns, factory):
+    for name, var in column_iterator(variables, columns):
+        if isinstance(var.data, da.Array):
+            ext_args = extent_args(var.dims, var.chunks)
+            var_data = var.data
+        elif isinstance(var.data, np.ndarray):
+            var_chunks = tuple(chunks[d] for d in var.dims)
+            ext_args = extent_args(var.dims, var_chunks)
+            var_data = da.from_array(var.data, chunks=var_chunks,
+                                     inline_array=True, name=False,)
+        else:
+            raise NotImplementedError(f"Writing {type(var.data)} "
+                                      f"unsupported")
+
+        write = da.blockwise(_setter_wrapper, var.dims,
+                             var_data, var.dims,
+                             name, None,
+                             factory, None,
+                             *ext_args,
+                             adjust_chunks={d: 1 for d in var.dims},
+                             concatenate=False,
+                             meta=np.empty((1,)*len(var.dims), np.bool))
+        write = inlined_array(write, ext_args[::2])
+
+        yield name, (var.dims, write, var.attrs)
+
+
 @requires("pip install dask-ms[zarr] for zarr support",
           zarr_import_error)
 def xds_to_zarr(xds, store, columns=None):
@@ -210,42 +237,16 @@ def xds_to_zarr(xds, store, columns=None):
 
     write_datasets = []
 
-    def _gen_writes(variables, chunks, columns):
-        for name, var in column_iterator(variables, columns):
-            if isinstance(var.data, da.Array):
-                ext_args = extent_args(var.dims, var.chunks)
-                var_data = var.data
-            elif isinstance(var.data, np.ndarray):
-                var_chunks = tuple(chunks[d] for d in var.dims)
-                ext_args = extent_args(var.dims, var_chunks)
-                var_data = da.from_array(var.data, chunks=var_chunks,
-                                         inline_array=True, name=False,)
-            else:
-                raise NotImplementedError(f"Writing {type(var.data)} "
-                                          f"unsupported")
-
-            write = da.blockwise(_setter_wrapper, var.dims,
-                                 var_data, var.dims,
-                                 name, None,
-                                 factory, None,
-                                 *ext_args,
-                                 adjust_chunks={d: 1 for d in var.dims},
-                                 concatenate=False,
-                                 meta=np.empty((1,)*len(var.dims), np.bool))
-            write = inlined_array(write, ext_args[::2])
-
-            yield name, (var.dims, write, var.attrs)
-
     for di, ds in enumerate(xds):
         schema = zarr_schema_factory(di, ds)
         attrs = dict(ds.attrs)
         attrs[DASKMS_ATTR_KEY] = {"chunks": dict(ds.chunks)}
         factory = ZarrDatasetFactory(store, di, schema, attrs)
-        chunks = ds.chunks
+        write_args = (ds.chunks, columns, factory)
 
-        data_vars = dict(_gen_writes(ds.data_vars, chunks, columns))
+        data_vars = dict(_gen_writes(ds.data_vars, *write_args))
         # Include coords in the write dataset so they're reified
-        data_vars.update(dict(_gen_writes(ds.coords, chunks, columns)))
+        data_vars.update(dict(_gen_writes(ds.coords, *write_args)))
 
         write_datasets.append(Dataset(data_vars))
 
