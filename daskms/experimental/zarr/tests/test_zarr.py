@@ -76,7 +76,6 @@ def test_xds_to_zarr(ms, tmp_path_factory):
             assert_array_equal(zattr, v)
 
 
-
 @pytest.mark.skipif(xarray is None, reason="Needs xarray to rechunk")
 def test_multiprocess_create(ms, tmp_path_factory):
     zarr_store = tmp_path_factory.mktemp("zarr_store") / "test.zarr"
