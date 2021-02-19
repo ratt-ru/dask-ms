@@ -87,7 +87,17 @@ def test_multiprocess_create(ms, tmp_path_factory):
     writes = xds_to_zarr(ms_datasets, zarr_store)
     dask.compute(writes, scheduler="processes")
 
+    zds = xds_from_zarr(zarr_store)
 
+    for zds, msds in zip(zds, ms_datasets):
+        for k, v in msds.data_vars.items():
+            assert_array_equal(v, getattr(zds, k))
+
+        for k, v in msds.coords.items():
+            assert_array_equal(v, getattr(zds, k))
+
+        for k, v in msds.attrs.items():
+            assert_array_equal(v, getattr(zds, k))
 
 
 @pytest.mark.optional

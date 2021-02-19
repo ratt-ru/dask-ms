@@ -1,16 +1,12 @@
-from collections import defaultdict
 import itertools
-import os
 from pathlib import Path
-from threading import Lock
-from weakref import WeakValueDictionary
 
 import dask
 import dask.array as da
-import numpy as np
 import numcodecs
+import numpy as np
 
-from daskms.utils import arg_hasher, requires
+from daskms.utils import requires
 from daskms.dataset import Dataset, Variable
 from daskms.experimental.utils import (encode_attr,
                                        extent_args,
@@ -18,52 +14,16 @@ from daskms.experimental.utils import (encode_attr,
                                        promote_columns)
 from daskms.optimisation import inlined_array
 
-DATASET_PREFIX = "__daskms_dataset__"
-DATASET_LOCK = ".zarr-dataset-lock"
-DATASET_PID = ".zarr-dataset-pid"
-DASKMS_ATTR_KEY = "__daskms_zarr_attr__"
-
 try:
     import zarr
-    from fasteners import InterProcessReaderWriterLock as ProcessRWLock
 except ImportError as e:
     zarr_import_error = e
 else:
     zarr_import_error = None
 
 
-def prepare_zarr_group(dataset_id, dataset, store):
-    dir_store = zarr.DirectoryStore(store)
-
-    try:
-        # Open in read/write, must exist
-        group = zarr.open_group(store=dir_store, mode="r+")
-    except zarr.errors.GroupNotFoundError:
-        # Create, must not exist
-        group = zarr.open_group(store=dir_store, mode="w-")
-
-    group_name = f"{DATASET_PREFIX}{dataset_id:08d}"
-    ds_group = group.require_group(group_name)
-    #ds_group.attrs.update(encode_attr(self.attrs))
-
-    for name, schema in zarr_schema_factory(dataset_id, dataset).items():
-        if schema["dtype"] == np.object:
-            codec = numcodecs.Pickle()
-        else:
-            codec = None
-
-        array = ds_group.require_dataset(name, schema["shape"],
-                                         chunks=schema["chunks"],
-                                         dtype=schema["dtype"],
-                                         object_codec=codec,
-                                         exact=True)
-        array.attrs[DASKMS_ATTR_KEY] = {
-            "dims": schema["dims"],
-            "coordinate": schema["coordinate"],
-            "array_type": schema["type"]
-        }
-
-    return ds_group
+DATASET_PREFIX = "__daskms_dataset__"
+DASKMS_ATTR_KEY = "__daskms_zarr_attr__"
 
 
 def zarr_schema_factory(di, dataset):
@@ -117,8 +77,55 @@ def zarr_schema_factory(di, dataset):
     return schema
 
 
-def _setter_wrapper(data, name, factory, *extents):
-    zarray = getattr(factory.group, name)
+def prepare_zarr_group(dataset_id, dataset, attrs, store):
+    dir_store = zarr.DirectoryStore(store)
+
+    try:
+        # Open in read/write, must exist
+        group = zarr.open_group(store=dir_store, mode="r+")
+    except zarr.errors.GroupNotFoundError:
+        # Create, must not exist
+        group = zarr.open_group(store=dir_store, mode="w-")
+
+    group_name = f"{DATASET_PREFIX}{dataset_id:08d}"
+    ds_group = group.require_group(group_name)
+    ds_group.attrs.update(encode_attr(attrs))
+
+    for name, schema in zarr_schema_factory(dataset_id, dataset).items():
+        if schema["dtype"] == np.object:
+            codec = numcodecs.Pickle()
+        else:
+            codec = None
+
+        array = ds_group.require_dataset(name, schema["shape"],
+                                         chunks=schema["chunks"],
+                                         dtype=schema["dtype"],
+                                         object_codec=codec,
+                                         exact=True)
+
+        if array.chunks != schema["chunks"]:
+            msg = (f"zarr chunks f{array.chunks} "
+                   f"don't match dask chunks {schema['chunks']}. "
+                   f"This can cause data corruption as described in "
+                   f"https://zarr.readthedocs.io/en/stable/tutorial.html"
+                   f"#parallel-computing-and-synchronization")
+            raise ValueError(msg)
+
+        array.attrs[DASKMS_ATTR_KEY] = {
+            "dims": schema["dims"],
+            "coordinate": schema["coordinate"],
+            "array_type": schema["type"]
+        }
+
+    return ds_group
+
+
+def zarr_setter(data, name, group, *extents):
+    try:
+        zarray = getattr(group, name)
+    except AttributeError:
+        raise ValueError(f"{name} is not a variable of {group}")
+
     selection = tuple(slice(start, end) for start, end in extents)
     zarray[selection] = data
     return np.full((1,)*len(extents), True)
@@ -138,7 +145,7 @@ def _gen_writes(variables, chunks, columns, factory):
             raise NotImplementedError(f"Writing {type(var.data)} "
                                       f"unsupported")
 
-        write = da.blockwise(_setter_wrapper, var.dims,
+        write = da.blockwise(zarr_setter, var.dims,
                              var_data, var.dims,
                              name, None,
                              factory, None,
@@ -192,10 +199,9 @@ def xds_to_zarr(xds, store, columns=None):
     write_datasets = []
 
     for di, ds in enumerate(xds):
-        schema = zarr_schema_factory(di, ds)
         attrs = dict(ds.attrs)
         attrs[DASKMS_ATTR_KEY] = {"chunks": dict(ds.chunks)}
-        group = prepare_zarr_group(di, ds, store)
+        group = prepare_zarr_group(di, ds, attrs, store)
         write_args = (ds.chunks, columns, group)
 
         data_vars = dict(_gen_writes(ds.data_vars, *write_args))
