@@ -79,6 +79,31 @@ def test_xds_to_zarr(ms, tmp_path_factory):
             assert_array_equal(zattr, v)
 
 
+@pytest.mark.skipif(xarray is None, reason="Needs xarray to rechunk")
+def test_multiprocess_create(ms, tmp_path_factory):
+    zarr_store = tmp_path_factory.mktemp("zarr_store") / "test.zarr"
+
+    ms_datasets = xds_from_ms(ms)
+
+    for i, ds in enumerate(ms_datasets):
+        ms_datasets[i] = ds.chunk({"row": 1})
+
+    writes = xds_to_zarr(ms_datasets, zarr_store)
+    dask.compute(writes, scheduler="processes")
+
+    zds = xds_from_zarr(zarr_store)
+
+    for zds, msds in zip(zds, ms_datasets):
+        for k, v in msds.data_vars.items():
+            assert_array_equal(v, getattr(zds, k))
+
+        for k, v in msds.coords.items():
+            assert_array_equal(v, getattr(zds, k))
+
+        for k, v in msds.attrs.items():
+            assert_array_equal(v, getattr(zds, k))
+
+
 @pytest.mark.optional
 @pytest.mark.skipif(xarray is None, reason="depends on xarray")
 def test_xarray_to_zarr(ms, tmp_path_factory):
