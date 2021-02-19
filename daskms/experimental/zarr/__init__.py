@@ -212,7 +212,7 @@ def xds_to_zarr(xds, store, columns=None):
     return write_datasets
 
 
-def _getter_wrapper(zarray, *extents):
+def zarr_getter(zarray, *extents):
     return zarray[tuple(slice(start, end) for start, end in extents)]
 
 
@@ -289,7 +289,7 @@ def xds_from_zarr(store, columns=None, chunks=None):
             array_chunks = da.core.normalize_chunks(array_chunks, zarray.shape)
             ext_args = extent_args(dims, array_chunks)
 
-            read = da.blockwise(_getter_wrapper, dims,
+            read = da.blockwise(zarr_getter, dims,
                                 zarray, None,
                                 *ext_args,
                                 concatenate=False,
