@@ -11,18 +11,14 @@ def test_dataset_schema(ms):
     ds = datasets[0]
 
     row, chan, corr = (ds.dims[d] for d in ("row", "chan", "corr"))
-
     cdata = np.random.random((row, chan, corr)).astype(np.complex64)
-    row_coord = np.arange(row)
-    chan_coord = np.arange(chan)
-    corr_coord = np.arange(corr)
 
     ds = ds.assign(**{"CORRECTED_DATA": (("row", "chan", "corr"), cdata)})
 
     ds = ds.assign_coords(**{
-        "row": ("row", row_coord),
-        "chan": ("chan", chan_coord),
-        "corr": ("corr", corr_coord),
+        "row": ("row", np.arange(row)),
+        "chan": ("chan", np.arange(chan)),
+        "corr": ("corr", np.arange(corr)),
     })
 
     # We can shift between objects and dict representation
