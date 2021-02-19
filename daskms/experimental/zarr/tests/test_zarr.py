@@ -23,7 +23,7 @@ def test_zarr_string_array(tmp_path_factory):
     data = ["hello", "this", "strange new world",
             "full of", "interesting", "stuff"]
     data = np.array(data, dtype=np.object).reshape(3, 2)
-    data = da.from_array(data, chunks=((1, 2), (1, 1)))
+    data = da.from_array(data, chunks=((2, 1), (1, 1)))
 
     datasets = [Dataset({"DATA": (("x", "y"), data)})]
     writes = xds_to_zarr(datasets, zarr_store)

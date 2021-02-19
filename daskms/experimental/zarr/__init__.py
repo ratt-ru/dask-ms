@@ -1,15 +1,14 @@
-import importlib
-import itertools
 from pathlib import Path
 
 import dask
 import dask.array as da
+from dask.array.core import normalize_chunks
 import numcodecs
 import numpy as np
 
 from daskms.utils import requires
 from daskms.dataset import Dataset, Variable
-from daskms.utils import encode_attr
+from daskms.dataset_schema import DatasetSchema, encode_type, decode_type
 from daskms.experimental.utils import (extent_args,
                                        column_iterator,
                                        promote_columns)
@@ -27,57 +26,66 @@ DATASET_PREFIX = "__daskms_dataset__"
 DASKMS_ATTR_KEY = "__daskms_zarr_attr__"
 
 
-def zarr_schema_factory(di, dataset):
-    schema = {}
+def zarr_chunks(column, dims, chunks):
+    if chunks is None:
+        return None
 
-    data_vars = ((k, v, False) for k, v in dataset.data_vars.items())
-    coords = ((k, v, True) for k, v in dataset.coords.items())
-    variables = itertools.chain(data_vars, coords)
-    chunks = dataset.chunks
+    zchunks = []
 
-    for name, var, is_coord in variables:
-        # Determine schema for backing zarr arrays
-        zarr_chunks = []
+    for dim, dim_chunks in zip(dims, chunks):
+        if any(np.isnan(dc) for dc in dim_chunks):
+            raise NotImplementedError(
+                f"Column {column} has nan chunks "
+                f"{dim_chunks} in dimension {dim} "
+                f"This is not currently supported")
 
-        for d in var.dims:
-            dim_chunks = chunks[d]
+        unique_chunks = set(dim_chunks[:-1])
 
-            if any(dc == np.nan for dc in dim_chunks):
-                raise NotImplementedError("nan chunks not yet supported.")
-
-            unique_chunks = set(dim_chunks[:-1])
-
-            if len(unique_chunks) == 0:
-                zarr_chunks.append(dim_chunks[-1])
-            elif len(unique_chunks) == 1:
-                zarr_chunks.append(unique_chunks.pop())
-            else:
-                raise ValueError(f"Multiple chunk sizes {unique_chunks} "
-                                 f"found in dataset {di} "
-                                 f"array {name} dimension {var.dims[d]}. "
-                                 f"zarr requires homogenous chunk sizes "
-                                 f"except for the last chunk in a "
-                                 f"dimension. Rechunk {name}.")
-
-        if isinstance(var.data, (da.Array, np.ndarray)):
-            typ = type(var.data)
-            array_type = ".".join((typ.__module__, typ.__name__))
+        if len(unique_chunks) == 0:
+            zchunks.append(dim_chunks[-1])
+        elif len(unique_chunks) == 1:
+            zchunks.append(dim_chunks[0])
         else:
-            raise NotImplementedError(f"{type(var.data)} not supported")
+            raise NotImplementedError(
+                f"Column {column} has heterogenous chunks "
+                f"{dim_chunks} in dimension {dim} "
+                f"zarr does not currently support this")
 
-        schema[name] = {
-            "dims": var.dims,
-            "shape": var.shape,
-            "chunks": tuple(zarr_chunks),
-            "dtype": var.dtype,
-            "coordinate": is_coord,
-            "type": array_type,
-        }
-
-    return schema
+    return tuple(zchunks)
 
 
-def prepare_zarr_group(dataset_id, dataset, attrs, store):
+def create_array(ds_group, column, schema, coordinate=False):
+    codec = numcodecs.Pickle() if schema.dtype == np.object else None
+
+    zchunks = zarr_chunks(column, schema.dims, schema.chunks)
+
+    array = ds_group.require_dataset(column, schema.shape,
+                                     chunks=zchunks,
+                                     dtype=schema.dtype,
+                                     object_codec=codec,
+                                     exact=True)
+
+    if zchunks is not None:
+        # Expand zarr chunks to full dask resolution
+        # For comparison purposes
+        zchunks = normalize_chunks(array.chunks, schema.shape)
+
+        if zchunks != schema.chunks:
+            raise ValueError(
+                   f"zarr chunks {zchunks} "
+                   f"don't match dask chunks {schema.chunks}. "
+                   f"This can cause data corruption as described in "
+                   f"https://zarr.readthedocs.io/en/stable/tutorial.html"
+                   f"#parallel-computing-and-synchronization")
+
+    array.attrs[DASKMS_ATTR_KEY] = {
+        "dims": schema.dims,
+        "coordinate": coordinate,
+        "array_type": encode_type(schema.type),
+    }
+
+
+def prepare_zarr_group(dataset_id, dataset, store):
     dir_store = zarr.DirectoryStore(store)
 
     try:
@@ -89,33 +97,19 @@ def prepare_zarr_group(dataset_id, dataset, attrs, store):
 
     group_name = f"{DATASET_PREFIX}{dataset_id:08d}"
     ds_group = group.require_group(group_name)
-    ds_group.attrs.update(encode_attr(attrs))
 
-    for name, schema in zarr_schema_factory(dataset_id, dataset).items():
-        if schema["dtype"] == np.object:
-            codec = numcodecs.Pickle()
-        else:
-            codec = None
+    schema = DatasetSchema.from_dataset(dataset)
 
-        array = ds_group.require_dataset(name, schema["shape"],
-                                         chunks=schema["chunks"],
-                                         dtype=schema["dtype"],
-                                         object_codec=codec,
-                                         exact=True)
+    for column, column_schema in schema.data_vars.items():
+        create_array(ds_group, column, column_schema, False)
 
-        if array.chunks != schema["chunks"]:
-            msg = (f"zarr chunks f{array.chunks} "
-                   f"don't match dask chunks {schema['chunks']}. "
-                   f"This can cause data corruption as described in "
-                   f"https://zarr.readthedocs.io/en/stable/tutorial.html"
-                   f"#parallel-computing-and-synchronization")
-            raise ValueError(msg)
+    for column, column_schema in schema.coords.items():
+        create_array(ds_group, column, column_schema, True)
 
-        array.attrs[DASKMS_ATTR_KEY] = {
-            "dims": schema["dims"],
-            "coordinate": schema["coordinate"],
-            "array_type": schema["type"]
-        }
+    ds_group.attrs.update({
+        **schema.attrs,
+        DASKMS_ATTR_KEY: {"chunks": dict(dataset.chunks)}
+    })
 
     return ds_group
 
@@ -199,9 +193,7 @@ def xds_to_zarr(xds, store, columns=None):
     write_datasets = []
 
     for di, ds in enumerate(xds):
-        attrs = dict(ds.attrs)
-        attrs[DASKMS_ATTR_KEY] = {"chunks": dict(ds.chunks)}
-        group = prepare_zarr_group(di, ds, attrs, store)
+        group = prepare_zarr_group(di, ds, store)
         write_args = (ds.chunks, columns, group)
 
         data_vars = dict(_gen_writes(ds.data_vars, *write_args))
@@ -265,7 +257,8 @@ def xds_from_zarr(store, columns=None, chunks=None):
     for g, (group_name, group) in enumerate(sorted(root.groups())):
         assert group_name.startswith(DATASET_PREFIX)
         group_attrs = dict(group.attrs)
-        natural_chunks = group_attrs.pop(DASKMS_ATTR_KEY)["chunks"]
+        dask_ms_attrs = group_attrs.pop(DASKMS_ATTR_KEY)
+        natural_chunks = dask_ms_attrs["chunks"]
         group_chunks = {d: tuple(dc) for d, dc in natural_chunks.items()}
 
         if chunks:
@@ -280,11 +273,8 @@ def xds_from_zarr(store, columns=None, chunks=None):
 
         for name, zarray in column_iterator(group, columns):
             attrs = dict(zarray.attrs[DASKMS_ATTR_KEY])
-            dims = attrs.pop("dims")
-            coordinate = attrs.pop("coordinate", False)
-            mod, typ = attrs.pop("array_type").rsplit(".", 1)
-            mod = importlib.import_module(mod)
-            typ = getattr(mod, typ)
+            dims = attrs["dims"]
+            coordinate = attrs.get("coordinate", False)
             array_chunks = tuple(group_chunks.get(d, s) for d, s
                                  in zip(dims, zarray.shape))
 
@@ -302,6 +292,8 @@ def xds_from_zarr(store, columns=None, chunks=None):
             (coords if coordinate else data_vars)[name] = var
 
             # Save numpy arrays for reification
+            typ = decode_type(attrs["array_type"])
+
             if typ is np.ndarray:
                 numpy_vars.append(var)
             elif typ is da.Array:

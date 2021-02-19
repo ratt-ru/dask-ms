@@ -610,36 +610,3 @@ def test_dataset_numpy(ms):
 
     for k, v in nds.coords.items():
         assert_array_equal(v.data, getattr(ds, k).data)
-
-
-def test_dataset_schema(ms):
-    from daskms.dataset import encode_schema, decode_schema
-    datasets = read_datasets(ms, [], [], [])
-    assert len(datasets) == 1
-    ds = datasets[0]
-
-    row, chan, corr = (ds.dims[d] for d in ("row", "chan", "corr"))
-
-    cdata = np.random.random((row, chan, corr)).astype(np.complex64)
-    row_coord = np.arange(row)
-    chan_coord = np.arange(chan)
-    corr_coord = np.arange(corr)
-
-    ds = ds.assign(**{"CORRECTED_DATA": (("row", "chan", "corr"), cdata)})
-
-    ds = ds.assign_coords(**{
-        "row": ("row", row_coord),
-        "chan": ("chan", chan_coord),
-        "corr": ("corr", corr_coord),
-    })
-
-    schema = encode_schema(ds)
-    from pprint import pprint
-    import json
-    import gzip
-    import pickle
-    pprint(schema)
-    print(len(gzip.compress(json.dumps(schema).encode())))
-    print(len(json.dumps(schema)))
-    print(len(pickle.dumps(schema)))
-    decode_schema(schema)
