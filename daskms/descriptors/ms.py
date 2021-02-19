@@ -81,7 +81,7 @@ class MSDescriptorBuilder(AbstractDescriptorBuilder):
 
         return desc
 
-    def descriptor(self, variables, default_desc):
+    def descriptor(self, column_schemas, default_desc):
         try:
             desc = {k: default_desc[k] for k in self.REQUIRED_FIELDS}
         except KeyError as e:
@@ -93,15 +93,15 @@ class MSDescriptorBuilder(AbstractDescriptorBuilder):
             desc[column]['dataManagerType'] = 'IncrementalStMan'
             desc[column]['option'] |= 1
 
-        for k, lv in variables.items():
+        for k, lv in column_schemas.items():
             try:
                 desc[k] = default_desc[k]
             except KeyError:
                 desc[k] = self.variable_descriptor(k, lv)
 
         if self.fixed:
-            ms_dims = self.infer_ms_dims(variables)
-            desc = self.fix_columns(variables, desc, ms_dims)
+            ms_dims = self.infer_ms_dims(column_schemas)
+            desc = self.fix_columns(column_schemas, desc, ms_dims)
 
         return desc
 
@@ -109,8 +109,8 @@ class MSDescriptorBuilder(AbstractDescriptorBuilder):
     def infer_ms_dims(variables):
 
         # Create a dictionary of all variables in all datasets
-        expanded_vars = {v.data.name: v for k, lv in variables.items()
-                         for v in lv}
+        expanded_vars = {(k, i): v for k, lv in variables.items()
+                         for i, v in enumerate(lv)}
 
         # Now try find consistent dimension sizes across all variables
         try:

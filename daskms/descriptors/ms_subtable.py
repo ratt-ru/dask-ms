@@ -21,14 +21,14 @@ class MSSubTableDescriptorBuilder(AbstractDescriptorBuilder):
     def default_descriptor(self):
         return self.DEFAULT_TABLE_DESC.copy()
 
-    def descriptor(self, variables, default_desc):
+    def descriptor(self, column_schemas, default_desc):
         try:
             desc = {k: default_desc[k] for k in self.REQUIRED_FIELDS}
         except KeyError as e:
             raise RuntimeError(f"'{str(e)}' is not in REQUIRED_FIELDS")
 
-        # Now copy/create descriptors for supplied variables
-        for k, v in variables.items():
+        # Now copy/create descriptors for supplied column_schemas
+        for k, v in column_schemas.items():
             try:
                 desc[k] = default_desc[k]
             except KeyError:

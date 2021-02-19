@@ -11,14 +11,6 @@ import pytest
 
 from daskms import xds_to_table, xds_from_ms, Dataset
 
-try:
-    from xarray import Dataset as xrDataset
-except ImportError:
-    xrDataset = None
-    xarray_param_marks = pytest.mark.skip(reason="xarray not installed")
-else:
-    xarray_param_marks = ()
-
 
 @pytest.mark.parametrize("chunks", [{
     "row": (10,),
@@ -34,11 +26,7 @@ else:
     [("PKS-1934", [5.1461782, -1.11199629], [0.9*.856e9, 1.1*.856e9]),
      ("3C286",  [3.53925792, 0.53248541], [0.8*.856e9, .856e9, 1.2*.856e9])],
 ])
-@pytest.mark.parametrize("Dataset", [
-    Dataset,
-    pytest.param(xrDataset, marks=xarray_param_marks)
-], ids=["daskms.Dataset", "xarray.Dataset"])
-def test_ms_create(Dataset, tmp_path, chunks, num_chans, corr_types, sources):
+def test_ms_create(tmp_path, chunks, num_chans, corr_types, sources):
     # Set up
     rs = np.random.RandomState(42)
 
@@ -255,11 +243,7 @@ def test_ms_create(Dataset, tmp_path, chunks, num_chans, corr_types, sources):
     "chan": (4, 4),
     "corr": (2, 2),
 }])
-@pytest.mark.parametrize("Dataset", [
-    Dataset,
-    pytest.param(xrDataset, marks=xarray_param_marks)
-], ids=["daskms.Dataset", "xarray.Dataset"])
-def test_ms_create_and_update(Dataset, tmp_path, chunks):
+def test_ms_create_and_update(tmp_path, chunks):
     """ Test that we can update and append at the same time """
     filename = str(tmp_path / "create-and-update.ms")
 

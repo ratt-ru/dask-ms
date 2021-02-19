@@ -3,10 +3,10 @@
 import abc
 from ast import parse
 from collections import defaultdict
+from daskms.dataset_schema import ColumnSchema, DatasetSchema
 import logging
 
 from daskms.columns import infer_casa_type
-from daskms.dataset import Variable
 
 
 log = logging.getLogger(__name__)
@@ -39,15 +39,15 @@ def register_descriptor_builder(name):
 
 class AbstractDescriptorBuilder(object, metaclass=abc.ABCMeta):
     @staticmethod
-    def variable_descriptor(column, variable):
-        return variable_column_descriptor(column, variable)
+    def variable_descriptor(column, column_schema):
+        return variable_column_descriptor(column, column_schema)
 
     @abc.abstractmethod
     def default_descriptor(self):
         pass
 
     @abc.abstractmethod
-    def descriptor(self, variables, default_desc):
+    def descriptor(self, column_schemas, default_desc):
         pass
 
     @abc.abstractmethod
@@ -55,14 +55,19 @@ class AbstractDescriptorBuilder(object, metaclass=abc.ABCMeta):
         pass
 
     @staticmethod
-    def dataset_variables(datasets):
+    def dataset_variables(schemas):
         variables = defaultdict(list)
 
-        if not isinstance(datasets, list):
-            datasets = list(datasets)
+        if not isinstance(schemas, list):
+            schemas = list(schemas)
 
-        for ds in datasets:
-            for column, variable in ds.data_vars.items():
+        if not all(isinstance(s, DatasetSchema) for s in schemas):
+            raise TypeError(f"'schemas' must be a DataSchema or "
+                            f"a tuple/list of  DatasetSchemas "
+                            f"Got {list(map(type, schemas))}.")
+
+        for schema in schemas:
+            for column, variable in schema.data_vars.items():
                 variables[column].append(variable)
 
         return variables
@@ -80,10 +85,10 @@ class DefaultDescriptorBuilder(AbstractDescriptorBuilder):
     def default_descriptor(self):
         return {}
 
-    def descriptor(self, variables, default_desc):
+    def descriptor(self, column_schemas, default_desc):
         desc = default_desc
 
-        for k, v in variables.items():
+        for k, v in column_schemas.items():
             try:
                 desc[k] = default_desc[k]
             except KeyError:
@@ -95,17 +100,17 @@ class DefaultDescriptorBuilder(AbstractDescriptorBuilder):
         return {}
 
 
-def variable_column_descriptor(column, variable):
+def variable_column_descriptor(column, column_schema):
     """
-    Generate a CASA column descriptor from a Variable
-    or list of Variables.
+    Generate a CASA column descriptor from a ColumnSchema
+    or list of ColumnSchemas.
 
     Parameters
     ----------
     column : str
         Column name
-    variable : :class:`daskms.Variable` or \
-       list of :class:`daskms.Variable`
+    variable : :class:`daskms.data_schema.ColumnSchema` or \
+       list of :class:`daskms.data_schema.ColumnSchema`
 
         Dataset variable
 
@@ -115,35 +120,37 @@ def variable_column_descriptor(column, variable):
         CASA column descriptor
     """
 
-    if isinstance(variable, Variable):
-        variable = [variable]
-    elif not isinstance(variable, (tuple, list)):
-        variable = [variable]
+    if isinstance(column_schema, ColumnSchema):
+        column_schema = [column_schema]
+    elif not isinstance(column_schema, (tuple, list)):
+        column_schema = [column_schema]
 
     dtypes = set()
     ndims = set()
     shapes = set()
 
-    for v in variable:
+    for v in column_schema:
         dtypes.add(v.dtype)
 
         if v.ndim == 0:
             # Scalar array, ndim == 0 in numpy and CASA
             ndims.append(0)
-        elif v.dims[0] == 'row':
+        else:
+            if not v.dims[0] == "row":
+                log.warning(f"Column {column} doesn't start with "
+                            f"with a 'row' dimension: {v.dims} "
+                            f"and will be ignored")
+                continue
+
             # Row only, so ndim must be removed from the descriptor
             # Add a marker to distinguish in case of multiple
             # shapes
-            if len(v.dims) == 1:
+            if v.ndim == 1:
                 ndims.add('row')
             # Other dims, add dimension data, excluding the row
             else:
                 ndims.add(v.ndim - 1)
                 shapes.add(v.shape[1:])
-        else:
-            # No row prefix, add dimension and shape
-            ndims.add(v.dim)
-            shapes.add(v.shape)
 
     # Fail on multiple dtypes
     if len(dtypes) > 1:
@@ -178,9 +185,9 @@ def variable_column_descriptor(column, variable):
                 desc['shape'] = shape
     else:
         # Anything goes...
-        log.warn("Multiple dimensions %s found in dataset variables "
-                 "for column %s. You appear to be attempting something "
-                 "exotic!", list(ndims), column)
+        log.warning(f"Multiple dimensions {ndims} found in dataset variables "
+                    f"for column {column}. You appear to be attempting "
+                    f"something exotic!")
 
         desc['ndim'] = -1
 

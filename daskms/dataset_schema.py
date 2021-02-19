@@ -41,10 +41,24 @@ class DatasetSchema:
                 self.attrs == other.attrs)
 
     @classmethod
-    def from_dataset(cls, dataset):
-        cs = ColumnSchema.from_var
-        data_vars = {c: cs(v) for c, v in dataset.data_vars.items()}
-        coords = {c: cs(v) for c, v in dataset.coords.items()}
+    def from_dataset(cls, dataset, columns=None):
+        dv = dataset.data_vars
+        co = dataset.coords
+
+        if columns is None or columns == "ALL":
+            columns = set(dv.keys()) | set(co.keys())
+        elif isinstance(columns, str):
+            columns = set([columns])
+        else:
+            columns = set(columns)
+
+        data_vars = {
+            c: ColumnSchema.from_var(v) for c, v
+            in dv.items() if c in columns}
+        coords = {
+            c: ColumnSchema.from_var(v) for c, v
+            in co.items() if c in columns}
+
         return DatasetSchema(data_vars, coords, dict(dataset.attrs))
 
     @classmethod
@@ -69,6 +83,21 @@ class DatasetSchema:
 
 class ColumnSchema:
     def __init__(self, typ, dims, dtype, chunks, shape):
+        if not isinstance(typ, type):
+            raise TypeError(f"typ '{typ}' is not a type")
+
+        if not isinstance(dims, (tuple, list)):
+            raise TypeError(f"dims '{dims}' is not a tuple")
+
+        if not isinstance(dtype, np.dtype):
+            raise TypeError(f"dtype '{dtype}' is not a np.dtype")
+
+        if not isinstance(chunks, (tuple, list)) and chunks is not None:
+            raise TypeError(f"chunks '{chunks}' is not None or a tuple")
+
+        if not isinstance(shape, (tuple, list)):
+            raise TypeError(f"shape '{shape}' is not tuple")
+
         self.type = typ
         self.dims = dims
         self.dtype = dtype
@@ -82,6 +111,10 @@ class ColumnSchema:
                 self.dtype == other.dtype and
                 self.chunks == other.chunks and
                 self.shape == other.shape)
+
+    @property
+    def ndim(self):
+        return len(self.dims)
 
     @classmethod
     def from_var(cls, var):
