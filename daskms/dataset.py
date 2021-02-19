@@ -145,6 +145,9 @@ else:
             attrs : dict or None
                 Array metadata
             """
+            if not isinstance(dims, (tuple, list)):
+                dims = (dims,)
+
             self.dims = dims
             self.data = data
             self.attrs = attrs or {}
