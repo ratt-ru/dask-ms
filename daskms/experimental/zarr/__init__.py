@@ -139,6 +139,10 @@ def _gen_writes(variables, chunks, columns, factory):
             raise NotImplementedError(f"Writing {type(var.data)} "
                                       f"unsupported")
 
+        from dask.base import tokenize
+        import uuid
+        token_name = f"{name}-{uuid.uuid4().hex}"
+
         write = da.blockwise(zarr_setter, var.dims,
                              var_data, var.dims,
                              name, None,
@@ -146,6 +150,7 @@ def _gen_writes(variables, chunks, columns, factory):
                              *ext_args,
                              adjust_chunks={d: 1 for d in var.dims},
                              concatenate=False,
+                             name=token_name,
                              meta=np.empty((1,)*len(var.dims), np.bool))
         write = inlined_array(write, ext_args[::2])
 
