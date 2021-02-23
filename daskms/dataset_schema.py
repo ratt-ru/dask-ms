@@ -1,9 +1,13 @@
+from collections import defaultdict
+import logging
 import importlib
 
 import numpy as np
 import dask.array as da
 
-from daskms.utils import encode_attr
+from daskms.utils import encode_attr, freeze
+
+log = logging.getLogger(__name__)
 
 _ALLOWED_PACKAGES = {"numpy", "dask"}
 
@@ -40,6 +44,27 @@ class DatasetSchema:
                 self.coords == other.coords and
                 self.attrs == other.attrs)
 
+    def __reduce__(self):
+        return (DatasetSchema, (self.data_vars, self.coords, self.attrs))
+
+    def __hash__(self):
+        return hash(
+            freeze(
+                (
+                    self.data_vars,
+                    self.coords,
+                    self.attrs
+                )
+            )
+        )
+
+    def drop_dim(self, dim):
+        return DatasetSchema(
+            {c: v.drop_dim(dim) for c, v in self.data_vars.items()},
+            {c: v.drop_dim(dim) for c, v in self.coords.items()},
+            self.attrs.copy(),
+        )
+
     @classmethod
     def from_dataset(cls, dataset, columns=None):
         dv = dataset.data_vars
@@ -68,7 +93,7 @@ class DatasetSchema:
 
         data_vars = {c: ColumnSchema.from_dict(v) for c, v in dv.items()}
         coords = {c: ColumnSchema.from_dict(v) for c, v in co.items()}
-        return DatasetSchema(data_vars, coords, d["attributes"])
+        return DatasetSchema(data_vars, coords, d["attributes"].copy())
 
     def to_dict(self):
         data_vars = {c: v.to_dict() for c, v in self.data_vars.items()}
@@ -82,27 +107,51 @@ class DatasetSchema:
 
 
 class ColumnSchema:
-    def __init__(self, typ, dims, dtype, chunks, shape):
-        if not isinstance(typ, type):
-            raise TypeError(f"typ '{typ}' is not a type")
+    __slots__ = ("type", "dims", "dtype", "chunks", "shape", "attrs")
 
-        if not isinstance(dims, (tuple, list)):
-            raise TypeError(f"dims '{dims}' is not a tuple")
+    """
+    Schema describing a column
 
-        if not isinstance(dtype, np.dtype):
-            raise TypeError(f"dtype '{dtype}' is not a np.dtype")
-
-        if not isinstance(chunks, (tuple, list)) and chunks is not None:
-            raise TypeError(f"chunks '{chunks}' is not None or a tuple")
-
-        if not isinstance(shape, (tuple, list)):
-            raise TypeError(f"shape '{shape}' is not tuple")
+    Parameters
+    ----------
+    typ : type
+        Type of the array. e.g. `dask.array.Array` or `numpy.ndarray`
+    dims : list of str
+        Dimension schema of array. e.g. :code:`(:row:, :chan:, :corr:)`
+    dtype : :class:`numpy.dtype`
+        Array Datatype
+    chunks : tuple of tuple of ints or None
+        Dask dimension chunks, else None for non-dask arrays
+    shape : tuple of ints
+        Array shape
+    attrs : dict
+        Dictionary of attributes
+    """
+    def __init__(self, typ, dims, dtype, chunks, shape, attrs):
+        self._type_check("type", typ, type)
+        self._type_check("dtype", dtype, np.dtype)
+        self._type_check("chunks", chunks, (tuple, list, type(None)))
+        self._type_check("shape", shape, (tuple, list))
+        self._type_check("attrs", attrs, dict)
 
         self.type = typ
         self.dims = dims
         self.dtype = dtype
         self.chunks = chunks
         self.shape = shape
+        self.attrs = attrs
+
+    @classmethod
+    def _type_check(cls, name, obj, typ):
+        if isinstance(obj, typ):
+            return
+
+        if (isinstance(obj, (set, list, tuple)) and
+                all(isinstance(o, typ) for o in obj)):
+            return
+
+        raise TypeError(f"{name} '{obj}' is not {typ.__name__} "
+                        f"or a (tuple, list, set) of {typ.__name__}")
 
     def __eq__(self, other):
         return (isinstance(other, ColumnSchema) and
@@ -110,7 +159,43 @@ class ColumnSchema:
                 self.dims == other.dims and
                 self.dtype == other.dtype and
                 self.chunks == other.chunks and
-                self.shape == other.shape)
+                self.shape == other.shape and
+                self.attrs == other.attrs)
+
+    def __reduce__(self):
+        return (
+            ColumnSchema,
+            (
+                self.type,
+                self.dims,
+                self.dtype,
+                self.chunks,
+                self.shape,
+                self.attrs,
+            )
+        )
+
+    def __hash__(self):
+        return hash(
+            (
+                self.type,
+                self.dims,
+                self.dtype,
+                self.chunks,
+                self.shape,
+                freeze(self.attrs),
+            )
+        )
+
+    def copy(self):
+        return ColumnSchema(
+            self.type,
+            self.dims,
+            self.dtype,
+            self.chunks,
+            self.shape,
+            self.attrs.copy()
+        )
 
     @property
     def ndim(self):
@@ -123,7 +208,8 @@ class ColumnSchema:
             var.dims,
             var.dtype,
             var.chunks if isinstance(var.data, da.Array) else None,
-            var.shape)
+            var.shape,
+            var.attrs)
 
     @classmethod
     def from_dict(self, d):
@@ -134,7 +220,8 @@ class ColumnSchema:
             tuple(d["dims"]),
             np.dtype(d["dtype"]),
             tuple(map(tuple, chunks)) if chunks is not None else None,
-            tuple(d["shape"]))
+            tuple(d["shape"]),
+            d["attrs"].copy())
 
     def to_dict(self):
         return {
@@ -142,5 +229,42 @@ class ColumnSchema:
             "dims": self.dims,
             "dtype": self.dtype.name,
             "chunks": self.chunks,
-            "shape": self.shape
+            "shape": self.shape,
+            "attrs": self.attrs.copy(),
         }
+
+
+def _unify_columns(columns, defs):
+    for c, var in columns.items():
+        defs[c]["dims"].append(var.dims)
+        defs[c]["shape"].append(var.shape)
+        defs[c]["chunks"].append(var.chunks)
+        defs[c]["dtype"].append(var.dtype)
+        defs[c]["typ"].append(var.type)
+        defs[c]["attrs"].append(var.attrs)
+
+
+def unify_schemas(dataset_schemas):
+    if not isinstance(dataset_schemas, (tuple, list)):
+        dataset_schemas = [dataset_schemas]
+
+    if not all(isinstance(ds, DatasetSchema) for ds in dataset_schemas):
+        raise TypeError("dataset_schemas must be a "
+                        "DatasetSchema or list of DatasetSchema's")
+
+    unified_data_vars = defaultdict(lambda: defaultdict(list))
+    unified_coords = defaultdict(lambda: defaultdict(list))
+
+    for ds in dataset_schemas:
+        _unify_columns(ds.data_vars, unified_data_vars)
+        _unify_columns(ds.coords, unified_coords)
+
+    for column, schema_attrs in unified_data_vars.items():
+        unified_data_vars[column] = ColumnSchema(**schema_attrs)
+
+    for column, schema_attrs in unified_coords.items():
+        unified_coords[column] = ColumnSchema(**schema_attrs)
+
+    unified_attrs = list(ds.attrs for ds in dataset_schemas)
+
+    return DatasetSchema(unified_data_vars, unified_coords, unified_attrs)

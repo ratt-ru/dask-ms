@@ -12,8 +12,9 @@ import numpy as np
 from daskms.dataset import Dataset
 from daskms.experimental.utils import (promote_columns,
                                        column_iterator)
-from daskms.experimental.arrow.writes import DASKMS_METADATA
+from daskms.experimental.arrow.arrow_schema import DASKMS_METADATA
 from daskms.experimental.arrow.extension_types import TensorType
+from daskms.experimental.arrow.require_arrow import requires_arrow
 from daskms.reads import PARTITION_KEY
 from daskms.utils import freeze
 
@@ -176,6 +177,7 @@ def partition_chunking(partition, fragment_rows, chunks):
     return ranges
 
 
+@requires_arrow(pyarrow_import_error)
 def xds_from_parquet(store, columns=None, chunks=None):
     if not isinstance(store, Path):
         store = Path(store)

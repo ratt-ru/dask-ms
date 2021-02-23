@@ -66,6 +66,9 @@ class TensorType(ExtensionType):
                 self._element_shape == other._element_shape and
                 self.storage_type == other.storage_type)
 
+    def __hash__(self):
+        return hash((self._element_shape, self.storage_type))
+
     @property
     def shape(self):
         return self._element_shape

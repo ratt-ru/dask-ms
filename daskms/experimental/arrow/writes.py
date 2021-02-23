@@ -1,4 +1,4 @@
-import json
+import itertools
 from pathlib import Path
 from threading import Lock
 import weakref
@@ -10,9 +10,9 @@ from daskms.dataset import Dataset
 from daskms.optimisation import inlined_array
 from daskms.reads import PARTITION_KEY
 from daskms.utils import freeze
-from daskms.experimental.arrow.schema import (dict_dataset_schema,
-                                              DASKMS_METADATA)
+from daskms.experimental.arrow.arrow_schema import ArrowSchema
 from daskms.experimental.arrow.extension_types import TensorArray
+from daskms.experimental.arrow.require_arrow import requires_arrow
 from daskms.experimental.utils import (promote_columns,
                                        column_iterator)
 
@@ -29,7 +29,6 @@ except ImportError as e:
     pyarrow_import_error = e
 else:
     pyarrow_import_error = None
-
 
 _dataset_cache = weakref.WeakValueDictionary()
 _dataset_lock = Lock()
@@ -56,55 +55,55 @@ class ParquetFragmentMetaClass(type):
 
 
 class ParquetFragment(metaclass=ParquetFragmentMetaClass):
-    def __init__(self, path, schema, partition):
+    def __init__(self, path, schema, dataset_id):
         path = Path(path)
+        partition = schema.attrs.get(PARTITION_KEY, None)
+
+        if not partition:
+            partition = (("DATASET", dataset_id),)
+        else:
+            partition = tuple((p, schema.attrs[p]) for p, _ in partition)
 
         for field, value in partition:
             path /= f"{field}={value}"
 
+        self.dataset_id = dataset_id
         self.path = path
         self.schema = schema
         self.partition = partition
         self.lock = Lock()
 
     def __reduce__(self):
-        return (ParquetFragment, (self.path, self.schema, self.partition))
+        return (ParquetFragment, (self.path, self.schema, self.dataset_id))
 
     def write(self, chunk, *data):
         with self.lock:
             self.path.mkdir(parents=True, exist_ok=True)
 
         table_data = {}
-        var_schema, table_meta = self.schema
-        column_meta = {column: meta for (column, _, _, meta) in var_schema}
-        fields = []
 
-        for column, v in zip(data[::2], data[1::2]):
-            while type(v) is list:
-                assert len(v) == 1
-                v = v[0]
+        for column, var in zip(data[::2], data[1::2]):
+            while type(var) is list:
+                assert len(var) == 1
+                var = var[0]
 
-            if v.ndim == 1:
-                pa_data = pa.array(v)
-            elif v.ndim > 1:
-                pa_data = TensorArray.from_numpy(v)
+            if var.ndim == 1:
+                pa_data = pa.array(var)
+            elif var.ndim > 1:
+                pa_data = TensorArray.from_numpy(var)
             else:
-                raise ValueError("Scalar arrays not yet handled")
+                raise NotImplementedError("Scalar array writing "
+                                          "not implemented")
 
-            metadata = {DASKMS_METADATA: json.dumps(column_meta[column])}
             table_data[column] = pa_data
-            fields.append(pa.field(column, pa_data.type,
-                                   metadata=metadata,
-                                   nullable=False))
 
-        metadata = {DASKMS_METADATA: json.dumps(table_meta)}
-        schema = pa.schema(fields, metadata=metadata)
-        table = pa.table(table_data, schema=schema)
+        table = pa.table(table_data, schema=self.schema.to_arrow_schema())
         pq.write_table(table, self.path / f"data-{chunk.item()}.parquet")
 
         return np.array([True], np.bool)
 
 
+@requires_arrow(pyarrow_import_error)
 def xds_to_parquet(xds, path, columns=None):
     if not isinstance(path, Path):
         path = Path(path)
@@ -119,22 +118,19 @@ def xds_to_parquet(xds, path, columns=None):
     else:
         raise TypeError("xds must be a Dataset or list of Datasets")
 
-    schema = dict_dataset_schema(xds)
     datasets = []
+    base_schema = ArrowSchema.from_datasets(xds)
 
-    for i, ds in enumerate(xds):
-        partition = ds.attrs.get(PARTITION_KEY, None)
-
-        if not partition:
-            ds_partition = (("DATASET", i),)
-        else:
-            ds_partition = tuple((p, getattr(ds, p)) for p, _ in partition)
-
-        fragment = ParquetFragment(path, schema, ds_partition)
+    for ds_id, ds in enumerate(xds):
+        arrow_schema = base_schema.with_attributes(ds)
+        fragment = ParquetFragment(path, arrow_schema, ds_id)
         chunk_ids = da.arange(len(ds.chunks["row"]), chunks=1)
         args = [chunk_ids, ("row",)]
 
-        for column, variable in column_iterator(ds.data_vars, columns):
+        data_var_it = column_iterator(ds.data_vars, columns)
+        coord_it = column_iterator(ds.coords, columns)
+
+        for column, variable in itertools.chain(data_var_it, coord_it):
             if not isinstance(variable.data, da.Array):
                 raise ValueError(f"Column {column} does not "
                                  f"contain a dask Array")

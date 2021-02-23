@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from collections import OrderedDict
 import logging
 from pathlib import Path
 import time
@@ -33,7 +34,7 @@ def freeze(arg):
         return tuple(map(freeze, sorted(arg)))
     elif isinstance(arg, (tuple, list)):
         return tuple(map(freeze, arg))
-    elif isinstance(arg, dict):
+    elif isinstance(arg, (dict, OrderedDict)):
         return frozenset((k, freeze(v)) for k, v in sorted(arg.items()))
     elif isinstance(arg, np.ndarray):
         return freeze(arg.tolist())
