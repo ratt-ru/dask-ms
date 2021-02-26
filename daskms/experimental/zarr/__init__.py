@@ -233,8 +233,8 @@ def xds_from_zarr(store, columns=None, chunks=None):
 
     Returns
     -------
-    writes : Dataset
-        A Dataset representing the write operations
+    writes : Dataset or list of Datasets
+        Dataset(s) representing write operations
     """
 
     if isinstance(store, Path):
