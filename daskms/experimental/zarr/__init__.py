@@ -306,7 +306,7 @@ def xds_from_zarr(store, columns=None, chunks=None):
             elif typ is da.Array:
                 pass
             else:
-                raise TypeError(f"Unknown {typ}")
+                raise TypeError(f"Unknown array_type '{attrs['array_type']}'")
 
         datasets.append(Dataset(data_vars, coords=coords, attrs=group_attrs))
 
