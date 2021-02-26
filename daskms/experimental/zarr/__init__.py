@@ -3,6 +3,7 @@ from pathlib import Path
 import dask
 import dask.array as da
 from dask.array.core import normalize_chunks
+from dask.base import tokenize
 import numcodecs
 import numpy as np
 
@@ -139,9 +140,8 @@ def _gen_writes(variables, chunks, columns, factory):
             raise NotImplementedError(f"Writing {type(var.data)} "
                                       f"unsupported")
 
-        from dask.base import tokenize
-        import uuid
-        token_name = f"{name}-{uuid.uuid4().hex}"
+        token_name = (f"write~{name}-"
+                      f"{tokenize(var_data, name, factory, *ext_args)}")
 
         write = da.blockwise(zarr_setter, var.dims,
                              var_data, var.dims,
@@ -285,11 +285,13 @@ def xds_from_zarr(store, columns=None, chunks=None):
 
             array_chunks = da.core.normalize_chunks(array_chunks, zarray.shape)
             ext_args = extent_args(dims, array_chunks)
+            token_name = f"read~{name}-{tokenize(zarray, *ext_args)}"
 
             read = da.blockwise(zarr_getter, dims,
                                 zarray, None,
                                 *ext_args,
                                 concatenate=False,
+                                name=token_name,
                                 meta=np.empty((0,)*zarray.ndim, zarray.dtype))
 
             read = inlined_array(read, ext_args[::2])

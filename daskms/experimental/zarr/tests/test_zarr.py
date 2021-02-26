@@ -89,6 +89,7 @@ def test_multiprocess_create(ms, tmp_path_factory):
         ms_datasets[i] = ds.chunk({"row": 1})
 
     writes = xds_to_zarr(ms_datasets, zarr_store)
+
     dask.compute(writes, scheduler="processes")
 
     zds = xds_from_zarr(zarr_store)
