@@ -1,5 +1,6 @@
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import logging
+import logging.config
 from pathlib import Path
 import sys
 
