@@ -55,7 +55,7 @@ setup(name='dask-ms',
           "Topic :: Scientific/Engineering :: Astronomy",
       ],
       entry_points={
-        'console_scripts': ['dask-ms=daskms.apps.base:main'],
+        'console_scripts': ['dask-ms=daskms.apps.entrypoint:main'],
       },
       extras_require=extras_require,
       install_requires=install_requires,
