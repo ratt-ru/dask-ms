@@ -7,7 +7,7 @@ def add_convert_parser(subparser):
     p = subparser.add_parser("convert")
     p.add_argument("input", type=Path)
     p.add_argument("-o", "--output", type=Path)
-    p.add_argument("-f", "--format", choices=["ms", "zarr", "parquet"])
+    p.add_argument("-f", "--format", choices=["casa", "zarr", "parquet"])
 
 
 def parser_factory():
