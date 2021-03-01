@@ -13,7 +13,7 @@ _DEFAULT_INDEX_COLUMNS = ["TIME"]
 log = logging.getLogger(__name__)
 
 
-def xds_to_table(xds, table_name, columns, descriptor=None,
+def xds_to_table(xds, table_name, columns="ALL", descriptor=None,
                  table_keywords=None, column_keywords=None,
                  table_proxy=False):
     """
