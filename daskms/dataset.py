@@ -388,8 +388,7 @@ else:
                 return {k: v for k, v in mapping.items() if k not in names}
             else:
                 raise ValueError(f"errors '{errors}' not in "
-                                    f"('raise', 'ignore')")
-
+                                 f"('raise', 'ignore')")
 
         def drop_vars(self, names, *, errors):
             """Drop variables from the Dataset
@@ -411,7 +410,6 @@ else:
             data_vars = self._drop_internal(self.data_vars, names, errors)
             coords = self._drop_internal(self.coords, names, errors)
             return Dataset(data_vars, coords=coords, attrs=self.attrs.copy())
-
 
         def __getattr__(self, name):
             try:
@@ -486,10 +484,10 @@ else:
                 for k, v in self._data_vars.items()
             ]
             return self.finalize_compute, (
-                        data_info,
-                        self._coords,
-                        self._attrs
-                    )
+                data_info,
+                self._coords,
+                self._attrs
+            )
 
         @staticmethod
         def finalize_persist(graph, info, coords, attrs):
@@ -512,6 +510,6 @@ else:
                 for k, v in self._data_vars.items()
             ]
             return self.finalize_persist, (
-                        data_info,
-                        self._coords,
-                        self._attrs)
+                data_info,
+                self._coords,
+                self._attrs)

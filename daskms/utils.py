@@ -2,6 +2,7 @@
 
 from collections import OrderedDict
 import logging
+import os.path
 from pathlib import Path
 import time
 
@@ -38,24 +39,6 @@ def freeze(arg):
         return frozenset((k, freeze(v)) for k, v in sorted(arg.items()))
     elif isinstance(arg, np.ndarray):
         return freeze(arg.tolist())
-    else:
-        return arg
-
-
-def encode_attr(arg):
-    """ Convert arg into something acceptable to json """
-    if isinstance(arg, tuple):
-        return tuple(map(encode_attr, arg))
-    elif isinstance(arg, list):
-        return list(map(encode_attr, arg))
-    elif isinstance(arg, set):
-        return list(map(encode_attr, sorted(arg)))
-    elif isinstance(arg, dict):
-        return {k: encode_attr(v) for k, v in sorted(arg.items())}
-    elif isinstance(arg, np.ndarray):
-        return arg.tolist()
-    elif isinstance(arg, np.generic):
-        return arg.item()
     else:
         return arg
 
@@ -212,3 +195,45 @@ def requires(*args):
             return fn
 
     return decorator
+
+
+def dataset_type(path):
+    """
+    Parameters
+    ----------
+    path : Path
+
+    Returns
+    -------
+    type : {"casa", "zarr", "parquet"}
+        Type of table at the specified path
+
+    Raises
+    ------
+    TypeError
+        If it was not possible to infer the type of dataset
+    """
+
+    if not isinstance(path, Path):
+        path = Path(path)
+
+    parts = path.name.split("::", 1)
+
+    if len(parts) == 1:
+        pass
+    elif len(parts) == 2:
+        path = path.parent / parts[0]
+    else:
+        raise ValueError(f"len(parts) '{len(parts)}' not in (1, 2)")
+
+    if (path / "table.dat").exists():
+        return "casa"
+    else:
+        for root, dirs, files in os.walk(str(path)):
+            for f in files:
+                if f == ".zgroup":
+                    return "zarr"
+                elif f.endswith(".parquet"):
+                    return "parquet"
+
+    raise TypeError("Unknown table type")

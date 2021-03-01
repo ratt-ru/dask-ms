@@ -9,10 +9,15 @@ import numpy as np
 
 from daskms.utils import requires
 from daskms.dataset import Dataset, Variable
-from daskms.dataset_schema import DatasetSchema, encode_type, decode_type
-from daskms.experimental.utils import (extent_args,
-                                       column_iterator,
-                                       promote_columns)
+from daskms.dataset_schema import (
+    DatasetSchema,
+    encode_type,
+    decode_type,
+    decode_attr)
+from daskms.experimental.utils import (
+    extent_args,
+    column_iterator,
+    promote_columns)
 from daskms.optimisation import inlined_array
 
 try:
@@ -73,11 +78,11 @@ def create_array(ds_group, column, schema, coordinate=False):
 
         if zchunks != schema.chunks:
             raise ValueError(
-                   f"zarr chunks {zchunks} "
-                   f"don't match dask chunks {schema.chunks}. "
-                   f"This can cause data corruption as described in "
-                   f"https://zarr.readthedocs.io/en/stable/tutorial.html"
-                   f"#parallel-computing-and-synchronization")
+                f"zarr chunks {zchunks} "
+                f"don't match dask chunks {schema.chunks}. "
+                f"This can cause data corruption as described in "
+                f"https://zarr.readthedocs.io/en/stable/tutorial.html"
+                f"#parallel-computing-and-synchronization")
 
     array.attrs[DASKMS_ATTR_KEY] = {
         "dims": schema.dims,
@@ -216,7 +221,6 @@ def zarr_getter(zarray, *extents):
 @requires("pip install dask-ms[zarr] for zarr support",
           zarr_import_error)
 def xds_from_zarr(store, columns=None, chunks=None):
-
     """
     Reads the zarr data store in `store` and returns list of
     Dataset's containing the data.
@@ -261,7 +265,7 @@ def xds_from_zarr(store, columns=None, chunks=None):
 
     for g, (group_name, group) in enumerate(sorted(root.groups())):
         assert group_name.startswith(DATASET_PREFIX)
-        group_attrs = dict(group.attrs)
+        group_attrs = decode_attr(dict(group.attrs))
         dask_ms_attrs = group_attrs.pop(DASKMS_ATTR_KEY)
         natural_chunks = dask_ms_attrs["chunks"]
         group_chunks = {d: tuple(dc) for d, dc in natural_chunks.items()}
@@ -277,7 +281,7 @@ def xds_from_zarr(store, columns=None, chunks=None):
         coords = {}
 
         for name, zarray in column_iterator(group, columns):
-            attrs = dict(zarray.attrs[DASKMS_ATTR_KEY])
+            attrs = decode_attr(dict(zarray.attrs[DASKMS_ATTR_KEY]))
             dims = attrs["dims"]
             coordinate = attrs.get("coordinate", False)
             array_chunks = tuple(group_chunks.get(d, s) for d, s

@@ -5,7 +5,7 @@ import importlib
 import numpy as np
 import dask.array as da
 
-from daskms.utils import encode_attr, freeze
+from daskms.utils import freeze
 
 log = logging.getLogger(__name__)
 
@@ -30,6 +30,35 @@ def decode_type(typ: str):
     except AttributeError:
         raise ValueError(f"{typ_str} is not an "
                          f"attribute of {mod_str}")
+
+
+def encode_attr(arg):
+    """ Convert arg into something acceptable to json """
+    if isinstance(arg, tuple):
+        return tuple(map(encode_attr, arg))
+    elif isinstance(arg, list):
+        return list(map(encode_attr, arg))
+    elif isinstance(arg, set):
+        return list(map(encode_attr, sorted(arg)))
+    elif isinstance(arg, dict):
+        return {k: encode_attr(v) for k, v in sorted(arg.items())}
+    elif isinstance(arg, np.ndarray):
+        return arg.tolist()
+    elif isinstance(arg, np.generic):
+        return arg.item()
+    else:
+        return arg
+
+
+def decode_attr(arg):
+    if isinstance(arg, (tuple, list)):
+        return tuple(map(decode_attr, arg))
+    elif isinstance(arg, set):
+        return set(map(decode_attr, arg))
+    elif isinstance(arg, dict):
+        return {k: decode_attr(v) for k, v in sorted(arg.items())}
+    else:
+        return arg
 
 
 class DatasetSchema:
@@ -127,11 +156,12 @@ class ColumnSchema:
     attrs : dict
         Dictionary of attributes
     """
+
     def __init__(self, typ, dims, dtype, chunks, shape, attrs):
         self._type_check("type", typ, type)
         self._type_check("dtype", dtype, np.dtype)
-        self._type_check("chunks", chunks, (tuple, list, type(None)))
-        self._type_check("shape", shape, (tuple, list))
+        self._type_check("chunks", chunks, (tuple, type(None)))
+        self._type_check("shape", shape, tuple)
         self._type_check("attrs", attrs, dict)
 
         self.type = typ

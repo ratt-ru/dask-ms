@@ -76,7 +76,7 @@ def test_ms_create(tmp_path, chunks, num_chans, corr_types, sources):
             "NAME": (("row",), dask_name),
             "REST_FREQUENCY": (("row", "line"), dask_rest_freq),
             "DIRECTION": (("row", "dir"), dask_direction),
-            })
+        })
         src_datasets.append(ds)
 
     # Create POLARISATION datasets.

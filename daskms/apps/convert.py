@@ -3,6 +3,7 @@ from pathlib import Path
 import shutil
 
 from daskms.apps.application import Application
+from daskms.utils import dataset_type
 
 
 def _check_input_path(input: str):
@@ -14,6 +15,8 @@ def _check_input_path(input: str):
 
 
 class Convert(Application):
+    TABLE_KEYWORD_PREFIX = "Table: "
+
     def __init__(self, args, log):
         self.log = log
         self.args = args
@@ -32,7 +35,6 @@ class Convert(Application):
                             help="Force overwrite of output")
 
     def execute(self):
-        from daskms import xds_from_ms
         import dask
 
         if self.args.output.exists():
@@ -42,13 +44,50 @@ class Convert(Application):
                 raise ValueError(f"{self.args.output} exists. "
                                  f"Use --force to overwrite.")
 
-        datasets = xds_from_ms(self.args.input)
+        input_format = dataset_type(self.args.input)
+
+        if input_format == "casa":
+            from daskms.table_proxy import TableProxy
+            import pyrap.tables as pt
+
+            table_proxy = TableProxy(pt.table, str(self.args.input))
+            keywords = table_proxy.getkeywords().result()
+
+            if "MS_VERSION" in keywords:
+                from daskms import xds_from_ms
+                reader = xds_from_ms
+            else:
+                from daskms import xds_from_table
+                reader = xds_from_table
+
+            n = len(self.TABLE_KEYWORD_PREFIX)
+            subtables = {k: v[n:] for k, v in keywords.items() if
+                         isinstance(v, str) and
+                         v.startswith(self.TABLE_KEYWORD_PREFIX)}
+            from pprint import pprint
+            pprint(subtables)
+        elif input_format == "zarr":
+            from daskms.experimental.zarr import xds_from_zarr
+            reader = xds_from_zarr
+        elif input_format == "parquet":
+            from daskms.experimental.arrow.reads import xds_from_parquet
+            reader = xds_from_parquet
+        else:
+            raise RuntimeError(f"Invalid input format {input_format}")
+
+        datasets = reader(self.args.input)
 
         if self.args.format == "casa":
             from daskms import xds_to_table
-            from functools import partial
-            writer = partial(xds_to_table, descriptor="ms")
-            datasets = [ds.drop_vars("ROWID", errors="ignore") for ds in datasets]
+            writer = xds_to_table
+
+            if "MS_VERSION" in keywords:
+                from functools import partial
+                writer = partial(writer, descriptor="ms")
+
+            # Strip out ROWID's so that a new Table is created
+            datasets = [ds.drop_vars("ROWID", errors="ignore")
+                        for ds in datasets]
         elif self.args.format == "zarr":
             from daskms.experimental.zarr import xds_to_zarr
             writer = xds_to_zarr
@@ -57,7 +96,6 @@ class Convert(Application):
             writer = xds_to_parquet
         else:
             raise ValueError(f"Unknown format {self.args.format}")
-
 
         writes = writer(datasets, str(self.args.output))
         dask.compute(writes)
