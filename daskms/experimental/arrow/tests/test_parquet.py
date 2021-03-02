@@ -80,10 +80,9 @@ def test_xds_to_parquet_string(tmp_path_factory):
     datasets = []
 
     for i in range(3):
-        names = [random.choice(["foo", "bar", "qux"]) for _ in range(10)]
+        names = random.choices([f"foo-{i}", f"bar-{i}", f"qux-{i}"], k=10)
         names = np.asarray(names, dtype=np.object)
-        chunks = [2, 3, 4, 1]
-        random.shuffle(chunks)
+        chunks = sorted([1, 2, 3, 4], key=lambda *a: random.random())
         names = da.from_array(names, chunks=chunks)
         datasets.append(Dataset({"NAME": (("row",), names)}))
 
