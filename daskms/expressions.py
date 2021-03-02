@@ -53,15 +53,15 @@ class DataColumnParseError(SyntaxError):
 
 def data_column_expr(statement, datasets):
     """
-    Produces a list of new datasets with a
+    Produces a list of dask arrays with a
     variable set to the result of the
     supplied expression:
 
     .. code-block:: python
 
-        ds = data_column_expr("DATA / (DIR1_DATA + DIR2_DATA)",
-                              datasets)
-        flag(ds[0].FLAG_DATA.data)
+        vis = data_column_expr("DATA / (DIR1_DATA + DIR2_DATA)",
+                               datasets)
+        flag(vis)
 
     Parameters
     ----------
