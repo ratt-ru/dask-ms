@@ -1,14 +1,27 @@
 from argparse import ArgumentTypeError
+import logging
 from pathlib import Path
 import shutil
 
 from daskms.apps.application import Application
 from daskms.utils import dataset_type
 
+log = logging.getLogger(__name__)
+
 
 def _check_input_path(input: str):
     input_path = Path(input)
-    if not input_path.exists():
+
+    parts = input_path.name.split("::", 1)
+
+    if len(parts) == 1:
+        check_path = input_path
+    elif len(parts) == 2:
+        check_path = input_path.parent / parts[0]
+    else:
+        raise RuntimeError("len(parts) not in (1, 2)")
+
+    if not check_path.exists():
         raise ArgumentTypeError(f"{input} is an invalid path.")
 
     return input_path
@@ -34,6 +47,40 @@ class Convert(Application):
                             default=False,
                             help="Force overwrite of output")
 
+    @classmethod
+    def casa_reader(cls, input_path):
+        from daskms.table_proxy import TableProxy
+        import pyrap.tables as pt
+
+        table_proxy = TableProxy(pt.table, str(input_path))
+        keywords = table_proxy.getkeywords().result()
+
+        if "MS_VERSION" in keywords:
+            from daskms import xds_from_ms
+            reader = xds_from_ms
+        else:
+            from daskms import xds_from_table
+            reader = xds_from_table
+
+        n = len(cls.TABLE_KEYWORD_PREFIX)
+        subtables = {k: v[n:] for k, v in keywords.items() if
+                     isinstance(v, str) and
+                     v.startswith(cls.TABLE_KEYWORD_PREFIX)}
+        from pprint import pprint
+        pprint(subtables)
+        return reader, keywords, subtables
+
+    @classmethod
+    def casa_writer(cls, keywords):
+        from daskms import xds_to_table
+        writer = xds_to_table
+
+        if "MS_VERSION" in keywords:
+            from functools import partial
+            writer = partial(writer, descriptor="ms")
+
+        return writer
+
     def execute(self):
         import dask
 
@@ -47,25 +94,7 @@ class Convert(Application):
         input_format = dataset_type(self.args.input)
 
         if input_format == "casa":
-            from daskms.table_proxy import TableProxy
-            import pyrap.tables as pt
-
-            table_proxy = TableProxy(pt.table, str(self.args.input))
-            keywords = table_proxy.getkeywords().result()
-
-            if "MS_VERSION" in keywords:
-                from daskms import xds_from_ms
-                reader = xds_from_ms
-            else:
-                from daskms import xds_from_table
-                reader = xds_from_table
-
-            n = len(self.TABLE_KEYWORD_PREFIX)
-            subtables = {k: v[n:] for k, v in keywords.items() if
-                         isinstance(v, str) and
-                         v.startswith(self.TABLE_KEYWORD_PREFIX)}
-            from pprint import pprint
-            pprint(subtables)
+            reader, keywords, subtables = self.casa_reader(self.args.input)
         elif input_format == "zarr":
             from daskms.experimental.zarr import xds_from_zarr
             reader = xds_from_zarr
@@ -78,13 +107,7 @@ class Convert(Application):
         datasets = reader(self.args.input)
 
         if self.args.format == "casa":
-            from daskms import xds_to_table
-            writer = xds_to_table
-
-            if "MS_VERSION" in keywords:
-                from functools import partial
-                writer = partial(writer, descriptor="ms")
-
+            writer = self.casa_writer(keywords)
             # Strip out ROWID's so that a new Table is created
             datasets = [ds.drop_vars("ROWID", errors="ignore")
                         for ds in datasets]
@@ -96,6 +119,9 @@ class Convert(Application):
             writer = xds_to_parquet
         else:
             raise ValueError(f"Unknown format {self.args.format}")
+
+        log.info("Input: '%s' %s", input_format, str(self.args.input))
+        log.info("Output: '%s' %s", self.args.format, str(self.args.output))
 
         writes = writer(datasets, str(self.args.output))
         dask.compute(writes)
