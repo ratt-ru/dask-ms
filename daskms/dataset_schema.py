@@ -295,6 +295,6 @@ def unify_schemas(dataset_schemas):
     for column, schema_attrs in unified_coords.items():
         unified_coords[column] = ColumnSchema(**schema_attrs)
 
-    unified_attrs = list(ds.attrs for ds in dataset_schemas)
+    unified_attrs = [ds.attrs for ds in dataset_schemas]
 
     return DatasetSchema(unified_data_vars, unified_coords, unified_attrs)

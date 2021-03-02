@@ -94,10 +94,20 @@ class ParquetFileProxy(metaclass=ParquetFileProxyMetaClass):
     def metadata(self):
         return self.file.metadata
 
+    def __eq__(self, other):
+        return (isinstance(other, ParquetFileProxy) and
+                self.path == other.path)
+
+    def __lt__(self, other):
+        return (isinstance(other, ParquetFileProxy) and
+                str(self.path) < str(other.path))
+
     def read_column(self, column, start=None, end=None):
         chunks = self.file.read(columns=[column]).column(column).chunks
         assert len(chunks) == 1
-        return chunks[0].to_numpy()[start:end]
+
+        zero_copy = chunks[0].type not in (pa.string(), pa.bool_())
+        return chunks[0].to_numpy(zero_copy_only=zero_copy)[start:end]
 
 
 def _partition_values(partition_strings, partition_meta):
@@ -213,7 +223,9 @@ def xds_from_parquet(store, columns=None, chunks=None):
         ds_cfg[partitions].append(fragment)
 
     # Sanity check partition schemas of all parquet files
-    if len(partition_schemas) != 1:
+    if len(partition_schemas) == 0:
+        raise ValueError(f"No parquet files found in {store}")
+    elif len(partition_schemas) != 1:
         raise ValueError(f"Multiple partitions discovered {partition_schemas}")
 
     partition_schemas = partition_schemas.pop()
@@ -221,6 +233,7 @@ def xds_from_parquet(store, columns=None, chunks=None):
 
     # Now create a dataset per partition
     for p, (partition, fragments) in enumerate(sorted(ds_cfg.items())):
+        fragments = list(sorted(fragments))
         column_arrays = defaultdict(list)
         fragment_rows = [f.metadata.num_rows for f in fragments]
 

@@ -358,7 +358,7 @@ class DatasetFactory(object):
             except IndexError:
                 group_chunks = self.chunks[-1]  # Re-use last group's chunks
 
-            # Prefix d
+            # Prefix dataset
             gid_str = ",".join(str(gid) for gid in group_id)
             array_suffix = f"[{gid_str}]-{short_table_name}"
 

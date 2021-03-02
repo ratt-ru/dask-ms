@@ -60,10 +60,17 @@ class ParquetFragment(metaclass=ParquetFragmentMetaClass):
         partition = schema.attrs.get(PARTITION_KEY, None)
 
         if not partition:
+            # There's no specific partitioning schema,
+            # make one up
             partition = (("DATASET", dataset_id),)
+            schema = ArrowSchema(
+                schema.data_vars,
+                schema.coords,
+                {**schema.attrs, PARTITION_KEY: (("DATASET", "int32"),)})
         else:
             partition = tuple((p, schema.attrs[p]) for p, _ in partition)
 
+        # Add the partitioning to the path
         for field, value in partition:
             path /= f"{field}={value}"
 
@@ -84,7 +91,9 @@ class ParquetFragment(metaclass=ParquetFragmentMetaClass):
 
         for column, var in zip(data[::2], data[1::2]):
             while type(var) is list:
-                assert len(var) == 1
+                if len(var) != 1:
+                    raise ValueError("Multiple chunks in blockwise "
+                                     "on non-row dimension")
                 var = var[0]
 
             if var.ndim == 1:
@@ -141,13 +150,14 @@ def xds_to_parquet(xds, path, columns=None):
 
             args.extend((column, None, variable.data, variable.dims))
 
-            for dim, chunk in zip(variable.dims, variable.data.chunks):
+            for dim, chunk in zip(variable.dims[1:], variable.data.chunks[1:]):
                 if len(chunk) != 1:
                     raise ValueError(f"Chunking in {dim} is not yet "
                                      f"supported.")
 
         writes = da.blockwise(fragment.write, ("row",),
                               *args,
+                              align_arrays=False,
                               adjust_chunks={"row": 1},
                               meta=np.empty((0,), np.bool))
 

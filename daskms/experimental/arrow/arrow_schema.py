@@ -74,6 +74,9 @@ class ArrowSchema(DatasetSchema):
 
     @classmethod
     def unify_attrs(cls, attrs):
+        if len(attrs) == 0:
+            return {}
+
         attrs = attrs.copy()
 
         for i, a in enumerate(attrs):
@@ -84,13 +87,16 @@ class ArrowSchema(DatasetSchema):
             else:
                 attrs[i] = (PARTITION_KEY, partition_key)
 
-        attrs = set(attrs)
+        set_attrs = set(attrs)
 
-        if len(attrs) != 1:
+        if len(set_attrs) != 1:
             raise ArrowUnificationError(f"Inconsistent dataset "
-                                        f"attributes {attrs}")
+                                        f"attributes {set_attrs}")
 
-        return dict(attrs)
+        if next(iter(set_attrs)) == ():
+            return {}
+
+        return dict(set_attrs)
 
     @classmethod
     def from_datasets(cls, datasets):
@@ -154,6 +160,9 @@ class ArrowSchema(DatasetSchema):
                 pa_type = ComplexType(pa.float32())
             elif var.dtype == np.dtype(np.complex128):
                 pa_type = ComplexType(pa.float64())
+            elif var.dtype == np.dtype(np.object):
+                # By convention, an object is a string...
+                pa_type = pa.string()
             else:
                 pa_type = pa.from_numpy_dtype(var.dtype)
 

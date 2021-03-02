@@ -108,7 +108,13 @@ class TensorArray(ExtensionArray):
 
         return _tensor_to_array(obj, dtype)
 
-    def to_numpy(self):
+    def to_numpy(self, zero_copy_only=True, writeable=False):
+        if zero_copy_only is False:
+            raise NotImplementedError("zero_copy_only is False for Tensors")
+
+        if writeable is True:
+            raise NotImplementedError("writeable is True for Tensors")
+
         shape = (len(self),) + self.type.shape
         storage_list_type = self.storage.type
         dtype = storage_list_type.value_type.to_pandas_dtype()
