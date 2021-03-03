@@ -14,7 +14,8 @@ from daskms.experimental.arrow.arrow_schema import ArrowSchema
 from daskms.experimental.arrow.extension_types import TensorArray
 from daskms.experimental.arrow.require_arrow import requires_arrow
 from daskms.experimental.utils import (promote_columns,
-                                       column_iterator)
+                                       column_iterator,
+                                       store_path_split)
 
 try:
     import pyarrow as pa
@@ -66,7 +67,10 @@ class ParquetFragment(metaclass=ParquetFragmentMetaClass):
             schema = ArrowSchema(
                 schema.data_vars,
                 schema.coords,
-                {**schema.attrs, DASKMS_PARTITION_KEY: (("DATASET", "int32"),)})
+                {
+                    **schema.attrs,
+                    DASKMS_PARTITION_KEY: (("DATASET", "int32"),)
+                })
         else:
             partition = tuple((p, schema.attrs[p]) for p, _ in partition)
 
@@ -107,13 +111,15 @@ class ParquetFragment(metaclass=ParquetFragmentMetaClass):
             table_data[column] = pa_data
 
         table = pa.table(table_data, schema=self.schema.to_arrow_schema())
-        pq.write_table(table, self.path / f"data-{chunk.item()}.parquet")
+        pq.write_table(table, self.path / f"{chunk.item()}.parquet")
 
         return np.array([True], np.bool)
 
 
 @requires_arrow(pyarrow_import_error)
 def xds_to_parquet(xds, path, columns=None):
+    path, table = store_path_split(path)
+
     if not isinstance(path, Path):
         path = Path(path)
 
@@ -132,7 +138,7 @@ def xds_to_parquet(xds, path, columns=None):
 
     for ds_id, ds in enumerate(xds):
         arrow_schema = base_schema.with_attributes(ds)
-        fragment = ParquetFragment(path, arrow_schema, ds_id)
+        fragment = ParquetFragment(path / table, arrow_schema, ds_id)
         chunk_ids = da.arange(len(ds.chunks["row"]), chunks=1)
         args = [chunk_ids, ("row",)]
 

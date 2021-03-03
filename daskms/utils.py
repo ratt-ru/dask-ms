@@ -87,7 +87,15 @@ def table_path_split(path):
         path = Path(path)
 
     root = path.parent
-    table_name, _, subtable = path.name.partition("::")
+    parts = path.name.split("::", 1)
+
+    if len(parts) == 1:
+        table_name = parts[0]
+        subtable = ""
+    elif len(parts) == 2:
+        table_name, subtable = parts
+    else:
+        raise RuntimeError("len(parts) not in (1, 2)")
 
     return root, table_name, subtable
 

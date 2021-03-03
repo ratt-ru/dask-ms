@@ -20,6 +20,7 @@ else:
 
 log = logging.getLogger(__name__)
 
+
 class ArrowUnificationError(ValueError):
     pass
 

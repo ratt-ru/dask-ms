@@ -17,7 +17,8 @@ from daskms.dataset_schema import (
 from daskms.experimental.utils import (
     extent_args,
     column_iterator,
-    promote_columns)
+    promote_columns,
+    store_path_split)
 from daskms.optimisation import inlined_array
 
 try:
@@ -28,7 +29,6 @@ else:
     zarr_import_error = None
 
 
-DATASET_PREFIX = "__daskms_dataset__"
 DASKMS_ATTR_KEY = "__daskms_zarr_attr__"
 
 
@@ -91,7 +91,7 @@ def create_array(ds_group, column, schema, coordinate=False):
     }
 
 
-def prepare_zarr_group(dataset_id, dataset, store):
+def prepare_zarr_group(dataset_id, dataset, store, table="MAIN"):
     dir_store = zarr.DirectoryStore(store)
 
     try:
@@ -101,8 +101,8 @@ def prepare_zarr_group(dataset_id, dataset, store):
         # Create, must not exist
         group = zarr.open_group(store=dir_store, mode="w-")
 
-    group_name = f"{DATASET_PREFIX}{dataset_id:08d}"
-    ds_group = group.require_group(group_name)
+    group_name = f"{table}_{dataset_id}"
+    ds_group = group.require_group(table).require_group(group_name)
 
     schema = DatasetSchema.from_dataset(dataset)
 
@@ -184,6 +184,8 @@ def xds_to_zarr(xds, store, columns=None):
     writes : Dataset
         A Dataset representing the write operations
     """
+    store, table = store_path_split(store)
+
     if isinstance(store, Path):
         store = str(store)
 
@@ -203,7 +205,7 @@ def xds_to_zarr(xds, store, columns=None):
     write_datasets = []
 
     for di, ds in enumerate(xds):
-        group = prepare_zarr_group(di, ds, store)
+        group = prepare_zarr_group(di, ds, store, table)
         write_args = (ds.chunks, columns, group)
 
         data_vars = dict(_gen_writes(ds.data_vars, *write_args))
@@ -240,6 +242,7 @@ def xds_from_zarr(store, columns=None, chunks=None):
     writes : Dataset or list of Datasets
         Dataset(s) representing write operations
     """
+    store, table = store_path_split(store)
 
     if isinstance(store, Path):
         store = str(store)
@@ -259,12 +262,12 @@ def xds_from_zarr(store, columns=None, chunks=None):
     else:
         raise TypeError("chunks must be None, a dict or a list of dicts")
 
-    root = zarr.open(store)
     datasets = []
     numpy_vars = []
 
-    for g, (group_name, group) in enumerate(sorted(root.groups())):
-        assert group_name.startswith(DATASET_PREFIX)
+    table_group = zarr.open(store)[table]
+
+    for g, (group_name, group) in enumerate(sorted(table_group.groups())):
         group_attrs = decode_attr(dict(group.attrs))
         dask_ms_attrs = group_attrs.pop(DASKMS_ATTR_KEY)
         natural_chunks = dask_ms_attrs["chunks"]

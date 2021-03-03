@@ -380,8 +380,9 @@ class DatasetFactory(object):
 
             # Assign values for the dataset's grouping columns
             # as attributes
-            attrs = {DASKMS_PARTITION_KEY: tuple((c, g.dtype.name) for c, g
-                                          in zip(self.group_cols, group_id))}
+            partitions = tuple((c, g.dtype.name) for c, g
+                               in zip(self.group_cols, group_id))
+            attrs = {DASKMS_PARTITION_KEY: partitions}
 
             # Use python types which are json serializable
             group_id = [gid.item() for gid in group_id]

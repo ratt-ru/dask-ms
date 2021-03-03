@@ -52,3 +52,20 @@ def promote_columns(columns):
     else:
         raise TypeError(f"'columns' must be None or str "
                         f"or list of str. Got {columns}")
+
+
+def store_path_split(store):
+    parts = store.name.split("::", 1)
+
+    if len(parts) == 1:
+        name = parts[0]
+        subtable = "MAIN"
+    elif len(parts) == 2:
+        name, subtable = parts
+
+        if subtable == "MAIN":
+            raise ValueError("'MAIN' is a reserved subtable name")
+    else:
+        raise RuntimeError(f"len(parts) {len(parts)} not in (1, 2)")
+
+    return store.parent / name, subtable
