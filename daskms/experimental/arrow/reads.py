@@ -15,7 +15,7 @@ from daskms.experimental.utils import (promote_columns,
 from daskms.experimental.arrow.arrow_schema import DASKMS_METADATA
 from daskms.experimental.arrow.extension_types import TensorType
 from daskms.experimental.arrow.require_arrow import requires_arrow
-from daskms.reads import PARTITION_KEY
+from daskms.constants import DASKMS_PARTITION_KEY
 from daskms.utils import freeze
 
 try:
@@ -216,7 +216,7 @@ def xds_from_parquet(store, columns=None, chunks=None):
         fragment = ParquetFileProxy(fragment)
         fragment_meta = fragment.metadata
         metadata = json.loads(fragment_meta.metadata[DASKMS_METADATA.encode()])
-        partition_meta = metadata[PARTITION_KEY]
+        partition_meta = metadata[DASKMS_PARTITION_KEY]
         partition_meta = tuple(tuple((f, v)) for f, v in partition_meta)
         partitions = _partition_values(partitions, partition_meta)
         partition_schemas.add(partition_meta)
@@ -281,7 +281,7 @@ def xds_from_parquet(store, columns=None, chunks=None):
             data_vars[column] = (array_dims.pop(), da.concatenate(arrays))
 
         attrs = dict(partition)
-        attrs[PARTITION_KEY] = partition_schemas
+        attrs[DASKMS_PARTITION_KEY] = partition_schemas
         datasets.append(Dataset(data_vars, attrs=attrs))
 
     return datasets

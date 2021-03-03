@@ -10,6 +10,7 @@ import pyrap.tables as pt
 
 from daskms.columns import (column_metadata, ColumnMetadataError,
                             dim_extents_array, infer_dtype)
+from daskms.constants import DASKMS_PARTITION_KEY
 from daskms.ordering import (ordering_taql, row_ordering,
                              group_ordering_taql, group_row_ordering)
 from daskms.optimisation import inlined_array
@@ -21,7 +22,6 @@ from daskms.table_schemas import lookup_table_schema
 from daskms.utils import table_path_split
 
 _DEFAULT_ROW_CHUNKS = 10000
-PARTITION_KEY = "__daskms_partition_schema__"
 
 log = logging.getLogger(__name__)
 
@@ -330,7 +330,7 @@ class DatasetFactory(object):
         else:
             coords = {"ROWID": rowid}
 
-        attrs = {PARTITION_KEY: ()}
+        attrs = {DASKMS_PARTITION_KEY: ()}
 
         return Dataset(variables, coords=coords, attrs=attrs)
 
@@ -380,7 +380,7 @@ class DatasetFactory(object):
 
             # Assign values for the dataset's grouping columns
             # as attributes
-            attrs = {PARTITION_KEY: tuple((c, g.dtype.name) for c, g
+            attrs = {DASKMS_PARTITION_KEY: tuple((c, g.dtype.name) for c, g
                                           in zip(self.group_cols, group_id))}
 
             # Use python types which are json serializable

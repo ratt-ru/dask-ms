@@ -8,7 +8,7 @@ import numpy as np
 
 from daskms.dataset import Dataset
 from daskms.optimisation import inlined_array
-from daskms.reads import PARTITION_KEY
+from daskms.constants import DASKMS_PARTITION_KEY
 from daskms.utils import freeze
 from daskms.experimental.arrow.arrow_schema import ArrowSchema
 from daskms.experimental.arrow.extension_types import TensorArray
@@ -57,7 +57,7 @@ class ParquetFragmentMetaClass(type):
 class ParquetFragment(metaclass=ParquetFragmentMetaClass):
     def __init__(self, path, schema, dataset_id):
         path = Path(path)
-        partition = schema.attrs.get(PARTITION_KEY, None)
+        partition = schema.attrs.get(DASKMS_PARTITION_KEY, None)
 
         if not partition:
             # There's no specific partitioning schema,
@@ -66,7 +66,7 @@ class ParquetFragment(metaclass=ParquetFragmentMetaClass):
             schema = ArrowSchema(
                 schema.data_vars,
                 schema.coords,
-                {**schema.attrs, PARTITION_KEY: (("DATASET", "int32"),)})
+                {**schema.attrs, DASKMS_PARTITION_KEY: (("DATASET", "int32"),)})
         else:
             partition = tuple((p, schema.attrs[p]) for p, _ in partition)
 

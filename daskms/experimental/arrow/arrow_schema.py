@@ -4,8 +4,9 @@ import logging
 
 import numpy as np
 
+from daskms.constants import DASKMS_METADATA
 from daskms.dataset_schema import DatasetSchema, ColumnSchema, unify_schemas
-from daskms.reads import PARTITION_KEY
+from daskms.constants import DASKMS_PARTITION_KEY
 
 from daskms.experimental.arrow.extension_types import TensorType, ComplexType
 from daskms.experimental.arrow.require_arrow import requires_arrow
@@ -18,11 +19,6 @@ else:
     pyarrow_import_error = None
 
 log = logging.getLogger(__name__)
-
-
-DASKMS_METADATA = "__daskms_metadata__"
-DASKMS_PARQUET_VERSION = "0.0.1"
-
 
 class ArrowUnificationError(ValueError):
     pass
@@ -81,11 +77,11 @@ class ArrowSchema(DatasetSchema):
 
         for i, a in enumerate(attrs):
             try:
-                partition_key = a[PARTITION_KEY]
+                partition_key = a[DASKMS_PARTITION_KEY]
             except KeyError:
                 attrs[i] = ()
             else:
-                attrs[i] = (PARTITION_KEY, partition_key)
+                attrs[i] = (DASKMS_PARTITION_KEY, partition_key)
 
         set_attrs = set(attrs)
 

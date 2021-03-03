@@ -12,7 +12,7 @@ from daskms.experimental.arrow.extension_types import TensorArray
 from daskms.experimental.arrow.reads import xds_from_parquet
 from daskms.experimental.arrow.reads import partition_chunking
 from daskms.experimental.arrow.writes import xds_to_parquet
-from daskms.reads import PARTITION_KEY
+from daskms.constants import DASKMS_PARTITION_KEY
 
 pa = pytest.importorskip("pyarrow")
 pq = pytest.importorskip("pyarrow.parquet")
@@ -122,8 +122,8 @@ def test_xds_to_parquet(ms, tmp_path_factory):
             assert_array_equal(var.data, pq_var.data)
             assert var.dims == pq_var.dims
 
-        partitions = ds.attrs[PARTITION_KEY]
-        pq_partitions = pq_ds.attrs[PARTITION_KEY]
+        partitions = ds.attrs[DASKMS_PARTITION_KEY]
+        pq_partitions = pq_ds.attrs[DASKMS_PARTITION_KEY]
         assert partitions == pq_partitions
 
         for field, dtype in partitions:
