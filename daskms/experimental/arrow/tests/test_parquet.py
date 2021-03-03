@@ -6,7 +6,7 @@ import numpy as np
 from numpy.testing import assert_array_equal
 import pytest
 
-from daskms import xds_from_ms
+from daskms import xds_from_ms, xds_from_table
 from daskms.dataset import Dataset
 from daskms.experimental.arrow.extension_types import TensorArray
 from daskms.experimental.arrow.reads import xds_from_parquet
@@ -96,15 +96,26 @@ def test_xds_to_parquet_string(tmp_path_factory):
         assert_array_equal(ds.NAME.data, pq_ds.NAME.data)
 
 
-def test_xds_to_parquet(ms, tmp_path_factory):
+def test_xds_to_parquet(ms, tmp_path_factory, spw_table, ant_table):
     store = tmp_path_factory.mktemp("parquet_store") / "out.parquet"
+    antenna_store = store.parent / f"{store.name}::ANTENNA"
+    spw_store = store.parent / f"{store.name}::SPECTRAL_WINDOW"
+
     datasets = xds_from_ms(ms)
 
     # We can test row chunking if xarray is installed
     if xarray is not None:
         datasets = [ds.chunk({"row": 1}) for ds in datasets]
 
-    writes = xds_to_parquet(datasets, store)
+    # spw_datasets = xds_from_table(spw_table, group_cols="__row__")
+    # ant_datasets = xds_from_table(ant_table, group_cols="__row__")
+
+    writes = []
+    writes.extend(xds_to_parquet(datasets, store))
+    # TODO(sjperkins)
+    # Fix arrow shape unification errors
+    # writes.extend(xds_to_parquet(spw_datasets, spw_store))
+    # writes.extend(xds_to_parquet(ant_datasets, antenna_store))
     dask.compute(writes)
 
     pq_datasets = xds_from_parquet(store, chunks={"row": 1})
