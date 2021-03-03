@@ -41,6 +41,7 @@ def test_parquet_roundtrip(tmp_path_factory):
     shape = (nrow, nchan, ncorr)
     data = np.random.random(shape) + np.random.random(shape)*1j
     uvw = np.random.random((nrow, 3))
+    name = np.array(random.choices(["foo", "bar", "qux"], k=nrow), dtype=np.object)
 
     columns = {
         "TIME": time,

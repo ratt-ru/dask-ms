@@ -161,7 +161,10 @@ class ArrowSchema(DatasetSchema):
             elif var.dtype == np.dtype(np.complex128):
                 pa_type = ComplexType(pa.float64())
             elif var.dtype == np.dtype(np.object):
-                # By convention, an object is a string...
+                # TODO(sjperkins)
+                # objects contain strings.
+                # Possibly replace this with a pa.binary()
+                # containing pickled objects
                 pa_type = pa.string()
             else:
                 pa_type = pa.from_numpy_dtype(var.dtype)
