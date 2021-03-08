@@ -123,7 +123,6 @@ def _partition_values(partition_strings, partition_meta):
                              f"{partition_strings} does not match "
                              f"metadata column name {pf}")
 
-        assert field == pf
         partitions.append((field, np.dtype(dt).type(value)))
 
     return tuple(partitions)
