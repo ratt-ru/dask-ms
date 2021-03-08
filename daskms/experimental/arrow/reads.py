@@ -101,7 +101,7 @@ class ParquetFileProxy(metaclass=ParquetFileProxyMetaClass):
 
     def __lt__(self, other):
         return (isinstance(other, ParquetFileProxy) and
-                str(self.path) < str(other.path))
+                self.path < other.path)
 
     def read_column(self, column, start=None, end=None):
         chunks = self.file.read(columns=[column]).column(column).chunks
