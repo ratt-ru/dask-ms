@@ -7,7 +7,7 @@ import numpy as np
 from numpy.testing import assert_array_equal
 import pytest
 
-from daskms import xds_from_ms
+from daskms import xds_from_ms, xds_from_table
 from daskms.dataset import Dataset
 from daskms.experimental.zarr import xds_from_zarr, xds_to_zarr
 
@@ -37,10 +37,14 @@ def test_zarr_string_array(tmp_path_factory):
         assert_array_equal(nds.DATA.data, ds.DATA.data)
 
 
-def test_xds_to_zarr(ms, tmp_path_factory):
+def test_xds_to_zarr(ms, spw_table, ant_table, tmp_path_factory):
     zarr_store = tmp_path_factory.mktemp("zarr_store") / "test.zarr"
+    spw_store = zarr_store.parent / f"{zarr_store.name}::SPECTRAL_WINDOW"
+    ant_store = zarr_store.parent / f"{zarr_store.name}::ANTENNA"
 
     ms_datasets = xds_from_ms(ms)
+    spw_datasets = xds_from_table(spw_table, group_cols="__row__")
+    ant_datasets = xds_from_table(ant_table)
 
     for i, ds in enumerate(ms_datasets):
         dims = ds.dims
@@ -51,7 +55,10 @@ def test_xds_to_zarr(ms, tmp_path_factory):
             "corr": (("corr",), np.arange(corr)),
         })
 
-    writes = xds_to_zarr(ms_datasets, zarr_store)
+    writes = []
+    writes.extend(xds_to_zarr(ms_datasets, zarr_store))
+    writes.extend(xds_to_zarr(spw_datasets, spw_store))
+    writes.extend(xds_to_zarr(ant_datasets, ant_store))
     dask.compute(writes)
 
     zarr_datasets = xds_from_zarr(zarr_store, chunks={"row": 1})

@@ -1,4 +1,6 @@
+import abc
 from argparse import ArgumentTypeError
+from functools import partial
 import logging
 from pathlib import Path
 import shutil
@@ -7,6 +9,209 @@ from daskms.apps.application import Application
 from daskms.utils import dataset_type
 
 log = logging.getLogger(__name__)
+
+
+class TableFormat(abc.ABC):
+    @abc.abstractproperty
+    def version(self):
+        raise NotImplementedError
+
+    @abc.abstractproperty
+    def subtables(self):
+        raise NotImplementedError
+
+    @abc.abstractclassmethod
+    def reader(self):
+        raise NotImplementedError
+
+    @abc.abstractclassmethod
+    def writer(self):
+        raise NotImplementedError
+
+    @staticmethod
+    def from_path(path):
+        if not isinstance(path, Path):
+            path = Path(path)
+
+        typ = dataset_type(path)
+
+        if typ == "casa":
+            from daskms.table_proxy import TableProxy
+            import pyrap.tables as pt
+            table_proxy = TableProxy(pt.table, str(
+                path), readonly=True, ack=False)
+            keywords = table_proxy.getkeywords().result()
+
+            try:
+                version = str(keywords["MS_VERSION"])
+            except KeyError:
+                typ = "plain"
+                version = "<unspecified>"
+            else:
+                typ = "measurementset"
+
+            subtables = CasaFormat.find_subtables(keywords)
+            return CasaFormat(version, subtables, typ)
+        elif typ == "zarr":
+            subtables = ZarrFormat.find_subtables(path)
+            return ZarrFormat("0.1", subtables)
+        elif typ == "parquet":
+            subtables = ParquetFormat.find_subtables(path)
+            return ParquetFormat("0.1", subtables)
+        else:
+            raise ValueError(f"Unexpected table type {typ}")
+
+    @staticmethod
+    def from_type(typ):
+        if typ == "casa":
+            return CasaFormat("<unspecified>", [], "plain")
+        elif typ == "zarr":
+            return ZarrFormat("0.1", [])
+        elif typ == "parquet":
+            return ParquetFormat("0.1", [])
+        else:
+            raise ValueError(f"Unexpected table type {typ}")
+
+
+class BaseTableFormat(TableFormat):
+    def __init__(self, version):
+        self._version = version
+
+    @property
+    def version(self):
+        return self._version
+
+
+class CasaFormat(BaseTableFormat):
+    TABLE_PREFIX = "Table: "
+    TABLE_TYPES = set(["plain", "measurementset"])
+
+    def __init__(self, version, subtables, type="plain"):
+        super().__init__(version)
+
+        if type not in self.TABLE_TYPES:
+            raise ValueError(f"{type} is not in {self.TABLE_TYPES}")
+
+        self._subtables = subtables
+        self._type = type
+
+    @classmethod
+    def find_subtables(cls, keywords):
+        return [k for k, v in keywords.items() if cls.is_subtable(v)]
+
+    @classmethod
+    def is_subtable(cls, keyword):
+        if not isinstance(keyword, str):
+            return False
+
+        if not keyword.startswith(cls.TABLE_PREFIX):
+            return False
+
+        path = Path(keyword[len(cls.TABLE_PREFIX):])
+        return (path.exists() and
+                path.is_dir() and
+                (path / "table.dat").exists())
+
+    def is_measurement_set(self):
+        return self._type == "measurementset"
+
+    def reader(self):
+        if self.is_measurement_set():
+            from daskms import xds_from_ms
+            return xds_from_ms
+        else:
+            from daskms import xds_from_table
+            return xds_from_table
+
+    def writer(self):
+        from daskms import xds_to_table
+
+        if self.is_measurement_set():
+            return partial(xds_to_table, descriptor="ms")
+        else:
+            return xds_to_table
+
+    @property
+    def subtables(self):
+        return self._subtables
+
+    def __str__(self):
+        return "casa" if not self.is_measurement_set() else self._type
+
+
+class ZarrFormat(BaseTableFormat):
+    def __init__(self, version, subtables):
+        self._subtables = subtables
+
+    @classmethod
+    def find_subtables(cls, path):
+        return [p.relative_to(path) for p in path.iterdir()
+                if p.is_dir()
+                and p.name != "MAIN"
+                and (p / ".zgroup").exists()]
+
+    @property
+    def subtables(self):
+        return self._subtables
+
+    def reader(self):
+        from daskms.experimental.zarr import xds_from_zarr
+        return xds_from_zarr
+
+    def writer(self):
+        from daskms.experimental.zarr import xds_to_zarr
+        return xds_to_zarr
+
+    def __str__(self):
+        return "zarr"
+
+
+class ParquetFormat(BaseTableFormat):
+    def __init__(self, version, subtables):
+        super().__init__(version)
+        self._subtables = subtables
+
+    @classmethod
+    def find_subtables(cls, path):
+        return [p.relative_to(path) for p in path.iterdir()
+                if p.is_dir() and p.name != "MAIN"]
+
+    @property
+    def subtables(self):
+        return self._subtables
+
+    def reader(self):
+        from daskms.experimental.arrow.reads import xds_from_parquet
+        return xds_from_parquet
+
+    def writer(self):
+        from daskms.experimental.arrow.writes import xds_to_parquet
+        return xds_to_parquet
+
+    def __str__(self):
+        return "parquet"
+
+
+class TableTransformer:
+    @staticmethod
+    def transform(input_path, output_path, output_format):
+        in_fmt = TableFormat.from_path(input_path)
+        out_fmt = TableFormat.from_type(output_format)
+
+        reader = in_fmt.reader()
+        writer = out_fmt.writer()
+
+        datasets = reader(input_path)
+
+        if isinstance(in_fmt, CasaFormat):
+            # Drop any ROWID columns
+            datasets = [ds.drop_vars("ROWID", errors="ignore")
+                        for ds in datasets]
+
+        log.info("Input: '%s' %s", in_fmt, str(input_path))
+        log.info("Output: '%s' %s", out_fmt, str(output_path))
+
+        return writer(datasets, str(output_path))
 
 
 def _check_input_path(input: str):
@@ -47,40 +252,6 @@ class Convert(Application):
                             default=False,
                             help="Force overwrite of output")
 
-    @classmethod
-    def casa_reader(cls, input_path):
-        from daskms.table_proxy import TableProxy
-        import pyrap.tables as pt
-
-        table_proxy = TableProxy(pt.table, str(input_path))
-        keywords = table_proxy.getkeywords().result()
-
-        if "MS_VERSION" in keywords:
-            from daskms import xds_from_ms
-            reader = xds_from_ms
-        else:
-            from daskms import xds_from_table
-            reader = xds_from_table
-
-        n = len(cls.TABLE_KEYWORD_PREFIX)
-        subtables = {k: v[n:] for k, v in keywords.items() if
-                     isinstance(v, str) and
-                     v.startswith(cls.TABLE_KEYWORD_PREFIX)}
-        from pprint import pprint
-        pprint(subtables)
-        return reader, keywords, subtables
-
-    @classmethod
-    def casa_writer(cls, keywords):
-        from daskms import xds_to_table
-        writer = xds_to_table
-
-        if "MS_VERSION" in keywords:
-            from functools import partial
-            writer = partial(writer, descriptor="ms")
-
-        return writer
-
     def execute(self):
         import dask
 
@@ -91,37 +262,7 @@ class Convert(Application):
                 raise ValueError(f"{self.args.output} exists. "
                                  f"Use --force to overwrite.")
 
-        input_format = dataset_type(self.args.input)
+        writes = TableTransformer.transform(
+            self.args.input, self.args.output, self.args.format)
 
-        if input_format == "casa":
-            reader, keywords, subtables = self.casa_reader(self.args.input)
-        elif input_format == "zarr":
-            from daskms.experimental.zarr import xds_from_zarr
-            reader = xds_from_zarr
-        elif input_format == "parquet":
-            from daskms.experimental.arrow.reads import xds_from_parquet
-            reader = xds_from_parquet
-        else:
-            raise RuntimeError(f"Invalid input format {input_format}")
-
-        datasets = reader(self.args.input)
-
-        if self.args.format == "casa":
-            writer = self.casa_writer(keywords)
-            # Strip out ROWID's so that a new Table is created
-            datasets = [ds.drop_vars("ROWID", errors="ignore")
-                        for ds in datasets]
-        elif self.args.format == "zarr":
-            from daskms.experimental.zarr import xds_to_zarr
-            writer = xds_to_zarr
-        elif self.args.format == "parquet":
-            from daskms.experimental.arrow.writes import xds_to_parquet
-            writer = xds_to_parquet
-        else:
-            raise ValueError(f"Unknown format {self.args.format}")
-
-        log.info("Input: '%s' %s", input_format, str(self.args.input))
-        log.info("Output: '%s' %s", self.args.format, str(self.args.output))
-
-        writes = writer(datasets, str(self.args.output))
         dask.compute(writes)

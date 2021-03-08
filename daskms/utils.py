@@ -237,7 +237,7 @@ def dataset_type(path):
     if (path / "table.dat").exists():
         return "casa"
     else:
-        for root, dirs, files in os.walk(str(path)):
+        for _, _, files in os.walk(str(path)):
             for f in files:
                 if f == ".zgroup":
                     return "zarr"

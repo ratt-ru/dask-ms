@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import dask
 import dask.array as da
 from dask.highlevelgraph import HighLevelGraph
@@ -55,6 +57,9 @@ def promote_columns(columns):
 
 
 def store_path_split(store):
+    if not isinstance(store, Path):
+        store = Path(store)
+
     parts = store.name.split("::", 1)
 
     if len(parts) == 1:
