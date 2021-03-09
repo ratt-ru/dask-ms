@@ -1,14 +1,45 @@
 import abc
+import ast
 from argparse import ArgumentTypeError
 from functools import partial
 import logging
 from pathlib import Path
 import shutil
+import sys
 
 from daskms.apps.application import Application
 from daskms.utils import dataset_type
 
 log = logging.getLogger(__name__)
+
+PY38 = (int(sys.version_info.major) * 10 + int(sys.version_info.minor) >= 38)
+
+
+class ChunkTransformer(ast.NodeTransformer):
+    def visit_Module(self, node):
+        if len(node.body) != 1 or not isinstance(node.body[0], ast.Expr):
+            raise ValueError("Module must contain a single expression")
+
+        expr = node.body[0]
+
+        if not isinstance(expr.value, ast.Dict):
+            raise ValueError("Expression must contain a dictionary")
+
+        return self.visit(expr).value
+
+    def visit_Dict(self, node):
+        keys = [self.visit(k) for k in node.keys]
+        values = [self.visit(v) for v in node.values]
+        return {k: v for k, v in zip(keys, values)}
+
+    def visit_Name(self, node):
+        return node.id
+
+    def visit_Tuple(self, node):
+        return tuple(self.visit(v) for v in node.elts)
+
+    def visit_Num(self, node):
+        return node.n
 
 
 class TableFormat(abc.ABC):
@@ -192,14 +223,14 @@ class ParquetFormat(BaseTableFormat):
         return "parquet"
 
 
-def convert_table(input_path, output_path, output_format):
+def convert_table(input_path, output_path, output_format, chunks):
     in_fmt = TableFormat.from_path(input_path)
     out_fmt = TableFormat.from_type(output_format)
 
     reader = in_fmt.reader()
     writer = out_fmt.writer()
 
-    datasets = reader(input_path)
+    datasets = reader(input_path, chunks=chunks)
 
     if isinstance(in_fmt, CasaFormat):
         # Drop any ROWID columns
@@ -255,6 +286,10 @@ def _check_input_path(input: str):
     return input_path
 
 
+def parse_chunks(chunks: str):
+    return ChunkTransformer().visit(ast.parse(chunks))
+
+
 class Convert(Application):
     TABLE_KEYWORD_PREFIX = "Table: "
 
@@ -274,6 +309,11 @@ class Convert(Application):
                             action="store_true",
                             default=False,
                             help="Force overwrite of output")
+        parser.add_argument("-c", "--chunks",
+                            default="{row: 10000}",
+                            help=("chunking schema applied to each dataset "
+                                  "e.g. {row: 1000, chan: 16, corr: 1}"),
+                            type=parse_chunks)
 
     def execute(self):
         import dask
@@ -287,6 +327,7 @@ class Convert(Application):
 
         writes = convert_table(self.args.input,
                                self.args.output,
-                               self.args.format)
+                               self.args.format,
+                               self.args.chunks)
 
         dask.compute(writes)
