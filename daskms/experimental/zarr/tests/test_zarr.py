@@ -1,10 +1,13 @@
+from multiprocessing import Pool
+import os
+
 import dask
 import dask.array as da
 import numpy as np
 from numpy.testing import assert_array_equal
 import pytest
 
-from daskms import xds_from_ms
+from daskms import xds_from_ms, xds_from_table
 from daskms.dataset import Dataset
 from daskms.experimental.zarr import xds_from_zarr, xds_to_zarr
 
@@ -20,7 +23,7 @@ def test_zarr_string_array(tmp_path_factory):
     data = ["hello", "this", "strange new world",
             "full of", "interesting", "stuff"]
     data = np.array(data, dtype=np.object).reshape(3, 2)
-    data = da.from_array(data, chunks=((1, 2), (1, 1)))
+    data = da.from_array(data, chunks=((2, 1), (1, 1)))
 
     datasets = [Dataset({"DATA": (("x", "y"), data)})]
     writes = xds_to_zarr(datasets, zarr_store)
@@ -34,10 +37,14 @@ def test_zarr_string_array(tmp_path_factory):
         assert_array_equal(nds.DATA.data, ds.DATA.data)
 
 
-def test_xds_to_zarr(ms, tmp_path_factory):
+def test_xds_to_zarr(ms, spw_table, ant_table, tmp_path_factory):
     zarr_store = tmp_path_factory.mktemp("zarr_store") / "test.zarr"
+    spw_store = zarr_store.parent / f"{zarr_store.name}::SPECTRAL_WINDOW"
+    ant_store = zarr_store.parent / f"{zarr_store.name}::ANTENNA"
 
     ms_datasets = xds_from_ms(ms)
+    spw_datasets = xds_from_table(spw_table, group_cols="__row__")
+    ant_datasets = xds_from_table(ant_table)
 
     for i, ds in enumerate(ms_datasets):
         dims = ds.dims
@@ -48,7 +55,10 @@ def test_xds_to_zarr(ms, tmp_path_factory):
             "corr": (("corr",), np.arange(corr)),
         })
 
-    writes = xds_to_zarr(ms_datasets, zarr_store)
+    writes = []
+    writes.extend(xds_to_zarr(ms_datasets, zarr_store))
+    writes.extend(xds_to_zarr(spw_datasets, spw_store))
+    writes.extend(xds_to_zarr(ant_datasets, ant_store))
     dask.compute(writes)
 
     zarr_datasets = xds_from_zarr(zarr_store, chunks={"row": 1})
@@ -76,6 +86,32 @@ def test_xds_to_zarr(ms, tmp_path_factory):
             assert_array_equal(zattr, v)
 
 
+@pytest.mark.skipif(xarray is None, reason="Needs xarray to rechunk")
+def test_multiprocess_create(ms, tmp_path_factory):
+    zarr_store = tmp_path_factory.mktemp("zarr_store") / "test.zarr"
+
+    ms_datasets = xds_from_ms(ms)
+
+    for i, ds in enumerate(ms_datasets):
+        ms_datasets[i] = ds.chunk({"row": 1})
+
+    writes = xds_to_zarr(ms_datasets, zarr_store)
+
+    dask.compute(writes, scheduler="processes")
+
+    zds = xds_from_zarr(zarr_store)
+
+    for zds, msds in zip(zds, ms_datasets):
+        for k, v in msds.data_vars.items():
+            assert_array_equal(v, getattr(zds, k))
+
+        for k, v in msds.coords.items():
+            assert_array_equal(v, getattr(zds, k))
+
+        for k, v in msds.attrs.items():
+            assert_array_equal(v, getattr(zds, k))
+
+
 @pytest.mark.optional
 @pytest.mark.skipif(xarray is None, reason="depends on xarray")
 def test_xarray_to_zarr(ms, tmp_path_factory):
@@ -95,3 +131,41 @@ def test_xarray_to_zarr(ms, tmp_path_factory):
 
     for i, ds in enumerate(datasets):
         ds.to_zarr(str(store / f"ds-{i}.zarr"))
+
+
+def _fasteners_runner(lockfile):
+    fasteners = pytest.importorskip("fasteners")
+    from pathlib import Path
+    import json
+
+    lock = fasteners.InterProcessLock(lockfile)
+
+    root = Path(lockfile).parents[0]
+    metafile = root / "metadata.json"
+
+    metadata = {"tables": ["MAIN", "SPECTRAL_WINDOW"]}
+
+    with lock:
+        if metafile.exists():
+            exists = True
+
+            with open(metafile, "r") as f:
+                assert json.loads(f.read()) == metadata
+        else:
+            exists = False
+
+            with open(metafile, "w") as f:
+                f.write(json.dumps(metadata))
+
+        return os.getpid(), exists
+
+
+def test_fasteners(ms, tmp_path_factory):
+    lockfile = tmp_path_factory.mktemp("fasteners-") / "dir" / ".lock"
+
+    from pprint import pprint
+
+    with Pool(4) as pool:
+        results = [pool.apply_async(_fasteners_runner, (lockfile,))
+                   for _ in range(4)]
+        pprint([r.get() for r in results])

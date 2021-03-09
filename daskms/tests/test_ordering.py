@@ -29,85 +29,85 @@ def test_ordering_query_taql_where_strings(ms, group_cols, index_cols):
     taql = group_ordering_taql(table_proxy(ms), group_cols, index_cols,
                                taql_where="ANTENNA1 != ANTENNA2")
     assert taql._args[0].replace("\t", " "*4) == (
-                    "SELECT\n"
-                    "    FIELD_ID,\n"
-                    "    SCAN_NUMBER,\n"
-                    "    GAGGR(TIME) as GROUP_TIME,\n"
-                    "    GAGGR(ANTENNA1) as GROUP_ANTENNA1,\n"
-                    "    GAGGR(ANTENNA2) as GROUP_ANTENNA2,\n"
-                    "    GROWID() AS __tablerow__,\n"
-                    "    GCOUNT() as __tablerows__,\n"
-                    "    GROWID()[0] as __firstrow__\n"
-                    "FROM\n"
-                    "    $1\n"
-                    "WHERE\n"
-                    "    ANTENNA1 != ANTENNA2\n"
-                    "GROUPBY\n"
-                    "    FIELD_ID,\n"
-                    "    SCAN_NUMBER")
+        "SELECT\n"
+        "    FIELD_ID,\n"
+        "    SCAN_NUMBER,\n"
+        "    GAGGR(TIME) as GROUP_TIME,\n"
+        "    GAGGR(ANTENNA1) as GROUP_ANTENNA1,\n"
+        "    GAGGR(ANTENNA2) as GROUP_ANTENNA2,\n"
+        "    GROWID() AS __tablerow__,\n"
+        "    GCOUNT() as __tablerows__,\n"
+        "    GROWID()[0] as __firstrow__\n"
+        "FROM\n"
+        "    $1\n"
+        "WHERE\n"
+        "    ANTENNA1 != ANTENNA2\n"
+        "GROUPBY\n"
+        "    FIELD_ID,\n"
+        "    SCAN_NUMBER")
 
     taql = group_ordering_taql(table_proxy(ms), group_cols, index_cols)
     assert taql._args[0].replace("\t", " "*4) == (
-                    "SELECT\n"
-                    "    FIELD_ID,\n"
-                    "    SCAN_NUMBER,\n"
-                    "    GAGGR(TIME) as GROUP_TIME,\n"
-                    "    GAGGR(ANTENNA1) as GROUP_ANTENNA1,\n"
-                    "    GAGGR(ANTENNA2) as GROUP_ANTENNA2,\n"
-                    "    GROWID() AS __tablerow__,\n"
-                    "    GCOUNT() as __tablerows__,\n"
-                    "    GROWID()[0] as __firstrow__\n"
-                    "FROM\n"
-                    "    $1\n"
-                    "GROUPBY\n"
-                    "    FIELD_ID,\n"
-                    "    SCAN_NUMBER")
+        "SELECT\n"
+        "    FIELD_ID,\n"
+        "    SCAN_NUMBER,\n"
+        "    GAGGR(TIME) as GROUP_TIME,\n"
+        "    GAGGR(ANTENNA1) as GROUP_ANTENNA1,\n"
+        "    GAGGR(ANTENNA2) as GROUP_ANTENNA2,\n"
+        "    GROWID() AS __tablerow__,\n"
+        "    GCOUNT() as __tablerows__,\n"
+        "    GROWID()[0] as __firstrow__\n"
+        "FROM\n"
+        "    $1\n"
+        "GROUPBY\n"
+        "    FIELD_ID,\n"
+        "    SCAN_NUMBER")
 
     taql = group_ordering_taql(table_proxy(ms), group_cols, [])
     assert taql._args[0].replace("\t", " "*4) == (
-                    "SELECT\n"
-                    "    FIELD_ID,\n"
-                    "    SCAN_NUMBER,\n"
-                    "    GROWID() AS __tablerow__,\n"
-                    "    GCOUNT() as __tablerows__,\n"
-                    "    GROWID()[0] as __firstrow__\n"
-                    "FROM\n"
-                    "    $1\n"
-                    "GROUPBY\n"
-                    "    FIELD_ID,\n"
-                    "    SCAN_NUMBER")
+        "SELECT\n"
+        "    FIELD_ID,\n"
+        "    SCAN_NUMBER,\n"
+        "    GROWID() AS __tablerow__,\n"
+        "    GCOUNT() as __tablerows__,\n"
+        "    GROWID()[0] as __firstrow__\n"
+        "FROM\n"
+        "    $1\n"
+        "GROUPBY\n"
+        "    FIELD_ID,\n"
+        "    SCAN_NUMBER")
 
     taql = ordering_taql(table_proxy(ms), index_cols,
                          taql_where="ANTENNA1 != ANTENNA2")
     assert taql._args[0].replace("\t", " "*4) == (
-                    "SELECT\n"
-                    "    ROWID() as __tablerow__\n"
-                    "FROM\n"
-                    "    $1\n"
-                    "WHERE\n"
-                    "    ANTENNA1 != ANTENNA2\n"
-                    "ORDERBY\n"
-                    "    TIME,\n"
-                    "    ANTENNA1,\n"
-                    "    ANTENNA2")
+        "SELECT\n"
+        "    ROWID() as __tablerow__\n"
+        "FROM\n"
+        "    $1\n"
+        "WHERE\n"
+        "    ANTENNA1 != ANTENNA2\n"
+        "ORDERBY\n"
+        "    TIME,\n"
+        "    ANTENNA1,\n"
+        "    ANTENNA2")
 
     taql = ordering_taql(table_proxy(ms), index_cols)
     assert taql._args[0].replace("\t", " "*4) == (
-                    "SELECT\n"
-                    "    ROWID() as __tablerow__\n"
-                    "FROM\n"
-                    "    $1\n"
-                    "ORDERBY\n"
-                    "    TIME,\n"
-                    "    ANTENNA1,\n"
-                    "    ANTENNA2")
+        "SELECT\n"
+        "    ROWID() as __tablerow__\n"
+        "FROM\n"
+        "    $1\n"
+        "ORDERBY\n"
+        "    TIME,\n"
+        "    ANTENNA1,\n"
+        "    ANTENNA2")
 
     taql = ordering_taql(table_proxy(ms), [])
     assert taql._args[0].replace("\t", " "*4) == (
-                    "SELECT\n"
-                    "    ROWID() as __tablerow__\n"
-                    "FROM\n"
-                    "    $1\n")
+        "SELECT\n"
+        "    ROWID() as __tablerow__\n"
+        "FROM\n"
+        "    $1\n")
 
 
 @pytest.mark.parametrize("group_cols", [

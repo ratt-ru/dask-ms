@@ -87,6 +87,7 @@ class ArrayCache(metaclass=ArrayCacheMetaClass):
 
     Cached on a WeakKeyDictionary with ``Key`` objects.
     """
+
     def __init__(self, token):
         self.token = token
         self.cache = WeakKeyDictionary()

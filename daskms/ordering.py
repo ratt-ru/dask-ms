@@ -89,17 +89,13 @@ def row_ordering(taql_proxy, index_cols, chunks):
         start += c
 
     graph = HighLevelGraph.from_collections(name, layers, [])
-    rows = da.Array(graph, name, chunks=chunks, dtype=np.object)
+    rows = da.Array(graph, name, chunks=chunks, dtype=np.int64)
     rows = cached_array(rows)
     row_runs = rows.map_blocks(row_run_factory, sort_dir="read",
                                dtype=np.object)
     row_runs = cached_array(row_runs)
 
     return rows, row_runs
-
-
-def _group_name(column):
-    return "GROUP_" + column
 
 
 def _sorted_group_rows(taql_proxy, group, index_cols):

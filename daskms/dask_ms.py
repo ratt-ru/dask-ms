@@ -13,7 +13,7 @@ _DEFAULT_INDEX_COLUMNS = ["TIME"]
 log = logging.getLogger(__name__)
 
 
-def xds_to_table(xds, table_name, columns, descriptor=None,
+def xds_to_table(xds, table_name, columns="ALL", descriptor=None,
                  table_keywords=None, column_keywords=None,
                  table_proxy=False):
     """
@@ -302,6 +302,39 @@ def xds_from_ms(ms, columns=None, index_cols=None, group_cols=None, **kwargs):
                           index_cols=index_cols,
                           group_cols=group_cols,
                           **kwargs)
+
+
+def xds_from_storage_table(store, **kwargs):
+    from daskms.utils import dataset_type
+    typ = dataset_type(store)
+
+    if typ == "casa":
+        return xds_from_table(store, **kwargs)
+    elif typ == "zarr":
+        from daskms.experimental.zarr import xds_from_zarr
+        return xds_from_zarr(store, **kwargs)
+    elif typ == "parquet":
+        from daskms.experimental.arrow import xds_from_parquet
+        return xds_from_parquet(store, **kwargs)
+    else:
+        raise TypeError(f"Unknown dataset {typ}")
+
+
+def xds_from_storage_ms(store, **kwargs):
+    from daskms.utils import dataset_type
+
+    typ = dataset_type(store)
+
+    if typ == "casa":
+        return xds_from_ms(store, **kwargs)
+    elif typ == "zarr":
+        from daskms.experimental.zarr import xds_from_zarr
+        return xds_from_zarr(store, **kwargs)
+    elif typ == "parquet":
+        from daskms.experimental.arrow import xds_from_parquet
+        return xds_from_parquet(store, **kwargs)
+    else:
+        raise TypeError(f"Unknown dataset {typ}")
 
 
 # Set docstring variables in try/except

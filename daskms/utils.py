@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
+from collections import OrderedDict
 import logging
+import os.path
 from pathlib import Path
 import time
 
@@ -33,7 +35,7 @@ def freeze(arg):
         return tuple(map(freeze, sorted(arg)))
     elif isinstance(arg, (tuple, list)):
         return tuple(map(freeze, arg))
-    elif isinstance(arg, dict):
+    elif isinstance(arg, (dict, OrderedDict)):
         return frozenset((k, freeze(v)) for k, v in sorted(arg.items()))
     elif isinstance(arg, np.ndarray):
         return freeze(arg.tolist())
@@ -85,7 +87,15 @@ def table_path_split(path):
         path = Path(path)
 
     root = path.parent
-    table_name, _, subtable = path.name.partition("::")
+    parts = path.name.split("::", 1)
+
+    if len(parts) == 1:
+        table_name = parts[0]
+        subtable = ""
+    elif len(parts) == 2:
+        table_name, subtable = parts
+    else:
+        raise RuntimeError("len(parts) not in (1, 2)")
 
     return root, table_name, subtable
 
@@ -193,3 +203,45 @@ def requires(*args):
             return fn
 
     return decorator
+
+
+def dataset_type(path):
+    """
+    Parameters
+    ----------
+    path : Path
+
+    Returns
+    -------
+    type : {"casa", "zarr", "parquet"}
+        Type of table at the specified path
+
+    Raises
+    ------
+    TypeError
+        If it was not possible to infer the type of dataset
+    """
+
+    if not isinstance(path, Path):
+        path = Path(path)
+
+    parts = path.name.split("::", 1)
+
+    if len(parts) == 1:
+        pass
+    elif len(parts) == 2:
+        path = path.parent / parts[0]
+    else:
+        raise ValueError(f"len(parts) '{len(parts)}' not in (1, 2)")
+
+    if (path / "table.dat").exists():
+        return "casa"
+    else:
+        for _, _, files in os.walk(str(path)):
+            for f in files:
+                if f == ".zgroup":
+                    return "zarr"
+                elif f.endswith(".parquet"):
+                    return "parquet"
+
+    raise TypeError("Unknown table type")

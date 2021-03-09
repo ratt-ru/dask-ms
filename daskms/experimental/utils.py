@@ -1,25 +1,9 @@
+from pathlib import Path
+
 import dask
 import dask.array as da
 from dask.highlevelgraph import HighLevelGraph
 import numpy as np
-
-
-def encode_attr(arg):
-    """ Convert arg into something acceptable to json """
-    if isinstance(arg, tuple):
-        return tuple(map(encode_attr, arg))
-    elif isinstance(arg, list):
-        return list(map(encode_attr, arg))
-    elif isinstance(arg, set):
-        return list(map(encode_attr, sorted(arg)))
-    elif isinstance(arg, dict):
-        return {k: encode_attr(v) for k, v in arg.items()}
-    elif isinstance(arg, np.ndarray):
-        return arg.tolist()
-    elif isinstance(arg, np.generic):
-        return arg.item()
-    else:
-        return arg
 
 
 def extent_args(dims, chunks):
@@ -70,3 +54,23 @@ def promote_columns(columns):
     else:
         raise TypeError(f"'columns' must be None or str "
                         f"or list of str. Got {columns}")
+
+
+def store_path_split(store):
+    if not isinstance(store, Path):
+        store = Path(store)
+
+    parts = store.name.split("::", 1)
+
+    if len(parts) == 1:
+        name = parts[0]
+        subtable = "MAIN"
+    elif len(parts) == 2:
+        name, subtable = parts
+
+        if subtable == "MAIN":
+            raise ValueError("'MAIN' is a reserved subtable name")
+    else:
+        raise RuntimeError(f"len(parts) {len(parts)} not in (1, 2)")
+
+    return store.parent / name, subtable

@@ -7,6 +7,7 @@
 
 import json
 
+from dask.base import flatten
 import numpy as np
 
 try:
@@ -30,6 +31,8 @@ def _tensor_to_array(obj, pa_dtype):
         flat_array = obj.view(obj.real.dtype).ravel()
         storage = pa.FixedSizeListArray.from_arrays(flat_array, 2)
         child_array = pa.ExtensionArray.from_storage(pa_dtype, storage)
+    elif pa_dtype == pa.string():
+        child_array = pa.array(list(flatten(obj.tolist())))
     else:
         child_buf = pa.py_buffer(obj)
         child_array = pa.Array.from_buffers(pa_dtype, total_elements,
@@ -66,6 +69,9 @@ class TensorType(ExtensionType):
                 self._element_shape == other._element_shape and
                 self.storage_type == other.storage_type)
 
+    def __hash__(self):
+        return hash((self._element_shape, self.storage_type))
+
     @property
     def shape(self):
         return self._element_shape
@@ -92,6 +98,10 @@ class TensorArray(ExtensionArray):
 
         if np.iscomplexobj(obj):
             dtype = ComplexType(pa.from_numpy_dtype(obj.real.dtype))
+        elif obj.dtype == np.dtype(np.object):
+            # TODO(sjperkins)
+            # Assumption here is that objects are string
+            dtype = pa.string()
         else:
             dtype = pa.from_numpy_dtype(obj.dtype)
 
@@ -105,14 +115,27 @@ class TensorArray(ExtensionArray):
 
         return _tensor_to_array(obj, dtype)
 
-    def to_numpy(self):
+    def to_numpy(self, zero_copy_only=True, writeable=False):
+        if zero_copy_only is False:
+            raise NotImplementedError("zero_copy_only is False for Tensors")
+
+        if writeable is True:
+            raise NotImplementedError("writeable is True for Tensors")
+
         shape = (len(self),) + self.type.shape
         storage_list_type = self.storage.type
         dtype = storage_list_type.value_type.to_pandas_dtype()
-        i = 4 if np.issubdtype(dtype, np.complexfloating) else 3
-        buf = self.storage.buffers()[i]
+        bufs = self.storage.buffers()
 
-        return np.ndarray(shape, buffer=buf, dtype=dtype)
+        # string case
+        if storage_list_type.value_type == pa.string():
+            # TODO(sjerkins)
+            # See if we can use the underlying arrow buffers here...
+            return np.array(self.storage.tolist(), dtype=np.object)
+        elif np.issubdtype(dtype, np.complexfloating):
+            return np.ndarray(shape, buffer=bufs[4], dtype=dtype)
+        else:
+            return np.ndarray(shape, buffer=bufs[3], dtype=dtype)
 
     def to_tensor(self):
         return pa.Tensor.from_numpy(self.to_numpy())

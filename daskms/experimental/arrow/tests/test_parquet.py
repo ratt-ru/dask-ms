@@ -1,17 +1,26 @@
+import random
+
 import dask
+import dask.array as da
 import numpy as np
 from numpy.testing import assert_array_equal
 import pytest
 
 from daskms import xds_from_ms
-from daskms.reads import PARTITION_KEY
+from daskms.dataset import Dataset
 from daskms.experimental.arrow.extension_types import TensorArray
 from daskms.experimental.arrow.reads import xds_from_parquet
 from daskms.experimental.arrow.reads import partition_chunking
 from daskms.experimental.arrow.writes import xds_to_parquet
+from daskms.constants import DASKMS_PARTITION_KEY
 
 pa = pytest.importorskip("pyarrow")
 pq = pytest.importorskip("pyarrow.parquet")
+
+try:
+    import xarray
+except ImportError:
+    xarray = None
 
 
 def test_parquet_roundtrip(tmp_path_factory):
@@ -65,23 +74,49 @@ def test_partition_chunks(row_chunks, user_chunks):
     assert partition_chunking(0, row_chunks, [user_chunks]) == expected
 
 
-def test_xds_to_parquet(ms, tmp_path_factory):
-    store = tmp_path_factory.mktemp("parquet_store") / "out.parquet"
-    datasets = xds_from_ms(ms)
+def test_xds_to_parquet_string(tmp_path_factory):
+    store = tmp_path_factory.mktemp("parquet_store") / "string-dataset.parquet"
+
+    datasets = []
+
+    for i in range(3):
+        names = random.choices([f"foo-{i}", f"bar-{i}", f"qux-{i}"], k=10)
+        names = np.asarray(names, dtype=np.object)
+        chunks = sorted([1, 2, 3, 4], key=lambda *a: random.random())
+        names = da.from_array(names, chunks=chunks)
+        datasets.append(Dataset({"NAME": (("row",), names)}))
+
     writes = xds_to_parquet(datasets, store)
     dask.compute(writes)
 
-    record_batches = pq.ParquetDataset(store).read().to_batches()
+    parquet_datasets = xds_from_parquet(store)
+    assert len(datasets) == len(parquet_datasets)
 
-    for ds, batch in zip(datasets, record_batches):
-        for column, array in zip(batch.schema.names, batch.columns):
-            if column in ds.attrs:
-                assert_array_equal(getattr(ds, column), array.to_numpy())
-            else:
-                var = getattr(ds, column).data
-                expected_patype = TensorArray if var.ndim > 1 else pa.Array
-                assert isinstance(array, expected_patype)
-                assert_array_equal(var, array.to_numpy())
+    for ds, pq_ds in zip(datasets, parquet_datasets):
+        assert_array_equal(ds.NAME.data, pq_ds.NAME.data)
+
+
+def test_xds_to_parquet(ms, tmp_path_factory, spw_table, ant_table):
+    store = tmp_path_factory.mktemp("parquet_store") / "out.parquet"
+    # antenna_store = store.parent / f"{store.name}::ANTENNA"
+    # spw_store = store.parent / f"{store.name}::SPECTRAL_WINDOW"
+
+    datasets = xds_from_ms(ms)
+
+    # We can test row chunking if xarray is installed
+    if xarray is not None:
+        datasets = [ds.chunk({"row": 1}) for ds in datasets]
+
+    # spw_datasets = xds_from_table(spw_table, group_cols="__row__")
+    # ant_datasets = xds_from_table(ant_table, group_cols="__row__")
+
+    writes = []
+    writes.extend(xds_to_parquet(datasets, store))
+    # TODO(sjperkins)
+    # Fix arrow shape unification errors
+    # writes.extend(xds_to_parquet(spw_datasets, spw_store))
+    # writes.extend(xds_to_parquet(ant_datasets, antenna_store))
+    dask.compute(writes)
 
     pq_datasets = xds_from_parquet(store, chunks={"row": 1})
     assert len(datasets) == len(pq_datasets)
@@ -92,8 +127,13 @@ def test_xds_to_parquet(ms, tmp_path_factory):
             assert_array_equal(var.data, pq_var.data)
             assert var.dims == pq_var.dims
 
-        partitions = ds.attrs[PARTITION_KEY]
-        pq_partitions = pq_ds.attrs[PARTITION_KEY]
+        for column, var in ds.coords.items():
+            pq_var = getattr(pq_ds, column)
+            assert_array_equal(var.data, pq_var.data)
+            assert var.dims == pq_var.dims
+
+        partitions = ds.attrs[DASKMS_PARTITION_KEY]
+        pq_partitions = pq_ds.attrs[DASKMS_PARTITION_KEY]
         assert partitions == pq_partitions
 
         for field, dtype in partitions:

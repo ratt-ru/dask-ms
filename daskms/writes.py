@@ -11,6 +11,7 @@ import pyrap.tables as pt
 
 from daskms.columns import dim_extents_array
 from daskms.dataset import Dataset
+from daskms.dataset_schema import DatasetSchema
 from daskms.descriptors.builder import AbstractDescriptorBuilder
 from daskms.descriptors.builder_factory import filename_builder_factory
 from daskms.descriptors.builder_factory import string_builder_factory
@@ -236,7 +237,8 @@ def _writable_table_proxy(table_name):
 
 def _create_table(table_name, datasets, columns, descriptor):
     builder = descriptor_builder(table_name, descriptor)
-    table_desc, dminfo = builder.execute(datasets)
+    schemas = [DatasetSchema.from_dataset(ds, columns) for ds in datasets]
+    table_desc, dminfo = builder.execute(schemas)
 
     root, table, subtable = table_path_split(table_name)
     table_path = root / table
@@ -298,12 +300,13 @@ def _updated_table(table, datasets, columns, descriptor):
         # seems to incur casacore's internal wrath.
         #
         # Here, we
-        # 1. Build a full table description from all variables
-        # 2. Take only the column descriptions for the missing variables.
-        # 3. Create Data Managers associated with missing variables,
+        # 1. Build a partial table description from missing variables
+        # 2. Create Data Managers associated with missing variables,
         #    discarding any that currently exist on the table
+
+        schemas = [DatasetSchema.from_dataset(ds, missing) for ds in datasets]
         builder = descriptor_builder(table, descriptor)
-        variables = builder.dataset_variables(datasets)
+        variables = builder.dataset_variables(schemas)
         default_desc = builder.default_descriptor()
         table_desc = builder.descriptor(variables, default_desc)
         table_desc = {m: table_desc[m] for m in missing}
@@ -315,7 +318,7 @@ def _updated_table(table, datasets, columns, descriptor):
 
         # Construct a dminfo object with Data Manager Groups not present
         # on the original dminfo object
-        dminfo = {"*%d" % (i + 1): v for i, v
+        dminfo = {f"*{i + 1}": v for i, v
                   in enumerate(builder.dminfo(table_desc).values())
                   if v['NAME'] not in odminfo}
 

@@ -11,10 +11,12 @@ import numpy as np
 
 from daskms.dataset import Dataset
 from daskms.experimental.utils import (promote_columns,
-                                       column_iterator)
-from daskms.experimental.arrow.writes import DASKMS_METADATA
+                                       column_iterator,
+                                       store_path_split)
+from daskms.experimental.arrow.arrow_schema import DASKMS_METADATA
 from daskms.experimental.arrow.extension_types import TensorType
-from daskms.reads import PARTITION_KEY
+from daskms.experimental.arrow.require_arrow import requires_arrow
+from daskms.constants import DASKMS_PARTITION_KEY
 from daskms.utils import freeze
 
 try:
@@ -93,10 +95,20 @@ class ParquetFileProxy(metaclass=ParquetFileProxyMetaClass):
     def metadata(self):
         return self.file.metadata
 
+    def __eq__(self, other):
+        return (isinstance(other, ParquetFileProxy) and
+                self.path == other.path)
+
+    def __lt__(self, other):
+        return (isinstance(other, ParquetFileProxy) and
+                self.path < other.path)
+
     def read_column(self, column, start=None, end=None):
         chunks = self.file.read(columns=[column]).column(column).chunks
         assert len(chunks) == 1
-        return chunks[0].to_numpy()[start:end]
+
+        zero_copy = chunks[0].type not in (pa.string(), pa.bool_())
+        return chunks[0].to_numpy(zero_copy_only=zero_copy)[start:end]
 
 
 def _partition_values(partition_strings, partition_meta):
@@ -111,7 +123,6 @@ def _partition_values(partition_strings, partition_meta):
                              f"{partition_strings} does not match "
                              f"metadata column name {pf}")
 
-        assert field == pf
         partitions.append((field, np.dtype(dt).type(value)))
 
     return tuple(partitions)
@@ -176,7 +187,11 @@ def partition_chunking(partition, fragment_rows, chunks):
     return ranges
 
 
+@requires_arrow(pyarrow_import_error)
 def xds_from_parquet(store, columns=None, chunks=None):
+    store, table = store_path_split(store)
+    store = store / table
+
     if not isinstance(store, Path):
         store = Path(store)
 
@@ -204,14 +219,16 @@ def xds_from_parquet(store, columns=None, chunks=None):
         fragment = ParquetFileProxy(fragment)
         fragment_meta = fragment.metadata
         metadata = json.loads(fragment_meta.metadata[DASKMS_METADATA.encode()])
-        partition_meta = metadata[PARTITION_KEY]
+        partition_meta = metadata[DASKMS_PARTITION_KEY]
         partition_meta = tuple(tuple((f, v)) for f, v in partition_meta)
         partitions = _partition_values(partitions, partition_meta)
         partition_schemas.add(partition_meta)
         ds_cfg[partitions].append(fragment)
 
     # Sanity check partition schemas of all parquet files
-    if len(partition_schemas) != 1:
+    if len(partition_schemas) == 0:
+        raise ValueError(f"No parquet files found in {store}")
+    elif len(partition_schemas) != 1:
         raise ValueError(f"Multiple partitions discovered {partition_schemas}")
 
     partition_schemas = partition_schemas.pop()
@@ -219,6 +236,7 @@ def xds_from_parquet(store, columns=None, chunks=None):
 
     # Now create a dataset per partition
     for p, (partition, fragments) in enumerate(sorted(ds_cfg.items())):
+        fragments = list(sorted(fragments))
         column_arrays = defaultdict(list)
         fragment_rows = [f.metadata.num_rows for f in fragments]
 
@@ -266,7 +284,7 @@ def xds_from_parquet(store, columns=None, chunks=None):
             data_vars[column] = (array_dims.pop(), da.concatenate(arrays))
 
         attrs = dict(partition)
-        attrs[PARTITION_KEY] = partition_schemas
+        attrs[DASKMS_PARTITION_KEY] = partition_schemas
         datasets.append(Dataset(data_vars, attrs=attrs))
 
     return datasets
