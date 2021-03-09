@@ -145,6 +145,9 @@ def _gen_writes(variables, chunks, columns, factory):
             raise NotImplementedError(f"Writing {type(var.data)} "
                                       f"unsupported")
 
+        if var.data.nbytes == 0:
+            continue
+
         token_name = (f"write~{name}-"
                       f"{tokenize(var_data, name, factory, *ext_args)}")
 

@@ -38,8 +38,8 @@ class TableFormat(abc.ABC):
         if typ == "casa":
             from daskms.table_proxy import TableProxy
             import pyrap.tables as pt
-            table_proxy = TableProxy(pt.table, str(
-                path), readonly=True, ack=False)
+            table_proxy = TableProxy(pt.table, str(path),
+                                     readonly=True, ack=False)
             keywords = table_proxy.getkeywords().result()
 
             try:
@@ -192,26 +192,49 @@ class ParquetFormat(BaseTableFormat):
         return "parquet"
 
 
-class TableTransformer:
-    @staticmethod
-    def transform(input_path, output_path, output_format):
-        in_fmt = TableFormat.from_path(input_path)
+def convert_table(input_path, output_path, output_format):
+    in_fmt = TableFormat.from_path(input_path)
+    out_fmt = TableFormat.from_type(output_format)
+
+    reader = in_fmt.reader()
+    writer = out_fmt.writer()
+
+    datasets = reader(input_path)
+
+    if isinstance(in_fmt, CasaFormat):
+        # Drop any ROWID columns
+        datasets = [ds.drop_vars("ROWID", errors="ignore")
+                    for ds in datasets]
+
+    log.info("Input: '%s' %s", in_fmt, str(input_path))
+    log.info("Output: '%s' %s", out_fmt, str(output_path))
+
+    writes = [writer(datasets, str(output_path))]
+
+    # Now do the subtables
+    for table in list(in_fmt.subtables):
+        if table == "SORTED_TABLE":
+            log.warning(f"Ignoring {table}")
+            continue
+
+        in_path = input_path.parent / "::".join((input_path.name, table))
+        in_fmt = TableFormat.from_path(in_path)
+        out_path = output_path.parent / "::".join((output_path.name, table))
         out_fmt = TableFormat.from_type(output_format)
 
         reader = in_fmt.reader()
         writer = out_fmt.writer()
 
-        datasets = reader(input_path)
-
         if isinstance(in_fmt, CasaFormat):
             # Drop any ROWID columns
             datasets = [ds.drop_vars("ROWID", errors="ignore")
-                        for ds in datasets]
+                        for ds in reader(in_path, group_cols="__row__")]
+        else:
+            datasets = reader(in_path)
 
-        log.info("Input: '%s' %s", in_fmt, str(input_path))
-        log.info("Output: '%s' %s", out_fmt, str(output_path))
+        writes.append(writer(datasets, str(out_path)))
 
-        return writer(datasets, str(output_path))
+    return writes
 
 
 def _check_input_path(input: str):
@@ -262,7 +285,8 @@ class Convert(Application):
                 raise ValueError(f"{self.args.output} exists. "
                                  f"Use --force to overwrite.")
 
-        writes = TableTransformer.transform(
-            self.args.input, self.args.output, self.args.format)
+        writes = convert_table(self.args.input,
+                               self.args.output,
+                               self.args.format)
 
         dask.compute(writes)

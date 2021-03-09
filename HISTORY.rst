@@ -4,11 +4,12 @@ History
 
 0.2.7 (YYYY-MM-DD)
 ------------------
+* Add a `dask-ms convert` script for converting between CASA, Zarr and Parquet formats (:pr:`145`)
 * Convert code-base to f-strings with flynt (:pr:`144`)
 * Consolidate Dataset Types into daskms.dataset (:pr:`143`)
 * Correct Dataset persistence issues (:pr:`140`)
-* Experimental arrow support (:pr:`130`, :pr:`132`, :pr:`133`, :pr:`135`, :pr:`136`, :pr:`138`)
-* Experimental zarr support (:pr:`129`, :pr:`133`, :pr:`139`, :pr:`142`, :pr:`150`)
+* Experimental arrow support (:pr:`130`, :pr:`132`, :pr:`133`, :pr:`135`, :pr:`136`, :pr:`138`, :pr:`145`)
+* Experimental zarr support (:pr:`129`, :pr:`133`, :pr:`139`, :pr:`142`, :pr:`150`, :pr:`145`)
 * Test data fix (:pr:`128`)
 * Fix array inlining for writes (:pr:`126`)
 * Allow Multi-Layer Inlining (:pr:`125`)
