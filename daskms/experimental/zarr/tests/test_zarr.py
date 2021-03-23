@@ -8,6 +8,7 @@ from numpy.testing import assert_array_equal
 import pytest
 
 from daskms import xds_from_ms, xds_from_table
+from daskms.constants import DASKMS_PARTITION_KEY
 from daskms.dataset import Dataset
 from daskms.experimental.zarr import xds_from_zarr, xds_to_zarr
 
@@ -55,8 +56,14 @@ def test_xds_to_zarr(ms, spw_table, ant_table, tmp_path_factory):
             "corr": (("corr",), np.arange(corr)),
         })
 
-    writes = []
-    writes.extend(xds_to_zarr(ms_datasets, zarr_store))
+    main_zarr_writes = xds_to_zarr(ms_datasets, zarr_store)
+    assert len(ms_datasets) == len(main_zarr_writes)
+
+    for ms_ds, zw_ds in zip(ms_datasets, main_zarr_writes):
+        for k, _ in ms_ds.attrs[DASKMS_PARTITION_KEY]:
+            assert getattr(ms_ds, k) == getattr(zw_ds, k)
+
+    writes = [main_zarr_writes]
     writes.extend(xds_to_zarr(spw_datasets, spw_store))
     writes.extend(xds_to_zarr(ant_datasets, ant_store))
     dask.compute(writes)

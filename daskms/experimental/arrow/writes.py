@@ -58,7 +58,7 @@ class ParquetFragmentMetaClass(type):
 class ParquetFragment(metaclass=ParquetFragmentMetaClass):
     def __init__(self, path, schema, dataset_id):
         path = Path(path)
-        partition = schema.attrs.get(DASKMS_PARTITION_KEY, None)
+        partition = schema.attrs.get(DASKMS_PARTITION_KEY, False)
 
         if not partition:
             # There's no specific partitioning schema,
@@ -169,6 +169,15 @@ def xds_to_parquet(xds, path, columns=None):
 
         writes = inlined_array(writes, chunk_ids)
 
-        datasets.append(Dataset({"WRITE": (("row",), writes)}))
+        # Transfer any partition information over to the write dataset
+        partition = ds.attrs.get(DASKMS_PARTITION_KEY, False)
+
+        if not partition:
+            attrs = None
+        else:
+            attrs = {DASKMS_PARTITION_KEY: partition,
+                     **{k: getattr(ds, k) for k, _ in partition}}
+
+        datasets.append(Dataset({"WRITE": (("row",), writes)}, attrs=attrs))
 
     return datasets
