@@ -4,6 +4,7 @@ History
 
 0.2.7 (YYYY-MM-DD)
 ------------------
+* Remove default time ordering from xds_from_ms (:pr:`156`)
 * Copy partitioning information when writing (:pr:`155`)
 * Add a `dask-ms convert` script for converting between CASA, Zarr and Parquet formats (:pr:`145`)
 * Convert code-base to f-strings with flynt (:pr:`144`)
