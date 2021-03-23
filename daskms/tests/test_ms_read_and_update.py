@@ -114,7 +114,7 @@ def test_ms_update(ms, group_cols, index_cols, select_cols):
         nds = ds.assign(STATE_ID=(("row",), state),
                         DATA=(("row", "chan", "corr"), data))
 
-        write = xds_to_table(nds, ms, ["STATE_ID", "DATA"])
+        write, = xds_to_table(nds, ms, ["STATE_ID", "DATA"])
 
         for k, _ in nds.attrs[DASKMS_PARTITION_KEY]:
             assert getattr(write, k) == getattr(nds, k)
