@@ -7,21 +7,20 @@ from numpy.testing import assert_array_equal
 import pyrap.tables as pt
 import pytest
 
-from daskms.query import orderby_clause, where_clause
-
 try:
     from dask.optimization import key_split
 except ImportError:
     from dask.utils import key_split
 
 from daskms.constants import DASKMS_PARTITION_KEY
-from daskms.utils import (group_cols_str, index_cols_str,
-                          select_cols_str, assert_liveness,
-                          table_path_split)
-from daskms.table_proxy import TableProxy, taql_factory
 from daskms.dask_ms import (xds_from_ms,
                             xds_from_table,
                             xds_to_table)
+from daskms.query import orderby_clause, where_clause
+from daskms.table_proxy import TableProxy, taql_factory
+from daskms.utils import (group_cols_str, index_cols_str,
+                          select_cols_str, assert_liveness,
+                          table_path_split)
 
 
 @pytest.mark.parametrize('group_cols', [
@@ -116,6 +115,10 @@ def test_ms_update(ms, group_cols, index_cols, select_cols):
                         DATA=(("row", "chan", "corr"), data))
 
         write = xds_to_table(nds, ms, ["STATE_ID", "DATA"])
+
+        for k, _ in nds.attrs[DASKMS_PARTITION_KEY]:
+            assert getattr(write, k) == getattr(nds, k)
+
         writes.append(write)
 
     # Do all writes in parallel
