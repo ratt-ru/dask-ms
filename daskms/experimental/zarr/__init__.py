@@ -7,7 +7,7 @@ from dask.base import tokenize
 import numcodecs
 import numpy as np
 
-from daskms.utils import requires
+from daskms.constants import DASKMS_PARTITION_KEY
 from daskms.dataset import Dataset, Variable
 from daskms.dataset_schema import (
     DatasetSchema,
@@ -20,6 +20,7 @@ from daskms.experimental.utils import (
     promote_columns,
     store_path_split)
 from daskms.optimisation import inlined_array
+from daskms.utils import requires
 
 try:
     import zarr
@@ -214,7 +215,17 @@ def xds_to_zarr(xds, store, columns=None):
         data_vars = dict(_gen_writes(ds.data_vars, *write_args))
         # Include coords in the write dataset so they're reified
         data_vars.update(dict(_gen_writes(ds.coords, *write_args)))
-        write_datasets.append(Dataset(data_vars))
+
+        # Transfer any partition information over to the write dataset
+        partition = ds.attrs.get(DASKMS_PARTITION_KEY, False)
+
+        if not partition:
+            attrs = None
+        else:
+            attrs = {DASKMS_PARTITION_KEY: partition,
+                     **{k: getattr(ds, k) for k, _ in partition}}
+
+        write_datasets.append(Dataset(data_vars, attrs=attrs))
 
     return write_datasets
 
