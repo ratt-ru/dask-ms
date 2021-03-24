@@ -163,7 +163,12 @@ def _gen_writes(variables, chunks, columns, factory):
                              meta=np.empty((1,)*len(var.dims), np.bool))
         write = inlined_array(write, ext_args[::2])
 
-        yield name, (var.dims, write, var.attrs)
+        # The following identifies coordinates - we prefix their dims so that
+        # they can be lazily evaluated.
+        if name == var.dims[0] and len(var.dims) == 1:
+            yield name, ("__" + var.dims[0], write, var.attrs)
+        else:
+            yield name, (var.dims, write, var.attrs)
 
 
 @requires("pip install dask-ms[zarr] for zarr support",
