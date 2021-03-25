@@ -132,7 +132,7 @@ def zarr_setter(data, name, group, *extents):
     return np.full((1,)*len(extents), True)
 
 
-def _gen_writes(variables, chunks, columns, factory):
+def _gen_writes(variables, chunks, columns, factory, indirect_dims=False):
     for name, var in column_iterator(variables, columns):
         if isinstance(var.data, da.Array):
             ext_args = extent_args(var.dims, var.chunks)
@@ -163,12 +163,10 @@ def _gen_writes(variables, chunks, columns, factory):
                              meta=np.empty((1,)*len(var.dims), np.bool))
         write = inlined_array(write, ext_args[::2])
 
-        # The following identifies coordinates - we prefix their dims so that
-        # they can be lazily evaluated.
-        if name == var.dims[0] and len(var.dims) == 1:
-            yield name, ("__" + var.dims[0], write, var.attrs)
-        else:
-            yield name, (var.dims, write, var.attrs)
+        # Alter the dimension names to preserve laziness on coordinates.
+        dims = [f"_{d}_" for d in var.dims] if indirect_dims else var.dims
+
+        yield name, (dims, write, var.attrs)
 
 
 @requires("pip install dask-ms[zarr] for zarr support",
@@ -219,7 +217,9 @@ def xds_to_zarr(xds, store, columns=None):
 
         data_vars = dict(_gen_writes(ds.data_vars, *write_args))
         # Include coords in the write dataset so they're reified
-        data_vars.update(dict(_gen_writes(ds.coords, *write_args)))
+        data_vars.update(dict(_gen_writes(ds.coords,
+                                          *write_args,
+                                          indirect_dims=True)))
 
         # Transfer any partition information over to the write dataset
         partition = ds.attrs.get(DASKMS_PARTITION_KEY, False)
