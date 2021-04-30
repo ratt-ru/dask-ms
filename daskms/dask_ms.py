@@ -7,8 +7,8 @@ from daskms.reads import DatasetFactory
 from daskms.writes import write_datasets
 from daskms.utils import promote_columns
 
+_DEFAULT_INDEX_COLUMNS = []
 _DEFAULT_GROUP_COLUMNS = ["FIELD_ID", "DATA_DESC_ID"]
-_DEFAULT_INDEX_COLUMNS = ["TIME"]
 
 log = logging.getLogger(__name__)
 
@@ -280,10 +280,10 @@ def xds_from_ms(ms, columns=None, index_cols=None, group_cols=None, **kwargs):
         Defaults to all if ``None``.
     index_cols  : tuple or list, optional
         Sequence of indexing columns.
-        Defaults to :code:`%(index)s`
+        Defaults to :code:`%(indices)s`
     group_cols  : tuple or list, optional
         Sequence of grouping columns.
-        Defaults to :code:`%(parts)s`
+        Defaults to :code:`%(groups)s`
     **kwargs : optional
 
     Returns
@@ -342,7 +342,7 @@ def xds_from_storage_ms(store, **kwargs):
 # ``python -OO`` strips docstrings
 try:
     xds_from_ms.__doc__ %= {
-        'index': _DEFAULT_INDEX_COLUMNS,
-        'parts': _DEFAULT_GROUP_COLUMNS}
+        'indices': _DEFAULT_INDEX_COLUMNS,
+        'groups': _DEFAULT_GROUP_COLUMNS}
 except AttributeError:
     pass

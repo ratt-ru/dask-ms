@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+import sys
+
 import dask
 import dask.array as da
 import numpy as np
@@ -21,6 +23,9 @@ from daskms.table_proxy import TableProxy, taql_factory
 from daskms.utils import (group_cols_str, index_cols_str,
                           select_cols_str, assert_liveness,
                           table_path_split)
+
+
+PY_37_GTE = sys.version_info[:2] >= (3, 7)
 
 
 @pytest.mark.parametrize('group_cols', [
@@ -243,12 +248,19 @@ def test_multiprocess_table(ms, nprocs):
     # Close and cleanup default dask threadpools
     with dt.pools_lock:
         if dt.default_pool is not None:
-            dt.default_pool.close()
+            if PY_37_GTE:
+                dt.default_pool.shutdown()
+            else:
+                dt.default_pool.close()
+
             dt.default_pool = None
 
         for thread in list(dt.pools.keys()):
             for p in dt.pools.pop(thread).values():
-                p.close()
+                if PY_37_GTE:
+                    p.shutdown()
+                else:
+                    p.close()
 
     # No TableProxies or Executors (with ThreadPools) live
     assert_liveness(0, 0)
