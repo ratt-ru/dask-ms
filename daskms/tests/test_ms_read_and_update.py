@@ -1,11 +1,15 @@
 # -*- coding: utf-8 -*-
 
+import sys
+
 import dask
 import dask.array as da
 import numpy as np
 from numpy.testing import assert_array_equal
 import pyrap.tables as pt
 import pytest
+
+PY_37_GTE = sys.version_info[:2] >= (3, 7)
 
 try:
     from dask.optimization import key_split
@@ -231,7 +235,6 @@ def _proc_map_fn(args):
 
     return True
 
-
 @pytest.mark.parametrize("nprocs", [3])
 def test_multiprocess_table(ms, nprocs):
     import time
@@ -243,12 +246,19 @@ def test_multiprocess_table(ms, nprocs):
     # Close and cleanup default dask threadpools
     with dt.pools_lock:
         if dt.default_pool is not None:
-            dt.default_pool.shutdown()
+            if PY_37_GTE:
+                dt.default_pool.shutdown()
+            else:
+                dt.default_pool.close()
+
             dt.default_pool = None
 
         for thread in list(dt.pools.keys()):
             for p in dt.pools.pop(thread).values():
-                p.shutdown()
+                if PY_37_GTE:
+                    p.shutdown()
+                else:
+                    p.close()
 
     # No TableProxies or Executors (with ThreadPools) live
     assert_liveness(0, 0)
