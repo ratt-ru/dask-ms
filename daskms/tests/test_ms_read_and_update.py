@@ -243,12 +243,12 @@ def test_multiprocess_table(ms, nprocs):
     # Close and cleanup default dask threadpools
     with dt.pools_lock:
         if dt.default_pool is not None:
-            dt.default_pool.close()
+            dt.default_pool.shutdown()
             dt.default_pool = None
 
         for thread in list(dt.pools.keys()):
             for p in dt.pools.pop(thread).values():
-                p.close()
+                p.shutdown()
 
     # No TableProxies or Executors (with ThreadPools) live
     assert_liveness(0, 0)
