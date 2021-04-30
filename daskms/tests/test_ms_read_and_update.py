@@ -9,8 +9,6 @@ from numpy.testing import assert_array_equal
 import pyrap.tables as pt
 import pytest
 
-PY_37_GTE = sys.version_info[:2] >= (3, 7)
-
 try:
     from dask.optimization import key_split
 except ImportError:
@@ -25,6 +23,9 @@ from daskms.table_proxy import TableProxy, taql_factory
 from daskms.utils import (group_cols_str, index_cols_str,
                           select_cols_str, assert_liveness,
                           table_path_split)
+
+
+PY_37_GTE = sys.version_info[:2] >= (3, 7)
 
 
 @pytest.mark.parametrize('group_cols', [
@@ -234,6 +235,7 @@ def _proc_map_fn(args):
         print(str(e))
 
     return True
+
 
 @pytest.mark.parametrize("nprocs", [3])
 def test_multiprocess_table(ms, nprocs):
