@@ -30,7 +30,9 @@ MS_SCHEMA = {
     # Extra imaging columns
     'MODEL_DATA': {'dims': ('chan', 'corr')},
     'CORRECTED_DATA': {'dims': ('chan', 'corr')},
-    'IMAGING_WEIGHT': {'dims': ('chan',)}
+    'IMAGING_WEIGHT': {'dims': ('chan',)},
+    # Extra WSClean imaging columns
+    'IMAGING_WEIGHT_SPECTRUM': {'dims': ('chan', 'corr')},
 }
 
 ANTENNA_SCHEMA = {
