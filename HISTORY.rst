@@ -4,6 +4,7 @@ History
 
 0.2.7 (YYYY-MM-DD)
 ------------------
+* Add IMAGING_WEIGHT_SPECTRUM to default Measurement Schema (:pr:`160`)
 * Remove default time ordering from xds_from_ms (:pr:`156`)
 * Make zarr writes completely lazy (:pr:`157`)
 * Copy partitioning information when writing (:pr:`155`)
