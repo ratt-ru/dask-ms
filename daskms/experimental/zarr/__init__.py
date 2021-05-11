@@ -160,7 +160,7 @@ def _gen_writes(variables, chunks, columns, factory, indirect_dims=False):
                              adjust_chunks={d: 1 for d in var.dims},
                              concatenate=False,
                              name=token_name,
-                             meta=np.empty((1,)*len(var.dims), np.bool))
+                             meta=np.empty((1,)*len(var.dims), bool))
         write = inlined_array(write, ext_args[::2])
 
         # Alter the dimension names to preserve laziness on coordinates.

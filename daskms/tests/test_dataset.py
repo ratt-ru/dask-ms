@@ -273,7 +273,7 @@ def test_dataset_table_schemas(ms):
     np.int16,
     np.int32,
     np.uint32,
-    np.bool,
+    bool,
     pytest.param(object,
                  marks=pytest.mark.xfail(reason="putcol can't handle "
                                                 "lists of ints")),

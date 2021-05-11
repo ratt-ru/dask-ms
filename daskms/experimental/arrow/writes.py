@@ -113,7 +113,7 @@ class ParquetFragment(metaclass=ParquetFragmentMetaClass):
         table = pa.table(table_data, schema=self.schema.to_arrow_schema())
         pq.write_table(table, self.path / f"{chunk.item()}.parquet")
 
-        return np.array([True], np.bool)
+        return np.array([True], bool)
 
 
 @requires_arrow(pyarrow_import_error)
@@ -165,7 +165,7 @@ def xds_to_parquet(xds, path, columns=None):
                               *args,
                               align_arrays=False,
                               adjust_chunks={"row": 1},
-                              meta=np.empty((0,), np.bool))
+                              meta=np.empty((0,), bool))
 
         writes = inlined_array(writes, chunk_ids)
 

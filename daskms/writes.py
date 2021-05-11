@@ -149,7 +149,7 @@ def putter_wrapper(row_orders, *args):
 
     # Handle dask compute_meta gracefully
     if len(row_orders) == 0:
-        return np.empty((0,) * nextent_args, dtype=np.bool)
+        return np.empty((0,) * nextent_args, dtype=bool)
 
     row_runs, resort = row_orders
 
@@ -650,7 +650,7 @@ def _write_datasets(table, table_proxy, datasets, columns, descriptor,
                                      adjust_chunks={d: 1 for d in full_dims},
                                      name=name,
                                      align_arrays=False,
-                                     dtype=np.bool)
+                                     dtype=bool)
 
             if inline:
                 write_col = inlined_array(write_col, inlinable_arrays)
