@@ -263,4 +263,4 @@ def dim_extents_array(dim, chunks):
         start += c
 
     graph = HighLevelGraph.from_collections(name, layers, [])
-    return da.Array(graph, name, chunks=(chunks,), dtype=np.object)
+    return da.Array(graph, name, chunks=(chunks,), dtype=object)

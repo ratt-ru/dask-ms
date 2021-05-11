@@ -98,7 +98,7 @@ class TensorArray(ExtensionArray):
 
         if np.iscomplexobj(obj):
             dtype = ComplexType(pa.from_numpy_dtype(obj.real.dtype))
-        elif obj.dtype == np.dtype(np.object):
+        elif obj.dtype == np.dtype(object):
             # TODO(sjperkins)
             # Assumption here is that objects are string
             dtype = pa.string()
@@ -131,7 +131,7 @@ class TensorArray(ExtensionArray):
         if storage_list_type.value_type == pa.string():
             # TODO(sjerkins)
             # See if we can use the underlying arrow buffers here...
-            return np.array(self.storage.tolist(), dtype=np.object)
+            return np.array(self.storage.tolist(), dtype=object)
         elif np.issubdtype(dtype, np.complexfloating):
             return np.ndarray(shape, buffer=bufs[4], dtype=dtype)
         else:

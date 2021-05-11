@@ -192,7 +192,7 @@ def putter_wrapper(row_orders, *args):
         # NOTE(sjperkins)
         # The convention here is that an object dtype implies an
         # array of string objects
-        if data.dtype == np.object:
+        if data.dtype == object:
             if data.ndim > 1:
                 # Multi-dimensional strings,
                 # we need to pass dicts through
@@ -461,7 +461,7 @@ def add_row_order_factory(table_proxy, datasets):
             graph = HighLevelGraph.from_collections(name, layers,
                                                     prev_deps + [array])
             chunks = (array.chunks[0],)
-            row_adds = da.Array(graph, name, chunks, dtype=np.object)
+            row_adds = da.Array(graph, name, chunks, dtype=object)
             row_add_ops.append(row_adds)
             prev_deps = [row_adds]
 
@@ -539,7 +539,7 @@ def cached_row_order(rowid):
 
     row_order = rowid.map_blocks(row_run_factory,
                                  sort_dir="write",
-                                 dtype=np.object)
+                                 dtype=object)
 
     return cached_array(row_order)
 

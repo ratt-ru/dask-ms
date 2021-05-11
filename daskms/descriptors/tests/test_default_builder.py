@@ -63,7 +63,7 @@ def test_variable_column_descriptor(chunks, dtype, tmp_path):
     dims = ("row",)
     shape = tuple(shapes[d] for d in dims)
     str_chunks = tuple(chunks[d] for d in dims)
-    np_str_array = np.asarray(["BOB"] * shape[0], dtype=np.object)
+    np_str_array = np.asarray(["BOB"] * shape[0], dtype=object)
     da_str_array = da.from_array(np_str_array, chunks=str_chunks)
     str_array_var = Variable(dims, da_str_array, {})
     meta = variable_column_descriptor("NAMES", str_array_var)
