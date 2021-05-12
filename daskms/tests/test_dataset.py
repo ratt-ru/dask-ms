@@ -273,8 +273,8 @@ def test_dataset_table_schemas(ms):
     np.int16,
     np.int32,
     np.uint32,
-    np.bool,
-    pytest.param(np.object,
+    bool,
+    pytest.param(object,
                  marks=pytest.mark.xfail(reason="putcol can't handle "
                                                 "lists of ints")),
     pytest.param(np.uint16,
@@ -318,7 +318,7 @@ def test_dataset_add_string_column(ms):
     dims = ds.dims
 
     name_list = ["BOB"] * dims['row']
-    names = np.asarray(name_list, dtype=np.object)
+    names = np.asarray(name_list, dtype=object)
     names = da.from_array(names, chunks=ds.TIME.chunks)
 
     nds = ds.assign(NAMES=(("row",), names))
@@ -340,7 +340,7 @@ def test_dataset_multidim_string_column(tmp_path, chunks):
     row = sum(chunks['row'])
 
     name_list = [["X-%d" % i, "Y-%d" % i, "Z-%d" % i] for i in range(row)]
-    np_names = np.array(name_list, dtype=np.object)
+    np_names = np.array(name_list, dtype=object)
     names = da.from_array(np_names, chunks=(chunks['row'], np_names.shape[1]))
 
     ds = Dataset({"POLARIZATION_TYPE": (("row", "xyz"), names)})
@@ -385,7 +385,7 @@ def test_dataset_create_table(tmp_path, dataset_chunks, dtype):
         dims = ("row",)
         shape = tuple(shapes[d] for d in dims)
         str_chunks = tuple(chunks[d] for d in dims)
-        np_str_array = np.asarray(["BOB"] * shape[0], dtype=np.object)
+        np_str_array = np.asarray(["BOB"] * shape[0], dtype=object)
         da_str_array = da.from_array(np_str_array, chunks=str_chunks)
         str_array_var = Variable(dims, da_str_array, {})
 

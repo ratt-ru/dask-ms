@@ -57,7 +57,7 @@ def test_ms_create(tmp_path, chunks, num_chans, corr_types, sources):
     na = 64
     position = da.random.random((na, 3))*10000
     offset = da.random.random((na, 3))
-    names = np.array(['ANTENNA-%d' % i for i in range(na)], dtype=np.object)
+    names = np.array(['ANTENNA-%d' % i for i in range(na)], dtype=object)
     ds = Dataset({
         'POSITION': (("row", "xyz"), position),
         'OFFSET': (("row", "xyz"), offset),
@@ -70,7 +70,7 @@ def test_ms_create(tmp_path, chunks, num_chans, corr_types, sources):
         dask_num_lines = da.full((1,), len(rest_freq), dtype=np.int32)
         dask_direction = da.asarray(direction)[None, :]
         dask_rest_freq = da.asarray(rest_freq)[None, :]
-        dask_name = da.asarray(np.asarray([name], dtype=np.object), chunks=1)
+        dask_name = da.asarray(np.asarray([name], dtype=object), chunks=1)
         ds = Dataset({
             "NUM_LINES": (("row",), dask_num_lines),
             "NAME": (("row",), dask_name),

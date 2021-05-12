@@ -32,7 +32,7 @@ singleton_xfail = pytest.mark.xfail(reason="Singletons not handled yet")
 
 
 @pytest.mark.parametrize("dtype", [
-    np.bool,
+    bool,
     np.int32,
     np.float32,
     np.float64,

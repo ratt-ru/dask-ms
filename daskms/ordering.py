@@ -92,7 +92,7 @@ def row_ordering(taql_proxy, index_cols, chunks):
     rows = da.Array(graph, name, chunks=chunks, dtype=np.int64)
     rows = cached_array(rows)
     row_runs = rows.map_blocks(row_run_factory, sort_dir="read",
-                               dtype=np.object)
+                               dtype=object)
     row_runs = cached_array(row_runs)
 
     return rows, row_runs
@@ -152,7 +152,7 @@ def _group_ordering_arrays(taql_proxy, index_cols, group,
 
     group_rows = group_rows.rechunk(group_row_chunks)
     row_runs = group_rows.map_blocks(row_run_factory, sort_dir="read",
-                                     dtype=np.object)
+                                     dtype=object)
 
     row_runs = cached_array(row_runs)
 
