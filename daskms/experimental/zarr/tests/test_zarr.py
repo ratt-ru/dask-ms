@@ -61,10 +61,10 @@ def test_xds_to_zarr_coords(tmp_path_factory):
 
     for ods, nds in zip(ds, rds):
         for c, v in ods.data_vars.items():
-            assert_array_equal(v.data, nds[c].data)
+            assert_array_equal(v.data, getattr(nds, c).data)
 
         for c, v in ods.coords.items():
-            assert_array_equal(v.data, nds[c].data)
+            assert_array_equal(v.data, getattr(nds, c).data)
 
 
 def test_xds_to_zarr(ms, spw_table, ant_table, tmp_path_factory):
