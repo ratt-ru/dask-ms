@@ -16,6 +16,7 @@ from daskms.dataset_schema import (
     decode_attr)
 from daskms.experimental.utils import (
     extent_args,
+    select_vars_and_coords,
     column_iterator,
     promote_columns,
     store_path_split)
@@ -61,34 +62,47 @@ def zarr_chunks(column, dims, chunks):
     return tuple(zchunks)
 
 
-def create_array(ds_group, column, schema, coordinate=False):
-    codec = numcodecs.Pickle() if schema.dtype == object else None
+def create_array(ds_group, column, column_schema,
+                 schema_chunks, coordinate=False):
 
-    zchunks = zarr_chunks(column, schema.dims, schema.chunks)
+    codec = numcodecs.Pickle() if column_schema.dtype == object else None
 
-    array = ds_group.require_dataset(column, schema.shape,
+    if column_schema.chunks is None:
+        try:
+            # No column chunking found, probably an ndarray,
+            # derive column chunking from chunks on dataset
+            chunks = tuple(schema_chunks[d] for d in column_schema.dims)
+        except KeyError:
+            # Nope, just set chunks equal to dimension size
+            chunks = tuple((s,) for s in column_schema.shape)
+    else:
+        chunks = column_schema.chunks
+
+    zchunks = zarr_chunks(column, column_schema.dims, chunks)
+
+    array = ds_group.require_dataset(column, column_schema.shape,
                                      chunks=zchunks,
-                                     dtype=schema.dtype,
+                                     dtype=column_schema.dtype,
                                      object_codec=codec,
                                      exact=True)
 
     if zchunks is not None:
         # Expand zarr chunks to full dask resolution
         # For comparison purposes
-        zchunks = normalize_chunks(array.chunks, schema.shape)
+        zchunks = normalize_chunks(array.chunks, column_schema.shape)
 
-        if zchunks != schema.chunks:
+        if zchunks != chunks:
             raise ValueError(
                 f"zarr chunks {zchunks} "
-                f"don't match dask chunks {schema.chunks}. "
+                f"don't match dask chunks {column_schema.chunks}. "
                 f"This can cause data corruption as described in "
                 f"https://zarr.readthedocs.io/en/stable/tutorial.html"
                 f"#parallel-computing-and-synchronization")
 
     array.attrs[DASKMS_ATTR_KEY] = {
-        "dims": schema.dims,
+        "dims": column_schema.dims,
         "coordinate": coordinate,
-        "array_type": encode_type(schema.type),
+        "array_type": encode_type(column_schema.type),
     }
 
 
@@ -106,12 +120,13 @@ def prepare_zarr_group(dataset_id, dataset, store, table="MAIN"):
     ds_group = group.require_group(table).require_group(group_name)
 
     schema = DatasetSchema.from_dataset(dataset)
+    schema_chunks = schema.chunks
 
     for column, column_schema in schema.data_vars.items():
-        create_array(ds_group, column, column_schema, False)
+        create_array(ds_group, column, column_schema, schema_chunks, False)
 
     for column, column_schema in schema.coords.items():
-        create_array(ds_group, column, column_schema, True)
+        create_array(ds_group, column, column_schema, schema_chunks, True)
 
     ds_group.attrs.update({
         **schema.attrs,
@@ -132,21 +147,24 @@ def zarr_setter(data, name, group, *extents):
     return np.full((1,)*len(extents), True)
 
 
-def _gen_writes(variables, chunks, columns, factory, indirect_dims=False):
-    for name, var in column_iterator(variables, columns):
+def _gen_writes(variables, chunks, factory, indirect_dims=False):
+    for name, var in variables.items():
         if isinstance(var.data, da.Array):
             ext_args = extent_args(var.dims, var.chunks)
             var_data = var.data
         elif isinstance(var.data, np.ndarray):
-            var_chunks = tuple(chunks[d] for d in var.dims)
+            try:
+                var_chunks = tuple(chunks[d] for d in var.dims)
+            except KeyError:
+                var_chunks = tuple((s,) for s in var.shape)
             ext_args = extent_args(var.dims, var_chunks)
             var_data = da.from_array(var.data, chunks=var_chunks,
-                                     inline_array=True, name=False,)
+                                     inline_array=True, name=False)
         else:
             raise NotImplementedError(f"Writing {type(var.data)} "
                                       f"unsupported")
 
-        if var.data.nbytes == 0:
+        if var_data.nbytes == 0:
             continue
 
         token_name = (f"write~{name}-"
@@ -213,12 +231,11 @@ def xds_to_zarr(xds, store, columns=None):
 
     for di, ds in enumerate(xds):
         group = prepare_zarr_group(di, ds, store, table)
-        write_args = (ds.chunks, columns, group)
 
-        data_vars = dict(_gen_writes(ds.data_vars, *write_args))
+        data_vars, coords = select_vars_and_coords(ds, columns)
+        data_vars = dict(_gen_writes(data_vars, ds.chunks, group))
         # Include coords in the write dataset so they're reified
-        data_vars.update(dict(_gen_writes(ds.coords,
-                                          *write_args,
+        data_vars.update(dict(_gen_writes(coords, ds.chunks, group,
                                           indirect_dims=True)))
 
         # Transfer any partition information over to the write dataset

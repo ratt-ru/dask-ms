@@ -1,4 +1,5 @@
 from collections import defaultdict
+from itertools import chain
 import logging
 import importlib
 
@@ -123,6 +124,47 @@ class DatasetSchema:
         data_vars = {c: ColumnSchema.from_dict(v) for c, v in dv.items()}
         coords = {c: ColumnSchema.from_dict(v) for c, v in co.items()}
         return DatasetSchema(data_vars, coords, d["attributes"].copy())
+
+    @property
+    def dims(self):
+        dims = defaultdict(set)
+
+        for v in chain(self.data_vars.values(), self.coords.values()):
+            for d, s in zip(v.dims, v.shape):
+                dims[d].add(s)
+
+        ret = {}
+
+        for d, sizes in dims.items():
+            if len(sizes) > 1:
+                raise ValueError(f"Inconsistent sizes {sizes} "
+                                 f"for dimension {d}")
+
+            ret[d] = next(iter(sizes))
+
+        return ret
+
+    @property
+    def chunks(self):
+        chunks = defaultdict(set)
+
+        for v in chain(self.data_vars.values(), self.coords.values()):
+            if v.chunks is None:
+                continue
+
+            for d, c in zip(v.dims, v.chunks):
+                chunks[d].add(c)
+
+        ret = {}
+
+        for d, dim_chunks in chunks.items():
+            if len(dim_chunks) > 1:
+                raise ValueError(f"Inconsistent chunks {dim_chunks}"
+                                 f"for dimension {d}")
+
+            ret[d] = next(iter(dim_chunks))
+
+        return ret
 
     def to_dict(self):
         data_vars = {c: v.to_dict() for c, v in self.data_vars.items()}

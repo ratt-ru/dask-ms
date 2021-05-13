@@ -4,6 +4,7 @@ History
 
 0.2.7 (YYYY-MM-DD)
 ------------------
+* Fix zarr coordinate writes (:pr:`162`)
 * Deprecate Python 3.6 (:pr:`161`)
 * Add IMAGING_WEIGHT_SPECTRUM to default Measurement Schema (:pr:`160`)
 * Remove default time ordering from xds_from_ms (:pr:`156`)

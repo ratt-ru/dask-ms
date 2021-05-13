@@ -38,6 +38,35 @@ def test_zarr_string_array(tmp_path_factory):
         assert_array_equal(nds.DATA.data, ds.DATA.data)
 
 
+def test_xds_to_zarr_coords(tmp_path_factory):
+    zarr_store = tmp_path_factory.mktemp("zarr_coords") / "test.zarr"
+
+    data = da.ones((100, 16, 4), chunks=(10, 4, 1), dtype=np.complex64)
+    rowid = da.arange(100, chunks=10)
+
+    data_vars = {"DATA": (("row", "chan", "corr"), data)}
+    coords = {
+        "ROWID": (("row",), rowid),
+        "chan": (("chan",), np.arange(16)),
+        "foo": (("foo",), np.arange(4)),
+    }
+
+    ds = [Dataset(data_vars, coords=coords)]
+
+    writes = xds_to_zarr(ds, zarr_store)
+    dask.compute(writes)
+
+    rds = xds_from_zarr(zarr_store)
+    assert len(ds) == len(rds)
+
+    for ods, nds in zip(ds, rds):
+        for c, v in ods.data_vars.items():
+            assert_array_equal(v.data, getattr(nds, c).data)
+
+        for c, v in ods.coords.items():
+            assert_array_equal(v.data, getattr(nds, c).data)
+
+
 def test_xds_to_zarr(ms, spw_table, ant_table, tmp_path_factory):
     zarr_store = tmp_path_factory.mktemp("zarr_store") / "test.zarr"
     spw_store = zarr_store.parent / f"{zarr_store.name}::SPECTRAL_WINDOW"
