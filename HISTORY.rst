@@ -5,6 +5,7 @@ History
 0.2.7 (YYYY-MM-DD)
 ------------------
 * Ignore row dimension when fixing column shapes (:pr:`165`)
+* Bump pip from 9.0.1 to 19.2 (:pr:`164`)
 * Fix zarr coordinate writes (:pr:`162`)
 * Deprecate Python 3.6 (:pr:`161`)
 * Add IMAGING_WEIGHT_SPECTRUM to default Measurement Schema (:pr:`160`)
