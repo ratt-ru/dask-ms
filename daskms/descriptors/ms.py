@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from collections import namedtuple
 from functools import reduce
 import logging
 from operator import mul
@@ -107,10 +108,30 @@ class MSDescriptorBuilder(AbstractDescriptorBuilder):
 
     @staticmethod
     def infer_ms_dims(variables):
+        class DummyVar:
+            __slots__ = ("dims", "shape")
+
+            def __init__(self, dims, shape):
+                self.dims = dims
+                self.shape = shape
+
+        def trim_row_dims(column, variables):
+            ret_val = []
+
+            for var in variables:
+                if var.dims[0] != "row":
+                    raise ValueError(f"'row' is not the first "
+                                     f"dimension in the dimensions "
+                                     f"{var.dims} of column {column}")
+                    
+                ret_val.append(DummyVar(var.dims[1:], var.shape[1:]))
+                
+            return ret_val
+
 
         # Create a dictionary of all variables in all datasets
         expanded_vars = {(k, i): v for k, lv in variables.items()
-                         for i, v in enumerate(lv)}
+                         for i, v in enumerate(trim_row_dims(k, lv))}
 
         # Now try find consistent dimension sizes across all variables
         try:

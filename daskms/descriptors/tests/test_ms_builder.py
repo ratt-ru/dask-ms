@@ -9,32 +9,55 @@ import pytest
 from daskms.dataset import Variable
 from daskms.descriptors.ms import MSDescriptorBuilder
 
+@pytest.fixture(params=[
+    [
+        {
+            "row": (2, 3, 2, 2),
+            "chan": (4, 4, 4, 4),
+            "corr": (2, 2)
+        },
+        {
+            "row": (4, 3),
+            "chan": (4, 4, 4, 4),
+            "corr": (2, 2)
+        },
+    ],
+])
+def dataset_chunks(request):
+    return request.param
 
-@pytest.mark.parametrize("variables", [
+def _variable_factory(dims, dtype, chunks):
+    shape = tuple(sum(chunks[d]) for d in dims)
+    achunks = tuple(chunks[d] for d in dims)
+    dask_array = da.random.random(shape, chunks=achunks).astype(dtype)
+    return Variable(dims, dask_array, {})
+
+
+@pytest.fixture(params=[
     [("DATA", ("row", "chan", "corr"), np.complex64)],
     [("DATA", ("row", "chan", "corr"), np.complex128),
      ("MODEL_DATA", ("row", "chan", "corr"), np.complex128)],
     [("IMAGING_WEIGHT", ("row", "chan"), np.float32),
      ("SIGMA_SPECTRUM", ("row", "chan", "corr"), float)],
-], ids=lambda v: f"variables={v}")
-@pytest.mark.parametrize("chunks", [
-    {"row": (2, 2, 2, 2, 2),
-     "chan": (4, 4, 4, 4),
-     "corr": (2, 2)}
-])
-@pytest.mark.parametrize("fixed", [
-    True,
-    False
-])
-def test_ms_builder(tmp_path, variables, chunks, fixed):
-    def _variable_factory(dims, dtype):
-        shape = tuple(sum(chunks[d]) for d in dims)
-        achunks = tuple(chunks[d] for d in dims)
-        dask_array = da.random.random(shape, chunks=achunks).astype(dtype)
-        return [Variable(dims, dask_array, {})]
 
-    variables = {n: _variable_factory(dims, dtype)
-                 for n, dims, dtype in variables}
+], ids=lambda v: f"variables={v}")
+def column_schema(request):
+    return request.param
+
+@pytest.fixture
+def variables(column_schema, dataset_chunks):
+    # We want channel and correlation chunks
+    # to be consistent across datasets
+    assert len(set(c["chan"] for c in dataset_chunks)) == 1
+    assert len(set(c["corr"] for c in dataset_chunks)) == 1
+
+    return {column: [_variable_factory(dims, dtype, chunks)
+                     for chunks in dataset_chunks]
+                     for column, dims, dtype in column_schema}
+
+
+@pytest.mark.parametrize("fixed", [True, False])
+def test_ms_builder(tmp_path, variables, fixed):
     var_names = set(variables.keys())
 
     builder = MSDescriptorBuilder(fixed)
@@ -50,11 +73,22 @@ def test_ms_builder(tmp_path, variables, chunks, fixed):
 
     with pt.table(filename, tab_desc, dminfo=dminfo, ack=False, nrow=10) as T:
         # We got required + the extra columns we asked for
+
         assert set(T.colnames()) == set.union(var_names, required_cols)
 
         if fixed:
             original_dminfo = {v['NAME']: v for v in dminfo.values()}
             table_dminfo = {v['NAME']: v for v in T.getdminfo().values()}
+
+            for column in variables.keys():
+                try:
+                    column_group = table_dminfo[column + "_GROUP"]
+                except KeyError:
+                    raise ValueError(f"{column} should be fixed but no "
+                                     f"Data Manager Group was created")
+
+                assert column in column_group["COLUMNS"]
+                assert column_group["TYPE"] == "TiledColumnStMan"
 
             assert len(original_dminfo) == len(table_dminfo)
 
