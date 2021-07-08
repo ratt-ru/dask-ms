@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-from collections import namedtuple
 from functools import reduce
 import logging
 from operator import mul
@@ -123,11 +122,10 @@ class MSDescriptorBuilder(AbstractDescriptorBuilder):
                     raise ValueError(f"'row' is not the first "
                                      f"dimension in the dimensions "
                                      f"{var.dims} of column {column}")
-                    
-                ret_val.append(DummyVar(var.dims[1:], var.shape[1:]))
-                
-            return ret_val
 
+                ret_val.append(DummyVar(var.dims[1:], var.shape[1:]))
+
+            return ret_val
 
         # Create a dictionary of all variables in all datasets
         expanded_vars = {(k, i): v for k, lv in variables.items()

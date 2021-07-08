@@ -9,6 +9,7 @@ import pytest
 from daskms.dataset import Variable
 from daskms.descriptors.ms import MSDescriptorBuilder
 
+
 @pytest.fixture(params=[
     [
         {
@@ -25,6 +26,7 @@ from daskms.descriptors.ms import MSDescriptorBuilder
 ])
 def dataset_chunks(request):
     return request.param
+
 
 def _variable_factory(dims, dtype, chunks):
     shape = tuple(sum(chunks[d]) for d in dims)
@@ -44,6 +46,7 @@ def _variable_factory(dims, dtype, chunks):
 def column_schema(request):
     return request.param
 
+
 @pytest.fixture
 def variables(column_schema, dataset_chunks):
     # We want channel and correlation chunks
@@ -53,7 +56,7 @@ def variables(column_schema, dataset_chunks):
 
     return {column: [_variable_factory(dims, dtype, chunks)
                      for chunks in dataset_chunks]
-                     for column, dims, dtype in column_schema}
+            for column, dims, dtype in column_schema}
 
 
 @pytest.mark.parametrize("fixed", [True, False])
