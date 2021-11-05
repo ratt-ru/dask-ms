@@ -69,4 +69,3 @@ def test_arrow_numpy_conversion(test_data):
 def test_complex_type_conversion(test_data):
     array = ComplexArray.from_numpy(test_data)
     assert_array_equal(array.to_numpy(), test_data)
-    
