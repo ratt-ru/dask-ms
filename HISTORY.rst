@@ -4,6 +4,7 @@ History
 
 0.2.7 (YYYY-MM-DD)
 ------------------
+* Add ComplexArray -> numpy conversion (:pr:`168`)
 * Ignore row dimension when fixing column shapes (:pr:`165`)
 * Bump pip from 9.0.1 to 19.2 (:pr:`164`)
 * Fix zarr coordinate writes (:pr:`162`)
