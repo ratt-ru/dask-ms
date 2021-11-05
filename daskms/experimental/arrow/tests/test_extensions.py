@@ -2,9 +2,8 @@ import numpy as np
 from numpy.testing import assert_array_equal
 import pytest
 
-from daskms.experimental.arrow.extension_types import (ComplexType,
-                                                       TensorType,
-                                                       TensorArray)
+from daskms.experimental.arrow.extension_types import (
+    ComplexType, ComplexArray, TensorType, TensorArray)
 
 pa = pytest.importorskip("pyarrow")
 
@@ -57,3 +56,17 @@ def test_arrow_numpy_conversion(test_data):
         assert pa_type == pa.from_numpy_dtype(test_data.dtype)
 
     assert_array_equal(test_data, pa_data.to_numpy())
+
+
+@pytest.mark.parametrize("dtype", [
+    np.complex64,
+    np.complex128])
+@pytest.mark.parametrize("shape", [
+    pytest.param((), marks=singleton_xfail),
+    (10,),
+    (20,)
+])
+def test_complex_type_conversion(test_data):
+    array = ComplexArray.from_numpy(test_data)
+    assert_array_equal(array.to_numpy(), test_data)
+    

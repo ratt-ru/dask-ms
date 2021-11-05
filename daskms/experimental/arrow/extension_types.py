@@ -142,8 +142,23 @@ class TensorArray(ExtensionArray):
 
 
 class ComplexArray(ExtensionArray):
-    def to_numpy_array(self):
-        return self.storage.to_numpy()
+    def to_numpy(self):
+        dtype = self.storage.type.value_type.to_pandas_dtype()
+        dtype = np.result_type(dtype, np.complex64)
+        return self.storage.flatten().to_numpy().view(dtype)
+
+    @classmethod
+    def from_numpy(cls, obj):
+        assert isinstance(obj, np.ndarray)
+        assert np.iscomplexobj(obj)
+
+        if not obj.flags.c_contiguous:
+            obj = np.ascontiguousarray(obj)
+
+        pa_dtype = ComplexType(pa.from_numpy_dtype(obj.real.dtype))
+        flat_array = obj.view(obj.real.dtype).ravel()
+        storage = pa.FixedSizeListArray.from_arrays(flat_array, 2)
+        return pa.ExtensionArray.from_storage(pa_dtype, storage)
 
 
 class ComplexType(ExtensionType):
