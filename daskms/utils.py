@@ -7,7 +7,9 @@ from pathlib import Path
 import time
 
 from dask.utils import funcname
-import numpy as np
+# The numpy module may disappear during interpreter shutdown
+# so explicitly import ndarray
+from numpy import ndarray
 
 from daskms.testing import in_pytest
 
@@ -20,7 +22,7 @@ def arg_hasher(args):
         return hash(tuple(arg_hasher(v) for v in args))
     elif isinstance(args, dict):
         return hash(tuple((k, arg_hasher(v)) for k, v in sorted(args.items())))
-    elif isinstance(args, np.ndarray):
+    elif isinstance(args, ndarray):
         # NOTE(sjperkins)
         # https://stackoverflow.com/a/16592241/1611416
         # Slowish, but we shouldn't be passing
@@ -37,7 +39,7 @@ def freeze(arg):
         return tuple(map(freeze, arg))
     elif isinstance(arg, (dict, OrderedDict)):
         return frozenset((k, freeze(v)) for k, v in sorted(arg.items()))
-    elif isinstance(arg, np.ndarray):
+    elif isinstance(arg, ndarray):
         return freeze(arg.tolist())
     else:
         return arg
