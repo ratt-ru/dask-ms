@@ -326,7 +326,11 @@ class Convert(Application):
         parser.add_argument("-o", "--output", type=Path)
         parser.add_argument("-g", "--group-columns",
                             type=Convert.group_col_converter,
-                            default="")
+                            default="",
+                            help="Columns to group or partition "
+                                 "the input dataset by. "
+                                 "This defaults to the default "
+                                 "for the underlying storage mechanism")
         parser.add_argument("-f", "--format",
                             choices=["casa", "zarr", "parquet"],
                             default="zarr",
