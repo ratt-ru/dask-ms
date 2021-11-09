@@ -5,7 +5,6 @@ from functools import partial
 import logging
 from pathlib import Path
 import shutil
-import sys
 
 from daskms.apps.application import Application
 from daskms.utils import dataset_type
