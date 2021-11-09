@@ -12,8 +12,6 @@ from daskms.utils import dataset_type
 
 log = logging.getLogger(__name__)
 
-PY38 = (int(sys.version_info.major) * 10 + int(sys.version_info.minor) >= 38)
-
 
 class ChunkTransformer(ast.NodeTransformer):
     def visit_Module(self, node):
