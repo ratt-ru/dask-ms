@@ -110,12 +110,13 @@ class BaseTableFormat(TableFormat):
     def version(self):
         return self._version
 
-    def reader_unused_kwargs(self, **kwargs):
+    def check_unused_kwargs(self, fn_name, **kwargs):
         if kwargs:
             raise NotImplementedError(f"The following kwargs: "
                                       f"{list(kwargs.keys())} "
-                                      f"were not consumed "
-                                      f"{self.__class__.__name__}.reader()")
+                                      f"were not consumed by "
+                                      f"{self.__class__.__name__}."
+                                      f"{fn_name}(**kw)")
 
 
 class CasaFormat(BaseTableFormat):
@@ -162,7 +163,7 @@ class CasaFormat(BaseTableFormat):
                 from daskms import xds_from_table
                 return xds_from_table
         finally:
-            self.reader_unused_kwargs(**kw)
+            self.check_unused_kwargs("reader", **kw)
 
     def writer(self):
         from daskms import xds_to_table
@@ -200,7 +201,7 @@ class ZarrFormat(BaseTableFormat):
             from daskms.experimental.zarr import xds_from_zarr
             return xds_from_zarr
         finally:
-            self.reader_unused_kwargs(**kw)
+            self.check_unused_kwargs("reader", **kw)
 
     def writer(self):
         from daskms.experimental.zarr import xds_to_zarr
@@ -229,7 +230,7 @@ class ParquetFormat(BaseTableFormat):
             from daskms.experimental.arrow.reads import xds_from_parquet
             return xds_from_parquet
         finally:
-            self.reader_unused_kwargs(**kw)
+            self.check_unused_kwargs("reader", **kw)
 
     def writer(self):
         from daskms.experimental.arrow.writes import xds_to_parquet
