@@ -5,14 +5,11 @@ from functools import partial
 import logging
 from pathlib import Path
 import shutil
-import sys
 
 from daskms.apps.application import Application
 from daskms.utils import dataset_type
 
 log = logging.getLogger(__name__)
-
-PY38 = (int(sys.version_info.major) * 10 + int(sys.version_info.minor) >= 38)
 
 
 class ChunkTransformer(ast.NodeTransformer):
@@ -112,6 +109,14 @@ class BaseTableFormat(TableFormat):
     def version(self):
         return self._version
 
+    def check_unused_kwargs(self, fn_name, **kwargs):
+        if kwargs:
+            raise NotImplementedError(f"The following kwargs: "
+                                      f"{list(kwargs.keys())} "
+                                      f"were not consumed by "
+                                      f"{self.__class__.__name__}."
+                                      f"{fn_name}(**kw)")
+
 
 class CasaFormat(BaseTableFormat):
     TABLE_PREFIX = "Table: "
@@ -146,13 +151,18 @@ class CasaFormat(BaseTableFormat):
     def is_measurement_set(self):
         return self._type == "measurementset"
 
-    def reader(self):
-        if self.is_measurement_set():
-            from daskms import xds_from_ms
-            return xds_from_ms
-        else:
-            from daskms import xds_from_table
-            return xds_from_table
+    def reader(self, **kw):
+        try:
+            group_cols = kw.pop("group_columns", None)
+
+            if self.is_measurement_set():
+                from daskms import xds_from_ms
+                return partial(xds_from_ms, group_cols=group_cols)
+            else:
+                from daskms import xds_from_table
+                return xds_from_table
+        finally:
+            self.check_unused_kwargs("reader", **kw)
 
     def writer(self):
         from daskms import xds_to_table
@@ -185,9 +195,12 @@ class ZarrFormat(BaseTableFormat):
     def subtables(self):
         return self._subtables
 
-    def reader(self):
-        from daskms.experimental.zarr import xds_from_zarr
-        return xds_from_zarr
+    def reader(self, **kw):
+        try:
+            from daskms.experimental.zarr import xds_from_zarr
+            return xds_from_zarr
+        finally:
+            self.check_unused_kwargs("reader", **kw)
 
     def writer(self):
         from daskms.experimental.zarr import xds_to_zarr
@@ -211,9 +224,12 @@ class ParquetFormat(BaseTableFormat):
     def subtables(self):
         return self._subtables
 
-    def reader(self):
-        from daskms.experimental.arrow.reads import xds_from_parquet
-        return xds_from_parquet
+    def reader(self, **kw):
+        try:
+            from daskms.experimental.arrow.reads import xds_from_parquet
+            return xds_from_parquet
+        finally:
+            self.check_unused_kwargs("reader", **kw)
 
     def writer(self):
         from daskms.experimental.arrow.writes import xds_to_parquet
@@ -223,24 +239,24 @@ class ParquetFormat(BaseTableFormat):
         return "parquet"
 
 
-def convert_table(input_path, output_path, output_format, chunks):
-    in_fmt = TableFormat.from_path(input_path)
-    out_fmt = TableFormat.from_type(output_format)
+def convert_table(args):
+    in_fmt = TableFormat.from_path(args.input)
+    out_fmt = TableFormat.from_type(args.format)
 
-    reader = in_fmt.reader()
+    reader = in_fmt.reader(group_columns=args.group_columns)
     writer = out_fmt.writer()
 
-    datasets = reader(input_path, chunks=chunks)
+    datasets = reader(args.input, chunks=args.chunks)
 
     if isinstance(in_fmt, CasaFormat):
         # Drop any ROWID columns
         datasets = [ds.drop_vars("ROWID", errors="ignore")
                     for ds in datasets]
 
-    log.info("Input: '%s' %s", in_fmt, str(input_path))
-    log.info("Output: '%s' %s", out_fmt, str(output_path))
+    log.info("Input: '%s' %s", in_fmt, str(args.input))
+    log.info("Output: '%s' %s", out_fmt, str(args.output))
 
-    writes = [writer(datasets, str(output_path))]
+    writes = [writer(datasets, str(args.output))]
 
     # Now do the subtables
     for table in list(in_fmt.subtables):
@@ -248,10 +264,10 @@ def convert_table(input_path, output_path, output_format, chunks):
             log.warning(f"Ignoring {table}")
             continue
 
-        in_path = input_path.parent / "::".join((input_path.name, table))
+        in_path = args.input.parent / "::".join((args.input.name, table))
         in_fmt = TableFormat.from_path(in_path)
-        out_path = output_path.parent / "::".join((output_path.name, table))
-        out_fmt = TableFormat.from_type(output_format)
+        out_path = args.output.parent / "::".join((args.output.name, table))
+        out_fmt = TableFormat.from_type(args.format)
 
         reader = in_fmt.reader()
         writer = out_fmt.writer()
@@ -297,10 +313,24 @@ class Convert(Application):
         self.log = log
         self.args = args
 
+    @staticmethod
+    def group_col_converter(group_columns):
+        if not group_columns:
+            return None
+
+        return [c.strip() for c in group_columns.split(",")]
+
     @classmethod
     def setup_parser(cls, parser):
         parser.add_argument("input", type=_check_input_path)
         parser.add_argument("-o", "--output", type=Path)
+        parser.add_argument("-g", "--group-columns",
+                            type=Convert.group_col_converter,
+                            default="",
+                            help="Columns to group or partition "
+                                 "the input dataset by. "
+                                 "This defaults to the default "
+                                 "for the underlying storage mechanism")
         parser.add_argument("-f", "--format",
                             choices=["casa", "zarr", "parquet"],
                             default="zarr",
@@ -325,9 +355,6 @@ class Convert(Application):
                 raise ValueError(f"{self.args.output} exists. "
                                  f"Use --force to overwrite.")
 
-        writes = convert_table(self.args.input,
-                               self.args.output,
-                               self.args.format,
-                               self.args.chunks)
+        writes = convert_table(self.args)
 
         dask.compute(writes)
