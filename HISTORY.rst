@@ -4,6 +4,7 @@ History
 
 0.2.7 (YYYY-MM-DD)
 ------------------
+* Fix inclusion of MANIFEST.in files (:pr:`173`)
 * Add --group-columns to `dask-ms convert` for CASA Formats (:pr:`169`)
 * Add ComplexArray -> numpy conversion (:pr:`168`)
 * Ignore row dimension when fixing column shapes (:pr:`165`)

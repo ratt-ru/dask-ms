@@ -60,6 +60,7 @@ setup(
     },
     extras_require=extras_require,
     install_requires=install_requires,
+    include_package_data=True,
     author="Simon Perkins",
     author_email="sperkins@ska.ac.za",
     packages=find_packages(),
