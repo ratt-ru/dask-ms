@@ -18,7 +18,6 @@ extras_require["complete"] = set(
 
 install_requires = [
     "dask[array] >= 2.2.0",
-    "fsspec",
 ]
 
 # ==================
