@@ -2,7 +2,7 @@
 History
 =======
 
-0.2.7 (YYYY-MM-DD)
+0.2.7 (2022-01-13)
 ------------------
 * Fix inclusion of MANIFEST.in files (:pr:`173`)
 * Add --group-columns to `dask-ms convert` for CASA Formats (:pr:`169`)
