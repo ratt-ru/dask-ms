@@ -2,6 +2,10 @@
 
 import logging
 
+import fsspec
+from fsspec.implementations.local import LocalFileSystem
+
+
 from daskms.table_proxy import TableProxy
 from daskms.reads import DatasetFactory
 from daskms.writes import write_datasets
@@ -70,6 +74,12 @@ def xds_to_table(xds, table_name, columns="ALL", descriptor=None,
     table_proxy : :class:`daskms.TableProxy`, optional
         The Table Proxy associated with the datasets
     """
+    of = fsspec.open_files(table_name)
+
+    if not isinstance(of.fs, LocalFileSystem):
+        raise ValueError(f"CASA Tables are only accessible "
+                         f"via local file systems. Got "
+                         f"{of.fs} {of.fs.protocol}")
 
     # Promote dataset to a list
     if not isinstance(xds, (tuple, list)):
@@ -255,6 +265,13 @@ def xds_from_table(table_name, columns=None,
 
 
     """
+    of = fsspec.open_files(table_name)
+
+    if not isinstance(of.fs, LocalFileSystem):
+        raise ValueError(f"CASA Tables are only accessible "
+                         f"via local file systems. Got "
+                         f"{of.fs} {of.fs.protocol}")
+
     columns = promote_columns(columns, [])
     index_cols = promote_columns(index_cols, [])
     group_cols = promote_columns(group_cols, [])
