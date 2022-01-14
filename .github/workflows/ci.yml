@@ -53,14 +53,14 @@ jobs:
       - name: Install Minio Server and Client
         run: |
           mkdir -p $HOME/bin
-          echo $HOME/bin >> $GITHUB_PATH
           cd $HOME/bin
           wget -q -c https://dl.min.io/server/minio/release/linux-amd64/minio
           wget -q -c https://dl.min.io/client/mc/release/linux-amd64/mc
           chmod a+x minio
           chmod a+x mc
-          minio --help
-          mc --help
+          ./minio --help
+          ./mc --help
+          echo $HOME/bin >> $GITHUB_PATH
 
       - name: Run complete test suite
         run: pipenv run py.test --flake8 -s -vvv daskms/
