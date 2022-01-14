@@ -51,8 +51,9 @@ jobs:
         run: pipenv install .[testing,arrow,xarray,zarr]
 
       - name: Install Minio Server and Client
-        run: >
-          mkdir -p $HOME/bin && cd $HOME/bin
+        run: |
+          mkdir -p $HOME/bin
+          cd $HOME/bin
           wget -c https://dl.min.io/server/minio/release/linux-amd64/minio
           wget -c https://dl.min.io/client/mc/release/linux-amd64/mc
           chmod a+x minio
