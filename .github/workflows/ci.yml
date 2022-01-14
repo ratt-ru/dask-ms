@@ -50,6 +50,16 @@ jobs:
       - name: Install dask-ms with xarray support
         run: pipenv install .[testing,arrow,xarray,zarr]
 
+      - name: Install Minio Server and Client
+        run: >
+          mkdir -p $HOME/bin && cd $HOME/bin
+          wget -c https://dl.min.io/server/minio/release/linux-amd64/minio
+          wget -c https://dl.min.io/client/mc/release/linux-amd64/mc
+          chmod a+x minio
+          chmod a+x mc
+          minio --help
+          mc --help
+
       - name: Run complete test suite
         run: pipenv run py.test --flake8 -s -vvv daskms/
 
