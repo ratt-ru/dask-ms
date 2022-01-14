@@ -62,8 +62,6 @@ jobs:
 
       - name: Run minio
         run: |
-          minio --help
-          mc --help
           pipenv run minio --help
           pipenv run mc --help
 
