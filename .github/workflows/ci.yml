@@ -60,7 +60,7 @@ jobs:
           chmod a+x mc
           ./minio --help
           ./mc --help
-          echo $HOME/bin >> $GITHUB_PATH
+          echo "${HOME}/bin" >> $GITHUB_PATH
 
       - name: Run complete test suite
         run: pipenv run py.test --flake8 -s -vvv daskms/
