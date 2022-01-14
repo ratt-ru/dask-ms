@@ -48,7 +48,7 @@ jobs:
         run: pipenv run py.test --flake8 -s -vvv daskms/
 
       - name: Install dask-ms with xarray support
-        run: pipenv install .[testing,arrow,xarray,zarr]
+        run: pipenv install .[testing,arrow,xarray,zarr,s3]
 
       - name: Install Minio Server and Client
         run: |

@@ -82,12 +82,32 @@ def minio_client(minio_server, minio_alias):
 
 
 @pytest.fixture
-def minio_admin(minio_client, minio_alias):
+def minio_user_key():
+    return "abcdef1234567890"
+
+
+@pytest.fixture
+def minio_admin(minio_client, minio_alias, minio_user_key):
     minio = pytest.importorskip("minio")
-    yield minio.MinioAdmin(minio_alias, binary_path=str(minio_client))
+    minio_admin = minio.MinioAdmin(minio_alias, binary_path=str(minio_client))
+    # Add a user and give it readwrite access
+    minio_admin.user_add(minio_user_key, minio_user_key)
+    minio_admin.policy_set("readwrite", user=minio_user_key)
+    yield minio_admin
 
 
-def test_local_store(tmp_path, minio_admin):
+@pytest.fixture
+def py_minio_client(minio_client, minio_admin, minio_alias, minio_user_key):
+    minio = pytest.importorskip("minio")
+    yield minio.Minio("127.0.0.1:9000",
+                      access_key=minio_user_key,
+                      secret_key=minio_user_key,
+                      secure=False)
+
+
+def test_local_store(tmp_path, py_minio_client,
+                     minio_admin, minio_alias,
+                     minio_user_key):
     zarr = pytest.importorskip("zarr")
     payload = "How now brown cow"
     filename = "cow.txt"
@@ -104,8 +124,22 @@ def test_local_store(tmp_path, minio_admin):
                                 shape=1000,
                                 dtype=np.complex128)
 
-    minio_admin.user_add("abcdef1234567890", "abcdef1234567890")
+    stuff = tmp_path / "stuff.txt"
+    stuff.write_text(payload)
 
-    print(minio_admin)
+    py_minio_client.make_bucket("test-bucket")
+    py_minio_client.fput_object("test-bucket",
+                                "stuff.txt",
+                                str(stuff))
 
-    print(store.ls())
+    s3fs = pytest.importorskip("s3fs")
+    s3 = s3fs.S3FileSystem(
+        key=minio_user_key,
+        secret=minio_user_key,
+        client_kwargs={
+            "endpoint_url": "http://127.0.0.1:9000",
+            "region_name": "af-cpt"
+        })
+
+    with s3.open("test-bucket/stuff.txt", "rb") as f:
+        assert f.read() == payload.encode("utf-8")
