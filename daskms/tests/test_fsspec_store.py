@@ -17,23 +17,17 @@ def find_executable(executable, path=None):
 
             if result:
                 return result
-
-    if not path.is_dir():
-        raise ValueError(f"{path} is not a directory")
-
-    for child in path.iterdir():
-        if child.is_file():
-            if child.stem == executable:
-                return child
-        elif child.is_dir():
-            result = find_executable(executable, path=child)
+    elif path.is_dir():
+        for child in path.iterdir():
+            result = find_executable(executable, child)
 
             if result:
                 return result
-        else:
-            raise ValueError(f"Unhandled path {child}")
-
-    return None
+    elif path.is_file():
+        if path.stem == executable:
+            return path
+    else:
+        return None
 
 
 @pytest.fixture(scope="session")
