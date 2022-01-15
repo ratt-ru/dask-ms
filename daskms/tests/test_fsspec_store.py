@@ -1,11 +1,15 @@
 import os
 from subprocess import Popen, PIPE
 from pathlib import Path
+from urllib.parse import urlparse
 
 import numpy as np
 import pytest
 
 from daskms.fsspec_store import Store
+
+
+URL = urlparse("http://127.0.0.1:9000")
 
 
 def find_executable(executable, path=None):
@@ -38,7 +42,8 @@ def minio_server(tmp_path_factory):
         pytest.skip("Unable to find \"minio\" server binary")
 
     data_dir = tmp_path_factory.mktemp("data")
-    args = [str(server_path), "server", str(data_dir)]
+    args = [str(server_path), "server",
+            str(data_dir), f"--address={URL.netloc}"]
 
     # Start the server process and read a line from stdout so that we know
     # it's started
@@ -71,7 +76,7 @@ def minio_client(minio_server, minio_alias):
 
     # Set the server alias on the client
     args = [str(client_path), "alias", "set", minio_alias,
-            "http://127.0.0.1:9000", "minioadmin", "minioadmin"]
+            URL.geturl(), "minioadmin", "minioadmin"]
     with Popen(args, shell=False, stdout=PIPE, stderr=PIPE) as client_process:
         retcode = client_process.wait()
 
@@ -99,10 +104,10 @@ def minio_admin(minio_client, minio_alias, minio_user_key):
 @pytest.fixture
 def py_minio_client(minio_client, minio_admin, minio_alias, minio_user_key):
     minio = pytest.importorskip("minio")
-    yield minio.Minio("127.0.0.1:9000",
+    yield minio.Minio(URL.netloc,
                       access_key=minio_user_key,
                       secret_key=minio_user_key,
-                      secure=False)
+                      secure=URL.scheme == "https")
 
 
 def test_local_store(tmp_path, py_minio_client,
@@ -137,7 +142,7 @@ def test_local_store(tmp_path, py_minio_client,
         key=minio_user_key,
         secret=minio_user_key,
         client_kwargs={
-            "endpoint_url": "http://127.0.0.1:9000",
+            "endpoint_url": URL.geturl(),
             "region_name": "af-cpt"
         })
 
