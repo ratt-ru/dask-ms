@@ -114,9 +114,7 @@ def py_minio_client(minio_client, minio_admin, minio_alias, minio_user_key):
                       secure=URL.scheme == "https")
 
 
-def test_local_store(tmp_path, py_minio_client,
-                     minio_admin, minio_alias,
-                     minio_user_key):
+def test_local_store(tmp_path):
     zarr = pytest.importorskip("zarr")
     payload = "How now brown cow"
     filename = "cow.txt"
@@ -133,6 +131,11 @@ def test_local_store(tmp_path, py_minio_client,
                                 shape=1000,
                                 dtype=np.complex128)
 
+
+def test_minio_server(tmp_path, py_minio_client,
+                      minio_admin, minio_alias,
+                      minio_user_key):
+    payload = "How now brown cow"
     stuff = tmp_path / "stuff.txt"
     stuff.write_text(payload)
 
