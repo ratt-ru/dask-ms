@@ -1,3 +1,4 @@
+import multiprocessing
 from multiprocessing import Pool
 import os
 
@@ -133,6 +134,7 @@ def test_multiprocess_create(ms, tmp_path_factory):
 
     writes = xds_to_zarr(ms_datasets, zarr_store)
 
+    ctx = multiprocessing.get_context("spawn")  # noqa
     dask.compute(writes, scheduler="processes")
 
     zds = xds_from_zarr(zarr_store)

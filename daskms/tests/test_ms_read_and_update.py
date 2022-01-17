@@ -239,39 +239,6 @@ def _proc_map_fn(args):
 
 @pytest.mark.parametrize("nprocs", [3])
 def test_multiprocess_table(ms, nprocs):
-    import time
-    import threading
-    import dask.threaded as dt
-
-    # Don't fork threads
-    # https://rachelbythebay.com/w/2011/06/07/forked/
-    # Close and cleanup default dask threadpools
-    with dt.pools_lock:
-        if dt.default_pool is not None:
-            if PY_37_GTE:
-                dt.default_pool.shutdown()
-            else:
-                dt.default_pool.close()
-
-            dt.default_pool = None
-
-        for thread in list(dt.pools.keys()):
-            for p in dt.pools.pop(thread).values():
-                if PY_37_GTE:
-                    p.shutdown()
-                else:
-                    p.close()
-
-    # No TableProxies or Executors (with ThreadPools) live
-    assert_liveness(0, 0)
-
-    # Wait for other threads to die
-    time.sleep(0.1)
-
-    # Only main thread and possibly the fsspecIO thread is alive
-    thread_names = {t.name for t in threading.enumerate()}
-    assert thread_names.issubset({"MainThread", "fsspecIO"})
-
     from multiprocessing import get_context
     pool = get_context("spawn").Pool(nprocs)
 
