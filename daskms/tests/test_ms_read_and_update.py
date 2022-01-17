@@ -21,7 +21,7 @@ from daskms.dask_ms import (xds_from_ms,
 from daskms.query import orderby_clause, where_clause
 from daskms.table_proxy import TableProxy, taql_factory
 from daskms.utils import (group_cols_str, index_cols_str,
-                          select_cols_str, assert_liveness,
+                          select_cols_str,
                           table_path_split)
 
 
