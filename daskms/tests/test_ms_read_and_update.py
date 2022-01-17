@@ -268,11 +268,12 @@ def test_multiprocess_table(ms, nprocs):
     # Wait for other threads to die
     time.sleep(0.1)
 
-    # Only main thread is alive
-    assert len(threading.enumerate()) == 1
+    # Only main thread and possibly the fsspecIO thread is alive
+    thread_names = {t.name for t in threading.enumerate()}
+    assert thread_names.issubset({"MainThread", "fsspecIO"})
 
-    from multiprocessing import Pool
-    pool = Pool(nprocs)
+    from multiprocessing import get_context
+    pool = get_context("spawn").Pool(nprocs)
 
     try:
         args = [tuple((ms, i)) for i in range(nprocs)]

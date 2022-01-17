@@ -1,3 +1,4 @@
+import multiprocessing
 import os
 from subprocess import Popen, PIPE
 from pathlib import Path
@@ -47,6 +48,7 @@ def minio_server(tmp_path_factory):
 
     # Start the server process and read a line from stdout so that we know
     # it's started
+    ctx = multiprocessing.get_context("spawn")  # noqa
     server_process = Popen(args, shell=False, stdout=PIPE, stderr=PIPE)
     server_process.stdout.readline()
 
@@ -77,6 +79,8 @@ def minio_client(minio_server, minio_alias):
     # Set the server alias on the client
     args = [str(client_path), "alias", "set", minio_alias,
             URL.geturl(), "minioadmin", "minioadmin"]
+
+    ctx = multiprocessing.get_context("spawn")  # noqa
     with Popen(args, shell=False, stdout=PIPE, stderr=PIPE) as client_process:
         retcode = client_process.wait()
 
