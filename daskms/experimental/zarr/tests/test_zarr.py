@@ -12,6 +12,7 @@ from daskms import xds_from_ms, xds_from_table
 from daskms.constants import DASKMS_PARTITION_KEY
 from daskms.dataset import Dataset
 from daskms.experimental.zarr import xds_from_zarr, xds_to_zarr
+from daskms.fsspec_store import DaskMSStore
 
 try:
     import xarray
@@ -68,10 +69,43 @@ def test_xds_to_zarr_coords(tmp_path_factory):
             assert_array_equal(v.data, getattr(nds, c).data)
 
 
-def test_xds_to_zarr(ms, spw_table, ant_table, tmp_path_factory):
-    zarr_store = tmp_path_factory.mktemp("zarr_store") / "test.zarr"
-    spw_store = zarr_store.parent / f"{zarr_store.name}::SPECTRAL_WINDOW"
-    ant_store = zarr_store.parent / f"{zarr_store.name}::ANTENNA"
+def test_xds_to_zarr_s3(ms, spw_table, ant_table,
+                        py_minio_client, minio_user_key,
+                        minio_url):
+
+    py_minio_client.make_bucket("test-bucket")
+
+    store = DaskMSStore("s3://test-bucket",
+                        key=minio_user_key,
+                        secret=minio_user_key,
+                        client_kwargs={
+                            "endpoint_url": minio_url.geturl(),
+                            "region_name": "af-cpt",
+                        })
+
+    ms_datasets = xds_from_ms(ms)
+    spw_datasets = xds_from_table(spw_table, group_cols="__row__")
+    ant_datasets = xds_from_table(ant_table)
+
+    for i, ds in enumerate(ms_datasets):
+        dims = ds.dims
+        row, chan, corr = (dims[d] for d in ("row", "chan", "corr"))
+
+        ms_datasets[i] = ds.assign_coords(**{
+            "chan": (("chan",), np.arange(chan)),
+            "corr": (("corr",), np.arange(corr)),
+        })
+
+    main_zarr_writes = xds_to_zarr(ms_datasets, store)
+    assert len(ms_datasets) == len(main_zarr_writes)
+
+    dask.compute(main_zarr_writes)
+
+    import ipdb; ipdb.set_trace()
+    None
+
+def zarr_tester(ms, spw_table, ant_table,
+                zarr_store, spw_store, ant_store):
 
     ms_datasets = xds_from_ms(ms)
     spw_datasets = xds_from_table(spw_table, group_cols="__row__")
@@ -121,6 +155,38 @@ def test_xds_to_zarr(ms, spw_table, ant_table, tmp_path_factory):
         for k, v in ms_ds.attrs.items():
             zattr = getattr(zarr_ds, k)
             assert_array_equal(zattr, v)
+
+
+def test_xds_to_zarr_local(ms, spw_table, ant_table, tmp_path_factory):
+    zarr_store = tmp_path_factory.mktemp("zarr_store") / "test.zarr"
+    spw_store = zarr_store.parent / f"{zarr_store.name}::SPECTRAL_WINDOW"
+    ant_store = zarr_store.parent / f"{zarr_store.name}::ANTENNA"
+
+    return zarr_tester(ms, spw_table, ant_table,
+                       zarr_store, spw_store, ant_store)
+
+
+def test_xds_to_zarr_s3(ms, spw_table, ant_table,
+                        py_minio_client, minio_user_key,
+                        minio_url):
+
+    py_minio_client.make_bucket("test-bucket")
+
+    zarr_store = DaskMSStore("s3://test-bucket/measurementset.MS",
+                             key=minio_user_key,
+                             secret=minio_user_key,
+                             client_kwargs={
+                                 "endpoint_url": minio_url.geturl(),
+                                 "region_name": "af-cpt",
+                             })
+
+    # NOTE(sjperkins)
+    # Review this interface
+    spw_store = zarr_store.subtable_store("SPECTRAL_WINDOW")
+    ant_store = zarr_store.subtable_store("ANTENNA")
+
+    return zarr_tester(ms, spw_table, ant_table,
+                       zarr_store, spw_store, ant_store)
 
 
 @pytest.mark.skipif(xarray is None, reason="Needs xarray to rechunk")

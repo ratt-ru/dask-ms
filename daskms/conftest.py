@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 
 import gc
+import multiprocessing
 import os
+from subprocess import Popen, PIPE
+from pathlib import Path
+from urllib.parse import urlparse
 
 import numpy as np
 import pyrap.tables as pt
@@ -214,3 +218,112 @@ def ant_table(tmp_path_factory, wsrt_antenna_positions):
         ant.putcol("NAME", names)
 
     yield fn
+
+
+MINIO_URL = urlparse("http://127.0.0.1:9000")
+
+
+@pytest.fixture
+def minio_url():
+    return MINIO_URL
+
+
+def find_executable(executable, path=None):
+    if not path:
+        paths = os.environ["PATH"].split(os.pathsep)
+
+        for path in map(Path, paths):
+            result = find_executable(executable, path=path)
+
+            if result:
+                return result
+    elif path.is_dir():
+        for child in path.iterdir():
+            result = find_executable(executable, child)
+
+            if result:
+                return result
+    elif path.is_file():
+        if path.stem == executable:
+            return path
+    else:
+        return None
+
+
+@pytest.fixture(scope="session")
+def minio_server(tmp_path_factory):
+    server_path = find_executable("minio")
+
+    if not server_path:
+        pytest.skip("Unable to find \"minio\" server binary")
+
+    data_dir = tmp_path_factory.mktemp("data")
+    args = [str(server_path), "server",
+            str(data_dir), f"--address={MINIO_URL.netloc}"]
+
+    # Start the server process and read a line from stdout so that we know
+    # it's started
+    ctx = multiprocessing.get_context("spawn")  # noqa
+    server_process = Popen(args, shell=False, stdout=PIPE, stderr=PIPE)
+    server_process.stdout.readline()
+
+    try:
+        retcode = server_process.poll()
+
+        if retcode is not None:
+            raise ValueError(f"Server failed to start "
+                             f"with return code {retcode}")
+
+        yield server_process
+    finally:
+        server_process.kill()
+
+
+@pytest.fixture
+def minio_alias():
+    return "testcloud"
+
+
+@pytest.fixture
+def minio_client(minio_server, minio_alias):
+    client_path = find_executable("mc")
+
+    if not client_path:
+        pytest.skip("Unable to find \"mc\" binary")
+
+    # Set the server alias on the client
+    args = [str(client_path), "alias", "set", minio_alias,
+            MINIO_URL.geturl(), "minioadmin", "minioadmin"]
+
+    ctx = multiprocessing.get_context("spawn")  # noqa
+    with Popen(args, shell=False, stdout=PIPE, stderr=PIPE) as client_process:
+        retcode = client_process.wait()
+
+        if retcode != 0:
+            raise ValueError(f"mc set alias failed with return code {retcode}")
+
+    yield client_path
+
+
+@pytest.fixture
+def minio_user_key():
+    return "abcdef1234567890"
+
+
+@pytest.fixture
+def minio_admin(minio_client, minio_alias, minio_user_key):
+    minio = pytest.importorskip("minio")
+    minio_admin = minio.MinioAdmin(minio_alias, binary_path=str(minio_client))
+    # Add a user and give it readwrite access
+    minio_admin.user_add(minio_user_key, minio_user_key)
+    minio_admin.policy_set("readwrite", user=minio_user_key)
+    yield minio_admin
+
+
+@pytest.fixture
+def py_minio_client(minio_client, minio_admin, minio_alias, minio_user_key):
+    minio = pytest.importorskip("minio")
+    yield minio.Minio(MINIO_URL.netloc,
+                      access_key=minio_user_key,
+                      secret_key=minio_user_key,
+                      secure=MINIO_URL.scheme == "https")
