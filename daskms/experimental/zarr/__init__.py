@@ -18,8 +18,7 @@ from daskms.experimental.utils import (
     extent_args,
     select_vars_and_coords,
     column_iterator,
-    promote_columns,
-    store_path_split)
+    promote_columns)
 from daskms.optimisation import inlined_array
 from daskms.utils import requires
 from daskms.fsspec_store import DaskMSStore
