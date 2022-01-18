@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import fsspec
@@ -50,18 +51,19 @@ class DaskMSStore(metaclass=Multiton):
         return s[len(prefix):] if s.startswith(prefix) else s
 
     def rglob(self, pattern, **kwargs):
-        paths = self.fs.glob(f"{self.path}/**/{pattern}", **kwargs)
-        return (self._remove_prefix(p, self.path + "/") for p in paths)
+        paths = self.fs.glob(f"{self.path}{os.sep}**{os.sep}{pattern}",
+                             **kwargs)
+        return (self._remove_prefix(p, f"{self.path}{os.sep}") for p in paths)
 
     def open_file(self, path, *args, **kwargs):
-        return self.fs.open(f"{self.path}/{path}", *args, **kwargs)
+        return self.fs.open(f"{self.path}{os.sep}{path}", *args, **kwargs)
 
     def makedirs(self, path, *args, **kwargs):
-        return self.fs.makedirs(f"{self.path}/{path}", *args, **kwargs)
+        return self.fs.makedirs(f"{self.path}{os.sep}{path}", *args, **kwargs)
 
     def subtable_store(self, subtable):
         if subtable == "MAIN":
             return self
 
-        return DaskMSStore(self.url + "/" + subtable,
+        return DaskMSStore(f"{self.url}{os.sep}{subtable}",
                            **self.storage_options)
