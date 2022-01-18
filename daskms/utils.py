@@ -2,8 +2,7 @@
 
 from collections import OrderedDict
 import logging
-import os.path
-from pathlib import Path
+from pathlib import PurePath, Path
 import time
 
 from dask.utils import funcname
@@ -85,7 +84,7 @@ def promote_columns(columns, default):
 
 def table_path_split(path):
     """ Splits a table path into a (root, table, subtable) tuple """
-    if not isinstance(path, Path):
+    if not isinstance(path, PurePath):
         path = Path(path)
 
     root = path.parent
@@ -205,45 +204,3 @@ def requires(*args):
             return fn
 
     return decorator
-
-
-def dataset_type(path):
-    """
-    Parameters
-    ----------
-    path : Path
-
-    Returns
-    -------
-    type : {"casa", "zarr", "parquet"}
-        Type of table at the specified path
-
-    Raises
-    ------
-    TypeError
-        If it was not possible to infer the type of dataset
-    """
-
-    if not isinstance(path, Path):
-        path = Path(path)
-
-    parts = path.name.split("::", 1)
-
-    if len(parts) == 1:
-        pass
-    elif len(parts) == 2:
-        path = path.parent / parts[0]
-    else:
-        raise ValueError(f"len(parts) '{len(parts)}' not in (1, 2)")
-
-    if (path / "table.dat").exists():
-        return "casa"
-    else:
-        for _, _, files in os.walk(str(path)):
-            for f in files:
-                if f == ".zgroup":
-                    return "zarr"
-                elif f.endswith(".parquet"):
-                    return "parquet"
-
-    raise TypeError("Unknown table type")

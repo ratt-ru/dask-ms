@@ -18,10 +18,10 @@ from daskms.experimental.utils import (
     extent_args,
     select_vars_and_coords,
     column_iterator,
-    promote_columns,
-    store_path_split)
+    promote_columns)
 from daskms.optimisation import inlined_array
 from daskms.utils import requires
+from daskms.fsspec_store import DaskMSStore
 
 try:
     import zarr
@@ -106,18 +106,16 @@ def create_array(ds_group, column, column_schema,
     }
 
 
-def prepare_zarr_group(dataset_id, dataset, store, table="MAIN"):
-    dir_store = zarr.DirectoryStore(store)
-
+def prepare_zarr_group(dataset_id, dataset, store):
     try:
         # Open in read/write, must exist
-        group = zarr.open_group(store=dir_store, mode="r+")
+        group = zarr.open_group(store=store.map, mode="r+")
     except zarr.errors.GroupNotFoundError:
         # Create, must not exist
-        group = zarr.open_group(store=dir_store, mode="w-")
+        group = zarr.open_group(store=store.map, mode="w-")
 
-    group_name = f"{table}_{dataset_id}"
-    ds_group = group.require_group(table).require_group(group_name)
+    group_name = f"{store.table}_{dataset_id}"
+    ds_group = group.require_group(store.table).require_group(group_name)
 
     schema = DatasetSchema.from_dataset(dataset)
     schema_chunks = schema.chunks
@@ -209,13 +207,15 @@ def xds_to_zarr(xds, store, columns=None):
     writes : Dataset
         A Dataset representing the write operations
     """
-    store, table = store_path_split(store)
-
-    if isinstance(store, Path):
-        store = str(store)
-
-    if not isinstance(store, str):
-        raise TypeError(f"store '{store}' must be Path or str")
+    if isinstance(store, DaskMSStore):
+        pass
+    elif isinstance(store, Path):
+        store = DaskMSStore(f"file://{store}")
+    elif isinstance(store, str):
+        store = DaskMSStore(f"file://{store}")
+    else:
+        raise TypeError(f"store '{store}' must be "
+                        f"Path, str or DaskMSStore")
 
     columns = promote_columns(columns)
 
@@ -230,7 +230,7 @@ def xds_to_zarr(xds, store, columns=None):
     write_datasets = []
 
     for di, ds in enumerate(xds):
-        group = prepare_zarr_group(di, ds, store, table)
+        group = prepare_zarr_group(di, ds, store)
 
         data_vars, coords = select_vars_and_coords(ds, columns)
         data_vars = dict(_gen_writes(data_vars, ds.chunks, group))
@@ -278,13 +278,15 @@ def xds_from_zarr(store, columns=None, chunks=None):
     writes : Dataset or list of Datasets
         Dataset(s) representing write operations
     """
-    store, table = store_path_split(store)
-
-    if isinstance(store, Path):
-        store = str(store)
-
-    if not isinstance(store, str):
-        raise TypeError("store must be a Path, str")
+    if isinstance(store, DaskMSStore):
+        pass
+    elif isinstance(store, Path):
+        store = DaskMSStore(f"file://{store}")
+    elif isinstance(store, str):
+        store = DaskMSStore(f"file://{store}")
+    else:
+        raise TypeError(f"store '{store}' must be "
+                        f"Path, str or DaskMSStore")
 
     columns = promote_columns(columns)
 
@@ -301,7 +303,7 @@ def xds_from_zarr(store, columns=None, chunks=None):
     datasets = []
     numpy_vars = []
 
-    table_group = zarr.open(store)[table]
+    table_group = zarr.open(store.map)[store.table]
 
     for g, (group_name, group) in enumerate(sorted(table_group.groups())):
         group_attrs = decode_attr(dict(group.attrs))

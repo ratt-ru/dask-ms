@@ -10,14 +10,14 @@ from dask.array.core import normalize_chunks
 import numpy as np
 
 from daskms.dataset import Dataset
+from daskms.fsspec_store import DaskMSStore
 from daskms.experimental.utils import (promote_columns,
-                                       column_iterator,
-                                       store_path_split)
+                                       column_iterator)
 from daskms.experimental.arrow.arrow_schema import DASKMS_METADATA
 from daskms.experimental.arrow.extension_types import TensorType
 from daskms.experimental.arrow.require_arrow import requires_arrow
 from daskms.constants import DASKMS_PARTITION_KEY
-from daskms.utils import freeze
+from daskms.patterns import Multiton
 
 try:
     import pyarrow as pa
@@ -55,41 +55,31 @@ _parquet_table_cache = weakref.WeakValueDictionary()
 log = logging.getLogger(__name__)
 
 
-class ParquetFileProxyMetaClass(type):
-    def __call__(cls, *args, **kwargs):
-        key = freeze((cls, ) + args + (kwargs,))
-
-        try:
-            return _parquet_table_cache[key]
-        except KeyError:
-            with _parquet_table_lock:
-                try:
-                    return _parquet_table_cache[key]
-                except KeyError:
-                    instance = type.__call__(cls, *args, **kwargs)
-                    _parquet_table_cache[key] = instance
-                    return instance
-
-
-class ParquetFileProxy(metaclass=ParquetFileProxyMetaClass):
-    def __init__(self, path):
-        self.path = path
+class ParquetFileProxy(metaclass=Multiton):
+    def __init__(self, store, key):
+        self.store = store
+        self.key = key
         self.lock = Lock()
 
     def __reduce__(self):
-        return (ParquetFileProxy, (self.path,))
+        return (ParquetFileProxy, (self.store, self.key))
 
     @property
     def file(self):
         try:
             return self._file
         except AttributeError:
-            with self.lock:
-                try:
-                    return self._file
-                except AttributeError:
-                    self._file = file_ = pq.ParquetFile(self.path)
-                    return file_
+            pass
+
+        with self.lock:
+            try:
+                return self._file
+            except AttributeError:
+                pass
+
+            sf = self.store.open_file(self.key, "rb")
+            self._file = file_ = pq.ParquetFile(sf)
+            return file_
 
     @property
     def metadata(self):
@@ -97,11 +87,13 @@ class ParquetFileProxy(metaclass=ParquetFileProxyMetaClass):
 
     def __eq__(self, other):
         return (isinstance(other, ParquetFileProxy) and
-                self.path == other.path)
+                self.store == other.store and
+                self.key == other.key)
 
     def __lt__(self, other):
         return (isinstance(other, ParquetFileProxy) and
-                self.path < other.path)
+                self.store == other.store and
+                self.key < other.key)
 
     def read_column(self, column, start=None, end=None):
         chunks = self.file.read(columns=[column]).column(column).chunks
@@ -189,11 +181,15 @@ def partition_chunking(partition, fragment_rows, chunks):
 
 @requires_arrow(pyarrow_import_error)
 def xds_from_parquet(store, columns=None, chunks=None):
-    store, table = store_path_split(store)
-    store = store / table
-
-    if not isinstance(store, Path):
-        store = Path(store)
+    if isinstance(store, DaskMSStore):
+        pass
+    elif isinstance(store, Path):
+        store = DaskMSStore(f"file://{store}")
+    elif isinstance(store, str):
+        store = DaskMSStore(f"file://{store}")
+    else:
+        raise TypeError(f"store '{store}' must be "
+                        f"Path, str or DaskMSStore")
 
     columns = promote_columns(columns)
 
@@ -207,7 +203,7 @@ def xds_from_parquet(store, columns=None, chunks=None):
     else:
         raise TypeError("chunks must be None or dict or list of dict")
 
-    fragments = store.rglob("*.parquet")
+    fragments = list(map(Path, store.rglob("*.parquet")))
     ds_cfg = defaultdict(list)
 
     # Iterate over all parquet files in the directory tree
@@ -215,8 +211,8 @@ def xds_from_parquet(store, columns=None, chunks=None):
     partition_schemas = set()
 
     for fragment in fragments:
-        *partitions, parquet_file = fragment.relative_to(store).parts
-        fragment = ParquetFileProxy(fragment)
+        *partitions, parquet_file = fragment.relative_to(store.table).parts
+        fragment = ParquetFileProxy(store, fragment)
         fragment_meta = fragment.metadata
         metadata = json.loads(fragment_meta.metadata[DASKMS_METADATA.encode()])
         partition_meta = metadata[DASKMS_PARTITION_KEY]
@@ -227,7 +223,7 @@ def xds_from_parquet(store, columns=None, chunks=None):
 
     # Sanity check partition schemas of all parquet files
     if len(partition_schemas) == 0:
-        raise ValueError(f"No parquet files found in {store}")
+        raise ValueError(f"No parquet files found in {store.path}")
     elif len(partition_schemas) != 1:
         raise ValueError(f"Multiple partitions discovered {partition_schemas}")
 

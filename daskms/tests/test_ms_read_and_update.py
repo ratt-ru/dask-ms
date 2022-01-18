@@ -21,7 +21,7 @@ from daskms.dask_ms import (xds_from_ms,
 from daskms.query import orderby_clause, where_clause
 from daskms.table_proxy import TableProxy, taql_factory
 from daskms.utils import (group_cols_str, index_cols_str,
-                          select_cols_str, assert_liveness,
+                          select_cols_str,
                           table_path_split)
 
 
@@ -239,40 +239,8 @@ def _proc_map_fn(args):
 
 @pytest.mark.parametrize("nprocs", [3])
 def test_multiprocess_table(ms, nprocs):
-    import time
-    import threading
-    import dask.threaded as dt
-
-    # Don't fork threads
-    # https://rachelbythebay.com/w/2011/06/07/forked/
-    # Close and cleanup default dask threadpools
-    with dt.pools_lock:
-        if dt.default_pool is not None:
-            if PY_37_GTE:
-                dt.default_pool.shutdown()
-            else:
-                dt.default_pool.close()
-
-            dt.default_pool = None
-
-        for thread in list(dt.pools.keys()):
-            for p in dt.pools.pop(thread).values():
-                if PY_37_GTE:
-                    p.shutdown()
-                else:
-                    p.close()
-
-    # No TableProxies or Executors (with ThreadPools) live
-    assert_liveness(0, 0)
-
-    # Wait for other threads to die
-    time.sleep(0.1)
-
-    # Only main thread is alive
-    assert len(threading.enumerate()) == 1
-
-    from multiprocessing import Pool
-    pool = Pool(nprocs)
+    from multiprocessing import get_context
+    pool = get_context("spawn").Pool(nprocs)
 
     try:
         args = [tuple((ms, i)) for i in range(nprocs)]

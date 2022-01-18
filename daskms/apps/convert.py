@@ -7,7 +7,7 @@ from pathlib import Path
 import shutil
 
 from daskms.apps.application import Application
-from daskms.utils import dataset_type
+from daskms.fsspec_store import DaskMSStore
 
 log = logging.getLogger(__name__)
 
@@ -58,15 +58,13 @@ class TableFormat(abc.ABC):
 
     @staticmethod
     def from_path(path):
-        if not isinstance(path, Path):
-            path = Path(path)
-
-        typ = dataset_type(path)
+        store = DaskMSStore(path)
+        typ = store.type()
 
         if typ == "casa":
             from daskms.table_proxy import TableProxy
             import pyrap.tables as pt
-            table_proxy = TableProxy(pt.table, str(path),
+            table_proxy = TableProxy(pt.table, str(store.casa_path()),
                                      readonly=True, ack=False)
             keywords = table_proxy.getkeywords().result()
 
@@ -81,10 +79,10 @@ class TableFormat(abc.ABC):
             subtables = CasaFormat.find_subtables(keywords)
             return CasaFormat(version, subtables, typ)
         elif typ == "zarr":
-            subtables = ZarrFormat.find_subtables(path)
+            subtables = ZarrFormat.find_subtables(store)
             return ZarrFormat("0.1", subtables)
         elif typ == "parquet":
-            subtables = ParquetFormat.find_subtables(path)
+            subtables = ParquetFormat.find_subtables(store)
             return ParquetFormat("0.1", subtables)
         else:
             raise ValueError(f"Unexpected table type {typ}")
@@ -185,17 +183,23 @@ class ZarrFormat(BaseTableFormat):
         self._subtables = subtables
 
     @classmethod
-    def find_subtables(cls, path):
-        return [p.relative_to(path) for p in path.iterdir()
-                if p.is_dir()
-                and p.name != "MAIN"
-                and (p / ".zgroup").exists()]
+    def find_subtables(cls, store):
+        paths = (p.relative_to(store.path) for p
+                 in map(Path, store.subdirectories()))
+
+        return [str(p) for p in paths if p.stem != "MAIN" and
+                store.exists(str(p / ".zgroup"))]
 
     @property
     def subtables(self):
         return self._subtables
 
     def reader(self, **kw):
+        group_columns = kw.pop("group_columns", False)
+
+        if group_columns:
+            raise ValueError("\"group_column\" is not supported "
+                             "for zarr inputs")
         try:
             from daskms.experimental.zarr import xds_from_zarr
             return xds_from_zarr
@@ -216,15 +220,24 @@ class ParquetFormat(BaseTableFormat):
         self._subtables = subtables
 
     @classmethod
-    def find_subtables(cls, path):
-        return [p.relative_to(path) for p in path.iterdir()
-                if p.is_dir() and p.name != "MAIN"]
+    def find_subtables(cls, store):
+        paths = (p.relative_to(store.path) for p
+                 in map(Path, store.subdirectories()))
+
+        return [str(p) for p in paths if p.stem != "MAIN" and
+                store.exists(str(p / ".zgroup"))]
 
     @property
     def subtables(self):
         return self._subtables
 
     def reader(self, **kw):
+        group_columns = kw.pop("group_columns", False)
+
+        if group_columns:
+            raise ValueError("\"group_column\" is not supported "
+                             "for zarr inputs")
+
         try:
             from daskms.experimental.arrow.reads import xds_from_parquet
             return xds_from_parquet

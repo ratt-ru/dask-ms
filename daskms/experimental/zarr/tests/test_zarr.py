@@ -1,3 +1,4 @@
+import multiprocessing
 from multiprocessing import Pool
 import os
 
@@ -7,10 +8,11 @@ import numpy as np
 from numpy.testing import assert_array_equal
 import pytest
 
-from daskms import xds_from_ms, xds_from_table
+from daskms import xds_from_ms, xds_from_table, xds_from_storage_ms
 from daskms.constants import DASKMS_PARTITION_KEY
 from daskms.dataset import Dataset
 from daskms.experimental.zarr import xds_from_zarr, xds_to_zarr
+from daskms.fsspec_store import DaskMSStore
 
 try:
     import xarray
@@ -67,10 +69,8 @@ def test_xds_to_zarr_coords(tmp_path_factory):
             assert_array_equal(v.data, getattr(nds, c).data)
 
 
-def test_xds_to_zarr(ms, spw_table, ant_table, tmp_path_factory):
-    zarr_store = tmp_path_factory.mktemp("zarr_store") / "test.zarr"
-    spw_store = zarr_store.parent / f"{zarr_store.name}::SPECTRAL_WINDOW"
-    ant_store = zarr_store.parent / f"{zarr_store.name}::ANTENNA"
+def zarr_tester(ms, spw_table, ant_table,
+                zarr_store, spw_store, ant_store):
 
     ms_datasets = xds_from_ms(ms)
     spw_datasets = xds_from_table(spw_table, group_cols="__row__")
@@ -97,7 +97,7 @@ def test_xds_to_zarr(ms, spw_table, ant_table, tmp_path_factory):
     writes.extend(xds_to_zarr(ant_datasets, ant_store))
     dask.compute(writes)
 
-    zarr_datasets = xds_from_zarr(zarr_store, chunks={"row": 1})
+    zarr_datasets = xds_from_storage_ms(zarr_store, chunks={"row": 1})
 
     for ms_ds, zarr_ds in zip(ms_datasets, zarr_datasets):
         # Check data variables
@@ -122,6 +122,38 @@ def test_xds_to_zarr(ms, spw_table, ant_table, tmp_path_factory):
             assert_array_equal(zattr, v)
 
 
+def test_xds_to_zarr_local(ms, spw_table, ant_table, tmp_path_factory):
+    zarr_store = tmp_path_factory.mktemp("zarr_store") / "test.zarr"
+    spw_store = zarr_store.parent / f"{zarr_store.name}::SPECTRAL_WINDOW"
+    ant_store = zarr_store.parent / f"{zarr_store.name}::ANTENNA"
+
+    return zarr_tester(ms, spw_table, ant_table,
+                       zarr_store, spw_store, ant_store)
+
+
+def test_xds_to_zarr_s3(ms, spw_table, ant_table,
+                        py_minio_client, minio_user_key,
+                        minio_url, s3_bucket_name):
+
+    py_minio_client.make_bucket(s3_bucket_name)
+
+    zarr_store = DaskMSStore(f"s3://{s3_bucket_name}/measurementset.MS",
+                             key=minio_user_key,
+                             secret=minio_user_key,
+                             client_kwargs={
+                                 "endpoint_url": minio_url.geturl(),
+                                 "region_name": "af-cpt",
+                             })
+
+    # NOTE(sjperkins)
+    # Review this interface
+    spw_store = zarr_store.subtable_store("SPECTRAL_WINDOW")
+    ant_store = zarr_store.subtable_store("ANTENNA")
+
+    return zarr_tester(ms, spw_table, ant_table,
+                       zarr_store, spw_store, ant_store)
+
+
 @pytest.mark.skipif(xarray is None, reason="Needs xarray to rechunk")
 def test_multiprocess_create(ms, tmp_path_factory):
     zarr_store = tmp_path_factory.mktemp("zarr_store") / "test.zarr"
@@ -133,6 +165,7 @@ def test_multiprocess_create(ms, tmp_path_factory):
 
     writes = xds_to_zarr(ms_datasets, zarr_store)
 
+    ctx = multiprocessing.get_context("spawn")  # noqa
     dask.compute(writes, scheduler="processes")
 
     zds = xds_from_zarr(zarr_store)

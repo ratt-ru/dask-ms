@@ -2,6 +2,11 @@
 History
 =======
 
+X.Y.Z (YYYY-MM-DD)
+------------------
+* Support cloud native storage formats via fsspec (:pr:`174`)
+
+
 0.2.7 (2022-01-13)
 ------------------
 * Fix inclusion of MANIFEST.in files (:pr:`173`)
