@@ -184,15 +184,22 @@ class ZarrFormat(BaseTableFormat):
 
     @classmethod
     def find_subtables(cls, store):
-        return [p for p in map(Path, store.subdirectories())
-                if p.stem != "MAIN"
-                and store.exists(str(p / ".zgroup"))]
+        paths = (p.relative_to(store.path) for p
+                 in map(Path, store.subdirectories()))
+
+        return [str(p) for p in paths if p.stem != "MAIN" and
+                store.exists(str(p / ".zgroup"))]
 
     @property
     def subtables(self):
         return self._subtables
 
     def reader(self, **kw):
+        group_columns = kw.pop("group_columns", False)
+
+        if group_columns:
+            raise ValueError("\"group_column\" is not supported "
+                             "for zarr inputs")
         try:
             from daskms.experimental.zarr import xds_from_zarr
             return xds_from_zarr
@@ -214,14 +221,23 @@ class ParquetFormat(BaseTableFormat):
 
     @classmethod
     def find_subtables(cls, store):
-        return [p for p in map(Path, store.subdirectories())
-                if p.stem != "MAIN"]
+        paths = (p.relative_to(store.path) for p
+                 in map(Path, store.subdirectories()))
+
+        return [str(p) for p in paths if p.stem != "MAIN" and
+                store.exists(str(p / ".zgroup"))]
 
     @property
     def subtables(self):
         return self._subtables
 
     def reader(self, **kw):
+        group_columns = kw.pop("group_columns", False)
+
+        if group_columns:
+            raise ValueError("\"group_column\" is not supported "
+                             "for zarr inputs")
+
         try:
             from daskms.experimental.arrow.reads import xds_from_parquet
             return xds_from_parquet
