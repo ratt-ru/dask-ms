@@ -8,6 +8,7 @@ import pytest
 
 from daskms import xds_from_ms
 from daskms.dataset import Dataset
+from daskms.fsspec_store import DaskMSStore
 from daskms.experimental.arrow.extension_types import TensorArray
 from daskms.experimental.arrow.reads import xds_from_parquet
 from daskms.experimental.arrow.reads import partition_chunking
@@ -96,11 +97,7 @@ def test_xds_to_parquet_string(tmp_path_factory):
         assert_array_equal(ds.NAME.data, pq_ds.NAME.data)
 
 
-def test_xds_to_parquet(ms, tmp_path_factory, spw_table, ant_table):
-    store = tmp_path_factory.mktemp("parquet_store") / "out.parquet"
-    # antenna_store = store.parent / f"{store.name}::ANTENNA"
-    # spw_store = store.parent / f"{store.name}::SPECTRAL_WINDOW"
-
+def parquet_tester(ms, store):
     datasets = xds_from_ms(ms)
 
     # We can test row chunking if xarray is installed
@@ -138,3 +135,33 @@ def test_xds_to_parquet(ms, tmp_path_factory, spw_table, ant_table):
 
         for field, dtype in partitions:
             assert getattr(ds, field) == getattr(pq_ds, field)
+
+
+def test_xds_to_parquet_local(ms, tmp_path_factory, spw_table, ant_table):
+    store = tmp_path_factory.mktemp("parquet_store") / "out.parquet"
+    # antenna_store = store.parent / f"{store.name}::ANTENNA"
+    # spw_store = store.parent / f"{store.name}::SPECTRAL_WINDOW"
+
+    return parquet_tester(ms, store)
+
+
+def test_xds_to_parquet_s3(ms, spw_table, ant_table,
+                           py_minio_client, minio_user_key,
+                           minio_url, s3_bucket_name):
+
+    py_minio_client.make_bucket(s3_bucket_name)
+
+    store = DaskMSStore(f"s3://{s3_bucket_name}/measurementset.MS",
+                        key=minio_user_key,
+                        secret=minio_user_key,
+                        client_kwargs={
+                          "endpoint_url": minio_url.geturl(),
+                          "region_name": "af-cpt",
+                        })
+
+    # NOTE(sjperkins)
+    # Review this interface
+    # spw_store = store.subtable_store("SPECTRAL_WINDOW")
+    # ant_store = store.subtable_store("ANTENNA")
+
+    return parquet_tester(ms, store)

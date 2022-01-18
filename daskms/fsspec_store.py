@@ -45,9 +45,13 @@ class DaskMSStore(metaclass=Multiton):
         path = path or self.path
         return list(map(Path, self.fs.ls(path, detail=False)))
 
+    @staticmethod
+    def _remove_prefix(s, prefix):
+        return s[len(prefix):] if s.startswith(prefix) else s
+
     def rglob(self, pattern, **kwargs):
         paths = self.fs.glob(f"{self.path}/**/{pattern}", **kwargs)
-        return (p.lstrip(self.path) for p in paths)
+        return (self._remove_prefix(p, self.path + "/") for p in paths)
 
     def open_file(self, path, *args, **kwargs):
         return self.fs.open(f"{self.path}/{path}", *args, **kwargs)
