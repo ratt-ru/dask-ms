@@ -24,13 +24,14 @@ def test_local_store(tmp_path):
 
 def test_minio_server(tmp_path, py_minio_client,
                       minio_admin, minio_alias,
-                      minio_user_key, minio_url):
+                      minio_user_key, minio_url,
+                      s3_bucket_name):
     payload = "How now brown cow"
     stuff = tmp_path / "stuff.txt"
     stuff.write_text(payload)
 
-    py_minio_client.make_bucket("test-bucket")
-    py_minio_client.fput_object("test-bucket",
+    py_minio_client.make_bucket(s3_bucket_name)
+    py_minio_client.fput_object(s3_bucket_name,
                                 "stuff.txt",
                                 str(stuff))
 
@@ -43,5 +44,5 @@ def test_minio_server(tmp_path, py_minio_client,
             "region_name": "af-cpt"
         })
 
-    with s3.open("test-bucket/stuff.txt", "rb") as f:
+    with s3.open(f"{s3_bucket_name}/stuff.txt", "rb") as f:
         assert f.read() == payload.encode("utf-8")

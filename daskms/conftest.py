@@ -6,6 +6,7 @@ import os
 from subprocess import Popen, PIPE
 from pathlib import Path
 from urllib.parse import urlparse
+from uuid import uuid4
 
 import numpy as np
 import pyrap.tables as pt
@@ -221,6 +222,11 @@ def ant_table(tmp_path_factory, wsrt_antenna_positions):
 
 
 MINIO_URL = urlparse("http://127.0.0.1:9000")
+
+
+@pytest.fixture(scope="function")
+def s3_bucket_name():
+    return f"test-bucket-{uuid4().hex[:8]}"
 
 
 @pytest.fixture
