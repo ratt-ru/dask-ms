@@ -13,6 +13,7 @@ def test_local_store(tmp_path):
     (tmp_path / "bar.txt").write_text(payload)
     (tmp_path / "qux.txt").write_text(payload)
     store = DaskMSStore(str(tmp_path))
+    store.fs.mkdir(f"{store.path}/bob", exist_ok=True)
 
     assert store.map[filename] == payload.encode("utf-8")
 

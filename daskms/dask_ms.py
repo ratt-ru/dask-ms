@@ -2,10 +2,7 @@
 
 import logging
 
-import fsspec
-from fsspec.implementations.local import LocalFileSystem
-
-
+from daskms.fsspec_store import DaskMSStore
 from daskms.table_proxy import TableProxy
 from daskms.reads import DatasetFactory
 from daskms.writes import write_datasets
@@ -74,12 +71,10 @@ def xds_to_table(xds, table_name, columns="ALL", descriptor=None,
     table_proxy : :class:`daskms.TableProxy`, optional
         The Table Proxy associated with the datasets
     """
-    of = fsspec.open_files(table_name)
-
-    if not isinstance(of.fs, LocalFileSystem):
-        raise ValueError(f"CASA Tables are only accessible "
-                         f"via local file systems. Got "
-                         f"{of.fs} {of.fs.protocol}")
+    if isinstance(table_name, DaskMSStore):
+        table_name = table_name.casa_path()
+    else:
+        table_name = DaskMSStore(table_name).casa_path()
 
     # Promote dataset to a list
     if not isinstance(xds, (tuple, list)):
@@ -265,12 +260,10 @@ def xds_from_table(table_name, columns=None,
 
 
     """
-    of = fsspec.open_files(table_name)
-
-    if not isinstance(of.fs, LocalFileSystem):
-        raise ValueError(f"CASA Tables are only accessible "
-                         f"via local file systems. Got "
-                         f"{of.fs} {of.fs.protocol}")
+    if isinstance(table_name, DaskMSStore):
+        table_name = table_name.casa_path()
+    else:
+        table_name = DaskMSStore(table_name).casa_path()
 
     columns = promote_columns(columns, [])
     index_cols = promote_columns(index_cols, [])
@@ -322,8 +315,10 @@ def xds_from_ms(ms, columns=None, index_cols=None, group_cols=None, **kwargs):
 
 
 def xds_from_storage_table(store, **kwargs):
-    from daskms.utils import dataset_type
-    typ = dataset_type(store)
+    if not isinstance(store, DaskMSStore):
+        store = DaskMSStore(store)
+
+    typ = store.type()
 
     if typ == "casa":
         return xds_from_table(store, **kwargs)
@@ -338,9 +333,10 @@ def xds_from_storage_table(store, **kwargs):
 
 
 def xds_from_storage_ms(store, **kwargs):
-    from daskms.utils import dataset_type
+    if not isinstance(store, DaskMSStore):
+        store = DaskMSStore(store)
 
-    typ = dataset_type(store)
+    typ = store.type()
 
     if typ == "casa":
         return xds_from_ms(store, **kwargs)

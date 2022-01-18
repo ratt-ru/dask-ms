@@ -6,7 +6,7 @@ import numpy as np
 from numpy.testing import assert_array_equal
 import pytest
 
-from daskms import xds_from_ms
+from daskms import xds_from_storage_ms
 from daskms.dataset import Dataset
 from daskms.fsspec_store import DaskMSStore
 from daskms.experimental.arrow.extension_types import TensorArray
@@ -98,7 +98,7 @@ def test_xds_to_parquet_string(tmp_path_factory):
 
 
 def parquet_tester(ms, store):
-    datasets = xds_from_ms(ms)
+    datasets = xds_from_storage_ms(ms)
 
     # We can test row chunking if xarray is installed
     if xarray is not None:

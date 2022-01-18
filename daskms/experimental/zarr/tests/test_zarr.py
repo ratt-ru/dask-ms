@@ -8,7 +8,7 @@ import numpy as np
 from numpy.testing import assert_array_equal
 import pytest
 
-from daskms import xds_from_ms, xds_from_table
+from daskms import xds_from_ms, xds_from_table, xds_from_storage_ms
 from daskms.constants import DASKMS_PARTITION_KEY
 from daskms.dataset import Dataset
 from daskms.experimental.zarr import xds_from_zarr, xds_to_zarr
@@ -97,7 +97,7 @@ def zarr_tester(ms, spw_table, ant_table,
     writes.extend(xds_to_zarr(ant_datasets, ant_store))
     dask.compute(writes)
 
-    zarr_datasets = xds_from_zarr(zarr_store, chunks={"row": 1})
+    zarr_datasets = xds_from_storage_ms(zarr_store, chunks={"row": 1})
 
     for ms_ds, zarr_ds in zip(ms_datasets, zarr_datasets):
         # Check data variables

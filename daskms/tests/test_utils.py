@@ -6,7 +6,9 @@ import platform
 
 import pytest
 
-from daskms.utils import promote_columns, table_path_split, requires
+from daskms.utils import (promote_columns,
+                          table_path_split,
+                          requires)
 
 
 @pytest.mark.parametrize("columns", [["TIME", "ANTENNA1"]])
