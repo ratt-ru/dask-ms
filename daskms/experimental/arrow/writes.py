@@ -1,7 +1,6 @@
 import itertools
 from pathlib import Path
 from threading import Lock
-import weakref
 
 import dask.array as da
 import numpy as np
@@ -9,13 +8,13 @@ import numpy as np
 from daskms.dataset import Dataset
 from daskms.optimisation import inlined_array
 from daskms.constants import DASKMS_PARTITION_KEY
-from daskms.utils import freeze
+from daskms.fsspec_store import DaskMSStore
+from daskms.patterns import Multiton
 from daskms.experimental.arrow.arrow_schema import ArrowSchema
 from daskms.experimental.arrow.extension_types import TensorArray
 from daskms.experimental.arrow.require_arrow import requires_arrow
 from daskms.experimental.utils import (promote_columns,
-                                       column_iterator,
-                                       store_path_split)
+                                       column_iterator)
 
 try:
     import pyarrow as pa
@@ -31,33 +30,9 @@ except ImportError as e:
 else:
     pyarrow_import_error = None
 
-_dataset_cache = weakref.WeakValueDictionary()
-_dataset_lock = Lock()
 
-
-class ParquetFragmentMetaClass(type):
-    """
-    https://en.wikipedia.org/wiki/Multiton_pattern
-
-    """
-    def __call__(cls, *args, **kwargs):
-        key = freeze((cls,) + args + (kwargs,))
-
-        try:
-            return _dataset_cache[key]
-        except KeyError:
-            with _dataset_lock:
-                try:
-                    return _dataset_cache[key]
-                except KeyError:
-                    instance = type.__call__(cls, *args, **kwargs)
-                    _dataset_cache[key] = instance
-                    return instance
-
-
-class ParquetFragment(metaclass=ParquetFragmentMetaClass):
-    def __init__(self, path, schema, dataset_id):
-        path = Path(path)
+class ParquetFragment(metaclass=Multiton):
+    def __init__(self, store, key, schema, dataset_id):
         partition = schema.attrs.get(DASKMS_PARTITION_KEY, False)
 
         if not partition:
@@ -74,22 +49,26 @@ class ParquetFragment(metaclass=ParquetFragmentMetaClass):
         else:
             partition = tuple((p, schema.attrs[p]) for p, _ in partition)
 
+        key = Path(key)
+
         # Add the partitioning to the path
         for field, value in partition:
-            path /= f"{field}={value}"
+            key /= f"{field}={value}"
 
         self.dataset_id = dataset_id
-        self.path = path
+        self.store = store
+        self.key = key
         self.schema = schema
         self.partition = partition
         self.lock = Lock()
 
     def __reduce__(self):
-        return (ParquetFragment, (self.path, self.schema, self.dataset_id))
+        return (ParquetFragment, (self.store, self.key,
+                                  self.schema, self.dataset_id))
 
     def write(self, chunk, *data):
         with self.lock:
-            self.path.mkdir(parents=True, exist_ok=True)
+            self.store.makedirs(self.key, exist_ok=True)
 
         table_data = {}
 
@@ -111,17 +90,24 @@ class ParquetFragment(metaclass=ParquetFragmentMetaClass):
             table_data[column] = pa_data
 
         table = pa.table(table_data, schema=self.schema.to_arrow_schema())
-        pq.write_table(table, self.path / f"{chunk.item()}.parquet")
+        parquet_filename = self.key / f"{chunk.item()}.parquet"
+        sf = self.store.open_file(parquet_filename, "wb")
+        pq.write_table(table, sf)
 
         return np.array([True], bool)
 
 
 @requires_arrow(pyarrow_import_error)
-def xds_to_parquet(xds, path, columns=None):
-    path, table = store_path_split(path)
-
-    if not isinstance(path, Path):
-        path = Path(path)
+def xds_to_parquet(xds, store, columns=None):
+    if isinstance(store, DaskMSStore):
+        pass
+    elif isinstance(store, Path):
+        store = DaskMSStore(f"file://{store}")
+    elif isinstance(store, str):
+        store = DaskMSStore(f"file://{store}")
+    else:
+        raise TypeError(f"store '{store}' must be "
+                        f"Path, str or DaskMSStore")
 
     columns = promote_columns(columns)
 
@@ -138,7 +124,7 @@ def xds_to_parquet(xds, path, columns=None):
 
     for ds_id, ds in enumerate(xds):
         arrow_schema = base_schema.with_attributes(ds)
-        fragment = ParquetFragment(path / table, arrow_schema, ds_id)
+        fragment = ParquetFragment(store, store.table, arrow_schema, ds_id)
         chunk_ids = da.arange(len(ds.chunks["row"]), chunks=1)
         args = [chunk_ids, ("row",)]
 
