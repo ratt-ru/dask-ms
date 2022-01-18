@@ -69,41 +69,6 @@ def test_xds_to_zarr_coords(tmp_path_factory):
             assert_array_equal(v.data, getattr(nds, c).data)
 
 
-def test_xds_to_zarr_s3(ms, spw_table, ant_table,
-                        py_minio_client, minio_user_key,
-                        minio_url):
-
-    py_minio_client.make_bucket("test-bucket")
-
-    store = DaskMSStore("s3://test-bucket",
-                        key=minio_user_key,
-                        secret=minio_user_key,
-                        client_kwargs={
-                            "endpoint_url": minio_url.geturl(),
-                            "region_name": "af-cpt",
-                        })
-
-    ms_datasets = xds_from_ms(ms)
-    spw_datasets = xds_from_table(spw_table, group_cols="__row__")
-    ant_datasets = xds_from_table(ant_table)
-
-    for i, ds in enumerate(ms_datasets):
-        dims = ds.dims
-        row, chan, corr = (dims[d] for d in ("row", "chan", "corr"))
-
-        ms_datasets[i] = ds.assign_coords(**{
-            "chan": (("chan",), np.arange(chan)),
-            "corr": (("corr",), np.arange(corr)),
-        })
-
-    main_zarr_writes = xds_to_zarr(ms_datasets, store)
-    assert len(ms_datasets) == len(main_zarr_writes)
-
-    dask.compute(main_zarr_writes)
-
-    import ipdb; ipdb.set_trace()
-    None
-
 def zarr_tester(ms, spw_table, ant_table,
                 zarr_store, spw_store, ant_store):
 
