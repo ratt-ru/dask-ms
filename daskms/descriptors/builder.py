@@ -37,7 +37,7 @@ def register_descriptor_builder(name):
     return decorator
 
 
-class AbstractDescriptorBuilder(object, metaclass=abc.ABCMeta):
+class AbstractDescriptorBuilder(metaclass=abc.ABCMeta):
     @staticmethod
     def variable_descriptor(column, column_schema):
         return variable_column_descriptor(column, column_schema)

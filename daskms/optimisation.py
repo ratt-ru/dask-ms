@@ -20,6 +20,11 @@ class KeyMetaClass(type):
     given the same constructor arguments
     """
     def __call__(cls, key):
+        try:
+            return _key_cache[key]
+        except KeyError:
+            pass
+
         with _key_cache_lock:
             try:
                 return _key_cache[key]
@@ -71,6 +76,11 @@ class ArrayCacheMetaClass(type):
     """
     def __call__(cls, token):
         key = (cls, token)
+
+        try:
+            return _array_cache_cache[key]
+        except KeyError:
+            pass
 
         with _array_cache_lock:
             try:
