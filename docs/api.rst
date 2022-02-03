@@ -48,3 +48,11 @@ Data Column Expressions
 -----------------------
 
 .. autofunction:: daskms.expressions.data_column_expr
+
+Patterns
+--------
+
+.. autoclass:: daskms.patterns.Multiton
+    :exclude-members: __call__, mro
+.. autoclass:: daskms.patterns.LazyProxy
+.. autoclass:: daskms.patterns.LazyProxyMultiton

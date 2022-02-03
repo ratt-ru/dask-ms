@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Add LazyProxy and LazyProxyMultiton patterns to dask-ms (:pr:`177`)
 * Support cloud native storage formats via fsspec (:pr:`174`)
 
 
