@@ -9,10 +9,12 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from daskms.patterns import LazyProxy
+import daskms.experimental.arrow.extension_types
 
 def create_parser():
     p = argparse.ArgumentParser()
     p.add_argument("ms")
+    p.add_argument("-c", "--column", default="TIME")
     return p
 
 def read_column(file_proxy, column):
@@ -53,5 +55,5 @@ def column(path, column):
 
 if __name__ == "__main__":
     args = create_parser().parse_args()
-    data = column(Path(args.ms), "TIME")
-    print(data.compute())
+    data = column(Path(args.ms), args.column)
+    print(data, data.compute())
