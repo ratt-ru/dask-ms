@@ -316,6 +316,7 @@ def xds_from_zarr(store, columns=None, chunks=None):
             try:
                 group_chunks.update(chunks[g])
             except IndexError:
+                group_chunks.update(chunks[-1])  # Reuse last chunking.
                 pass
 
         data_vars = {}
