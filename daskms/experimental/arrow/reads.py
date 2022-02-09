@@ -137,7 +137,7 @@ def partition_chunking(partition, fragment_rows, chunks):
 
         if len(unhandled_dims) != 0:
             warnings.warn(f"{unhandled_dims} chunking dimensions are "
-                          "currently ignored for arrow", UserWarning)
+                          f"currently ignored for arrow", UserWarning)
 
         # Get any user specified row chunking, defaulting to
         row_chunks = partition_chunks.get("row", fragment_rows)
