@@ -1,9 +1,9 @@
 from collections import defaultdict
 import json
-import logging
 from pathlib import Path
 from threading import Lock
 import weakref
+import warnings
 
 import dask.array as da
 from dask.array.core import normalize_chunks
@@ -51,8 +51,6 @@ else:
 
 _parquet_table_lock = Lock()
 _parquet_table_cache = weakref.WeakValueDictionary()
-
-log = logging.getLogger(__name__)
 
 
 class ParquetFileProxy(metaclass=Multiton):
@@ -138,8 +136,8 @@ def partition_chunking(partition, fragment_rows, chunks):
         unhandled_dims = set(partition_chunks.keys()) - {"row"}
 
         if len(unhandled_dims) != 0:
-            log.warning("%s chunking dimensions are currently "
-                        "ignored for arrow", unhandled_dims)
+            warnings.warn(f"{unhandled_dims} chunking dimensions are "
+                          "currently ignored for arrow", UserWarning)
 
         # Get any user specified row chunking, defaulting to
         row_chunks = partition_chunks.get("row", fragment_rows)
@@ -262,6 +260,7 @@ def xds_from_parquet(store, columns=None, chunks=None):
                                     column, None,
                                     start, None,
                                     end, None,
+                                    adjust_chunks={"row": end - start},
                                     new_axes=new_axes,
                                     meta=meta)
 
