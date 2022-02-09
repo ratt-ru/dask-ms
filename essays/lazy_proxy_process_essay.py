@@ -34,7 +34,7 @@ def _write(proxy, column, start_len, data):
 
 
 def main(ms, column="TIME"):
-    read_proxy = LazyProxy(pt.table, ms, lockoptions="usernoread", readonly=True)
+    read_proxy = LazyProxy(pt.table, ms, lockoptions="user", readonly=True)
     write_proxy = LazyProxy(pt.table, ms, lockoptions="user", readonly=False)
 
     sl = np.array(([0, 10], [10, 10], [20, 10]))
