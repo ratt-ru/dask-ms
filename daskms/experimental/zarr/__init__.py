@@ -316,6 +316,7 @@ def xds_from_zarr(store, columns=None, chunks=None):
             try:
                 group_chunks.update(chunks[g])
             except IndexError:
+                group_chunks.update(chunks[0])  # Single chunking strategy.
                 pass
 
         data_vars = {}
