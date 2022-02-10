@@ -4,6 +4,7 @@ from collections import OrderedDict
 import inspect
 from inspect import getattr_static
 from threading import Lock
+from types import MethodType
 from warnings import warn
 import weakref
 
@@ -26,6 +27,22 @@ def freeze(arg):
         return freeze(arg.tolist())
     else:
         return arg
+
+
+def _warn_if_positional_in_kwargs(cls, kwargs):
+    signature = inspect.signature(cls.__init__)
+    positional_in_kwargs = [p.name for p in signature.parameters.values()
+                            if p.kind == p.POSITIONAL_OR_KEYWORD
+                            and p.default == p.empty
+                            and p.name in kwargs]
+
+    if positional_in_kwargs:
+        warn(f"Positional arguments {positional_in_kwargs} were "
+             f"supplied as keyword arguments to "
+             f"{cls.__init__}{signature}. "
+             f"This may create separate Multiton instances "
+             f"for what is intended to be a unique set of "
+             f"arguments.")
 
 
 class Multiton(type):
@@ -66,21 +83,8 @@ class Multiton(type):
         self.__lock = Lock()
 
     def __call__(cls, *args, **kwargs):
-        signature = inspect.signature(cls.__init__)
-        positional_in_kwargs = [p.name for p in signature.parameters.values()
-                                if p.kind == p.POSITIONAL_OR_KEYWORD
-                                and p.default == p.empty
-                                and p.name in kwargs]
-
-        if positional_in_kwargs:
-            warn(f"Positional arguments {positional_in_kwargs} were "
-                 f"supplied as keyword arguments to "
-                 f"{cls.__init__}{signature}. "
-                 f"This may create separate Multiton instances "
-                 f"for what is intended to be a unique set of "
-                 f"arguments.")
-
-        key = freeze(args + (kwargs if kwargs else Multiton.MISSING,))
+        _warn_if_positional_in_kwargs(cls, kwargs)
+        key = freeze(args + (kwargs if kwargs else cls.MISSING,))
 
         # Double-checked locking
         # https://en.wikipedia.org/wiki/Double-checked_locking
@@ -94,6 +98,56 @@ class Multiton(type):
                 return cls.__cache[key]
             except KeyError:
                 instance = type.__call__(cls, *args, **kwargs)
+                cls.__cache[key] = instance
+                return instance
+
+
+def dummy(self, *args, **kwargs):
+    pass
+
+class PersistentMultiton(type):
+    """Similar to a :class:`Multiton`, but """
+    MISSING = object()
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.__cache = {}
+        self.__lock = Lock()
+
+    def __new__(cls, name, bases, namespace):
+        return super().__new__(cls, name, bases, {
+            "__forget_multiton__": dummy,
+            **namespace,
+        })
+
+    @staticmethod
+    def forgetter(key):
+        def __forget_multiton__(self, *args, **kwargs):
+            try:
+                del self.__cache[key]
+            except KeyError:
+                pass
+
+        return __forget_multiton__
+
+    def __call__(cls, *args, **kwargs):
+        _warn_if_positional_in_kwargs(cls, kwargs)
+        key = freeze(args + (kwargs if kwargs else cls.MISSING,))
+
+        # Double-checked locking
+        # https://en.wikipedia.org/wiki/Double-checked_locking
+        try:
+            return cls.__cache[key]
+        except KeyError:
+            pass
+
+        with cls.__lock:
+            try:
+                return cls.__cache[key]
+            except KeyError:
+                instance = type.__call__(cls, *args, **kwargs)
+                forget_method = MethodType(cls.forgetter(key), instance)
+                instance.__forget_multiton__ = forget_method
                 cls.__cache[key] = instance
                 return instance
 
@@ -359,7 +413,7 @@ class LazyProxy:
             raise AttributeError(name) from e
 
     def __setattr__(self, name, value):
-        obj = self if name in self.__lazy_members__ else self.__lazy_object__
+        obj = self if name in dir(self) else self.__lazy_object__
         return object.__setattr__(obj, name, value)
 
     def __delattr__(self, name):
@@ -391,3 +445,6 @@ class LazyProxyMultiton(LazyProxy, metaclass=Multiton):
 
     See :class:`LazyProxy` and :class:`Multiton` for further details
     """
+
+class PersistentLazyProxyMultiton(LazyProxy, metaclass=PersistentMultiton):
+    pass

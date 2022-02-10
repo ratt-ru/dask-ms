@@ -2,6 +2,7 @@ from collections import defaultdict
 import json
 import logging
 from pathlib import Path
+import re
 from threading import Lock
 import weakref
 
@@ -55,6 +56,10 @@ _parquet_table_cache = weakref.WeakValueDictionary()
 log = logging.getLogger(__name__)
 
 
+def natural_order(key):
+    return tuple(int(c) if c.isdigit() else c.lower()
+                 for c in re.split("(\d+)", str(key)))
+
 class ParquetFileProxy(metaclass=Multiton):
     def __init__(self, store, key):
         self.store = store
@@ -93,7 +98,7 @@ class ParquetFileProxy(metaclass=Multiton):
     def __lt__(self, other):
         return (isinstance(other, ParquetFileProxy) and
                 self.store == other.store and
-                self.key < other.key)
+                natural_order(self.key) < natural_order(other.key))
 
     def read_column(self, column, start=None, end=None):
         chunks = self.file.read(columns=[column]).column(column).chunks

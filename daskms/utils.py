@@ -118,12 +118,14 @@ def assert_liveness(table_proxies, executors, collect=True):
     Asserts that the given number of TableProxy
     and Executor objects are alive.
     """
-    from daskms.table_proxy import _table_cache
+    from daskms.table_proxy import TableProxy
     from daskms.table_executor import _executor_cache
     import gc
 
     if collect:
         gc.collect()
+
+    _table_cache = TableProxy._Multiton__cache
 
     if table_proxies is not None and len(_table_cache) != table_proxies:
         lines = ["len(_table_cache)[%d] != %d" %
