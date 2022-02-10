@@ -3,6 +3,7 @@
 from collections import OrderedDict
 import logging
 from pathlib import PurePath, Path
+import re
 import time
 
 from dask.utils import funcname
@@ -13,6 +14,11 @@ from numpy import ndarray
 from daskms.testing import in_pytest
 
 log = logging.getLogger(__name__)
+
+
+def natural_order(key):
+    return tuple(int(c) if c.isdigit() else c.lower()
+                 for c in re.split(r"(\d+)", str(key)))
 
 
 def arg_hasher(args):

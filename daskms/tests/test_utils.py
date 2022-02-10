@@ -7,8 +7,16 @@ import platform
 import pytest
 
 from daskms.utils import (promote_columns,
+                          natural_order,
                           table_path_split,
                           requires)
+
+
+def test_natural_order():
+    data = [f"{i}.parquet" for i in reversed(range(20))]
+    expected = [f"{i}.parquet" for i in range(20)]
+    assert sorted(data, key=natural_order) == expected
+    assert sorted(data) != expected
 
 
 @pytest.mark.parametrize("columns", [["TIME", "ANTENNA1"]])
