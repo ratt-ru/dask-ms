@@ -18,6 +18,7 @@ from daskms.experimental.arrow.extension_types import TensorType
 from daskms.experimental.arrow.require_arrow import requires_arrow
 from daskms.constants import DASKMS_PARTITION_KEY
 from daskms.patterns import Multiton
+from daskms.utils import natural_order
 
 try:
     import pyarrow as pa
@@ -93,7 +94,7 @@ class ParquetFileProxy(metaclass=Multiton):
     def __lt__(self, other):
         return (isinstance(other, ParquetFileProxy) and
                 self.store == other.store and
-                self.key < other.key)
+                natural_order(self.key) < natural_order(other.key))
 
     def read_column(self, column, start=None, end=None):
         chunks = self.file.read(columns=[column]).column(column).chunks
