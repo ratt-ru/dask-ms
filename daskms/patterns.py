@@ -413,8 +413,20 @@ class LazyProxy:
             raise AttributeError(name) from e
 
     def __setattr__(self, name, value):
-        obj = self if name in dir(self) else self.__lazy_object__
-        return object.__setattr__(obj, name, value)
+        # Defer to self
+        # if name in self.__lazy_members__:
+        #     return object.__setattr__(self, name, value)
+
+        try:
+            # name might exist on self, e.g. maybe a metaclass
+            # added a method
+            getattr_static(self, name)
+        except AttributeError:
+            # Nope, defer to the proxy
+            return object.__setattr__(self.__lazy_object__, name, value)
+        else:
+            # Defer to self
+            return object.__setattr__(self, name, value)
 
     def __delattr__(self, name):
         if name in self.__lazy_members__:
