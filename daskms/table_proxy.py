@@ -146,11 +146,6 @@ class TableProxyMetaClass(Multiton):
         return super().__new__(cls, name, bases, dct)
 
 
-def _map_create_proxy(cls, factory, args, kwargs):
-    """ Support pickling of kwargs in TableProxy.__reduce__ """
-    return cls(factory, *args, **kwargs)
-
-
 class MismatchedLocks(Exception):
     pass
 
@@ -344,10 +339,13 @@ class TableProxy(object, metaclass=TableProxyMetaClass):
     def executor_key(self):
         return self._ex_key
 
+    @classmethod
+    def from_args(cls, factory, args, kwargs):
+        return cls(factory, *args, **kwargs)
+
     def __reduce__(self):
         """ Defer to _map_create_proxy to support kwarg pickling """
-        return (_map_create_proxy, (TableProxy, self._factory,
-                                    self._args, self._kwargs))
+        return (self.from_args, (self._factory, self._args, self._kwargs))
 
     def __enter__(self):
         return self
