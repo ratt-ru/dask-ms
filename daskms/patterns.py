@@ -414,8 +414,8 @@ class LazyProxy:
 
     def __setattr__(self, name, value):
         # Defer to self
-        # if name in self.__lazy_members__:
-        #     return object.__setattr__(self, name, value)
+        if name in self.__lazy_members__:
+            return object.__setattr__(self, name, value)
 
         try:
             # name might exist on self, e.g. maybe a metaclass
