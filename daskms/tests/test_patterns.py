@@ -255,14 +255,18 @@ class TableProxy(metaclass=TableProxyMetaClass):
                                             *self.args,
                                             **self.kwargs)
 
+
+
         spawn_ctx = multiprocessing.get_context("spawn")
         self._ex = executor = cf.ProcessPoolExecutor(5, mp_context=spawn_ctx)
+        self._ex = executor = LazyProxyMultiton(cf.ProcessPoolExecutor, 5, mp_context=spawn_ctx)
+        #self._ex = executor = cf.ThreadPoolExecutor(1)
 
-        weakref.finalize(self, self.finalise_proxy, proxy, executor)
+        weakref.finalize(self, self.finaliser, proxy, executor)
 
 
     @staticmethod
-    def finalise_proxy(proxy, executor):
+    def finaliser(proxy, executor):
         nprocess = len(executor._processes)
         list(executor.map(proxy.__forget_multiton__, [None]*nprocess))
         print(f"Finalising {proxy}")
