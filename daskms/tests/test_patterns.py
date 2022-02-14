@@ -1,5 +1,6 @@
 """Keep this file in sync with the codex-africanus version"""
 
+import os
 import pickle
 
 import numpy as np
@@ -135,7 +136,6 @@ def test_persistent_multiton():
     assert len(PersistentA._PersistentMultiton__cache) == 0
 
 
-
 # CASA Table Locking Modes
 NOLOCK = 0
 READLOCK = 1
@@ -173,7 +173,6 @@ _proxied_methods = [
     ("putcolkeywords", WRITELOCK)]
 
 
-
 def proxied_method_factory(cls, method, locktype):
     """
     Proxy pyrap.tables.table.method calls.
@@ -207,12 +206,12 @@ def proxied_method_factory(cls, method, locktype):
     return public_method
 
 
-
 def __nolock_runner(proxy, method, args, kwargs):
     try:
         return getattr(proxy, method)(*args, **kwargs)
     except Exception as e:
         print(str(e))
+
 
 def __read_runner(proxy, method, args, kwargs):
     proxy.lock(False)
@@ -224,6 +223,7 @@ def __read_runner(proxy, method, args, kwargs):
     finally:
         proxy.unlock()
 
+
 def __write_runner(proxy, method, args, kwargs):
     proxy.lock(True)
 
@@ -234,12 +234,14 @@ def __write_runner(proxy, method, args, kwargs):
     finally:
         proxy.unlock()
 
+
 class TableProxyMetaClass(Multiton):
     def __new__(cls, name, bases, dct):
         for method, locktype in _proxied_methods:
             dct[method] = proxied_method_factory(cls, method, locktype)
 
         return super().__new__(cls, name, bases, dct)
+
 
 class TableProxy(metaclass=TableProxyMetaClass):
     def __init__(self, factory, *args, **kwargs):
@@ -255,15 +257,13 @@ class TableProxy(metaclass=TableProxyMetaClass):
                                             *self.args,
                                             **self.kwargs)
 
-
-
         spawn_ctx = multiprocessing.get_context("spawn")
         self._ex = executor = cf.ProcessPoolExecutor(5, mp_context=spawn_ctx)
-        self._ex = executor = LazyProxyMultiton(cf.ProcessPoolExecutor, 5, mp_context=spawn_ctx)
-        #self._ex = executor = cf.ThreadPoolExecutor(1)
+        self._ex = executor = \
+            LazyProxyMultiton(cf.ProcessPoolExecutor, 5, mp_context=spawn_ctx)
+        # self._ex = executor = cf.ThreadPoolExecutor(1)
 
         weakref.finalize(self, self.finaliser, proxy, executor)
-
 
     @staticmethod
     def finaliser(proxy, executor):
@@ -281,8 +281,6 @@ class TableProxy(metaclass=TableProxyMetaClass):
         return (self.from_args, (self.factory, self.args, self.kwargs))
 
 
-import os
-
 class Resource:
     def __init__(self, *args, **kwargs):
         self.args = args
@@ -298,6 +296,7 @@ class Resource:
 
 def process_fn(proxy, *args, **kwargs):
     return proxy.execute(*args, **kwargs)
+
 
 def test_persistent_multiton_in_process_pool():
     import concurrent.futures as cf
@@ -315,7 +314,6 @@ def test_persistent_multiton_in_process_pool():
     pool.shutdown(wait=True)
 
 
-
 def test_ms_in_persistent_multiton(ms):
     import pyrap.tables as pt
     proxy = TableProxy(pt.table, ms, ack=True)
@@ -328,14 +326,13 @@ def test_ms_in_persistent_multiton(ms):
             yield n, chunk
             n += chunk
 
-
-
     futures = [proxy.getcol("TIME", startrow=s, nrow=n)
                for s, n in ranges(10, 1)]
 
     import concurrent.futures as cf
     for f in cf.as_completed(futures):
         print(f.result())
+
 
 def test_multiton():
     class A(metaclass=Multiton):
