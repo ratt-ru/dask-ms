@@ -258,9 +258,9 @@ class TableProxy(metaclass=TableProxyMetaClass):
                                             **self.kwargs)
 
         spawn_ctx = multiprocessing.get_context("spawn")
-        self._ex = executor = cf.ProcessPoolExecutor(5, mp_context=spawn_ctx)
+        # self._ex = executor = cf.ProcessPoolExecutor(1, mp_context=spawn_ctx)
         self._ex = executor = \
-            LazyProxyMultiton(cf.ProcessPoolExecutor, 5, mp_context=spawn_ctx)
+            LazyProxyMultiton(cf.ProcessPoolExecutor, 1, mp_context=spawn_ctx)
         # self._ex = executor = cf.ThreadPoolExecutor(1)
 
         weakref.finalize(self, self.finaliser, proxy, executor)
@@ -332,6 +332,73 @@ def test_ms_in_persistent_multiton(ms):
     import concurrent.futures as cf
     for f in cf.as_completed(futures):
         print(f.result())
+
+
+def test_cloudpicklable(ms):
+    import pyrap.tables as pt
+    proxy = TableProxy(pt.table, ms, ack=True)
+
+    import cloudpickle
+    dumped = cloudpickle.dumps(proxy)
+    loaded = cloudpickle.loads(dumped)
+
+    assert proxy is loaded
+
+
+def test_serializable(ms):
+    import pyrap.tables as pt
+    proxy = TableProxy(pt.table, ms, ack=True)
+
+    from distributed.protocol import serialize, deserialize
+    header, frames = serialize(proxy)
+    deserialized = deserialize(header, frames)
+
+    assert proxy is deserialized
+
+
+def colgetter(proxy, fn_name, col_name, startrow, nrow):
+    fn = getattr(proxy, fn_name)
+
+    return fn(col_name, startrow=startrow[0], nrow=nrow).result()
+
+
+@pytest.mark.parametrize("scheduler",
+                         ["sync", "threads", "processes", "distributed"])
+def test_blockwise_read(ms, scheduler):
+    import pyrap.tables as pt
+
+    proxy = TableProxy(pt.table, ms, ack=True)
+
+    import dask
+    import dask.array as da
+    from dask.distributed import Client, LocalCluster
+
+    if scheduler == "distributed":
+
+        dask.config.set({"distributed.worker.daemon": False})
+
+        cluster = LocalCluster(
+            processes=True,
+            n_workers=2,
+            threads_per_worker=2,
+            memory_limit=0
+        )
+
+        client = Client(cluster)  # noqa
+
+    starts = da.arange(0, 10, 1, chunks=1)
+    nrow = 1
+
+    foo = da.blockwise(colgetter, "r",
+                       proxy, None,
+                       "getcol", None,
+                       "TIME", None,
+                       starts, "r",
+                       nrow, None,
+                       dtype=np.float64,
+                       meta=np.empty((0,), dtype=object))
+
+    foo.compute(scheduler=scheduler, num_workers=2)
 
 
 def test_multiton():
