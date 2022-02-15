@@ -105,6 +105,7 @@ class Multiton(type):
 def dummy(self, *args, **kwargs):
     pass
 
+
 class PersistentMultiton(type):
     """Similar to a :class:`Multiton`, but """
     MISSING = object()
@@ -390,9 +391,19 @@ class LazyProxy:
                 # Raise exceptions if we're in an invalid call frame
                 cls.__lazy_raise_on_invalid_frames__(inspect.currentframe())
 
-                # Create __lazy_object__
-                lazy_obj = proxy.__lazy_fn__(*proxy.__lazy_args__,
-                                             **proxy.__lazy_kwargs__)
+                argspec = inspect.getfullargspec(proxy.__lazy_fn__)
+
+                if not argspec.varkw:
+                    known_args = argspec.args
+                    kwargs = {k: v for k, v in proxy.__lazy_kwargs__.items()
+                              if k in known_args}
+                    lazy_obj = proxy.__lazy_fn__(*proxy.__lazy_args__,
+                                                 **kwargs)
+                else:
+                    # Create __lazy_object__
+                    lazy_obj = proxy.__lazy_fn__(*proxy.__lazy_args__,
+                                                 **proxy.__lazy_kwargs__)
+
                 proxy.__lazy_object__ = lazy_obj
 
                 # Create finaliser if provided
@@ -406,7 +417,6 @@ class LazyProxy:
     def __getattr__(self, name):
         if name == "__lazy_object__":
             return LazyProxy.__lazy_obj_from_args__(self)
-
         try:
             return object.__getattribute__(self.__lazy_object__, name)
         except InvalidLazyContext as e:
@@ -457,6 +467,7 @@ class LazyProxyMultiton(LazyProxy, metaclass=Multiton):
 
     See :class:`LazyProxy` and :class:`Multiton` for further details
     """
+
 
 class PersistentLazyProxyMultiton(LazyProxy, metaclass=PersistentMultiton):
     pass

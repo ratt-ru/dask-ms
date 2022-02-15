@@ -2,6 +2,7 @@
 
 import os
 import pickle
+from inspect import getfullargspec
 
 import numpy as np
 import pytest
@@ -250,13 +251,10 @@ class TableProxy(metaclass=TableProxyMetaClass):
         import concurrent.futures as cf
         import multiprocessing
 
-        meta_kwargs = ["_nproc"]
-
         self.factory = factory
         self.args = args
-        self.kwargs = {k: v for k, v in kwargs.items() if k not in meta_kwargs}
+        self.kwargs = kwargs
         self.nproc = kwargs.get("_nproc", 1)
-        print(self.nproc)
         self.proxy = proxy = PersistentLazyProxyMultiton(
                                             self.factory,
                                             *self.args,
@@ -375,7 +373,7 @@ def colgetter(proxy, fn_name, col_name, startrow, nrow):
 def test_blockwise_read(ms, scheduler):
     import pyrap.tables as pt
 
-    proxy = TableProxy(pt.table, ms, ack=True, _nproc=5)
+    proxy = TableProxy(pt.table, ms, ack=True, _nproc=1)
 
     import dask
     import dask.array as da
