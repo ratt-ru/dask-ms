@@ -107,7 +107,7 @@ def test_lazy_resource(tmp_path):
                           file_proxy, None,
                           pool_proxy, None,
                           da.arange(100, chunks=10), "r",
-                          meta=np.empty((0,), np.object))
+                          meta=np.empty((0,), object))
     values.compute(scheduler="processes")
 
 
@@ -244,14 +244,19 @@ class TableProxyMetaClass(Multiton):
 
 
 class TableProxy(metaclass=TableProxyMetaClass):
+
     def __init__(self, factory, *args, **kwargs):
         import weakref
         import concurrent.futures as cf
         import multiprocessing
 
+        meta_kwargs = ["_nproc"]
+
         self.factory = factory
         self.args = args
-        self.kwargs = kwargs
+        self.kwargs = {k: v for k, v in kwargs.items() if k not in meta_kwargs}
+        self.nproc = kwargs.get("_nproc", 1)
+        print(self.nproc)
         self.proxy = proxy = PersistentLazyProxyMultiton(
                                             self.factory,
                                             *self.args,
@@ -259,8 +264,11 @@ class TableProxy(metaclass=TableProxyMetaClass):
 
         spawn_ctx = multiprocessing.get_context("spawn")
         # self._ex = executor = cf.ProcessPoolExecutor(1, mp_context=spawn_ctx)
-        self._ex = executor = \
-            LazyProxyMultiton(cf.ProcessPoolExecutor, 1, mp_context=spawn_ctx)
+        self._ex = executor = LazyProxyMultiton(
+            cf.ProcessPoolExecutor,
+            self.nproc,
+            mp_context=spawn_ctx
+        )
         # self._ex = executor = cf.ThreadPoolExecutor(1)
 
         weakref.finalize(self, self.finaliser, proxy, executor)
@@ -367,7 +375,7 @@ def colgetter(proxy, fn_name, col_name, startrow, nrow):
 def test_blockwise_read(ms, scheduler):
     import pyrap.tables as pt
 
-    proxy = TableProxy(pt.table, ms, ack=True)
+    proxy = TableProxy(pt.table, ms, ack=True, _nproc=5)
 
     import dask
     import dask.array as da
