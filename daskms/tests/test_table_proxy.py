@@ -240,7 +240,7 @@ def test_softlinks(ms, scheduler):
         cluster = LocalCluster(
             processes=True,
             n_workers=1,
-            threads_per_worker=2,
+            threads_per_worker=1,
             memory_limit=0
         )
 
@@ -250,9 +250,8 @@ def test_softlinks(ms, scheduler):
 
     xdsl = xds_from_ms(
         ms,
-        group_cols=["DATA_DESC_ID", "SCAN_NUMBER", "FIELD_ID"]
+        group_cols=["DATA_DESC_ID", "SCAN_NUMBER", "FIELD_ID"],
+        chunks={"row": -1, "chan": -1, "corr": -1}
     )
 
-    xdsl = xdsl[:8]
-
-    da.compute(xdsl, scheduler=scheduler, num_workers=4)
+    da.compute(xdsl[:10], scheduler=scheduler, num_workers=4)

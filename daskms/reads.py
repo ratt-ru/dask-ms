@@ -281,26 +281,38 @@ class SoftlinkTable(pt.table):
 
     def __init__(self, *args, **kwargs):
 
-        assert len(args) == 1, "pyrap.tables.table takes one positional arg."
-
-        tid = threading.get_ident()
-
-        table_path = Path(args[0])
-        table_name = table_path.name
-
-        link_path = Path(f"/tmp/{tid}-{table_name}")
-
-        try:
-            link_path.symlink_to(table_path)
-        except FileExistsError:  # This should raise a warning.
-            link_path.unlink()
-            link_path.symlink_to(table_path)
-
-        args = (str(link_path),)  # Use the softlink.
-
-        self._sym_path = link_path
+        self._table_cache = {}
+        self._table_name = args[0]  # TODO: This should be checked.
 
         super().__init__(*args, **kwargs)
+
+    def __getattribute__(self, name):
+
+        thread_id = threading.get_ident()
+        table_cache = pt.table.__getattribute__(self, "_table_cache")
+
+        try:
+            table = table_cache[thread_id]
+        except KeyError:
+
+            table_path = pt.table.__getattribute__(self, "_table_name")
+            table_path = Path(table_path)
+            table_name = table_path.name
+            link_path = Path(f"/tmp/{thread_id}-{table_name}")
+
+            try:
+                link_path.symlink_to(table_path)
+            except FileExistsError:  # This should raise a warning.
+                link_path.unlink()
+                link_path.symlink_to(table_path)
+
+            table_cache[thread_id] = table = pt.table(
+                str(link_path),
+                lockoptions="autonoread",
+                ack=False
+            )
+
+        return table.__getattribute__(name)
 
 
 class DatasetFactory(object):
@@ -333,7 +345,7 @@ class DatasetFactory(object):
 
     def _table_proxy_factory(self):
         return TableProxy(SoftlinkTable, self.table_path, ack=False,
-                          readonly=True, lockoptions='user',
+                          readonly=True, lockoptions='autonoread',
                           __executor_key__=executor_key(self.canonical_name))
 
     def _table_schema(self):
