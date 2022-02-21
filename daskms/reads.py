@@ -7,6 +7,7 @@ import dask
 import dask.array as da
 import numpy as np
 import pyrap.tables as pt
+import threading
 
 from daskms.columns import (column_metadata, ColumnMetadataError,
                             dim_extents_array, infer_dtype)
@@ -276,6 +277,32 @@ def _col_keyword_getter(table):
     return {c: table.getcolkeywords(c) for c in table.colnames()}
 
 
+class SoftlinkTable(pt.table):
+
+    def __init__(self, *args, **kwargs):
+
+        assert len(args) == 1, "pyrap.tables.table takes one positional arg."
+
+        tid = threading.get_ident()
+
+        table_path = Path(args[0])
+        table_name = table_path.name
+
+        link_path = Path(f"/tmp/{tid}-{table_name}")
+
+        try:
+            link_path.symlink_to(table_path)
+        except FileExistsError:  # This should raise a warning.
+            link_path.unlink()
+            link_path.symlink_to(table_path)
+
+        args = (str(link_path),)  # Use the softlink.
+
+        self._sym_path = link_path
+
+        super().__init__(*args, **kwargs)
+
+
 class DatasetFactory(object):
     def __init__(self, table, select_cols, group_cols, index_cols, **kwargs):
         if not table_exists(table):
@@ -305,7 +332,7 @@ class DatasetFactory(object):
             raise ValueError(f"Unhandled kwargs: {kwargs}")
 
     def _table_proxy_factory(self):
-        return TableProxy(pt.table, self.table_path, ack=False,
+        return TableProxy(SoftlinkTable, self.table_path, ack=False,
                           readonly=True, lockoptions='user',
                           __executor_key__=executor_key(self.canonical_name))
 

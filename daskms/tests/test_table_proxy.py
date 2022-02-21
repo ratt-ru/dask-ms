@@ -222,3 +222,37 @@ def test_proxy_finalization(tmpdir_factory, epochs, iterations):
 
     del futures, data, u, tab_fut
     assert_liveness(0, 0)
+
+
+@pytest.mark.parametrize("scheduler",
+                         ["sync", "threads", "processes", "distributed"])
+def test_softlinks(ms, scheduler):
+
+    import dask
+    import dask.array as da
+    from dask.distributed import Client, LocalCluster
+    from daskms import xds_from_ms
+
+    if scheduler == "distributed":
+
+        dask.config.set({"distributed.worker.daemon": False})
+
+        cluster = LocalCluster(
+            processes=True,
+            n_workers=1,
+            threads_per_worker=2,
+            memory_limit=0
+        )
+
+        client = Client(cluster)  # noqa
+
+    ms = "/home/jonathan/reductions/3C147/msdir/C147_unflagged.MS"
+
+    xdsl = xds_from_ms(
+        ms,
+        group_cols=["DATA_DESC_ID", "SCAN_NUMBER", "FIELD_ID"]
+    )
+
+    xdsl = xdsl[:8]
+
+    da.compute(xdsl, scheduler=scheduler, num_workers=4)
