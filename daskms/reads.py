@@ -7,8 +7,6 @@ import dask
 import dask.array as da
 import numpy as np
 import pyrap.tables as pt
-from pyrap.tables import table as Table
-import threading
 
 from daskms.columns import (column_metadata, ColumnMetadataError,
                             dim_extents_array, infer_dtype)
@@ -19,6 +17,7 @@ from daskms.optimisation import inlined_array
 from daskms.dataset import Dataset
 from daskms.table_executor import executor_key
 from daskms.table import table_exists
+from daskms.parallel_table import ParallelTable
 from daskms.table_proxy import TableProxy, READLOCK
 from daskms.table_schemas import lookup_table_schema
 from daskms.utils import table_path_split
@@ -278,44 +277,6 @@ def _col_keyword_getter(table):
     return {c: table.getcolkeywords(c) for c in table.colnames()}
 
 
-class SoftlinkTable(Table):
-
-    def __init__(self, *args, **kwargs):
-
-        self._table_cache = {}
-        self._table_name = args[0]  # TODO: This should be checked.
-
-        super().__init__(*args, **kwargs)
-
-    def __getattribute__(self, name):
-
-        thread_id = threading.get_ident()
-        table_cache = Table.__getattribute__(self, "_table_cache")
-
-        try:
-            table = table_cache[thread_id]
-        except KeyError:
-            table_path = pt.table.__getattribute__(self, "_table_name")
-            table_path = Path(table_path)
-            table_name = table_path.name
-            link_path = Path(f"/tmp/{thread_id}-{table_name}")
-
-            try:
-                link_path.symlink_to(table_path)
-            except FileExistsError:  # This should raise a warning.
-                link_path.unlink()
-                link_path.symlink_to(table_path)
-
-            table_cache[thread_id] = table = pt.table(
-                str(link_path),
-                lockoptions="user",
-                readonly=True,
-                ack=False
-            )
-
-        return Table.__getattribute__(table, name)
-
-
 class DatasetFactory(object):
     def __init__(self, table, select_cols, group_cols, index_cols, **kwargs):
         if not table_exists(table):
@@ -345,8 +306,8 @@ class DatasetFactory(object):
             raise ValueError(f"Unhandled kwargs: {kwargs}")
 
     def _table_proxy_factory(self):
-        return TableProxy(SoftlinkTable, self.table_path, ack=False,
-                          readonly=True, lockoptions='autonoread',
+        return TableProxy(ParallelTable, self.table_path, ack=False,
+                          readonly=True, lockoptions='user',
                           __executor_key__=executor_key(self.canonical_name))
 
     def _table_schema(self):

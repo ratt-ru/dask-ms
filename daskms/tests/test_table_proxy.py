@@ -239,8 +239,8 @@ def test_softlinks(ms, scheduler):
 
         cluster = LocalCluster(
             processes=True,
-            n_workers=1,
-            threads_per_worker=1,
+            n_workers=2,
+            threads_per_worker=2,
             memory_limit=0
         )
 

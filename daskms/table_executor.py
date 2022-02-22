@@ -38,7 +38,7 @@ class ExecutorMetaClass(type):
 class Executor(object, metaclass=ExecutorMetaClass):
     def __init__(self, key=STANDARD_EXECUTOR):
         # Initialise a single thread
-        self.impl = impl = cf.ThreadPoolExecutor(1)
+        self.impl = impl = cf.ThreadPoolExecutor(4)
         self.key = key
 
         # Register a finaliser shutting down the
