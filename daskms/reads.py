@@ -7,6 +7,7 @@ import dask
 import dask.array as da
 import numpy as np
 import pyrap.tables as pt
+from pyrap.tables import table as Table
 import threading
 
 from daskms.columns import (column_metadata, ColumnMetadataError,
@@ -277,7 +278,7 @@ def _col_keyword_getter(table):
     return {c: table.getcolkeywords(c) for c in table.colnames()}
 
 
-class SoftlinkTable(pt.table):
+class SoftlinkTable(Table):
 
     def __init__(self, *args, **kwargs):
 
@@ -289,12 +290,11 @@ class SoftlinkTable(pt.table):
     def __getattribute__(self, name):
 
         thread_id = threading.get_ident()
-        table_cache = pt.table.__getattribute__(self, "_table_cache")
+        table_cache = Table.__getattribute__(self, "_table_cache")
 
         try:
             table = table_cache[thread_id]
         except KeyError:
-
             table_path = pt.table.__getattribute__(self, "_table_name")
             table_path = Path(table_path)
             table_name = table_path.name
@@ -308,11 +308,12 @@ class SoftlinkTable(pt.table):
 
             table_cache[thread_id] = table = pt.table(
                 str(link_path),
-                lockoptions="autonoread",
+                lockoptions="user",
+                readonly=True,
                 ack=False
             )
 
-        return table.__getattribute__(name)
+        return Table.__getattribute__(table, name)
 
 
 class DatasetFactory(object):
