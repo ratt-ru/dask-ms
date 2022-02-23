@@ -8,6 +8,11 @@ from weakref import finalize
 log = logging.getLogger(__name__)
 
 
+def _map_create_parallel_table(cls, args, kwargs):
+    """ Support pickling of kwargs in ParallelTable.__reduce__ """
+    return cls(*args, **kwargs)
+
+
 def _parallel_table_finalizer(_linked_tables):
 
     for table in _linked_tables.values():
@@ -30,6 +35,13 @@ class ParallelTable(Table):
         super().__init__(*args, **kwargs)
 
         finalize(self, _parallel_table_finalizer, self._linked_tables)
+
+    def __reduce__(self):
+        """ Defer to _map_create_parallel_table to support kwarg pickling """
+        return (
+            _map_create_parallel_table,
+            (ParallelTable, self._args, self._kwargs)
+        )
 
     def getcol(self, *args, **kwargs):
         table = self._get_table(threading.get_ident())
