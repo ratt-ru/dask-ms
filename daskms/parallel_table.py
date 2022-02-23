@@ -2,6 +2,7 @@ from pyrap.tables import table as Table
 import logging
 import threading
 from pathlib import Path
+from weakref import finalize
 
 
 log = logging.getLogger(__name__)
@@ -78,6 +79,15 @@ class ParallelTableMetaClass(type):
     #             return instance
 
 
+def _parallel_table_finalizer(_linked_tables):
+
+    for table in _linked_tables.values():
+
+        link_path = Path(table.name())
+        table.close()
+        link_path.unlink()
+
+
 class ParallelTable(Table):
 
     def __init__(self, *args, **kwargs):
@@ -89,6 +99,8 @@ class ParallelTable(Table):
         self._table_path = args[0]  # TODO: This should be checked.
 
         super().__init__(*args, **kwargs)
+
+        finalize(self, _parallel_table_finalizer, self._linked_tables)
 
     def getcolnp(self, *args, **kwargs):
 
