@@ -16,10 +16,7 @@ def _map_create_parallel_table(cls, args, kwargs):
 def _parallel_table_finalizer(_cached_tables):
 
     for table in _cached_tables.values():
-
-        link_path = Path(table.name())
         table.close()
-        # link_path.unlink()
 
 
 class ParallelTable(Table):

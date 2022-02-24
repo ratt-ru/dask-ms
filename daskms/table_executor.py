@@ -77,6 +77,7 @@ class DummyFuture(object):
 
         return self.value
 
+
 def executor_key(table_name):
     """
     Product an executor key from table_name

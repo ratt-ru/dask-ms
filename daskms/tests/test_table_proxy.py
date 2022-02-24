@@ -255,7 +255,6 @@ def test_softlinks(ms, scheduler):
         chunks={"row": 30000, "chan": -1, "corr": -1}
     )
 
-    result = [xds.DATA.sum() for xds in xdsl]
+    result = [xds.DATA.data.map_blocks(lambda x: x[:1, :1, :1]) for xds in xdsl]
 
-    with dask.config.set({"multiprocessing.context": "spawn"}):
-        da.compute(result, scheduler=scheduler, num_workers=4)
+    da.compute(result, scheduler=scheduler, num_workers=4)
