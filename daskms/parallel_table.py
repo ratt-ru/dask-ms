@@ -13,13 +13,13 @@ def _map_create_parallel_table(cls, args, kwargs):
     return cls(*args, **kwargs)
 
 
-def _parallel_table_finalizer(_linked_tables):
+def _parallel_table_finalizer(_cached_tables):
 
-    for table in _linked_tables.values():
+    for table in _cached_tables.values():
 
         link_path = Path(table.name())
         table.close()
-        link_path.unlink()
+        # link_path.unlink()
 
 
 class ParallelTable(Table):
@@ -29,12 +29,12 @@ class ParallelTable(Table):
         self._args = args
         self._kwargs = kwargs
 
-        self._linked_tables = {}
+        self._cached_tables = {}
         self._table_path = args[0]  # TODO: This should be checked.
 
         super().__init__(*args, **kwargs)
 
-        finalize(self, _parallel_table_finalizer, self._linked_tables)
+        finalize(self, _parallel_table_finalizer, self._cached_tables)
 
     def __reduce__(self):
         """ Defer to _map_create_parallel_table to support kwarg pickling """
@@ -78,16 +78,10 @@ class ParallelTable(Table):
     def _get_table(self, thread_id):
 
         try:
-            table = self._linked_tables[thread_id]
+            table = self._cached_tables[thread_id]
         except KeyError:
-            table_path = Path(self._table_path)
-            table_name = table_path.name
-            link_path = Path(f"/tmp/{thread_id}-{table_name}")
-
-            link_path.symlink_to(table_path)
-
-            self._linked_tables[thread_id] = table = Table(
-                str(link_path),
+            self._cached_tables[thread_id] = table = Table(
+                *self._args,
                 **self._kwargs
             )
 
