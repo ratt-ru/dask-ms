@@ -235,7 +235,7 @@ def test_softlinks(ms, scheduler):
 
     if scheduler == "distributed":
 
-        dask.config.set({"distributed.worker.daemon": False})
+        # dask.config.set({"distributed.worker.daemon": False})
 
         cluster = LocalCluster(
             processes=True,
@@ -246,12 +246,16 @@ def test_softlinks(ms, scheduler):
 
         client = Client(cluster)  # noqa
 
-    ms = "/home/jonathan/reductions/3C147/msdir/C147_unflagged.MS"
+    # ms = "/home/jonathan/reductions/3C147/msdir/C147_unflagged.MS"
+    ms = "/home/jonathan/recipes/proxy_experiments/vla_empty.ms"
 
     xdsl = xds_from_ms(
         ms,
         group_cols=["DATA_DESC_ID", "SCAN_NUMBER", "FIELD_ID"],
-        chunks={"row": -1, "chan": -1, "corr": -1}
+        chunks={"row": 30000, "chan": -1, "corr": -1}
     )
 
-    da.compute(xdsl[:10], scheduler=scheduler, num_workers=4)
+    result = [xds.DATA.sum() for xds in xdsl]
+
+    with dask.config.set({"multiprocessing.context": "spawn"}):
+        da.compute(result, scheduler=scheduler, num_workers=4)

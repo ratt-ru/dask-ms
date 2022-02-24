@@ -80,6 +80,8 @@ class ParallelTable(Table):
         try:
             table = self._cached_tables[thread_id]
         except KeyError:
+            print(f"opening for {thread_id}")
+
             self._cached_tables[thread_id] = table = Table(
                 *self._args,
                 **self._kwargs
