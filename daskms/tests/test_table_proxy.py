@@ -228,14 +228,11 @@ def test_proxy_finalization(tmpdir_factory, epochs, iterations):
                          ["sync", "threads", "processes", "distributed"])
 def test_softlinks(ms, scheduler):
 
-    import dask
     import dask.array as da
     from dask.distributed import Client, LocalCluster
     from daskms import xds_from_ms
 
     if scheduler == "distributed":
-
-        # dask.config.set({"distributed.worker.daemon": False})
 
         cluster = LocalCluster(
             processes=True,

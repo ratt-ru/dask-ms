@@ -1,16 +1,10 @@
 import logging
 import threading
 from pyrap.tables import table as Table
-from pathlib import Path
 from weakref import finalize
 
 
 log = logging.getLogger(__name__)
-
-
-def _map_create_parallel_table(cls, args, kwargs):
-    """ Support pickling of kwargs in ParallelTable.__reduce__ """
-    return cls(*args, **kwargs)
 
 
 def _parallel_table_finalizer(_cached_tables):
@@ -20,6 +14,11 @@ def _parallel_table_finalizer(_cached_tables):
 
 
 class ParallelTable(Table):
+
+    @classmethod
+    def _map_create_parallel_table(cls, args, kwargs):
+        """ Support pickling of kwargs in ParallelTable.__reduce__ """
+        return cls(*args, **kwargs)
 
     def __init__(self, *args, **kwargs):
 
@@ -36,7 +35,7 @@ class ParallelTable(Table):
     def __reduce__(self):
         """ Defer to _map_create_parallel_table to support kwarg pickling """
         return (
-            _map_create_parallel_table,
+            ParallelTable._map_create_parallel_table,
             (ParallelTable, self._args, self._kwargs)
         )
 
