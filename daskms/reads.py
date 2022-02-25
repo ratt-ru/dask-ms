@@ -17,7 +17,7 @@ from daskms.optimisation import inlined_array
 from daskms.dataset import Dataset
 from daskms.table_executor import executor_key
 from daskms.table import table_exists
-from daskms.parallel_table import ParallelTable
+from daskms.parallel_table import ParallelTableProxy
 from daskms.table_proxy import TableProxy, READLOCK
 from daskms.table_schemas import lookup_table_schema
 from daskms.utils import table_path_split
@@ -27,104 +27,74 @@ _DEFAULT_ROW_CHUNKS = 10000
 log = logging.getLogger(__name__)
 
 
-def ndarray_getcol(row_runs, table_future, column, result, dtype):
+def ndarray_getcol(row_runs, table_proxy, column, result, dtype):
     """ Get numpy array data """
-    table = table_future.result()
-    getcolnp = table.getcolnp
+    getcolnp = table_proxy.getcolnp
     rr = 0
 
-    table.lock(write=False)
-
-    try:
-        for rs, rl in row_runs:
-            getcolnp(column, result[rr:rr + rl], startrow=rs, nrow=rl)
-            rr += rl
-    finally:
-        table.unlock()
-
-    return result
+    for rs, rl in row_runs:
+        getcolnp(column, result[rr:rr + rl], startrow=rs, nrow=rl)
+        rr += rl
 
 
-def ndarray_getcolslice(row_runs, table_future, column, result,
+def ndarray_getcolslice(row_runs, table_proxy, column, result,
                         blc, trc, dtype):
     """ Get numpy array data """
-    table = table_future.result()
-    getcolslicenp = table.getcolslicenp
+    getcolslicenp = table_proxy.getcolslicenp
     rr = 0
 
-    table.lock(write=False)
-
-    try:
-        for rs, rl in row_runs:
-            getcolslicenp(column, result[rr:rr + rl],
-                          blc=blc, trc=trc,
-                          startrow=rs, nrow=rl)
-            rr += rl
-    finally:
-        table.unlock()
-
-    return result
+    for rs, rl in row_runs:
+        getcolslicenp(column, result[rr:rr + rl],
+                      blc=blc, trc=trc,
+                      startrow=rs, nrow=rl)
+        rr += rl
 
 
-def object_getcol(row_runs, table_future, column, result, dtype):
+def object_getcol(row_runs, table_proxy, column, result, dtype):
     """ Get object list data """
-    table = table_future.result()
-    getcol = table.getcol
+    getcol = table_proxy.getcol
     rr = 0
 
-    table.lock(write=False)
+    for rs, rl in row_runs:
+        data = getcol(column, rs, rl)
 
-    try:
-        for rs, rl in row_runs:
-            data = getcol(column, rs, rl)
+        # Multi-dimensional string arrays are returned as a
+        # dict with 'array' and 'shape' keys. Massage the data.
+        if isinstance(data, dict):
+            data = (np.asarray(data['array'], dtype=dtype)
+                    .reshape(data['shape']))
 
-            # Multi-dimensional string arrays are returned as a
-            # dict with 'array' and 'shape' keys. Massage the data.
-            if isinstance(data, dict):
-                data = (np.asarray(data['array'], dtype=dtype)
-                          .reshape(data['shape']))
+        # NOTE(sjperkins)
+        # Dask wants ndarrays internally, so we asarray objects
+        # the returning list of objects.
+        # See https://github.com/ska-sa/dask-ms/issues/42
+        result[rr:rr + rl] = np.asarray(data, dtype=dtype)
 
-            # NOTE(sjperkins)
-            # Dask wants ndarrays internally, so we asarray objects
-            # the returning list of objects.
-            # See https://github.com/ska-sa/dask-ms/issues/42
-            result[rr:rr + rl] = np.asarray(data, dtype=dtype)
-
-            rr += rl
-    finally:
-        table.unlock()
-
-    return result
+        rr += rl
 
 
-def object_getcolslice(row_runs, table_future, column, result,
+def object_getcolslice(row_runs, table_proxy, column, result,
                        blc, trc, dtype):
     """ Get object list data """
-    table = table_future.result()
-    getcolslice = table.getcolslice
+    getcolslice = table_proxy.getcolslice
     rr = 0
 
-    table.lock(write=False)
+    for rs, rl in row_runs:
+        data = getcolslice(column, blc, trc, startrow=rs, nrow=rl)
 
-    try:
-        for rs, rl in row_runs:
-            data = getcolslice(column, blc, trc, startrow=rs, nrow=rl)
+        # Multi-dimensional string arrays are returned as a
+        # dict with 'array' and 'shape' keys. Massage the data.
+        if isinstance(data, dict):
+            data = (np.asarray(data['array'], dtype=dtype)
+                    .reshape(data['shape']))
 
-            # Multi-dimensional string arrays are returned as a
-            # dict with 'array' and 'shape' keys. Massage the data.
-            if isinstance(data, dict):
-                data = (np.asarray(data['array'], dtype=dtype)
-                          .reshape(data['shape']))
+        # NOTE(sjperkins)
+        # Dask wants ndarrays internally, so we asarray objects
+        # the returning list of objects.
+        # See https://github.com/ska-sa/dask-ms/issues/42
+        result[rr:rr + rl] = np.asarray(data, dtype=dtype)
 
-            # NOTE(sjperkins)
-            # Dask wants ndarrays internally, so we asarray objects
-            # the returning list of objects.
-            # See https://github.com/ska-sa/dask-ms/issues/42
-            result[rr:rr + rl] = np.asarray(data, dtype=dtype)
-
-            rr += rl
-    finally:
-        table.unlock()
+        rr += rl
 
     return result
 
@@ -154,11 +124,15 @@ def getter_wrapper(row_orders, *args):
         io_fn = (object_getcolslice if np.dtype == object
                  else ndarray_getcolslice)
 
-        # Submit table I/O on executor
-        future = table_proxy._ex.submit(io_fn, row_runs,
-                                        table_proxy._table_future,
-                                        column, result,
-                                        blc, trc, dtype)
+        io_fn(
+            row_runs,
+            table_proxy,
+            column,
+            result,
+            blc,
+            trc,
+            dtype
+        )
     # In this case, the full resolution data
     # for each row is requested, so we defer to getcol
     else:
@@ -166,16 +140,19 @@ def getter_wrapper(row_orders, *args):
         io_fn = (object_getcol if dtype == object
                  else ndarray_getcol)
 
-        # Submit table I/O on executor
-        future = table_proxy._ex.submit(io_fn, row_runs,
-                                        table_proxy._table_future,
-                                        column, result, dtype)
+        io_fn(
+            row_runs,
+            table_proxy,
+            column,
+            result,
+            dtype
+        )
 
     # Resort result if necessary
     if resort is not None:
-        return future.result()[resort]
+        return result[resort]
 
-    return future.result()
+    return result
 
 
 def _dataset_variable_factory(table_proxy, table_schema, select_cols,
@@ -210,7 +187,6 @@ def _dataset_variable_factory(table_proxy, table_schema, select_cols,
     dict
         A dictionary looking like :code:`{column: (arrays, dims)}`.
     """
-
     sorted_rows, row_runs = orders
     dataset_vars = {"ROWID": (("row",), sorted_rows)}
 
@@ -306,9 +282,14 @@ class DatasetFactory(object):
             raise ValueError(f"Unhandled kwargs: {kwargs}")
 
     def _table_proxy_factory(self):
-        return TableProxy(ParallelTable, self.table_path, ack=False,
-                          readonly=True, lockoptions='user',
-                          __executor_key__=executor_key(self.canonical_name))
+        return ParallelTableProxy(
+            pt.table,
+            self.table_path,
+            ack=False,
+            readonly=True,
+            lockoptions='user',
+            __executor_key__=executor_key(self.canonical_name)
+        )
 
     def _table_schema(self):
         return lookup_table_schema(self.canonical_name, self.table_schema)

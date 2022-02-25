@@ -1,86 +1,200 @@
 import logging
 import threading
-from pyrap.tables import table as Table
-from weakref import finalize
+from daskms.table_proxy import (TableProxy,
+                                TableProxyMetaClass,
+                                _proxied_methods,
+                                NOLOCK,
+                                READLOCK,
+                                WRITELOCK,
+                                _LOCKTYPE_STRINGS,
+                                _PROXY_DOCSTRING,
+                                STANDARD_EXECUTOR)
+from weakref import finalize, WeakValueDictionary
+from daskms.utils import arg_hasher
 
+_table_cache = WeakValueDictionary()
+_table_lock = threading.Lock()
 
 log = logging.getLogger(__name__)
 
 
-def _parallel_table_finalizer(_cached_tables):
+_parallel_methods = [
+    "getcol",
+    "getcolnp",
+    "getcolslice",
+    "getvarcol",
+    "getcell",
+    "getcellslice",
+    "getkeywords",
+    "getcolkeywords"
+]
 
-    for table in _cached_tables.values():
+
+def _parallel_table_finalizer(table_cache):
+
+    for table in table_cache.cache.values():
         table.close()
 
 
-class ParallelTable(Table):
+def proxied_method_factory(method, locktype):
+    """
+    Proxy pyrap.tables.table.method calls.
 
-    @classmethod
-    def _map_create_parallel_table(cls, args, kwargs):
-        """ Support pickling of kwargs in ParallelTable.__reduce__ """
-        return cls(*args, **kwargs)
+    Creates a private implementation function which performs
+    the call locked according to to ``locktype``.
 
-    def __init__(self, *args, **kwargs):
+    The private implementation is accessed by a public ``method``
+    which submits a call to the implementation
+    on a concurrent.futures.ThreadPoolExecutor.
+    """
 
-        self._args = args
-        self._kwargs = kwargs
+    if locktype == NOLOCK:
+        def _impl(table_future, args, kwargs):
+            if isinstance(table_future, TableCache):
+                table = table_future.get_cached_table(threading.get_ident())
+            else:
+                table = table_future.result()
 
-        self._cached_tables = {}
-        self._table_path = args[0]  # TODO: This should be checked.
+            try:
+                return getattr(table, method)(*args, **kwargs)
+            except Exception:
+                if logging.DEBUG >= log.getEffectiveLevel():
+                    log.exception("Exception in %s", method)
+                raise
 
-        super().__init__(*args, **kwargs)
+    elif locktype == READLOCK:
+        def _impl(table_future, args, kwargs):
+            if isinstance(table_future, TableCache):
+                table = table_future.get_cached_table(threading.get_ident())
+            else:
+                table = table_future.result()
+            table.lock(write=False)
+
+            try:
+                return getattr(table, method)(*args, **kwargs)
+            except Exception:
+                if logging.DEBUG >= log.getEffectiveLevel():
+                    log.exception("Exception in %s", method)
+                raise
+            finally:
+                table.unlock()
+
+    elif locktype == WRITELOCK:
+        def _impl(table_future, args, kwargs):
+            if isinstance(table_future, TableCache):
+                table = table_future.get_cached_table(threading.get_ident())
+            else:
+                table = table_future.result()
+            table.lock(write=True)
+
+            try:
+                return getattr(table, method)(*args, **kwargs)
+            except Exception:
+                if logging.DEBUG >= log.getEffectiveLevel():
+                    log.exception("Exception in %s", method)
+                raise
+            finally:
+                table.unlock()
+
+    else:
+        raise ValueError(f"Invalid locktype {locktype}")
+
+    _impl.__name__ = method + "_impl"
+    _impl.__doc__ = ("Calls table.%s, wrapped in a %s." %
+                     (method, _LOCKTYPE_STRINGS[locktype]))
+
+    if method in _parallel_methods:
+        def public_method(self, *args, **kwargs):
+            """
+            Submits _impl(args, kwargs) to the executor
+            and returns a Future
+            """
+            return self._ex.submit(_impl, self._cached_tables, args, kwargs)
+    else:
+        def public_method(self, *args, **kwargs):
+            """
+            Submits _impl(args, kwargs) to the executor
+            and returns a Future
+            """
+            return self._ex.submit(_impl, self._table_future, args, kwargs)
+
+    public_method.__name__ = method
+    public_method.__doc__ = _PROXY_DOCSTRING % method
+
+    return public_method
+
+
+class ParallelTableProxyMetaClass(TableProxyMetaClass):
+    """
+    https://en.wikipedia.org/wiki/Multiton_pattern
+
+    """
+    def __new__(cls, name, bases, dct):
+        for method, locktype in _proxied_methods:
+            proxy_method = proxied_method_factory(method, locktype)
+            dct[method] = proxy_method
+
+        return type.__new__(cls, name, bases, dct)
+
+    def __call__(cls, *args, **kwargs):
+        key = arg_hasher((cls,) + args + (kwargs,))
+
+        with _table_lock:
+            try:
+                return _table_cache[key]
+            except KeyError:
+                instance = type.__call__(cls, *args, **kwargs)
+                _table_cache[key] = instance
+                return instance
+
+
+def _map_create_parallel_table(cls, factory, args, kwargs):
+    """ Support pickling of kwargs in ParallelTable.__reduce__ """
+    return cls(factory, *args, **kwargs)
+
+
+class ParallelTableProxy(TableProxy, metaclass=ParallelTableProxyMetaClass):
+
+    def __init__(self, factory, *args, **kwargs):
+
+        super().__init__(factory, *args, **kwargs)
+
+        self._cached_tables = TableCache(factory, *args, **kwargs)
 
         finalize(self, _parallel_table_finalizer, self._cached_tables)
 
     def __reduce__(self):
         """ Defer to _map_create_parallel_table to support kwarg pickling """
         return (
-            ParallelTable._map_create_parallel_table,
-            (ParallelTable, self._args, self._kwargs)
+            _map_create_parallel_table,
+            (ParallelTableProxy, self._factory, self._args, self._kwargs)
         )
 
-    def getcol(self, *args, **kwargs):
-        table = self._get_table(threading.get_ident())
-        return table.getcol(*args, **kwargs)
 
-    def getcolslice(self, *args, **kwargs):
-        table = self._get_table(threading.get_ident())
-        return table.getcolslice(*args, **kwargs)
+class TableCache(object):
 
-    def getcolnp(self, *args, **kwargs):
-        table = self._get_table(threading.get_ident())
-        return table.getcolnp(*args, **kwargs)
+    def __init__(self, fn, *args, **kwargs):
+        self.cache = {}
+        self.fn = fn
+        self.args = args
+        self.kwargs = kwargs
 
-    def getvarcol(self, *args, **kwargs):
-        table = self._get_table(threading.get_ident())
-        return table.getvarcol(*args, **kwargs)
-
-    def getcell(self, *args, **kwargs):
-        table = self._get_table(threading.get_ident())
-        return table.getcell(*args, **kwargs)
-
-    def getcellslice(self, *args, **kwargs):
-        table = self._get_table(threading.get_ident())
-        return table.getcellslice(*args, **kwargs)
-
-    def getkeywords(self, *args, **kwargs):
-        table = self._get_table(threading.get_ident())
-        return table.getkeywords(*args, **kwargs)
-
-    def getcolkeywords(self, *args, **kwargs):
-        table = self._get_table(threading.get_ident())
-        return table.getcolkeywords(*args, **kwargs)
-
-    def _get_table(self, thread_id):
+    def get_cached_table(self, thread_id):
 
         try:
-            table = self._cached_tables[thread_id]
+            table = self.cache[thread_id]
         except KeyError:
             print(f"opening for {thread_id}")
 
-            self._cached_tables[thread_id] = table = Table(
-                *self._args,
-                **self._kwargs
+            # This is a bit hacky, as noted by Simon. Maybe storing a
+            # sanitised version would be better?
+            args = self.args
+            kwargs = self.kwargs.copy()
+            kwargs.pop("__executor_key__", STANDARD_EXECUTOR)
+
+            self.cache[thread_id] = table = self.fn(
+                *args,
+                **kwargs
             )
 
         return table
