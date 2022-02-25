@@ -148,26 +148,31 @@ class ParallelTableProxyMetaClass(TableProxyMetaClass):
                 return instance
 
 
-def _map_create_parallel_table(cls, factory, args, kwargs):
-    """ Support pickling of kwargs in ParallelTable.__reduce__ """
-    return cls(factory, *args, **kwargs)
-
-
 class ParallelTableProxy(TableProxy, metaclass=ParallelTableProxyMetaClass):
+
+    @classmethod
+    def _from_args_kwargs(cls, factory, args, kwargs):
+        """Support pickling of kwargs in ParallelTableProxy.__reduce__."""
+        return cls(factory, *args, **kwargs)
 
     def __init__(self, factory, *args, **kwargs):
 
         super().__init__(factory, *args, **kwargs)
+
+        # This is a bit hacky, as noted by Simon in TableProxy. Maybe storing
+        # a sanitised version would be better?
+        kwargs = self._kwargs.copy()
+        kwargs.pop("__executor_key__", STANDARD_EXECUTOR)
 
         self._cached_tables = TableCache(factory, *args, **kwargs)
 
         finalize(self, _parallel_table_finalizer, self._cached_tables)
 
     def __reduce__(self):
-        """ Defer to _map_create_parallel_table to support kwarg pickling """
+        """ Defer to _from_args_kwargs to support kwarg pickling """
         return (
-            _map_create_parallel_table,
-            (ParallelTableProxy, self._factory, self._args, self._kwargs)
+            self._from_args_kwargs,
+            (self._factory, self._args, self._kwargs)
         )
 
 
@@ -186,17 +191,7 @@ class TableCache(object):
         try:
             table = self.cache[thread_id]
         except KeyError:
-            print(f"opening for {thread_id}")
-
-            # This is a bit hacky, as noted by Simon. Maybe storing a
-            # sanitised version would be better?
-            args = self.args
-            kwargs = self.kwargs.copy()
-            kwargs.pop("__executor_key__", STANDARD_EXECUTOR)
-
-            self.cache[thread_id] = table = self.fn(
-                *args,
-                **kwargs
-            )
+            print(f"Opening table in {thread_id}.")
+            self.cache[thread_id] = table = self.fn(*self.args, **self.kwargs)
 
         return table
