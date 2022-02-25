@@ -51,7 +51,7 @@ def proxied_method_factory(method, locktype):
     if locktype == NOLOCK:
         def _impl(table_future, args, kwargs):
             if isinstance(table_future, TableCache):
-                table = table_future.get_cached_table(threading.get_ident())
+                table = table_future.get_cached_table()
             else:
                 table = table_future.result()
 
@@ -65,7 +65,7 @@ def proxied_method_factory(method, locktype):
     elif locktype == READLOCK:
         def _impl(table_future, args, kwargs):
             if isinstance(table_future, TableCache):
-                table = table_future.get_cached_table(threading.get_ident())
+                table = table_future.get_cached_table()
             else:
                 table = table_future.result()
             table.lock(write=False)
@@ -82,7 +82,7 @@ def proxied_method_factory(method, locktype):
     elif locktype == WRITELOCK:
         def _impl(table_future, args, kwargs):
             if isinstance(table_future, TableCache):
-                table = table_future.get_cached_table(threading.get_ident())
+                table = table_future.get_cached_table()
             else:
                 table = table_future.result()
             table.lock(write=True)
@@ -179,7 +179,9 @@ class TableCache(object):
         self.args = args
         self.kwargs = kwargs
 
-    def get_cached_table(self, thread_id):
+    def get_cached_table(self):
+
+        thread_id = threading.get_ident()
 
         try:
             table = self.cache[thread_id]

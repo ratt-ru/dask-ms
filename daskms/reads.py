@@ -33,7 +33,7 @@ def ndarray_getcol(row_runs, table_proxy, column, result, dtype):
     rr = 0
 
     for rs, rl in row_runs:
-        getcolnp(column, result[rr:rr + rl], startrow=rs, nrow=rl)
+        getcolnp(column, result[rr:rr + rl], startrow=rs, nrow=rl).result()
         rr += rl
 
 
@@ -46,7 +46,7 @@ def ndarray_getcolslice(row_runs, table_proxy, column, result,
     for rs, rl in row_runs:
         getcolslicenp(column, result[rr:rr + rl],
                       blc=blc, trc=trc,
-                      startrow=rs, nrow=rl)
+                      startrow=rs, nrow=rl).result()
         rr += rl
 
 
@@ -56,7 +56,7 @@ def object_getcol(row_runs, table_proxy, column, result, dtype):
     rr = 0
 
     for rs, rl in row_runs:
-        data = getcol(column, rs, rl)
+        data = getcol(column, rs, rl).result()
 
         # Multi-dimensional string arrays are returned as a
         # dict with 'array' and 'shape' keys. Massage the data.
@@ -80,7 +80,7 @@ def object_getcolslice(row_runs, table_proxy, column, result,
     rr = 0
 
     for rs, rl in row_runs:
-        data = getcolslice(column, blc, trc, startrow=rs, nrow=rl)
+        data = getcolslice(column, blc, trc, startrow=rs, nrow=rl).result()
 
         # Multi-dimensional string arrays are returned as a
         # dict with 'array' and 'shape' keys. Massage the data.
@@ -95,8 +95,6 @@ def object_getcolslice(row_runs, table_proxy, column, result,
         result[rr:rr + rl] = np.asarray(data, dtype=dtype)
 
         rr += rl
-
-    return result
 
 
 def getter_wrapper(row_orders, *args):
