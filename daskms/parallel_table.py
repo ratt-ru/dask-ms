@@ -50,8 +50,8 @@ def proxied_method_factory(method, locktype):
 
     if locktype == NOLOCK:
         def _impl(table_future, args, kwargs):
-            if isinstance(table_future, TableCache):
-                table = table_future.get_cached_table()
+            if isinstance(table_future, TIDCache):
+                table = table_future.get()
             else:
                 table = table_future.result()
 
@@ -64,8 +64,8 @@ def proxied_method_factory(method, locktype):
 
     elif locktype == READLOCK:
         def _impl(table_future, args, kwargs):
-            if isinstance(table_future, TableCache):
-                table = table_future.get_cached_table()
+            if isinstance(table_future, TIDCache):
+                table = table_future.get()
             else:
                 table = table_future.result()
             table.lock(write=False)
@@ -81,8 +81,8 @@ def proxied_method_factory(method, locktype):
 
     elif locktype == WRITELOCK:
         def _impl(table_future, args, kwargs):
-            if isinstance(table_future, TableCache):
-                table = table_future.get_cached_table()
+            if isinstance(table_future, TIDCache):
+                table = table_future.get()
             else:
                 table = table_future.result()
             table.lock(write=True)
@@ -164,7 +164,7 @@ class ParallelTableProxy(TableProxy, metaclass=ParallelTableProxyMetaClass):
         kwargs = self._kwargs.copy()
         kwargs.pop("__executor_key__", STANDARD_EXECUTOR)
 
-        self._cached_tables = TableCache(factory, *args, **kwargs)
+        self._cached_tables = TIDCache(factory, *args, **kwargs)
 
         finalize(self, _parallel_table_finalizer, self._cached_tables)
 
@@ -176,22 +176,29 @@ class ParallelTableProxy(TableProxy, metaclass=ParallelTableProxyMetaClass):
         )
 
 
-class TableCache(object):
+class TIDCache(object):
 
     def __init__(self, fn, *args, **kwargs):
+        """A cache keyed on thread ID.
+
+        When a key is not found, it is added with a value given by
+        fn(*args, **kwargs).
+        """
+
         self.cache = {}
         self.fn = fn
         self.args = args
         self.kwargs = kwargs
 
-    def get_cached_table(self):
+    def get(self):
+        """Return or create fn(*args, **args) for the calling thread."""
 
         thread_id = threading.get_ident()
 
         try:
-            table = self.cache[thread_id]
+            item = self.cache[thread_id]
         except KeyError:
-            print(f"Opening table in {thread_id}.")
-            self.cache[thread_id] = table = self.fn(*self.args, **self.kwargs)
+            print(f"Opening item in {thread_id}.")
+            self.cache[thread_id] = item = self.fn(*self.args, **self.kwargs)
 
-        return table
+        return item
