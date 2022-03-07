@@ -2,6 +2,7 @@ import logging
 import threading
 from pyrap.tables import table as Table
 from weakref import finalize
+from pathlib import Path
 
 
 log = logging.getLogger(__name__)
@@ -10,7 +11,9 @@ log = logging.getLogger(__name__)
 def _parallel_table_finalizer(_cached_tables):
 
     for table in _cached_tables.values():
+        link_path = Path(table.name())
         table.close()
+        link_path.unlink()
 
 
 class ParallelTable(Table):
@@ -78,8 +81,14 @@ class ParallelTable(Table):
         except KeyError:
             print(f"opening for {thread_id}")
 
+            table_path = Path(self._table_path)
+            table_name = table_path.name
+            link_path = Path(f"/tmp/{thread_id}-{table_name}")
+
+            link_path.symlink_to(table_path)
+
             self._cached_tables[thread_id] = table = Table(
-                *self._args,
+                str(link_path),
                 **self._kwargs
             )
 
