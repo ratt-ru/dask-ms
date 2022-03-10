@@ -247,5 +247,5 @@ def test_basic_roundtrip(tmp_path):
     xdsl = [xarray.Dataset({'x': (('y',), da.ones(i))}) for i in range(1, 12)]
     dask.compute(xds_to_zarr(xdsl, path))
 
-    xdsl = xds_from_zarr('test.zarr')
+    xdsl = xds_from_zarr(path)
     dask.compute(xds_to_zarr(xdsl, path))
