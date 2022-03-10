@@ -256,6 +256,10 @@ def zarr_getter(zarray, *extents):
     return zarray[tuple(slice(start, end) for start, end in extents)]
 
 
+def group_sortkey(element):
+    return int(element[0].split('_')[-1])
+
+
 @requires("pip install dask-ms[zarr] for zarr support",
           zarr_import_error)
 def xds_from_zarr(store, columns=None, chunks=None):
@@ -305,7 +309,8 @@ def xds_from_zarr(store, columns=None, chunks=None):
 
     table_group = zarr.open(store.map)[store.table]
 
-    for g, (group_name, group) in enumerate(sorted(table_group.groups())):
+    for g, (group_name, group) in enumerate(sorted(table_group.groups(),
+                                                   key=group_sortkey)):
         group_attrs = decode_attr(dict(group.attrs))
         dask_ms_attrs = group_attrs.pop(DASKMS_ATTR_KEY)
         natural_chunks = dask_ms_attrs["chunks"]
