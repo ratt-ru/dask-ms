@@ -244,6 +244,7 @@ def test_basic_roundtrip(tmp_path):
 
     path = tmp_path / "test.zarr"
 
+    # We need >10 datasets to be sure roundtripping is consistent.
     xdsl = [xarray.Dataset({'x': (('y',), da.ones(i))}) for i in range(1, 12)]
     dask.compute(xds_to_zarr(xdsl, path))
 
