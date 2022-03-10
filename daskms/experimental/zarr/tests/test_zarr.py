@@ -238,3 +238,14 @@ def test_fasteners(ms, tmp_path_factory):
         results = [pool.apply_async(_fasteners_runner, (lockfile,))
                    for _ in range(4)]
         pprint([r.get() for r in results])
+
+
+def test_basic_roundtrip(tmp_path):
+
+    path = tmp_path / "test.zarr"
+
+    xdsl = [xarray.Dataset({'x': (('y',), da.ones(i))}) for i in range(1, 12)]
+    dask.compute(xds_to_zarr(xdsl, path))
+
+    xdsl = xds_from_zarr('test.zarr')
+    dask.compute(xds_to_zarr(xdsl, path))
