@@ -252,6 +252,9 @@ class ParquetFormat(BaseTableFormat):
         return "parquet"
 
 
+NONUNIFORM_SUBTABLES = ["SPECTRAL_WINDOW", "POLARIZATION", "FEED", "SOURCE"]
+
+
 def convert_table(args):
     in_fmt = TableFormat.from_path(args.input)
     out_fmt = TableFormat.from_type(args.format)
@@ -285,7 +288,7 @@ def convert_table(args):
         reader = in_fmt.reader()
         writer = out_fmt.writer()
 
-        if isinstance(in_fmt, CasaFormat):
+        if isinstance(in_fmt, CasaFormat) and table in NONUNIFORM_SUBTABLES:
             # Drop any ROWID columns
             datasets = [ds.drop_vars("ROWID", errors="ignore")
                         for ds in reader(in_path, group_cols="__row__")]
