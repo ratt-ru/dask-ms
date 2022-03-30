@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Improve handling of subtables with variably sized rows in daskms-convert.
 * Ensure that `xds_from_zarr` sorts groups as integers and not strings (:pr:`188`)
 * Ensure Natural Ordering for parquet files (:pr:`183)
 * Fix xds_from_zarr and xds_from_parquet chunking behaviour (:pr:`182`)
