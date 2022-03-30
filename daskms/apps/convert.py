@@ -152,10 +152,15 @@ class CasaFormat(BaseTableFormat):
     def reader(self, **kw):
         try:
             group_cols = kw.pop("group_columns", None)
+            index_cols = kw.pop("index_columns", None)
 
             if self.is_measurement_set():
                 from daskms import xds_from_ms
-                return partial(xds_from_ms, group_cols=group_cols)
+                return partial(
+                    xds_from_ms,
+                    group_cols=group_cols,
+                    index_cols=index_cols
+                )
             else:
                 from daskms import xds_from_table
                 return xds_from_table
@@ -196,9 +201,13 @@ class ZarrFormat(BaseTableFormat):
 
     def reader(self, **kw):
         group_columns = kw.pop("group_columns", False)
+        index_columns = kw.pop("index_columns", False)
 
         if group_columns:
-            raise ValueError("\"group_column\" is not supported "
+            raise ValueError("\"group_columns\" is not supported "
+                             "for zarr inputs")
+        if index_columns:
+            raise ValueError("\"index_columns\" is not supported "
                              "for zarr inputs")
         try:
             from daskms.experimental.zarr import xds_from_zarr
@@ -233,10 +242,14 @@ class ParquetFormat(BaseTableFormat):
 
     def reader(self, **kw):
         group_columns = kw.pop("group_columns", False)
+        index_columns = kw.pop("index_columns", False)
 
         if group_columns:
             raise ValueError("\"group_column\" is not supported "
-                             "for zarr inputs")
+                             "for parquet inputs")
+        if index_columns:
+            raise ValueError("\"index_columns\" is not supported "
+                             "for parquet inputs")
 
         try:
             from daskms.experimental.arrow.reads import xds_from_parquet
@@ -259,7 +272,10 @@ def convert_table(args):
     in_fmt = TableFormat.from_path(args.input)
     out_fmt = TableFormat.from_type(args.format)
 
-    reader = in_fmt.reader(group_columns=args.group_columns)
+    reader = in_fmt.reader(
+        group_columns=args.group_columns,
+        index_columns=args.index_columns
+    )
     writer = out_fmt.writer()
 
     datasets = reader(args.input, chunks=args.chunks)
@@ -330,23 +346,34 @@ class Convert(Application):
         self.args = args
 
     @staticmethod
-    def group_col_converter(group_columns):
-        if not group_columns:
+    def col_converter(columns):
+        if not columns:
             return None
 
-        return [c.strip() for c in group_columns.split(",")]
+        return [c.strip() for c in columns.split(",")]
 
     @classmethod
     def setup_parser(cls, parser):
         parser.add_argument("input", type=_check_input_path)
         parser.add_argument("-o", "--output", type=Path)
         parser.add_argument("-g", "--group-columns",
-                            type=Convert.group_col_converter,
+                            type=Convert.col_converter,
                             default="",
                             help="Columns to group or partition "
                                  "the input dataset by. "
                                  "This defaults to the default "
-                                 "for the underlying storage mechanism")
+                                 "for the underlying storage mechanism."
+                                 "This is only supported when converting "
+                                 "from casa format.")
+        parser.add_argument("-i", "--index-columns",
+                            type=Convert.col_converter,
+                            default="",
+                            help="Columns to sort "
+                                 "the input dataset by. "
+                                 "This defaults to the default "
+                                 "for the underlying storage mechanism."
+                                 "This is only supported when converting "
+                                 "from casa format.")
         parser.add_argument("-f", "--format",
                             choices=["casa", "zarr", "parquet"],
                             default="zarr",
