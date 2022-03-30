@@ -179,7 +179,16 @@ def partition_chunking(partition, fragment_rows, chunks):
 
 
 @requires_arrow(pyarrow_import_error)
-def xds_from_parquet(store, columns=None, chunks=None):
+def xds_from_parquet(store, columns=None, chunks=None, **kwargs):
+
+    # If any kwargs are added, they should be popped prior to this check.
+    if len(kwargs) > 0:
+        warnings.warn(
+            f"The following unsupported kwargs were ignored in "
+            f"xds_from_parquet: {kwargs}",
+            UserWarning,
+        )
+
     if isinstance(store, DaskMSStore):
         pass
     elif isinstance(store, Path):

@@ -97,7 +97,9 @@ class DaskMSStore(metaclass=Multiton):
 
     def rglob(self, pattern, **kwargs):
         sep = self.fs.sep
-        fullpath = "".join((self.path, sep, "**", sep, pattern))
+        fullpath = "".join(
+            (self.path, sep, self.table, sep, "**", sep, pattern)
+        )
         paths = self.fs.glob(fullpath, **kwargs)
         prefix = "".join((self.path, sep))
         return (self._remove_prefix(p, prefix) for p in paths)

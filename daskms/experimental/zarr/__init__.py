@@ -6,6 +6,7 @@ from dask.array.core import normalize_chunks
 from dask.base import tokenize
 import numcodecs
 import numpy as np
+import warnings
 
 from daskms.constants import DASKMS_PARTITION_KEY
 from daskms.dataset import Dataset, Variable
@@ -262,7 +263,7 @@ def group_sortkey(element):
 
 @requires("pip install dask-ms[zarr] for zarr support",
           zarr_import_error)
-def xds_from_zarr(store, columns=None, chunks=None):
+def xds_from_zarr(store, columns=None, chunks=None, **kwargs):
     """
     Reads the zarr data store in `store` and returns list of
     Dataset's containing the data.
@@ -276,12 +277,22 @@ def xds_from_zarr(store, columns=None, chunks=None):
         Otherwise, a list of columns should be supplied.
     chunks: dict or list of dicts
         chunking schema for each dataset
+    **kwargs: optional
 
     Returns
     -------
     writes : Dataset or list of Datasets
         Dataset(s) representing write operations
     """
+
+    # If any kwargs are added, they should be popped prior to this check.
+    if len(kwargs) > 0:
+        warnings.warn(
+            f"The following unsupported kwargs were ignored in "
+            f"xds_from_zarr: {kwargs}",
+            UserWarning,
+        )
+
     if isinstance(store, DaskMSStore):
         pass
     elif isinstance(store, Path):
