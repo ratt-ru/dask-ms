@@ -33,6 +33,9 @@ def _tensor_to_array(obj, pa_dtype):
         child_array = pa.ExtensionArray.from_storage(pa_dtype, storage)
     elif pa_dtype == pa.string():
         child_array = pa.array(list(flatten(obj.tolist())))
+    elif pa_dtype == pa.bool_():
+        flat_array = obj.ravel()
+        child_array = pa.array(flat_array)
     else:
         child_buf = pa.py_buffer(obj)
         child_array = pa.Array.from_buffers(pa_dtype, total_elements,
@@ -124,7 +127,8 @@ class TensorArray(ExtensionArray):
 
         shape = (len(self),) + self.type.shape
         storage_list_type = self.storage.type
-        dtype = storage_list_type.value_type.to_pandas_dtype()
+        value_type = storage_list_type.value_type
+        dtype = value_type.to_pandas_dtype()
         bufs = self.storage.buffers()
 
         # string case
@@ -134,6 +138,23 @@ class TensorArray(ExtensionArray):
             return np.array(self.storage.tolist(), dtype=object)
         elif np.issubdtype(dtype, np.complexfloating):
             return np.ndarray(shape, buffer=bufs[4], dtype=dtype)
+        elif pa.types.is_boolean(value_type):
+            # The following accounts for the fact that booleans are stored as
+            # bits in arrow but are represented as bytes in python. NOTE: This
+            # may be slower than other types as it is not zero-copy.
+            numpy_size = np.prod(shape)
+            arrow_size = int(np.ceil(numpy_size / 8))  # 8 bits in a byte.
+            packed_array = np.ndarray(
+                arrow_size,
+                buffer=bufs[3],
+                dtype=np.uint8
+            )
+            unpacked_array = np.unpackbits(
+                packed_array,
+                count=numpy_size,
+                bitorder='little'
+            )
+            return unpacked_array.view(np.bool_).reshape(shape)
         else:
             return np.ndarray(shape, buffer=bufs[3], dtype=dtype)
 
