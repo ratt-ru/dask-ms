@@ -4,6 +4,10 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+*
+
+0.2.8 (2022-04-06)
+------------------
 * Fix #176. Fix roundtripping of boolean tensor arrays. (:pr:`194`)
 * Fix #175 for xds_from_storage_* functions. (:pr:`192`)
 * Improve handling of subtables with variably sized rows in daskms-convert. (:pr:`191`)
