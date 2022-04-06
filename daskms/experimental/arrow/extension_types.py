@@ -139,8 +139,22 @@ class TensorArray(ExtensionArray):
         elif np.issubdtype(dtype, np.complexfloating):
             return np.ndarray(shape, buffer=bufs[4], dtype=dtype)
         elif pa.types.is_boolean(value_type):
-            flat_array = self.storage.flatten()
-            return flat_array.to_numpy(zero_copy_only=False).reshape(shape)
+            # The following accounts for the fact that booleans are stored as
+            # bits in arrow but are represented as bytes in python. NOTE: This
+            # may be slower than other types as it is not zero-copy.
+            numpy_size = np.prod(shape)
+            arrow_size = int(np.ceil(numpy_size / 8))  # 8 bits in a byte.
+            packed_array = np.ndarray(
+                arrow_size,
+                buffer=bufs[3],
+                dtype=np.uint8
+            )
+            unpacked_array = np.unpackbits(
+                packed_array,
+                count=numpy_size,
+                bitorder='little'
+            )
+            return unpacked_array.view(np.bool_).reshape(shape)
         else:
             return np.ndarray(shape, buffer=bufs[3], dtype=dtype)
 

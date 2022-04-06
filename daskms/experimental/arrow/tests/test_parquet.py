@@ -42,12 +42,14 @@ def test_parquet_roundtrip(tmp_path_factory):
     shape = (nrow, nchan, ncorr)
     data = np.random.random(shape) + np.random.random(shape)*1j
     uvw = np.random.random((nrow, 3))
+    flag = np.random.randint(0, 2, shape).astype(np.bool_)
 
     columns = {
         "TIME": time,
         "ANTENNA1": ant1,
         "ANTENNA2": ant2,
         "UVW": uvw,
+        "FLAG": flag,
         "DATA": data,
     }
 
