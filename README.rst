@@ -5,8 +5,8 @@ xarray Datasets from CASA Tables
 .. image:: https://img.shields.io/pypi/v/dask-ms.svg
         :target: https://pypi.python.org/pypi/dask-ms
 
-.. image:: https://img.shields.io/travis/ska-sa/dask-ms.svg
-        :target: https://travis-ci.org/ska-sa/dask-ms
+.. image:: https://github.com/ratt-ru/dask-ms/actions/workflows/ci.yml/badge.svg
+        :target: https://github.com/ratt-ru/dask-ms/actions/workflows/ci.yml
 
 .. image:: https://readthedocs.org/projects/dask-ms/badge/?version=latest
         :target: https://dask-ms.readthedocs.io/en/latest/?badge=latest
