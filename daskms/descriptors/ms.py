@@ -207,6 +207,15 @@ class MSDescriptorBuilder(AbstractDescriptorBuilder):
             self._maybe_fix_column("FLAG_CATEGORY", desc,
                                    (flagcat, chan, corr))
 
+        # NOTE(JSKenyon): Attempt to fix custom columns with (row, chan, corr)
+        # dimensions. This is important for performance on large columns.
+        for col_name, schemas in variables.items():
+            schema_dims = set([schema.dims for schema in schemas])
+            if len(schema_dims) == 1:
+                schema_dims = schema_dims.pop()
+                if schema_dims == ('row', 'chan', 'corr'):
+                    self._maybe_fix_column(col_name, desc, (chan, corr))
+
         return desc
 
     def _fit_tile_shape(self, desc):
