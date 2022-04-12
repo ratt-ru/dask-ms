@@ -102,7 +102,7 @@ def test_lazy_resource(tmp_path):
                           file_proxy, None,
                           pool_proxy, None,
                           da.arange(100, chunks=10), "r",
-                          meta=np.empty((0,), np.object))
+                          meta=np.empty((0,), object))
     values.compute(scheduler="processes")
 
 

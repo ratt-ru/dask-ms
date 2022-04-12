@@ -164,57 +164,35 @@ class MSDescriptorBuilder(AbstractDescriptorBuilder):
     def fix_columns(self, variables, desc, dim_sizes):
         """ Set large columns to fixed columns """
 
-        # We need channel and correlation
-        try:
-            chan = dim_sizes['chan']
-        except KeyError:
-            log.warning("Unable to infer 'chan' dimension from variables. "
-                        "Columns won't be FixedShape.")
-            return desc
-        else:
-            if np.isnan(chan):
-                log.warning("'nan' chan dimension. "
-                            "Columns won't be FixedShape.")
-                return desc
-
-            # We can fix IMAGING_WEIGHT at least
-            self._maybe_fix_column('IMAGING_WEIGHT', desc, (chan,))
-
-        try:
-            corr = dim_sizes['corr']
-        except KeyError:
-            log.warning("Unable to infer 'corr' dimension from variables. "
-                        "Columns won't be FixedShape.")
-            return desc
-        else:
-            if np.isnan(corr):
-                log.warning("'nan' corr dimension. "
-                            "Columns won't be FixedShape.")
-
-        self._maybe_fix_column('FLAG', desc, (chan, corr))
-        self._maybe_fix_column('DATA', desc, (chan, corr))
-        self._maybe_fix_column('MODEL_DATA', desc, (chan, corr))
-        self._maybe_fix_column('CORRECTED_DATA', desc, (chan, corr))
-        self._maybe_fix_column('WEIGHT_SPECTRUM', desc, (chan, corr))
-        self._maybe_fix_column('SIGMA_SPECTRUM', desc, (chan, corr))
-
-        try:
-            flagcat = dim_sizes['flagcat']
-        except KeyError:
-            log.warning("Unable to infer 'flagcat' dimension "
-                        "from input variables")
-        else:
-            self._maybe_fix_column("FLAG_CATEGORY", desc,
-                                   (flagcat, chan, corr))
-
-        # NOTE(JSKenyon): Attempt to fix custom columns with (row, chan, corr)
-        # dimensions. This is important for performance on large columns.
+        # NOTE(JSKenyon): Attempt to make custom (non-standard) columns fixed
+        # shape when possible. Only chan and corr dimensions are handled at
+        # the moment.
         for col_name, schemas in variables.items():
-            schema_dims = set([schema.dims for schema in schemas])
+            # Don't attempt to fix columns with object type.
+            if schemas[0].dtype == np.dtype('O'):
+                continue
+
+            schema_dims = schemas[0].dims
+            # First dim must be row (for now).
+            if schema_dims[0] != "row":
+                continue
+            # Don't bother fixing row-only columns.
             if len(schema_dims) == 1:
-                schema_dims = schema_dims.pop()
-                if schema_dims == ('row', 'chan', 'corr'):
-                    self._maybe_fix_column(col_name, desc, (chan, corr))
+                continue
+
+            try:
+                shape = tuple([dim_sizes[d] for d in schema_dims[1:]])
+            except KeyError:  # We don't understand the dims.
+                log.warning(f"Could not fix shape for column {col_name} "
+                            f"with dimensions {schema_dims}.")
+                continue
+
+            if np.nan in shape:
+                log.warning(f"Could not fix shape for column {col_name} "
+                            f"with np.nan in shape.")
+                continue
+
+            self._maybe_fix_column(col_name, desc, shape)
 
         return desc
 

@@ -310,21 +310,19 @@ def _updated_table(table, datasets, columns, descriptor):
         variables = builder.dataset_variables(schemas)
         default_desc = builder.default_descriptor()
         table_desc = builder.descriptor(variables, default_desc)
-        table_desc = {m: table_desc[m] for m in missing}
 
         # Original Data Manager Groups
         odminfo = {g['NAME'] for g in table_proxy.getdminfo()
                                                  .result()
                                                  .values()}
 
-        # Construct a dminfo object with Data Manager Groups not present
-        # on the original dminfo object
-        dminfo = {f"*{i + 1}": v for i, v
-                  in enumerate(builder.dminfo(table_desc).values())
-                  if v['NAME'] not in odminfo}
-
-        # Add the columns
-        table_proxy.addcols(table_desc, dminfo=dminfo).result()
+        # NOTE(JSKenyon): Add columns one at a time - this avoids issues when
+        # adding multiple columns with different managers.
+        for col in missing:
+            _table_desc = {col: table_desc[col]}
+            _dminfo = builder.dminfo(_table_desc)
+            _dminfo = {} if _dminfo['*1']['NAME'] in odminfo else _dminfo
+            table_proxy.addcols(_table_desc, dminfo=_dminfo).result()
 
     return table_proxy
 
