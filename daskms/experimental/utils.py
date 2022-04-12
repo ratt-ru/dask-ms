@@ -75,8 +75,16 @@ def select_vars_and_coords(dataset, columns):
         column_set = set(columns)
         data_vars = dataset.data_vars
         coords = dataset.coords
-        data_cols = column_set & set(data_vars.keys())
-        coord_cols = column_set & set(coords.keys())
+        data_var_names = set(data_vars.keys())
+        coord_names = set(coords.keys())
+
+        if not column_set.issubset((data_var_names | coord_names)):
+            raise ValueError(f"User requested writes on the following "
+                             f"columns: {column_set}. Some or all of these "
+                             f"are not present on the datasets. Aborting.")
+
+        data_cols = column_set & data_var_names
+        coord_cols = column_set & coord_names
 
         for c in coord_cols:
             coord_cols.union(*(d for d in coords[c].dims))
