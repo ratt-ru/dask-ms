@@ -231,9 +231,16 @@ def xds_to_zarr(xds, store, columns=None):
     write_datasets = []
 
     for di, ds in enumerate(xds):
-        group = prepare_zarr_group(di, ds, store)
 
         data_vars, coords = select_vars_and_coords(ds, columns)
+
+        if not data_vars:
+            raise ValueError(f"User requested writes on the following "
+                             f"columns: {columns}. Some or all of these "
+                             f"are not present on the datasets. Aborting.")
+
+        group = prepare_zarr_group(di, ds, store)
+
         data_vars = dict(_gen_writes(data_vars, ds.chunks, group))
         # Include coords in the write dataset so they're reified
         data_vars.update(dict(_gen_writes(coords, ds.chunks, group,
