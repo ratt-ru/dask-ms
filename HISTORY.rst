@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Improve fix for #172 - error out more reliably. (:pr:`198`)
 * Fix #172 - error out when missing datavars should be written. (:pr:`197`)
 * Fix #195 - allow non-standard columns to be tiled. (:pr:`196`)
 
