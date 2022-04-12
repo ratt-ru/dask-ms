@@ -201,7 +201,8 @@ def xds_to_zarr(xds, store, columns=None):
         Path to store the data
     columns : list of str or str or None
         Columns to store. `None` or `"ALL"` stores all columns on each dataset.
-        Otherwise, a list of columns should be supplied.
+        Otherwise, a list of columns should be supplied. All coordinates
+        associated with a specified column will be written automatically.
 
     Returns
     -------
@@ -233,6 +234,9 @@ def xds_to_zarr(xds, store, columns=None):
     for di, ds in enumerate(xds):
 
         data_vars, coords = select_vars_and_coords(ds, columns)
+
+        # Create a new ds which is consistent with what we want to write.
+        ds = Dataset(data_vars, coords=coords, attrs=ds.attrs)
 
         group = prepare_zarr_group(di, ds, store)
 

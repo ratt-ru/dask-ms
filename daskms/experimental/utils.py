@@ -83,27 +83,14 @@ def select_vars_and_coords(dataset, columns):
                              f"columns: {column_set}. Some or all of these "
                              f"are not present on the datasets. Aborting.")
 
-        data_cols = column_set & data_var_names
-        coord_cols = column_set & coord_names
+        data_sel = column_set & data_var_names
+        coord_sel = column_set & coord_names
 
-        for c in coord_cols:
-            coord_cols.union(*(d for d in coords[c].dims))
+        for dv in data_sel:
+            coord_sel = coord_sel.union(*data_vars[dv].coords.keys())
 
-        ret_data_vars = {}
-
-        for c in data_cols:
-            ret_data_vars[c] = v = data_vars[c]
-            coord_cols.union(*(d for d in v.dims))
-
-        ret_coords = {}
-
-        for c in coord_cols:
-            try:
-                v = coords[c]
-            except KeyError:
-                continue
-            else:
-                ret_coords[c] = v
+        ret_data_vars = {col: data_vars[col] for col in data_sel}
+        ret_coords = {c: coords[c] for c in coord_sel}
 
     return ret_data_vars, ret_coords
 
