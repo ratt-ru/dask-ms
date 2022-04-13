@@ -1,8 +1,5 @@
 # -*- coding: utf-8 -*-
-
-from functools import reduce
 import logging
-from operator import mul
 
 import numpy as np
 import pyrap.tables as pt
@@ -202,8 +199,6 @@ class MSDescriptorBuilder(AbstractDescriptorBuilder):
             shape = desc['shape']
         except KeyError:
             raise ValueError(f"No shape in descriptor {desc}")
-        else:
-            rev_shape = tuple(reversed(shape))
 
         try:
             casa_type = desc['valueType']
@@ -213,12 +208,31 @@ class MSDescriptorBuilder(AbstractDescriptorBuilder):
             dtype = infer_dtype(casa_type, desc)
             nbytes = np.dtype(dtype).itemsize
 
-        rows = 1
+        # NOTE(JSKenyon): The following is entirely heuristic and may require
+        # adjustments if chunks grow unwieldy.
 
-        while reduce(mul, rev_shape + (2*rows,), 1)*nbytes < 4*1024*1024:
-            rows *= 2
+        min_tile_dims = [512]  # Approx sensible starting number of rows.
+        max_tile_dims = [np.inf]
 
-        return {"DEFAULTTILESHAPE": np.int32(rev_shape + (2*rows,))}
+        for dim in shape:
+            min_tile = min(dim, 4)  # Don't tile <=4 elements.
+            # For dims which are not exact powers of two, treat them as though
+            # they are floored to the nearest power of two.
+            max_tile = np.int(min(2 ** np.int(np.log2(dim)) / 8, 64))
+            max_tile = min_tile if max_tile < min_tile else max_tile
+            min_tile_dims.append(min_tile)
+            max_tile_dims.append(max_tile)
+
+        tile_shape = min_tile_dims.copy()
+        growth_axis = 0
+
+        while np.prod(tile_shape)*nbytes < 1024**2:  # 1MB tiles.
+            if tile_shape[growth_axis] < max_tile_dims[growth_axis]:
+                tile_shape[growth_axis] *= 2
+            growth_axis += 1
+            growth_axis %= len(tile_shape)
+
+        return {"DEFAULTTILESHAPE": np.int32(tile_shape[::-1])}
 
     def dminfo(self, table_desc):
         """
