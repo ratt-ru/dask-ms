@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Fix #187 - add option to rechunk automatically on writes. (:pr:`204`)
 * Fix #118 - raise more informative error. (:pr:`203`)
 * Fix #201 - improve tiling. (:pr:`202`)
 * Fix #199 - do not create spurious fields in zarr writes. (:pr:`200`)

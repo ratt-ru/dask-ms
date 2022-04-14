@@ -87,19 +87,6 @@ def create_array(ds_group, column, column_schema,
                                      object_codec=codec,
                                      exact=True)
 
-    if zchunks is not None:
-        # Expand zarr chunks to full dask resolution
-        # For comparison purposes
-        zchunks = normalize_chunks(array.chunks, column_schema.shape)
-
-        if zchunks != chunks:
-            raise ValueError(
-                f"zarr chunks {zchunks} "
-                f"don't match dask chunks {column_schema.chunks}. "
-                f"This can cause data corruption as described in "
-                f"https://zarr.readthedocs.io/en/stable/tutorial.html"
-                f"#parallel-computing-and-synchronization")
-
     array.attrs[DASKMS_ATTR_KEY] = {
         "dims": column_schema.dims,
         "coordinate": coordinate,
@@ -133,6 +120,41 @@ def prepare_zarr_group(dataset_id, dataset, store):
     })
 
     return ds_group
+
+
+def maybe_rechunk(dataset, group, rechunk=False):
+
+    for field in (*dataset.data_vars.keys(), *dataset.coords.keys()):
+        zarr_array = group.get(field)
+        shape = zarr_array.shape
+        disk_chunks = normalize_chunks(zarr_array.chunks, shape)
+        dask_chunks = dataset[field].chunks
+
+        if dask_chunks and (dask_chunks != disk_chunks):
+            if rechunk:
+                dataset = dataset.assign(
+                    {field: dataset[field].chunk(disk_chunks)}
+                )
+            else:
+                raise ValueError(
+                    f"On disk (zarr) chunks: {disk_chunks} - don't match in "
+                    f"memory (dask) chunks: {dask_chunks}. This can cause "
+                    f"data corruption as described in "
+                    f"https://zarr.readthedocs.io/en/stable/tutorial.html"
+                    f"#parallel-computing-and-synchronization. Consider "
+                    f"setting 'rechunk=True' in 'xds_to_zarr'.")
+
+    try:
+        dataset.chunks
+    except ValueError as e:
+        raise e
+
+    # This makes the attributes consistent with the final chunking.
+    group.attrs.update({
+        DASKMS_ATTR_KEY: {"chunks": dict(dataset.chunks)}
+    })
+
+    return dataset, group
 
 
 def zarr_setter(data, name, group, *extents):
@@ -188,7 +210,7 @@ def _gen_writes(variables, chunks, factory, indirect_dims=False):
 
 @requires("pip install dask-ms[zarr] for zarr support",
           zarr_import_error)
-def xds_to_zarr(xds, store, columns=None):
+def xds_to_zarr(xds, store, columns=None, rechunk=False):
     """
     Stores a dataset of list of datasets defined by `xds` in
     file location `store`.
@@ -203,6 +225,9 @@ def xds_to_zarr(xds, store, columns=None):
         Columns to store. `None` or `"ALL"` stores all columns on each dataset.
         Otherwise, a list of columns should be supplied. All coordinates
         associated with a specified column will be written automatically.
+    rechunk : bool
+        Controls whether dask arrays should be automatically rechunked to be
+        consistent with existing on-disk zarr arrays while writing to disk.
 
     Returns
     -------
@@ -240,9 +265,11 @@ def xds_to_zarr(xds, store, columns=None):
 
         group = prepare_zarr_group(di, ds, store)
 
-        data_vars = dict(_gen_writes(data_vars, ds.chunks, group))
+        ds, group = maybe_rechunk(ds, group, rechunk=rechunk)
+
+        data_vars = dict(_gen_writes(ds.data_vars, ds.chunks, group))
         # Include coords in the write dataset so they're reified
-        data_vars.update(dict(_gen_writes(coords, ds.chunks, group,
+        data_vars.update(dict(_gen_writes(ds.coords, ds.chunks, group,
                                           indirect_dims=True)))
 
         # Transfer any partition information over to the write dataset
