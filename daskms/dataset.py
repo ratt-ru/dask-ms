@@ -411,6 +411,22 @@ else:
             coords = self._drop_internal(self.coords, names, errors)
             return Dataset(data_vars, coords=coords, attrs=self.attrs.copy())
 
+        def __getitem__(self, name):
+            try:
+                return self._data_vars[name]
+            except KeyError:
+                pass
+
+            try:
+                return self._coords[name]
+            except KeyError:
+                pass
+
+            try:
+                return self._attrs[name]
+            except KeyError:
+                raise AttributeError(f"Invalid Attribute {name}")
+
         def __getattr__(self, name):
             try:
                 return self._data_vars[name]

@@ -252,6 +252,7 @@ def test_basic_roundtrip(tmp_path):
     dask.compute(xds_to_zarr(xdsl, path))
 
 
+@pytest.mark.skipif(xarray is None, reason="depends on xarray")
 @pytest.mark.parametrize("prechunking", [{"row": -1, "chan": -1},
                                          {"row": 1, "chan": 1},
                                          {"row": 2, "chan": 7}])

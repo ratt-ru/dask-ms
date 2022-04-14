@@ -144,7 +144,10 @@ def maybe_rechunk(dataset, group, rechunk=False):
                     f"#parallel-computing-and-synchronization. Consider "
                     f"setting 'rechunk=True' in 'xds_to_zarr'.")
 
-    assert dataset.chunks, "Dataset has inconsistent chunks."
+    try:
+        dataset.chunks
+    except ValueError as e:
+        raise e
 
     # This makes the attributes consistent with the final chunking.
     group.attrs.update({
