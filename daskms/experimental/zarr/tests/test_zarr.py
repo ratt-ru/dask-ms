@@ -250,3 +250,38 @@ def test_basic_roundtrip(tmp_path):
 
     xdsl = xds_from_zarr(path)
     dask.compute(xds_to_zarr(xdsl, path))
+
+
+@pytest.mark.parametrize("prechunking", [{"row": -1, "chan": -1},
+                                         {"row": 1, "chan": 1},
+                                         {"row": 2, "chan": 7}])
+@pytest.mark.parametrize("postchunking", [{"row": -1, "chan": -1},
+                                          {"row": 1, "chan": 1},
+                                          {"row": 2, "chan": 7}])
+def test_rechunking(ms, tmp_path_factory, prechunking, postchunking):
+    store = tmp_path_factory.mktemp("zarr_store")
+    ref_datasets = xds_from_ms(ms)
+
+    for i, ds in enumerate(ref_datasets):
+        chunks = ds.chunks
+        row = sum(chunks["row"])
+        chan = sum(chunks["chan"])
+        corr = sum(chunks["corr"])
+
+        ref_datasets[i] = ds.assign_coords(
+            row=np.arange(row),
+            chan=np.arange(chan),
+            corr=np.arange(corr)
+        )
+
+    chunked_datasets = [ds.chunk(prechunking) for ds in ref_datasets]
+    dask.compute(xds_to_zarr(chunked_datasets, store))
+
+    rechunked_datasets = [ds.chunk(postchunking)
+                          for ds in xds_from_zarr(store)]
+    dask.compute(xds_to_zarr(rechunked_datasets, store, rechunk=True))
+
+    rechunked_datasets = xds_from_zarr(store)
+
+    assert all([ds.equals(rds)
+                for ds, rds in zip(rechunked_datasets, ref_datasets)])
