@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Fix #118 - raise more informative error. (:pr:`203`)
 * Fix #201 - improve tiling. (:pr:`202`)
 * Fix #199 - do not create spurious fields in zarr writes. (:pr:`200`)
 * Improve fix for #172 - error out more reliably. (:pr:`198`)
