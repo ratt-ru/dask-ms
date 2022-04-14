@@ -218,7 +218,7 @@ class MSDescriptorBuilder(AbstractDescriptorBuilder):
             min_tile = min(dim, 4)  # Don't tile <=4 elements.
             # For dims which are not exact powers of two, treat them as though
             # they are floored to the nearest power of two.
-            max_tile = np.int(min(2 ** np.int(np.log2(dim)) / 8, 64))
+            max_tile = int(min(2 ** int(np.log2(dim)) / 8, 64))
             max_tile = min_tile if max_tile < min_tile else max_tile
             min_tile_dims.append(min_tile)
             max_tile_dims.append(max_tile)

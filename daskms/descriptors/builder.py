@@ -137,10 +137,9 @@ def variable_column_descriptor(column, column_schema):
             ndims.append(0)
         else:
             if not v.dims[0] == "row":
-                log.warning(f"Column {column} doesn't start with "
-                            f"with a 'row' dimension: {v.dims} "
-                            f"and will be ignored")
-                continue
+                raise ValueError(f"'row' is not the first dimension in the "
+                                 f"dimensions {v.dims} of column {column}. "
+                                 f"Column cannot be added to MAIN table.")
 
             # Row only, so ndim must be removed from the descriptor
             # Add a marker to distinguish in case of multiple
