@@ -83,8 +83,11 @@ class DaskMSStore(metaclass=Multiton):
     def __getitem__(self, key):
         return self.map[key]
 
-    def exists(self, path):
-        fullpath = "".join((self.path, self.fs.sep, path))
+    def exists(self, path=None):
+        if path:
+            fullpath = "".join((self.path, self.fs.sep, path))
+        else:
+            fullpath = self.path
         return self.fs.exists(fullpath)
 
     def ls(self, path=None):
