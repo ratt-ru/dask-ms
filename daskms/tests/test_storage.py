@@ -58,8 +58,6 @@ def test_storage_parquet(ms, tmp_path_factory):
 
     oxdsl = dask.compute(oxdsl)[0]
 
-    # import ipdb; ipdb.set_trace()
-
     dask.compute(writes)
 
     xdsl = dask.compute(xds_from_parquet(parquet_store), scheduler='sync')[0]
