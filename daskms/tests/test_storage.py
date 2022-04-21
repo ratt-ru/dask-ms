@@ -69,6 +69,6 @@ def test_storage_parquet(ms, tmp_path_factory):
 
     dask.compute(writes)
 
-    xdsl = dask.compute(xds_from_parquet(parquet_store), scheduler='sync')[0]
+    xdsl = dask.compute(xds_from_parquet(parquet_store))[0]
 
     assert all([xds.equals(oxds) for xds, oxds in zip(xdsl, oxdsl)])

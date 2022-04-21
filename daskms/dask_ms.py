@@ -6,7 +6,7 @@ from daskms.fsspec_store import DaskMSStore
 from daskms.table_proxy import TableProxy
 from daskms.reads import DatasetFactory
 from daskms.writes import write_datasets
-from daskms.utils import promote_columns
+from daskms.utils import promote_columns, filter_kwargs
 
 _DEFAULT_INDEX_COLUMNS = []
 _DEFAULT_GROUP_COLUMNS = ["FIELD_ID", "DATA_DESC_ID"]
@@ -365,12 +365,15 @@ def xds_to_storage_table(xds, store, **kwargs):
     typ = store.type()
 
     if typ == "casa":
+        filter_kwargs(xds_to_table, kwargs)
         return xds_to_table(xds, store,  **kwargs)
     elif typ == "zarr":
         from daskms.experimental.zarr import xds_to_zarr
+        filter_kwargs(xds_to_zarr, kwargs)
         return xds_to_zarr(xds, store, **kwargs)
     elif typ == "parquet":
         from daskms.experimental.arrow import xds_to_parquet
+        filter_kwargs(xds_to_parquet, kwargs)
         return xds_to_parquet(xds, store, **kwargs)
     else:
         raise TypeError(f"Unknown dataset {typ}")

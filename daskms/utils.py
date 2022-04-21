@@ -5,6 +5,8 @@ import logging
 from pathlib import PurePath, Path
 import re
 import time
+import inspect
+import warnings
 
 from dask.utils import funcname
 # The numpy module may disappear during interpreter shutdown
@@ -210,3 +212,21 @@ def requires(*args):
             return fn
 
     return decorator
+
+
+def filter_kwargs(func, kwargs):
+    """Filters unhandled kwargs and raises appropriate warnings."""
+
+    known_args = inspect.getfullargspec(func).args
+
+    unhandled_kwargs = [k for k in kwargs.keys() if k not in known_args]
+
+    for unhandled_kwarg in unhandled_kwargs:
+        kwargs.pop(unhandled_kwarg)
+
+    if unhandled_kwargs:
+        warnings.warn(
+            f"The following kwargs will be ignored in {func.__name__}: "
+            f"{unhandled_kwargs}.",
+            UserWarning,
+        )
