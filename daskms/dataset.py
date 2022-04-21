@@ -425,7 +425,7 @@ else:
             try:
                 return self._attrs[name]
             except KeyError:
-                raise AttributeError(f"Invalid Attribute {name}")
+                raise AttributeError(f"Invalid item {name}")
 
         def __getattr__(self, name):
             try:

@@ -1,9 +1,16 @@
+import pytest
 import dask
 from daskms import xds_to_storage_table, xds_from_ms
 from daskms.experimental.zarr import xds_from_zarr, xds_to_zarr
 from daskms.experimental.arrow import xds_from_parquet, xds_to_parquet
 
+try:
+    import xarray
+except ImportError:
+    xarray = None
 
+
+@pytest.mark.skipif(xarray is None, reason="Need xarray to check equality.")
 def test_storage_ms(ms):
 
     oxdsl = xds_from_ms(ms)
@@ -19,6 +26,7 @@ def test_storage_ms(ms):
     assert all([xds.equals(oxds) for xds, oxds in zip(xdsl, oxdsl)])
 
 
+@pytest.mark.skipif(xarray is None, reason="Need xarray to check equality.")
 def test_storage_zarr(ms, tmp_path_factory):
 
     zarr_store = tmp_path_factory.mktemp("zarr") / "test.zarr"
@@ -42,6 +50,7 @@ def test_storage_zarr(ms, tmp_path_factory):
     assert all([xds.equals(oxds) for xds, oxds in zip(xdsl, oxdsl)])
 
 
+@pytest.mark.skipif(xarray is None, reason="Need xarray to check equality.")
 def test_storage_parquet(ms, tmp_path_factory):
 
     parquet_store = tmp_path_factory.mktemp("parquet") / "test.parquet"
