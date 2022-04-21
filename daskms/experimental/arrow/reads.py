@@ -114,7 +114,10 @@ def _partition_values(partition_strings, partition_meta):
                              f"{partition_strings} does not match "
                              f"metadata column name {pf}")
 
-        partitions.append((field, np.dtype(dt).type(value)))
+        # NOTE(JSKenyon): Use item to get a python type. Coercing to numpy
+        # type is not used for the other formats and causes serialization
+        # woes.
+        partitions.append((field, np.dtype(dt).type(value).item()))
 
     return tuple(partitions)
 

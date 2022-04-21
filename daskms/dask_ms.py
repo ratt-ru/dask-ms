@@ -6,7 +6,7 @@ from daskms.fsspec_store import DaskMSStore
 from daskms.table_proxy import TableProxy
 from daskms.reads import DatasetFactory
 from daskms.writes import write_datasets
-from daskms.utils import promote_columns
+from daskms.utils import promote_columns, filter_kwargs
 
 _DEFAULT_INDEX_COLUMNS = []
 _DEFAULT_GROUP_COLUMNS = ["FIELD_ID", "DATA_DESC_ID"]
@@ -72,13 +72,21 @@ def xds_to_table(xds, table_name, columns="ALL", descriptor=None,
         The Table Proxy associated with the datasets
     """
     if isinstance(table_name, DaskMSStore):
-        table_name = table_name.casa_path()
+        store = table_name
     else:
-        table_name = DaskMSStore(table_name).casa_path()
+        store = DaskMSStore(table_name)
+
+    table_name = store.casa_path()
 
     # Promote dataset to a list
     if not isinstance(xds, (tuple, list)):
         xds = [xds]
+
+    # Not writing to an existing dataset so we drop ROWID to ensure that rows
+    # get added correctly. TODO: This may be a little brittle - we could
+    # consider altering the functionality in writes.py.
+    if not store.exists():
+        xds = [ds.drop_vars("ROWID", errors="ignore") for ds in xds]
 
     if not isinstance(columns, (tuple, list)):
         if columns != "ALL":
@@ -346,6 +354,27 @@ def xds_from_storage_ms(store, **kwargs):
     elif typ == "parquet":
         from daskms.experimental.arrow import xds_from_parquet
         return xds_from_parquet(store, **kwargs)
+    else:
+        raise TypeError(f"Unknown dataset {typ}")
+
+
+def xds_to_storage_table(xds, store, **kwargs):
+    if not isinstance(store, DaskMSStore):
+        store = DaskMSStore(store)
+
+    typ = store.type()
+
+    if typ == "casa":
+        filter_kwargs(xds_to_table, kwargs)
+        return xds_to_table(xds, store,  **kwargs)
+    elif typ == "zarr":
+        from daskms.experimental.zarr import xds_to_zarr
+        filter_kwargs(xds_to_zarr, kwargs)
+        return xds_to_zarr(xds, store, **kwargs)
+    elif typ == "parquet":
+        from daskms.experimental.arrow import xds_to_parquet
+        filter_kwargs(xds_to_parquet, kwargs)
+        return xds_to_parquet(xds, store, **kwargs)
     else:
         raise TypeError(f"Unknown dataset {typ}")
 

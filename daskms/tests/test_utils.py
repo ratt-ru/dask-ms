@@ -9,7 +9,8 @@ import pytest
 from daskms.utils import (promote_columns,
                           natural_order,
                           table_path_split,
-                          requires)
+                          requires,
+                          filter_kwargs)
 
 
 def test_natural_order():
@@ -78,3 +79,16 @@ def test_requires():
     assert "need bar" in e.value.msg
 
     assert requires("need foo", 1, None)(fn)() == 1
+
+
+def test_sanitize():
+
+    def f(arg0, arg1=None, arg2=None):
+        return
+
+    kwargs = {"arg0": None, "arg1": None, "arg2": None, "arg3": None}
+
+    with pytest.warns(UserWarning):
+        filter_kwargs(f, kwargs)
+
+    assert "arg3" not in kwargs
