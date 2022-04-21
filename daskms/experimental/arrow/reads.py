@@ -115,7 +115,7 @@ def _partition_values(partition_strings, partition_meta):
                              f"metadata column name {pf}")
 
         # NOTE(JSKenyon): Use item to get a python type. Coercing to numpy
-        # type is not used for the other formats and cuases serialization
+        # type is not used for the other formats and causes serialization
         # woes.
         partitions.append((field, np.dtype(dt).type(value).item()))
 
