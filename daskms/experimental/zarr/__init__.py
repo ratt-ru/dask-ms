@@ -287,7 +287,11 @@ def xds_to_zarr(xds, store, columns=None, rechunk=False):
 
 
 def zarr_getter(zarray, *extents):
-    return zarray[tuple(slice(start, end) for start, end in extents)]
+    if any([start == end for start, end in extents]):  # Empty slice.
+        shape = [start - end for start, end in extents]
+        return np.empty(shape, dtype=zarray.dtype)
+    else:
+        return zarray[tuple(slice(start, end) for start, end in extents)]
 
 
 def group_sortkey(element):
