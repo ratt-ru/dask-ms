@@ -87,7 +87,7 @@ def select_vars_and_coords(dataset, columns):
         coord_sel = column_set & coord_names
 
         for dv in data_sel:
-            coord_sel = coord_sel.union(*data_vars[dv].coords.keys())
+            coord_sel = coord_sel.union(set(data_vars[dv].coords.keys()))
 
         ret_data_vars = {col: data_vars[col] for col in data_sel}
         ret_coords = {c: coords[c] for c in coord_sel}

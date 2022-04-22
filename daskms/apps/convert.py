@@ -305,11 +305,13 @@ def convert_table(args):
         writer = out_fmt.writer()
 
         if isinstance(in_fmt, CasaFormat) and table in NONUNIFORM_SUBTABLES:
-            # Drop any ROWID columns
-            datasets = [ds.drop_vars("ROWID", errors="ignore")
-                        for ds in reader(in_path, group_cols="__row__")]
+            datasets = reader(in_path, group_cols="__row__")
         else:
             datasets = reader(in_path)
+
+        if isinstance(in_fmt, CasaFormat):
+            datasets = [ds.drop_vars("ROWID", errors="ignore")
+                        for ds in datasets]
 
         writes.append(writer(datasets, str(out_path)))
 
