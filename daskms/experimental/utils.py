@@ -33,9 +33,9 @@ def extent_args(dims, chunks):
 
 def column_iterator(variables, columns):
     if columns is None or columns == "ALL":
-        columns = set(variables.array_keys())
+        columns = set(variables.keys())
     else:
-        columns = set(columns) & set(variables.array_keys())
+        columns = set(columns) & set(variables.keys())
 
     for c in columns:
         yield c, variables[c]
