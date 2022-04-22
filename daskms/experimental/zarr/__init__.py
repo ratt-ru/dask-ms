@@ -26,6 +26,7 @@ from daskms.fsspec_store import DaskMSStore
 
 try:
     import zarr
+    import zarr.convenience as zc
 except ImportError as e:
     zarr_import_error = e
 else:
@@ -355,7 +356,10 @@ def xds_from_zarr(store, columns=None, chunks=None, **kwargs):
     datasets = []
     numpy_vars = []
 
-    table_group = zarr.open(store.map)[store.table]
+    # NOTE(JSKenyon): Iterating over all the zarr groups/arrays is VERY
+    # expensive if the metadata has not been consolidated.
+    zc.consolidate_metadata(store.map)
+    table_group = zarr.open_consolidated(store.map)[store.table]
 
     for g, (group_name, group) in enumerate(sorted(table_group.groups(),
                                                    key=group_sortkey)):
