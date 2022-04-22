@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Fix minor bugs in zarr and conversion functionality. (:pr:`208`)
 * Fix #205 - Add xds_to_storage_table. (:pr:`207`)
 * Fix #187 - add option to rechunk automatically on writes. (:pr:`204`)
 * Fix #118 - raise more informative error. (:pr:`203`)
