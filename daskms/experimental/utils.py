@@ -33,12 +33,11 @@ def extent_args(dims, chunks):
 
 def column_iterator(variables, columns):
     if columns is None or columns == "ALL":
-        columns = set(variables.keys())
+        for k, v in variables.items():
+            yield k, v
     else:
-        columns = set(columns) & set(variables.keys())
-
-    for c in columns:
-        yield c, variables[c]
+        for c in (set(columns) & set(variables.keys())):
+            yield c, variables[c]
 
 
 def promote_columns(columns):
