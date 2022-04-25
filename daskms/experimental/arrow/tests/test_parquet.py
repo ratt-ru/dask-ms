@@ -7,6 +7,7 @@ from numpy.testing import assert_array_equal
 import pytest
 
 from daskms import xds_from_storage_ms
+from daskms.dask_ms import xds_from_ms
 from daskms.dataset import Dataset
 from daskms.fsspec_store import DaskMSStore
 from daskms.experimental.arrow.extension_types import TensorArray
@@ -167,3 +168,24 @@ def test_xds_to_parquet_s3(ms, spw_table, ant_table,
     # ant_store = store.subtable_store("ANTENNA")
 
     return parquet_tester(ms, store)
+
+
+@pytest.fixture
+def parquet_ms(ms, tmp_path_factory):
+
+    parquet_store = tmp_path_factory.mktemp("parquet") / "test.parquet"
+
+    xdsl = xds_from_ms(ms, chunks={"row": 1})  # Probe chunking behaviour.
+
+    writes = xds_to_parquet(xdsl, parquet_store)
+
+    dask.compute(writes)  # Write to parquet.
+
+    return parquet_store
+
+
+def test_xds_from_parquet_chunks(ms, parquet_ms):
+
+    xdsl = xds_from_parquet(parquet_ms, chunks={'row': 3})
+
+    assert all([len(xds.chunks['row']) == 1 for xds in xdsl])

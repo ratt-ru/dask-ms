@@ -81,7 +81,7 @@ def test_requires():
     assert requires("need foo", 1, None)(fn)() == 1
 
 
-def test_sanitize():
+def test_filter_kwargs():
 
     def f(arg0, arg1=None, arg2=None):
         return
