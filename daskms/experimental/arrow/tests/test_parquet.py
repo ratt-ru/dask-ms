@@ -1,5 +1,5 @@
 import random
-import itertools
+from itertools import chain
 
 import dask
 import dask.array as da
@@ -76,7 +76,11 @@ def test_partition_chunks(row_chunks, user_chunks):
                 (1, (0, 2)), (1, (2, 3)),
                 (2, (0, 1)), (2, (1, 3)), (2, (3, 4))]
 
-    assert partition_chunking(0, row_chunks, [user_chunks]) == expected
+    partition_chunks = partition_chunking(0, row_chunks, [user_chunks])
+
+    obtained = chain.from_iterable([c for c in partition_chunks.values()])
+
+    assert list(obtained) == expected
 
 
 def test_xds_to_parquet_string(tmp_path_factory):
@@ -191,6 +195,6 @@ def test_xds_from_parquet_chunks(ms, parquet_ms, rc):
 
     xdsl = xds_from_parquet(parquet_ms, chunks={'row': rc})
 
-    chunks = itertools.chain.from_iterable([xds.chunks['row'] for xds in xdsl])
+    chunks = chain.from_iterable([xds.chunks['row'] for xds in xdsl])
 
     assert all([c <= rc for c in chunks])
