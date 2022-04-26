@@ -153,10 +153,11 @@ def partition_chunking(partition, fragment_rows, chunks):
 
     intervals = np.cumsum([0] + fragment_rows)
     chunk_intervals = np.cumsum((0,) + row_chunks)
-    ranges = []
+    ranges = defaultdict(list)
     it = zip(chunk_intervals, chunk_intervals[1:])
 
     for c, (lower, upper) in enumerate(it):
+
         si = np.searchsorted(intervals, lower, side='right') - 1
         ei = np.searchsorted(intervals, upper, side='left')
 
@@ -176,9 +177,26 @@ def partition_chunking(partition, fragment_rows, chunks):
             else:
                 end = upper - intervals[s]
 
-            ranges.append((s, (start, end)))
+            ranges[c].append((s, (start, end)))
 
     return ranges
+
+
+def fragment_reader(fragments, ranges, column, shape, dtype):
+
+    if len(fragments) > 1:  # Reading over multiple row_groups.
+        arr = np.empty(shape, dtype=dtype)
+        offset = 0
+        for fragment, (start, end) in zip(fragments, ranges):
+            sel = slice(offset, offset + (end - start))
+            arr[sel] = fragment.read_column(column, start, end)
+            offset += (end - start)
+    else:
+        fragment = fragments[0]
+        start, end = ranges[0]
+        arr = fragment.read_column(column, start, end)
+
+    return arr
 
 
 @requires_arrow(pyarrow_import_error)
@@ -247,14 +265,24 @@ def xds_from_parquet(store, columns=None, chunks=None, **kwargs):
         column_arrays = defaultdict(list)
         fragment_rows = [f.metadata.num_rows for f in fragments]
 
-        for (f, (start, end)) in partition_chunking(p, fragment_rows, chunks):
-            fragment = fragments[f]
-            fragment_meta = fragment.metadata
-            rows = fragment_meta.num_rows
-            schema = fragment_meta.schema.to_arrow_schema()
-            fields = {n: schema.field(n) for n in schema.names}
+        # Returns a dictionary of lists mapping fragments to partitions.
+        partition_chunks = partition_chunking(p, fragment_rows, chunks)
 
-            for column, field in column_iterator(fields, columns):
+        for pieces in partition_chunks.values():
+
+            chunk_fragments = [fragments[i] for i, _ in pieces]
+            chunk_ranges = [r for _, r in pieces]
+            chunk_metas = [f.metadata for f in chunk_fragments]
+
+            rows = sum(end - start for start, end in chunk_ranges)
+
+            # NOTE(JSKenyon): This assumes that the schema/fields are
+            # consistent between fragments. This should be ok.
+            exemplar_schema = chunk_metas[0].schema.to_arrow_schema()
+            exemplar_fields = {n: exemplar_schema.field(n)
+                               for n in exemplar_schema.names}
+
+            for column, field in column_iterator(exemplar_fields, columns):
                 field_metadata = field.metadata[DASKMS_METADATA.encode()]
                 field_metadata = json.loads(field_metadata)
                 dims = tuple(field_metadata["dims"])
@@ -266,14 +294,17 @@ def xds_from_parquet(store, columns=None, chunks=None, **kwargs):
 
                 assert len(shape) == len(dims)
 
-                meta = np.empty((0,)*len(dims), field.type.to_pandas_dtype())
+                dtype = field.type.to_pandas_dtype()
+                meta = np.empty((0,)*len(dims), dtype)
                 new_axes = {d: s for d, s in zip(dims, shape)}
 
-                read = da.blockwise(fragment.read_column, dims,
+                read = da.blockwise(fragment_reader, dims,
+                                    chunk_fragments, None,
+                                    chunk_ranges, None,
                                     column, None,
-                                    start, None,
-                                    end, None,
-                                    adjust_chunks={"row": end - start},
+                                    shape, None,
+                                    dtype, None,
+                                    adjust_chunks={"row": rows},
                                     new_axes=new_axes,
                                     meta=meta)
 

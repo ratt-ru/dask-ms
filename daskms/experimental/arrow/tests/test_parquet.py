@@ -1,4 +1,5 @@
 import random
+from itertools import chain
 
 import dask
 import dask.array as da
@@ -7,6 +8,7 @@ from numpy.testing import assert_array_equal
 import pytest
 
 from daskms import xds_from_storage_ms
+from daskms.dask_ms import xds_from_ms
 from daskms.dataset import Dataset
 from daskms.fsspec_store import DaskMSStore
 from daskms.experimental.arrow.extension_types import TensorArray
@@ -74,7 +76,11 @@ def test_partition_chunks(row_chunks, user_chunks):
                 (1, (0, 2)), (1, (2, 3)),
                 (2, (0, 1)), (2, (1, 3)), (2, (3, 4))]
 
-    assert partition_chunking(0, row_chunks, [user_chunks]) == expected
+    partition_chunks = partition_chunking(0, row_chunks, [user_chunks])
+
+    obtained = chain.from_iterable([c for c in partition_chunks.values()])
+
+    assert list(obtained) == expected
 
 
 def test_xds_to_parquet_string(tmp_path_factory):
@@ -167,3 +173,28 @@ def test_xds_to_parquet_s3(ms, spw_table, ant_table,
     # ant_store = store.subtable_store("ANTENNA")
 
     return parquet_tester(ms, store)
+
+
+@pytest.fixture(params=[1, 2, 3, 4])
+def parquet_ms(ms, tmp_path_factory, request):
+
+    parquet_store = tmp_path_factory.mktemp("parquet") / "test.parquet"
+
+    # Chunk in row so we can probe chunk behaviour on reads.
+    xdsl = xds_from_ms(ms, chunks={"row": request.param})
+
+    writes = xds_to_parquet(xdsl, parquet_store)
+
+    dask.compute(writes)  # Write to parquet.
+
+    return parquet_store
+
+
+@pytest.mark.parametrize("rc", [1, 2, 3, 4])
+def test_xds_from_parquet_chunks(ms, parquet_ms, rc):
+
+    xdsl = xds_from_parquet(parquet_ms, chunks={'row': rc})
+
+    chunks = chain.from_iterable([xds.chunks['row'] for xds in xdsl])
+
+    assert all([c <= rc for c in chunks])
