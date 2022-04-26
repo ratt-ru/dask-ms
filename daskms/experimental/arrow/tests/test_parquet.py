@@ -191,10 +191,32 @@ def parquet_ms(ms, tmp_path_factory, request):
 
 
 @pytest.mark.parametrize("rc", [1, 2, 3, 4])
-def test_xds_from_parquet_chunks(ms, parquet_ms, rc):
+def test_xds_from_parquet_chunks(parquet_ms, rc):
 
     xdsl = xds_from_parquet(parquet_ms, chunks={'row': rc})
 
     chunks = chain.from_iterable([xds.chunks['row'] for xds in xdsl])
 
     assert all([c <= rc for c in chunks])
+
+
+def test_xds_to_parquet_coords(ms, tmp_path_factory):
+
+    parquet_store = tmp_path_factory.mktemp("parquet") / "test.parquet"
+
+    xdsl = xds_from_ms(ms)
+
+    coord_xdsl = []
+
+    for xds in xdsl:
+
+        coord_xds = xds.assign_coords(
+            {'chan': (('chan',), np.arange(xds.dims['chan'])),
+             'corr': (('corr',), np.arange(xds.dims['corr']))}
+        )
+
+        coord_xdsl.append(coord_xds)
+
+    writes = xds_to_parquet(coord_xdsl, parquet_store)
+
+    assert all(len(w.coords) == 0 for w in writes)

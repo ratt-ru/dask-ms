@@ -102,8 +102,7 @@ class ArrowSchema(DatasetSchema):
 
         data_vars = {c: cls.unify_column(c, s) for c, s
                      in unified_schema.data_vars.items()}
-        coords = {c: cls.unify_column(c, s) for c, s
-                  in unified_schema.coords.items()}
+        coords = {}  # Ignore coords - we cannot easily represent them.
 
         attrs = cls.unify_attrs(unified_schema.attrs)
 

@@ -129,9 +129,8 @@ def xds_to_parquet(xds, store, columns=None):
         args = [chunk_ids, ("row",)]
 
         data_var_it = column_iterator(ds.data_vars, columns)
-        coord_it = column_iterator(ds.coords, columns)
 
-        for column, variable in itertools.chain(data_var_it, coord_it):
+        for column, variable in itertools.chain(data_var_it):
             if not isinstance(variable.data, da.Array):
                 raise ValueError(f"Column {column} does not "
                                  f"contain a dask Array")
