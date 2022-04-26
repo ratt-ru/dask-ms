@@ -1,4 +1,5 @@
 import random
+import itertools
 
 import dask
 import dask.array as da
@@ -170,12 +171,13 @@ def test_xds_to_parquet_s3(ms, spw_table, ant_table,
     return parquet_tester(ms, store)
 
 
-@pytest.fixture
-def parquet_ms(ms, tmp_path_factory):
+@pytest.fixture(params=[1, 2, 3, 4])
+def parquet_ms(ms, tmp_path_factory, request):
 
     parquet_store = tmp_path_factory.mktemp("parquet") / "test.parquet"
 
-    xdsl = xds_from_ms(ms, chunks={"row": 1})  # Probe chunking behaviour.
+    # Chunk in row so we can probe chunk behaviour on reads.
+    xdsl = xds_from_ms(ms, chunks={"row": request.param})
 
     writes = xds_to_parquet(xdsl, parquet_store)
 
@@ -184,8 +186,11 @@ def parquet_ms(ms, tmp_path_factory):
     return parquet_store
 
 
-def test_xds_from_parquet_chunks(ms, parquet_ms):
+@pytest.mark.parametrize("rc", [1, 2, 3, 4])
+def test_xds_from_parquet_chunks(ms, parquet_ms, rc):
 
-    xdsl = xds_from_parquet(parquet_ms, chunks={'row': 3})
+    xdsl = xds_from_parquet(parquet_ms, chunks={'row': rc})
 
-    assert all([len(xds.chunks['row']) == 1 for xds in xdsl])
+    chunks = itertools.chain.from_iterable([xds.chunks['row'] for xds in xdsl])
+
+    assert all([c <= rc for c in chunks])
