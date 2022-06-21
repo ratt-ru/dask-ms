@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Wait for minio to start with greater precision (:pr:`215`)
 * Fix #209 - chunk correctly when reading from parquet. (:pr:`210`)
 * Fix minor bugs in zarr and conversion functionality. (:pr:`208`)
 * Fix #205 - Add xds_to_storage_table. (:pr:`207`)

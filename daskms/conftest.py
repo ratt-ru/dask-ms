@@ -269,11 +269,13 @@ def minio_server(tmp_path_factory):
 
     # Start the server process and read a line from stdout so that we know
     # it's started
-    ctx = multiprocessing.get_context("spawn")  # noqa
     server_process = Popen(args, shell=False, stdout=PIPE, stderr=PIPE)
-    server_process.stdout.readline()
 
     try:
+        while line := server_process.stdout.readline():
+            if "Documentation: ".encode("utf-8") in line:
+                break
+
         retcode = server_process.poll()
 
         if retcode is not None:
