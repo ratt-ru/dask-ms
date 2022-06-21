@@ -2,37 +2,40 @@ from pathlib import Path, PurePath
 
 import fsspec
 
-from daskms.patterns import Multiton
 
-
-class DaskMSStore(metaclass=Multiton):
+class DaskMSStore:
     def __init__(self, url, **storage_options):
         if isinstance(url, PurePath):
             url = str(url)
 
-        self.url = url
-        self.map = fsspec.get_mapper(url, **storage_options)
-        self.fs = self.map.fs
-        self.storage_options = storage_options
-        protocol = fsspec.core.split_protocol(url)[0]
-        self.protocol = "file" if protocol is None else protocol
-
-        path = fsspec.core.strip_protocol(url)
-        bits = path.split("::", 1)
+        bits = url.split("::", 1)
 
         if len(bits) == 1:
-            path = bits[0]
-            table = "MAIN"
+            url = bits[0]
+            table = ""
         elif len(bits) == 2:
-            path, table = bits
+            url, table = bits
 
             if table == "MAIN":
                 raise ValueError("MAIN is a reserved table name")
         else:
             raise RuntimeError(f"len(bits): {len(bits)} not in (1, 2)")
 
-        self.path = path
-        self.table = table
+        self.map = fsspec.get_mapper(url, **storage_options)
+        self.fs = self.map.fs
+        self.storage_options = storage_options
+        protocol, path = fsspec.core.split_protocol(url)
+        self.protocol = "file" if protocol is None else protocol
+
+        if table:
+            self.canonical_path = f"{path}::{table}"
+            self.full_path = f"{path}{self.fs.sep}{table}"
+            self.table = table
+        else:
+            self.canonical_path = path
+            self.full_path = path
+            self.table = "MAIN"
+
 
     def type(self):
         """
@@ -50,27 +53,30 @@ class DaskMSStore(metaclass=Multiton):
         if self.exists("table.dat"):
             return "casa"
         else:
-            for _, _, files in self.fs.walk(self.path):
+            for _, _, files in self.fs.walk(self.full_path):
                 for f in files:
                     if f == ".zgroup":
                         return "zarr"
                     elif f.endswith(".parquet"):
                         return "parquet"
 
-        raise TypeError(f"Unknown table type at {self.url}")
+        raise ValueError(f"Unable to infer table type at {self.full_path}")
+
+    @property
+    def url(self):
+        return f"{self.fs.unstrip_protocol(self.canonical_path)}"
 
     def subdirectories(self):
         return [d["name"] for d
-                in self.fs.listdir(self.path, detail=True)
+                in self.fs.listdir(self.full_path, detail=True)
                 if d["type"] == "directory"]
 
     def casa_path(self):
         if self.protocol != "file":
-            raise ValueError(f"CASA Tables don't work with the "
+            raise ValueError(f"CASA Tables are incompatible with the "
                              f"{self.protocol} protocol")
 
-        return (self.path if self.table == "MAIN"
-                else f"{self.path}::{self.table}")
+        return self.canonical_path
 
     @staticmethod
     def from_url_storage_options(url, storage_options):
@@ -83,15 +89,16 @@ class DaskMSStore(metaclass=Multiton):
     def __getitem__(self, key):
         return self.map[key]
 
-    def exists(self, path=None):
-        if path:
-            fullpath = "".join((self.path, self.fs.sep, path))
-        else:
-            fullpath = self.path
-        return self.fs.exists(fullpath)
+    def _extend_path(self, path=""):
+        return (f"{self.full_path}{self.fs.sep}{path}"
+                if self.full_path
+                else self.full_path)
 
-    def ls(self, path=None):
-        path = path or self.path
+    def exists(self, path=""):
+        return self.fs.exists(self._extend_path(path))
+
+    def ls(self, path=""):
+        path = self._extend_path(path)
         return list(map(Path, self.fs.ls(path, detail=False)))
 
     @staticmethod
@@ -100,24 +107,25 @@ class DaskMSStore(metaclass=Multiton):
 
     def rglob(self, pattern, **kwargs):
         sep = self.fs.sep
-        fullpath = "".join(
-            (self.path, sep, self.table, sep, "**", sep, pattern)
-        )
-        paths = self.fs.glob(fullpath, **kwargs)
-        prefix = "".join((self.path, sep))
+        globpath = f"{self.full_path}{sep}**{sep}{pattern}"
+        paths = self.fs.glob(globpath, **kwargs)
+        prefix = f"{self.full_path}{sep}"
         return (self._remove_prefix(p, prefix) for p in paths)
 
     def open_file(self, key, *args, **kwargs):
-        fullpath = f"{self.path}{self.fs.sep}{key}"
-        return self.fs.open(fullpath, *args, **kwargs)
+        path = self._extend_path(key)
+        return self.fs.open(path, *args, **kwargs)
 
     def makedirs(self, key, *args, **kwargs):
-        fullpath = f"{self.path}{self.fs.sep}{key}"
-        return self.fs.makedirs(fullpath, *args, **kwargs)
+        path = self._extend_path(key)
+        return self.fs.makedirs(path, *args, **kwargs)
+
+    def rm(self, path="", recursive=False, maxdepth=None):
+        path = self._extend_path(path)
+        self.fs.rm(path, recursive=recursive, maxdepth=maxdepth)
 
     def subtable_store(self, subtable):
         if subtable == "MAIN":
             return self
 
-        fullpath = f"{self.url}{self.fs.sep}{subtable}"
-        return DaskMSStore(fullpath, **self.storage_options)
+        return DaskMSStore(f"{self.url}::{subtable}", **self.storage_options)
