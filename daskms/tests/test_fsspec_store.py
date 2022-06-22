@@ -23,6 +23,40 @@ def test_local_store(tmp_path):
                                 dtype=np.complex128)
 
 
+def test_store_main_access(tmp_path_factory):
+    store_dir = tmp_path_factory.mktemp("STORE0")
+
+    store = DaskMSStore(f"file://{store_dir}")
+    assert store.url == f"file://{store_dir}"
+    assert store.full_path == str(store_dir)
+    assert store.canonical_path == str(store_dir)
+    assert store.table == "MAIN"
+
+    with store.open("foo.txt", "w") as f:
+        f.write("How now brown cow")
+
+    assert store.exists("foo.txt")
+    assert (store_dir / "foo.txt").exists()
+
+
+def test_store_subtable_access(tmp_path_factory):
+    store_dir = tmp_path_factory.mktemp("STORE0")
+    table_dir = store_dir / "TABLE"
+    table_dir.mkdir()
+
+    store = DaskMSStore(f"file://{store_dir}::TABLE")
+    assert store.url == f"file://{store_dir}::TABLE"
+    assert store.full_path == f"{store_dir}{store.fs.sep}TABLE"
+    assert store.canonical_path == f"{store_dir}::TABLE"
+    assert store.table == "TABLE"
+
+    with store.open("foo.txt", "w") as f:
+        f.write("How now brown cow")
+
+    assert store.exists("foo.txt")
+    assert (table_dir / "foo.txt").exists()
+
+
 def test_minio_server(tmp_path, py_minio_client,
                       minio_admin, minio_alias,
                       minio_user_key, minio_url,
