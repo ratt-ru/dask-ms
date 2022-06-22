@@ -4,7 +4,6 @@ from argparse import ArgumentTypeError
 from functools import partial
 import logging
 from pathlib import Path
-import shutil
 
 from daskms.apps.application import Application
 from daskms.fsspec_store import DaskMSStore
