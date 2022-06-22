@@ -36,7 +36,6 @@ class DaskMSStore:
             self.full_path = path
             self.table = "MAIN"
 
-
     def type(self):
         """
         Returns
