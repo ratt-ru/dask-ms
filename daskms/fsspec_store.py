@@ -111,7 +111,7 @@ class DaskMSStore:
         prefix = f"{self.full_path}{sep}"
         return (self._remove_prefix(p, prefix) for p in paths)
 
-    def open_file(self, key, *args, **kwargs):
+    def open(self, key, *args, **kwargs):
         path = self._extend_path(key)
         return self.fs.open(path, *args, **kwargs)
 
