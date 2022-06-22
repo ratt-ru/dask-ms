@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Upgrade from Upgrade from deprecated ``visit_Num`` to ``visit_Constant`` (:pr:`217`)
 * Ensure url and table consistency in DaskMSStore (:pr:`216`)
 * Wait for minio to start with greater precision (:pr:`215`)
 * Chunk correctly when reading from parquet. (:pr:`210`)

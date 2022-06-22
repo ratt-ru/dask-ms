@@ -35,7 +35,7 @@ class ChunkTransformer(ast.NodeTransformer):
     def visit_Tuple(self, node):
         return tuple(self.visit(v) for v in node.elts)
 
-    def visit_Num(self, node):
+    def visit_Constant(self, node):
         return node.n
 
 
