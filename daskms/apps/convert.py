@@ -58,7 +58,7 @@ class TableFormat(abc.ABC):
 
     @staticmethod
     def from_path(path):
-        store = DaskMSStore(path)
+        store = path if isinstance(path, DaskMSStore) else DaskMSStore(path)
         typ = store.type()
 
         if typ == "casa":
@@ -288,7 +288,7 @@ def convert_table(args):
     log.info("Input: '%s' %s", in_fmt, str(args.input))
     log.info("Output: '%s' %s", out_fmt, str(args.output))
 
-    writes = [writer(datasets, str(args.output))]
+    writes = [writer(datasets, args.output)]
 
     # Now do the subtables
     for table in list(in_fmt.subtables):
@@ -296,44 +296,39 @@ def convert_table(args):
             log.warning(f"Ignoring {table}")
             continue
 
-        in_path = args.input.parent / "::".join((args.input.name, table))
-        in_fmt = TableFormat.from_path(in_path)
-        out_path = args.output.parent / "::".join((args.output.name, table))
+        in_store = args.input.subtable_store(table)
+        in_fmt = TableFormat.from_path(in_store)
+        out_store = args.output.subtable_store(table)
         out_fmt = TableFormat.from_type(args.format)
 
         reader = in_fmt.reader()
         writer = out_fmt.writer()
 
         if isinstance(in_fmt, CasaFormat) and table in NONUNIFORM_SUBTABLES:
-            datasets = reader(in_path, group_cols="__row__")
+            datasets = reader(in_store, group_cols="__row__")
         else:
-            datasets = reader(in_path)
+            datasets = reader(in_store)
 
         if isinstance(in_fmt, CasaFormat):
             datasets = [ds.drop_vars("ROWID", errors="ignore")
                         for ds in datasets]
 
-        writes.append(writer(datasets, str(out_path)))
+        writes.append(writer(datasets, out_store))
 
     return writes
 
 
 def _check_input_path(input: str):
-    input_path = Path(input)
+    input_path = DaskMSStore(input)
 
-    parts = input_path.name.split("::", 1)
-
-    if len(parts) == 1:
-        check_path = input_path
-    elif len(parts) == 2:
-        check_path = input_path.parent / parts[0]
-    else:
-        raise RuntimeError("len(parts) not in (1, 2)")
-
-    if not check_path.exists():
+    if not input_path.exists():
         raise ArgumentTypeError(f"{input} is an invalid path.")
 
     return input_path
+
+
+def _check_output_path(output: str):
+    return DaskMSStore(output)
 
 
 def parse_chunks(chunks: str):
@@ -357,7 +352,7 @@ class Convert(Application):
     @classmethod
     def setup_parser(cls, parser):
         parser.add_argument("input", type=_check_input_path)
-        parser.add_argument("-o", "--output", type=Path)
+        parser.add_argument("-o", "--output", type=_check_output_path)
         parser.add_argument("-g", "--group-columns",
                             type=Convert.col_converter,
                             default="",
@@ -395,7 +390,7 @@ class Convert(Application):
 
         if self.args.output.exists():
             if self.args.force:
-                shutil.rmtree(self.args.output)
+                self.args.output.rm(recursive=True)
             else:
                 raise ValueError(f"{self.args.output} exists. "
                                  f"Use --force to overwrite.")
