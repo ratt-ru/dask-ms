@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Ensure url and table consistency in DaskMSStore (:pr:`216`)
 * Wait for minio to start with greater precision (:pr:`215`)
 * Chunk correctly when reading from parquet. (:pr:`210`)
 * Fix minor bugs in zarr and conversion functionality. (:pr:`208`)
