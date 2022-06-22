@@ -91,7 +91,7 @@ class ParquetFragment(metaclass=Multiton):
 
         table = pa.table(table_data, schema=self.schema.to_arrow_schema())
         parquet_filename = self.key / f"{chunk.item()}.parquet"
-        sf = self.store.open_file(parquet_filename, "wb")
+        sf = self.store.open(parquet_filename, "wb")
         pq.write_table(table, sf)
 
         return np.array([True], bool)

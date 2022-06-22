@@ -76,7 +76,7 @@ class ParquetFileProxy(metaclass=Multiton):
             except AttributeError:
                 pass
 
-            sf = self.store.open_file(self.key, "rb")
+            sf = self.store.open(self.key, "rb")
             self._file = file_ = pq.ParquetFile(sf)
             return file_
 
