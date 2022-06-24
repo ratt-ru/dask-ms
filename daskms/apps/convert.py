@@ -291,7 +291,7 @@ def convert_table(args):
 
     # Now do the subtables
     for table in list(in_fmt.subtables):
-        if table == "SORTED_TABLE":
+        if table in {"SORTED_TABLE", "SOURCE"}:
             log.warning(f"Ignoring {table}")
             continue
 
