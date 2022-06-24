@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Ignore SOURCE subtable in dask-ms convert (:pr:`221`)
 * Fix cached_array implementation. (:pr:`220`)
 * Use DaskMSStore throughout dask-ms convert (:pr:`218`)
 * Upgrade from deprecated ``visit_Num`` to ``visit_Constant`` (:pr:`217`)
