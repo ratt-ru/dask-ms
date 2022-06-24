@@ -1,113 +1,44 @@
 # -*- coding: utf-8 -*-
 
 from threading import Lock
-import uuid
-from weakref import WeakValueDictionary, WeakKeyDictionary
+from itertools import product
 
+import dask
 import dask.array as da
-from dask.core import flatten, _execute_task
+from dask.core import flatten, get
 from dask.highlevelgraph import HighLevelGraph
 from dask.optimization import cull, inline
+import numpy as np
 
 
-_key_cache = WeakValueDictionary()
-_key_cache_lock = Lock()
 
 
-class KeyMetaClass(type):
-    """
-    Ensures that Key identities are the same,
-    given the same constructor arguments
-    """
-    def __call__(cls, key):
-        try:
-            return _key_cache[key]
-        except KeyError:
-            pass
-
-        with _key_cache_lock:
-            try:
-                return _key_cache[key]
-            except KeyError:
-                _key_cache[key] = instance = type.__call__(cls, key)
-                return instance
-
-
-class Key(metaclass=KeyMetaClass):
-    """
-    Suitable for storing a tuple
-    (or other dask key type) in a WeakKeyDictionary.
-    Uniques of key identity guaranteed by KeyMetaClass
-    """
-    __slots__ = ("key", "__weakref__")
-
-    def __init__(self, key):
-        self.key = key
-
-    def __hash__(self):
-        return hash(self.key)
-
-    def __repr__(self):
-        return f"Key{self.key}"
-
-    def __reduce__(self):
-        return (Key, (self.key,))
-
-    __str__ = __repr__
-
-
-def cache_entry(cache, key, task):
-    with cache.lock:
-        try:
-            return cache.cache[key]
-        except KeyError:
-            cache.cache[key] = value = _execute_task(task, {})
-            return value
-
-
-_array_cache_cache = WeakValueDictionary()
-_array_cache_lock = Lock()
-
-
-class ArrayCacheMetaClass(type):
-    """
-    Ensures that Array Cache identities are the same,
-    given the same constructor arguments
-    """
-    def __call__(cls, token):
-        key = (cls, token)
-
-        try:
-            return _array_cache_cache[key]
-        except KeyError:
-            pass
-
-        with _array_cache_lock:
-            try:
-                return _array_cache_cache[key]
-            except KeyError:
-                instance = type.__call__(cls, token)
-                _array_cache_cache[key] = instance
-                return instance
-
-
-class ArrayCache(metaclass=ArrayCacheMetaClass):
-    """
-    Thread-safe array data cache. token makes this picklable.
-
-    Cached on a WeakKeyDictionary with ``Key`` objects.
-    """
-
-    def __init__(self, token):
-        self.token = token
-        self.cache = WeakKeyDictionary()
+class GraphCache:
+    def __init__(self, collection):
+        self.collection = collection
         self.lock = Lock()
+        self.cache = {}
 
     def __reduce__(self):
-        return (ArrayCache, (self.token,))
+        return (GraphCache, (self.collection,))
 
-    def __repr__(self):
-        return f"ArrayCache[{self.token}]"
+    def __call__(self, block_id):
+        try:
+            dsk = self.dsk
+        except AttributeError:
+            with self.lock:
+                try:
+                    dsk = self.dsk
+                except AttributeError:
+                    self.dsk = dsk = dict(self.collection.__dask_graph__())
+
+        key = (self.collection.name,) + block_id
+
+        with self.lock:
+            try:
+                return self.cache[key]
+            except KeyError:
+                return get(dsk, key, self.cache)
 
 
 def cached_array(array, token=None):
@@ -123,33 +54,27 @@ def cached_array(array, token=None):
     ----------
     array : :class:`dask.array.Array`
         dask array to cache.
-    token : optional, str
-        A unique token for identifying the internal cache.
-        If None, it will be automatically generated.
     """
-    dsk = dict(array.__dask_graph__())
-    keys = set(flatten(array.__dask_keys__()))
+    assert isinstance(array, da.Array)
+    name = f"block-id-{array.name}"
+    dsk = {(name,) + block_id: block_id
+           for block_id in product(*(range(len(c)) for c in array.chunks))}
+    assert all(all(isinstance(e, int) for e in bid) for bid in dsk.values())
+    block_id_array = da.Array(dsk, name,
+                              chunks=tuple((1,)*len(c) for c in array.chunks),
+                              dtype=np.object_)
 
-    if token is None:
-        token = uuid.uuid4().hex
+    assert array.ndim == block_id_array.ndim
+    idx = list(range(array.ndim))
+    adjust_chunks = dict(zip(idx, array.chunks))
+    cache = GraphCache(array)
+    token = f"GraphCache-{dask.base.tokenize(cache, block_id_array)}"
 
-    # Inline + cull everything except the current array
-    inline_keys = set(dsk.keys() - keys)
-    dsk2 = inline(dsk, inline_keys, inline_constants=True)
-    dsk3, _ = cull(dsk2, keys)
-
-    # Create a cache used to store array values
-    cache = ArrayCache(token)
-
-    assert len(dsk3) == len(keys)
-
-    for k in keys:
-        dsk3[k] = (cache_entry, cache, Key(k), dsk3.pop(k))
-
-    graph = HighLevelGraph.from_collections(array.name, dsk3, [])
-
-    return da.Array(graph, array.name, array.chunks, array.dtype)
-
+    return da.blockwise(cache, idx,
+                        block_id_array, idx,
+                        adjust_chunks=adjust_chunks,
+                        meta=array._meta,
+                        name=token)
 
 def inlined_array(a, inline_arrays=None):
     """ Flatten underlying graph """
