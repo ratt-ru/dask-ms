@@ -56,7 +56,7 @@ class Key(metaclass=KeyMetaClass):
     __str__ = __repr__
 
 
-def cache_entry(cache, key, task):
+def cache_entry(cache, key, *task):
     with cache.lock:
         try:
             return cache.cache[key]
@@ -144,7 +144,7 @@ def cached_array(array, token=None):
     assert len(dsk3) == len(keys)
 
     for k in keys:
-        dsk3[k] = (cache_entry, cache, Key(k), dsk3.pop(k))
+        dsk3[k] = (cache_entry, cache, Key(k), *dsk3.pop(k))
 
     graph = HighLevelGraph.from_collections(array.name, dsk3, [])
 
