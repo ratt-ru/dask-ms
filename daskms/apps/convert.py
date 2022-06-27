@@ -5,6 +5,8 @@ from functools import partial
 import logging
 from pathlib import Path
 
+import dask.array as da
+
 from daskms.apps.application import Application
 from daskms.fsspec_store import DaskMSStore
 
@@ -88,6 +90,8 @@ class TableFormat(abc.ABC):
 
     @staticmethod
     def from_type(typ):
+        if typ == "ms":
+            return CasaFormat("2.0", [], "measurementset")
         if typ == "casa":
             return CasaFormat("<unspecified>", [], "plain")
         elif typ == "zarr":
@@ -267,56 +271,6 @@ class ParquetFormat(BaseTableFormat):
 NONUNIFORM_SUBTABLES = ["SPECTRAL_WINDOW", "POLARIZATION", "FEED", "SOURCE"]
 
 
-def convert_table(args):
-    in_fmt = TableFormat.from_path(args.input)
-    out_fmt = TableFormat.from_type(args.format)
-
-    reader = in_fmt.reader(
-        group_columns=args.group_columns,
-        index_columns=args.index_columns
-    )
-    writer = out_fmt.writer()
-
-    datasets = reader(args.input, chunks=args.chunks)
-
-    if isinstance(in_fmt, CasaFormat):
-        # Drop any ROWID columns
-        datasets = [ds.drop_vars("ROWID", errors="ignore")
-                    for ds in datasets]
-
-    log.info("Input: '%s' %s", in_fmt, str(args.input))
-    log.info("Output: '%s' %s", out_fmt, str(args.output))
-
-    writes = [writer(datasets, args.output)]
-
-    # Now do the subtables
-    for table in list(in_fmt.subtables):
-        if table in {"SORTED_TABLE", "SOURCE"}:
-            log.warning(f"Ignoring {table}")
-            continue
-
-        in_store = args.input.subtable_store(table)
-        in_fmt = TableFormat.from_path(in_store)
-        out_store = args.output.subtable_store(table)
-        out_fmt = TableFormat.from_type(args.format)
-
-        reader = in_fmt.reader()
-        writer = out_fmt.writer()
-
-        if isinstance(in_fmt, CasaFormat) and table in NONUNIFORM_SUBTABLES:
-            datasets = reader(in_store, group_cols="__row__")
-        else:
-            datasets = reader(in_store)
-
-        if isinstance(in_fmt, CasaFormat):
-            datasets = [ds.drop_vars("ROWID", errors="ignore")
-                        for ds in datasets]
-
-        writes.append(writer(datasets, out_store))
-
-    return writes
-
-
 def _check_input_path(input: str):
     input_path = DaskMSStore(input)
 
@@ -371,7 +325,7 @@ class Convert(Application):
                                  "This is only supported when converting "
                                  "from casa format.")
         parser.add_argument("-f", "--format",
-                            choices=["casa", "zarr", "parquet"],
+                            choices=["ms", "casa", "zarr", "parquet"],
                             default="zarr",
                             help="Output format")
         parser.add_argument("--force",
@@ -394,6 +348,76 @@ class Convert(Application):
                 raise ValueError(f"{self.args.output} exists. "
                                  f"Use --force to overwrite.")
 
-        writes = convert_table(self.args)
+        writes = self.convert_table(self.args)
 
         dask.compute(writes)
+
+    def _convert_casa_datasets(self, datasets, args):
+        new_datasets = []
+        group_columns = args.group_columns or []
+
+        for ds in datasets:
+            # Drop any ROWID columns
+            new_ds = ds.drop_vars("ROWID", errors="ignore")
+
+            # Remove grouping attribute and recreate grouping columns
+            new_group_vars = {}
+            row_chunks = new_ds.chunks["row"]
+            row_dims = new_ds.dims["row"]
+
+            for column in group_columns:
+                value = new_ds.attrs.pop(column)
+                group_column = da.full(row_dims, value, chunks=row_chunks)
+                new_group_vars[column] = (("row",), group_column)
+
+            new_datasets.append(new_ds.assign(**new_group_vars))
+
+        return new_datasets
+
+    def convert_table(self, args):
+        in_fmt = TableFormat.from_path(args.input)
+        out_fmt = TableFormat.from_type(args.format)
+
+        reader = in_fmt.reader(
+            group_columns=args.group_columns,
+            index_columns=args.index_columns
+        )
+        writer = out_fmt.writer()
+
+        datasets = reader(args.input, chunks=args.chunks)
+
+        if isinstance(in_fmt, CasaFormat):
+            datasets = self._convert_casa_datasets(datasets, args)
+
+        log.info("Input: '%s' %s", in_fmt, str(args.input))
+        log.info("Output: '%s' %s", out_fmt, str(args.output))
+
+        writes = [writer(datasets, args.output)]
+
+        # Now do the subtables
+        for table in list(in_fmt.subtables):
+            if table in {"SORTED_TABLE", "SOURCE"}:
+                log.warning(f"Ignoring {table}")
+                continue
+
+            in_store = args.input.subtable_store(table)
+            in_fmt = TableFormat.from_path(in_store)
+            out_store = args.output.subtable_store(table)
+            out_fmt = TableFormat.from_type(args.format)
+
+            reader = in_fmt.reader()
+            writer = out_fmt.writer()
+
+            if (isinstance(in_fmt, CasaFormat) and
+                    table in NONUNIFORM_SUBTABLES):
+                datasets = reader(in_store, group_cols="__row__")
+            else:
+                datasets = reader(in_store)
+
+            if isinstance(in_fmt, CasaFormat):
+                datasets = [ds.drop_vars("ROWID", errors="ignore")
+                            for ds in datasets]
+
+            writes.append(writer(datasets, out_store))
+
+        return writes

@@ -265,7 +265,7 @@ else:
         @property
         def attrs(self):
             """ Dataset attributes """
-            return Frozen(self._attrs)
+            return self._attrs
 
         @property
         def dims(self):
@@ -331,9 +331,7 @@ else:
                 those in \*\*kwargs.
             """
             data_vars = self._data_vars.copy()
-
-            for k, v in kwargs.items():
-                data_vars[k] = v
+            data_vars.update(**kwargs)
 
             return Dataset(data_vars,
                            attrs=self._attrs.copy(),
