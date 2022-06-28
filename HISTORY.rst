@@ -2,9 +2,12 @@
 History
 =======
 
+X.Y.Z (YYYY-MM-DD)
+------------------
+
 0.2.9 (2022-06-28)
 ------------------
-* Recreate Grouping Columns when writing to CASA format in dask-ms convert (:pr:`222`)
+* Recreate Grouping Columns when writing to CASA format in ``dask-ms convert`` (:pr:`222`)
 * Ignore SOURCE subtable in dask-ms convert (:pr:`221`)
 * Fix cached_array implementation. (:pr:`220`)
 * Use DaskMSStore throughout dask-ms convert (:pr:`218`)
@@ -24,11 +27,11 @@ History
 0.2.8 (2022-04-06)
 ------------------
 * Fix roundtripping of boolean tensor arrays. (:pr:`194`)
-* Ignore unsupported kwargs in xds_from_storage_* functions. (:pr:`192`)
+* Ignore unsupported kwargs in ``xds_from_storage_*`` functions. (:pr:`192`)
 * Improve handling of subtables with variably sized rows in daskms-convert. (:pr:`191`)
-* Ensure that `xds_from_zarr` sorts groups as integers and not strings (:pr:`188`)
+* Ensure that ``xds_from_zarr`` sorts groups as integers and not strings (:pr:`188`)
 * Ensure Natural Ordering for parquet files (:pr:`183)
-* Fix xds_from_zarr and xds_from_parquet chunking behaviour (:pr:`182`)
+* Fix ``xds_from_zarr`` and ``xds_from_parquet`` chunking behaviour (:pr:`182`)
 * Add LazyProxy and LazyProxyMultiton patterns to dask-ms (:pr:`177`)
 * Support cloud native storage formats via fsspec (:pr:`174`)
 
@@ -36,7 +39,7 @@ History
 0.2.7 (2022-01-13)
 ------------------
 * Fix inclusion of MANIFEST.in files (:pr:`173`)
-* Add --group-columns to `dask-ms convert` for CASA Formats (:pr:`169`)
+* Add --group-columns to ``dask-ms convert`` for CASA Formats (:pr:`169`)
 * Add ComplexArray -> numpy conversion (:pr:`168`)
 * Ignore row dimension when fixing column shapes (:pr:`165`)
 * Bump pip from 9.0.1 to 19.2 (:pr:`164`)
@@ -46,7 +49,7 @@ History
 * Remove default time ordering from xds_from_ms (:pr:`156`)
 * Make zarr writes completely lazy (:pr:`157`)
 * Copy partitioning information when writing (:pr:`155`)
-* Add a `dask-ms convert` script for converting between CASA, Zarr and Parquet formats (:pr:`145`)
+* Add a ``dask-ms convert`` script for converting between CASA, Zarr and Parquet formats (:pr:`145`)
 * Convert code-base to f-strings with flynt (:pr:`144`)
 * Consolidate Dataset Types into daskms.dataset (:pr:`143`)
 * Correct Dataset persistence issues (:pr:`140`)
