@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Add ``__repr__`` and ``__str__`` for ``DaskMSStore`` (:pr:`224`)
 
 0.2.9 (2022-06-28)
 ------------------
