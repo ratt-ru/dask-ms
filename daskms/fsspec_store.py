@@ -128,3 +128,8 @@ class DaskMSStore:
             return self
 
         return DaskMSStore(f"{self.url}::{subtable}", **self.storage_options)
+
+    def __repr__(self):
+        return f"DaskMSStore({self.url})"
+
+    __str__ = __repr__
