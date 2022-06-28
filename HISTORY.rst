@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Recreate Grouping Columns when writing to CASA format in dask-ms convert (:pr:`222`)
 * Ignore SOURCE subtable in dask-ms convert (:pr:`221`)
 * Fix cached_array implementation. (:pr:`220`)
 * Use DaskMSStore throughout dask-ms convert (:pr:`218`)
