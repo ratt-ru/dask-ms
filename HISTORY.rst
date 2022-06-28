@@ -2,7 +2,7 @@
 History
 =======
 
-X.Y.Z (YYYY-MM-DD)
+0.2.9 (2022-06-28)
 ------------------
 * Recreate Grouping Columns when writing to CASA format in dask-ms convert (:pr:`222`)
 * Ignore SOURCE subtable in dask-ms convert (:pr:`221`)
