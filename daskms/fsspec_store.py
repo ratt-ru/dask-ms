@@ -132,4 +132,5 @@ class DaskMSStore:
     def __repr__(self):
         return f"DaskMSStore({self.url})"
 
-    __str__ = __repr__
+    def __str__(self):
+        return self.url
