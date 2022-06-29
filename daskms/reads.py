@@ -17,6 +17,7 @@ from daskms.optimisation import inlined_array
 from daskms.dataset import Dataset
 from daskms.table_executor import executor_key
 from daskms.table import table_exists
+from daskms.parallel_table import ParallelTable
 from daskms.table_proxy import TableProxy, READLOCK
 from daskms.table_schemas import lookup_table_schema
 from daskms.utils import table_path_split
@@ -305,7 +306,7 @@ class DatasetFactory(object):
             raise ValueError(f"Unhandled kwargs: {kwargs}")
 
     def _table_proxy_factory(self):
-        return TableProxy(pt.table, self.table_path, ack=False,
+        return TableProxy(ParallelTable, self.table_path, ack=False,
                           readonly=True, lockoptions='user',
                           __executor_key__=executor_key(self.canonical_name))
 

@@ -38,7 +38,7 @@ class ExecutorMetaClass(type):
 class Executor(object, metaclass=ExecutorMetaClass):
     def __init__(self, key=STANDARD_EXECUTOR):
         # Initialise a single thread
-        self.impl = impl = cf.ThreadPoolExecutor(1)
+        self.impl = impl = DummyThreadPoolExecutor(1)
         self.key = key
 
         # Register a finaliser shutting down the
@@ -52,6 +52,30 @@ class Executor(object, metaclass=ExecutorMetaClass):
         return f"Executor({self.key})"
 
     __str__ = __repr__
+
+
+class DummyThreadPoolExecutor(object):
+
+    def __init__(self, nthread):
+        pass
+
+    def submit(self, fn, *args, **kwargs):
+
+        return DummyFuture(fn(*args, **kwargs))
+
+    def shutdown(self, wait=True):
+        pass
+
+
+class DummyFuture(object):
+
+    def __init__(self, value):
+
+        self.value = value
+
+    def result(self):
+
+        return self.value
 
 
 def executor_key(table_name):
