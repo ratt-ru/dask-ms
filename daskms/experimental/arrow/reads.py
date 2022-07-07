@@ -207,8 +207,7 @@ def xds_from_parquet(store, columns=None, chunks=None, **kwargs):
         warnings.warn(
             f"The following unsupported kwargs were ignored in "
             f"xds_from_parquet: {kwargs}",
-            UserWarning,
-        )
+            UserWarning)
 
     if isinstance(store, DaskMSStore):
         pass

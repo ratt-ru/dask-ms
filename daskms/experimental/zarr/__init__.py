@@ -245,6 +245,13 @@ def xds_to_zarr(xds, store, columns=None, rechunk=False, **kwargs):
         raise TypeError(f"store '{store}' must be "
                         f"Path, str or DaskMSStore")
 
+    # If any kwargs are added, they should be popped prior to this check.
+    if len(kwargs) > 0:
+        warnings.warn(
+            f"The following unsupported kwargs were ignored in "
+            f"xds_to_zarr: {kwargs}",
+            UserWarning)
+
     columns = promote_columns(columns)
 
     if isinstance(xds, Dataset):
@@ -337,8 +344,7 @@ def xds_from_zarr(store, columns=None, chunks=None, **kwargs):
         warnings.warn(
             f"The following unsupported kwargs were ignored in "
             f"xds_from_zarr: {kwargs}",
-            UserWarning,
-        )
+            UserWarning)
 
     columns = promote_columns(columns)
 

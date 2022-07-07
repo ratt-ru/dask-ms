@@ -1,6 +1,7 @@
 import itertools
 from pathlib import Path
 from threading import Lock
+import warnings
 
 import dask.array as da
 import numpy as np
@@ -107,6 +108,13 @@ def xds_to_parquet(xds, store, columns=None, **kwargs):
     else:
         raise TypeError(f"store '{store}' must be "
                         f"Path, str or DaskMSStore")
+
+    # If any kwargs are added, they should be popped prior to this check.
+    if len(kwargs) > 0:
+        warnings.warn(
+            f"The following unsupported kwargs were ignored in "
+            f"xds_to_parquet: {kwargs}",
+            UserWarning)
 
     columns = promote_columns(columns)
 
