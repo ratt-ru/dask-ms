@@ -1,31 +1,12 @@
 """Keep this file in sync with the codex-africanus version"""
 
-from collections import OrderedDict
 import inspect
 from inspect import getattr_static
 from threading import Lock
 from warnings import warn
 import weakref
 
-from numpy import ndarray
-
-
-def freeze(arg):
-    """ Recursively generates a hashable object from arg """
-    if isinstance(arg, set):
-        return tuple(map(freeze, sorted(arg)))
-    elif isinstance(arg, (tuple, list)):
-        return tuple(map(freeze, arg))
-    elif isinstance(arg, (dict, OrderedDict)):
-        return frozenset((freeze(k), freeze(v)) for k, v
-                         in sorted(arg.items()))
-    elif isinstance(arg, ndarray):
-        if arg.nbytes > 10:
-            warn(f"freezing ndarray of size {arg.nbytes} "
-                 f" is probably inefficient")
-        return freeze(arg.tolist())
-    else:
-        return arg
+from daskms.utils import freeze
 
 
 class Multiton(type):

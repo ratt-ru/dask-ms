@@ -2,6 +2,8 @@ from pathlib import Path, PurePath
 
 import fsspec
 
+from daskms.utils import freeze
+
 
 class DaskMSStore:
     def __init__(self, url, **storage_options):
@@ -85,6 +87,16 @@ class DaskMSStore:
         return (isinstance(other, DaskMSStore) and
                 self.url == other.url and
                 self.storage_options == other.storage_options)
+
+    def __hash__(self):
+        return hash(
+            freeze(
+                (
+                    self.url,
+                    self.storage_options,
+                )
+            )
+        )
 
     def __reduce__(self):
         return (DaskMSStore.from_url_storage_options,

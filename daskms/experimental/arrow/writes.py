@@ -10,7 +10,6 @@ from daskms.dataset import Dataset
 from daskms.optimisation import inlined_array
 from daskms.constants import DASKMS_PARTITION_KEY
 from daskms.fsspec_store import DaskMSStore
-from daskms.patterns import Multiton
 from daskms.experimental.arrow.arrow_schema import ArrowSchema
 from daskms.experimental.arrow.extension_types import TensorArray
 from daskms.experimental.arrow.require_arrow import requires_arrow
@@ -32,7 +31,7 @@ else:
     pyarrow_import_error = None
 
 
-class ParquetFragment(metaclass=Multiton):
+class ParquetFragment:
     def __init__(self, store, key, schema, dataset_id):
         partition = schema.attrs.get(DASKMS_PARTITION_KEY, False)
 
