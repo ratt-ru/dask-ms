@@ -211,7 +211,7 @@ def _gen_writes(variables, chunks, factory, indirect_dims=False):
 
 @requires("pip install dask-ms[zarr] for zarr support",
           zarr_import_error)
-def xds_to_zarr(xds, store, columns=None, rechunk=False):
+def xds_to_zarr(xds, store, columns=None, rechunk=False, **kwargs):
     """
     Stores a dataset of list of datasets defined by `xds` in
     file location `store`.
@@ -229,6 +229,7 @@ def xds_to_zarr(xds, store, columns=None, rechunk=False):
     rechunk : bool
         Controls whether dask arrays should be automatically rechunked to be
         consistent with existing on-disk zarr arrays while writing to disk.
+    **kwargs : optional
 
     Returns
     -------
@@ -237,10 +238,9 @@ def xds_to_zarr(xds, store, columns=None, rechunk=False):
     """
     if isinstance(store, DaskMSStore):
         pass
-    elif isinstance(store, Path):
-        store = DaskMSStore(f"file://{store}")
-    elif isinstance(store, str):
-        store = DaskMSStore(f"file://{store}")
+    elif isinstance(store, (Path, str)):
+        storage_opts = kwargs.pop("storage_options", {})
+        store = DaskMSStore(f"file://{store}", **storage_opts)
     else:
         raise TypeError(f"store '{store}' must be "
                         f"Path, str or DaskMSStore")
@@ -323,6 +323,15 @@ def xds_from_zarr(store, columns=None, chunks=None, **kwargs):
         Dataset(s) representing write operations
     """
 
+    if isinstance(store, DaskMSStore):
+        pass
+    elif isinstance(store, (Path, str)):
+        storage_opts = kwargs.pop("storage_options", {})
+        store = DaskMSStore(f"file://{store}", **storage_opts)
+    else:
+        raise TypeError(f"store '{store}' must be "
+                        f"Path, str or DaskMSStore")
+
     # If any kwargs are added, they should be popped prior to this check.
     if len(kwargs) > 0:
         warnings.warn(
@@ -331,15 +340,6 @@ def xds_from_zarr(store, columns=None, chunks=None, **kwargs):
             UserWarning,
         )
 
-    if isinstance(store, DaskMSStore):
-        pass
-    elif isinstance(store, Path):
-        store = DaskMSStore(f"file://{store}")
-    elif isinstance(store, str):
-        store = DaskMSStore(f"file://{store}")
-    else:
-        raise TypeError(f"store '{store}' must be "
-                        f"Path, str or DaskMSStore")
 
     columns = promote_columns(columns)
 

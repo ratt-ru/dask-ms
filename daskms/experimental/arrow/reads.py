@@ -212,10 +212,9 @@ def xds_from_parquet(store, columns=None, chunks=None, **kwargs):
 
     if isinstance(store, DaskMSStore):
         pass
-    elif isinstance(store, Path):
-        store = DaskMSStore(f"file://{store}")
-    elif isinstance(store, str):
-        store = DaskMSStore(f"file://{store}")
+    elif isinstance(store, (str, Path)):
+        storage_opts = kwargs.pop("storage_options", {})
+        store = DaskMSStore(f"file://{store}", **storage_opts)
     else:
         raise TypeError(f"store '{store}' must be "
                         f"Path, str or DaskMSStore")

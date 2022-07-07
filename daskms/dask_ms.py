@@ -271,7 +271,9 @@ def xds_from_table(table_name, columns=None,
     if isinstance(table_name, DaskMSStore):
         table_name = table_name.casa_path()
     else:
-        table_name = DaskMSStore(table_name).casa_path()
+        storage_opts = kwargs.pop("storage_options", {})
+        store = DaskMSStore(table_name, **storage_opts)
+        table_name = store.casa_path()
 
     columns = promote_columns(columns, [])
     index_cols = promote_columns(index_cols, [])
@@ -324,7 +326,8 @@ def xds_from_ms(ms, columns=None, index_cols=None, group_cols=None, **kwargs):
 
 def xds_from_storage_table(store, **kwargs):
     if not isinstance(store, DaskMSStore):
-        store = DaskMSStore(store)
+        storage_opts = kwargs.pop("storage_options", {})
+        store = DaskMSStore(store, **storage_opts)
 
     typ = store.type()
 
@@ -342,7 +345,8 @@ def xds_from_storage_table(store, **kwargs):
 
 def xds_from_storage_ms(store, **kwargs):
     if not isinstance(store, DaskMSStore):
-        store = DaskMSStore(store)
+        storage_opts = kwargs.pop("storage_options", {})
+        store = DaskMSStore(store, **storage_opts)
 
     typ = store.type()
 
@@ -360,7 +364,8 @@ def xds_from_storage_ms(store, **kwargs):
 
 def xds_to_storage_table(xds, store, **kwargs):
     if not isinstance(store, DaskMSStore):
-        store = DaskMSStore(store)
+        storage_opts = kwargs.pop("storage_options", {})
+        store = DaskMSStore(store, **storage_opts)
 
     typ = store.type()
 
