@@ -1,3 +1,5 @@
+import pickle
+
 import numpy as np
 import pytest
 
@@ -81,3 +83,14 @@ def test_minio_server(tmp_path, py_minio_client,
 
     with s3.open(f"{s3_bucket_name}/stuff.txt", "rb") as f:
         assert f.read() == payload.encode("utf-8")
+
+
+def test_store_pickle():
+    store = DaskMSStore("s3://binface", key="foo", secret="bar",
+                        client_kwargs={
+                           "endpoint_url": "http://127.0.0.1:9000",
+                           "region_name": "af-cpt"
+                        })
+
+    pstore = pickle.loads(pickle.dumps(store))
+    assert pstore == store

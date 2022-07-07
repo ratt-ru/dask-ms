@@ -81,6 +81,11 @@ class DaskMSStore:
     def from_url_storage_options(url, storage_options):
         return DaskMSStore(url, **storage_options)
 
+    def __eq__(self, other):
+        return (isinstance(other, DaskMSStore) and
+                self.url == other.url and
+                self.storage_options == other.storage_options)
+
     def __reduce__(self):
         return (DaskMSStore.from_url_storage_options,
                 (self.url, self.storage_options))

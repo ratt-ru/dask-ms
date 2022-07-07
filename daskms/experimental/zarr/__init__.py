@@ -240,7 +240,7 @@ def xds_to_zarr(xds, store, columns=None, rechunk=False, **kwargs):
         pass
     elif isinstance(store, (Path, str)):
         storage_opts = kwargs.pop("storage_options", {})
-        store = DaskMSStore(f"file://{store}", **storage_opts)
+        store = DaskMSStore(f"{store}", **storage_opts)
     else:
         raise TypeError(f"store '{store}' must be "
                         f"Path, str or DaskMSStore")
@@ -334,7 +334,7 @@ def xds_from_zarr(store, columns=None, chunks=None, **kwargs):
         pass
     elif isinstance(store, (Path, str)):
         storage_opts = kwargs.pop("storage_options", {})
-        store = DaskMSStore(f"file://{store}", **storage_opts)
+        store = DaskMSStore(f"{store}", **storage_opts)
     else:
         raise TypeError(f"store '{store}' must be "
                         f"Path, str or DaskMSStore")
