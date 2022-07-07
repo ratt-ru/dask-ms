@@ -340,7 +340,6 @@ def xds_from_zarr(store, columns=None, chunks=None, **kwargs):
             UserWarning,
         )
 
-
     columns = promote_columns(columns)
 
     if chunks is None:

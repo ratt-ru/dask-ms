@@ -98,7 +98,7 @@ class ParquetFragment(metaclass=Multiton):
 
 
 @requires_arrow(pyarrow_import_error)
-def xds_to_parquet(xds, store, columns=None):
+def xds_to_parquet(xds, store, columns=None, **kwargs):
     if isinstance(store, DaskMSStore):
         pass
     elif isinstance(store, (str, Path)):
