@@ -5,6 +5,11 @@ import pytest
 
 from daskms.fsspec_store import DaskMSStore
 
+try:
+    import s3fs
+except ImportError:
+    s3fs = None
+
 
 def test_local_store(tmp_path):
     zarr = pytest.importorskip("zarr")
@@ -85,6 +90,7 @@ def test_minio_server(tmp_path, py_minio_client,
         assert f.read() == payload.encode("utf-8")
 
 
+@pytest.mark.skipif(s3fs is None, reason="s3fs not installed")
 def test_store_pickle():
     store = DaskMSStore("s3://binface", key="foo", secret="bar",
                         client_kwargs={
