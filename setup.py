@@ -18,6 +18,7 @@ extras_require["complete"] = set(
 )
 
 install_requires = [
+    "appdirs",
     "dask[array] >= 2.2.0",
 ]
 

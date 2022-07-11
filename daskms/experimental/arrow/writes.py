@@ -1,6 +1,7 @@
 import itertools
 from pathlib import Path
 from threading import Lock
+import warnings
 
 import dask.array as da
 import numpy as np
@@ -9,7 +10,6 @@ from daskms.dataset import Dataset
 from daskms.optimisation import inlined_array
 from daskms.constants import DASKMS_PARTITION_KEY
 from daskms.fsspec_store import DaskMSStore
-from daskms.patterns import Multiton
 from daskms.experimental.arrow.arrow_schema import ArrowSchema
 from daskms.experimental.arrow.extension_types import TensorArray
 from daskms.experimental.arrow.require_arrow import requires_arrow
@@ -31,7 +31,7 @@ else:
     pyarrow_import_error = None
 
 
-class ParquetFragment(metaclass=Multiton):
+class ParquetFragment:
     def __init__(self, store, key, schema, dataset_id):
         partition = schema.attrs.get(DASKMS_PARTITION_KEY, False)
 
@@ -98,16 +98,21 @@ class ParquetFragment(metaclass=Multiton):
 
 
 @requires_arrow(pyarrow_import_error)
-def xds_to_parquet(xds, store, columns=None):
+def xds_to_parquet(xds, store, columns=None, **kwargs):
     if isinstance(store, DaskMSStore):
         pass
-    elif isinstance(store, Path):
-        store = DaskMSStore(f"file://{store}")
-    elif isinstance(store, str):
-        store = DaskMSStore(f"file://{store}")
+    elif isinstance(store, (str, Path)):
+        store = DaskMSStore.from_url_and_kw(f"{store}", kwargs)
     else:
         raise TypeError(f"store '{store}' must be "
                         f"Path, str or DaskMSStore")
+
+    # If any kwargs are added, they should be popped prior to this check.
+    if len(kwargs) > 0:
+        warnings.warn(
+            f"The following unsupported kwargs were ignored in "
+            f"xds_to_parquet: {kwargs}",
+            UserWarning)
 
     columns = promote_columns(columns)
 

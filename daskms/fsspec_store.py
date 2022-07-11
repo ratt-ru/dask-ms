@@ -2,6 +2,8 @@ from pathlib import Path, PurePath
 
 import fsspec
 
+from daskms.utils import freeze
+
 
 class DaskMSStore:
     def __init__(self, url, **storage_options):
@@ -78,11 +80,45 @@ class DaskMSStore:
         return self.canonical_path
 
     @staticmethod
-    def from_url_storage_options(url, storage_options):
+    def from_reduce_args(url, storage_options):
         return DaskMSStore(url, **storage_options)
 
+    @staticmethod
+    def from_url_and_kw(url, kw):
+        if opts := kw.pop("storage_options", None):
+            pass
+        else:
+            import json
+            from appdirs import AppDirs
+
+            path = Path(AppDirs("dask-ms").user_config_dir)
+            path = path / "storage_options.json"
+
+            if not path.exists():
+                opts = {}
+            else:
+                with open(path, "r") as f:
+                    opts = json.loads(f.read())
+
+        return DaskMSStore(url, **opts)
+
+    def __eq__(self, other):
+        return (isinstance(other, DaskMSStore) and
+                self.url == other.url and
+                self.storage_options == other.storage_options)
+
+    def __hash__(self):
+        return hash(
+            freeze(
+                (
+                    self.url,
+                    self.storage_options,
+                )
+            )
+        )
+
     def __reduce__(self):
-        return (DaskMSStore.from_url_storage_options,
+        return (DaskMSStore.from_reduce_args,
                 (self.url, self.storage_options))
 
     def __getitem__(self, key):

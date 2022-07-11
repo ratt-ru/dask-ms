@@ -40,13 +40,18 @@ def arg_hasher(args):
 
 
 def freeze(arg):
+    """ Recursively generates a hashable object from arg """
     if isinstance(arg, set):
         return tuple(map(freeze, sorted(arg)))
     elif isinstance(arg, (tuple, list)):
         return tuple(map(freeze, arg))
     elif isinstance(arg, (dict, OrderedDict)):
-        return frozenset((k, freeze(v)) for k, v in sorted(arg.items()))
+        return frozenset((freeze(k), freeze(v)) for k, v
+                         in sorted(arg.items()))
     elif isinstance(arg, ndarray):
+        if arg.nbytes > 10:
+            warnings.warn(f"freezing ndarray of size {arg.nbytes} "
+                          f" is probably inefficient")
         return freeze(arg.tolist())
     else:
         return arg

@@ -115,8 +115,8 @@ def parquet_tester(ms, store):
     # spw_datasets = xds_from_table(spw_table, group_cols="__row__")
     # ant_datasets = xds_from_table(ant_table, group_cols="__row__")
 
-    writes = []
-    writes.extend(xds_to_parquet(datasets, store))
+    writes = xds_to_parquet(datasets, store.url,
+                            storage_options=store.storage_options)
     # TODO(sjperkins)
     # Fix arrow shape unification errors
     # writes.extend(xds_to_parquet(spw_datasets, spw_store))
@@ -150,7 +150,7 @@ def test_xds_to_parquet_local(ms, tmp_path_factory, spw_table, ant_table):
     # antenna_store = store.parent / f"{store.name}::ANTENNA"
     # spw_store = store.parent / f"{store.name}::SPECTRAL_WINDOW"
 
-    return parquet_tester(ms, store)
+    return parquet_tester(ms, DaskMSStore(store))
 
 
 def test_xds_to_parquet_s3(ms, spw_table, ant_table,

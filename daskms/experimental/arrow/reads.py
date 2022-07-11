@@ -201,24 +201,20 @@ def fragment_reader(fragments, ranges, column, shape, dtype):
 
 @requires_arrow(pyarrow_import_error)
 def xds_from_parquet(store, columns=None, chunks=None, **kwargs):
+    if isinstance(store, DaskMSStore):
+        pass
+    elif isinstance(store, (str, Path)):
+        store = DaskMSStore.from_url_and_kw(f"{store}", kwargs)
+    else:
+        raise TypeError(f"store '{store}' must be "
+                        f"Path, str or DaskMSStore")
 
     # If any kwargs are added, they should be popped prior to this check.
     if len(kwargs) > 0:
         warnings.warn(
             f"The following unsupported kwargs were ignored in "
             f"xds_from_parquet: {kwargs}",
-            UserWarning,
-        )
-
-    if isinstance(store, DaskMSStore):
-        pass
-    elif isinstance(store, Path):
-        store = DaskMSStore(f"file://{store}")
-    elif isinstance(store, str):
-        store = DaskMSStore(f"file://{store}")
-    else:
-        raise TypeError(f"store '{store}' must be "
-                        f"Path, str or DaskMSStore")
+            UserWarning)
 
     columns = promote_columns(columns)
 

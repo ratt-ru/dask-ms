@@ -85,7 +85,8 @@ def zarr_tester(ms, spw_table, ant_table,
             "corr": (("corr",), np.arange(corr)),
         })
 
-    main_zarr_writes = xds_to_zarr(ms_datasets, zarr_store)
+    main_zarr_writes = xds_to_zarr(ms_datasets, zarr_store.url,
+                                   storage_options=zarr_store.storage_options)
     assert len(ms_datasets) == len(main_zarr_writes)
 
     for ms_ds, zw_ds in zip(ms_datasets, main_zarr_writes):
@@ -128,7 +129,9 @@ def test_xds_to_zarr_local(ms, spw_table, ant_table, tmp_path_factory):
     ant_store = zarr_store.parent / f"{zarr_store.name}::ANTENNA"
 
     return zarr_tester(ms, spw_table, ant_table,
-                       zarr_store, spw_store, ant_store)
+                       DaskMSStore(zarr_store),
+                       DaskMSStore(spw_store),
+                       DaskMSStore(ant_store))
 
 
 def test_xds_to_zarr_s3(ms, spw_table, ant_table,
