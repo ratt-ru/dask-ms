@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Stop converting results returned from DaskMSStore into Path objects (:pr:`229`)
 * Accept storage_options in dataset read/write methods (:pr:`228`)
 * Add ``__repr__`` and ``__str__`` for ``DaskMSStore`` (:pr:`224`)
 

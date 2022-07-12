@@ -134,7 +134,7 @@ class DaskMSStore:
 
     def ls(self, path=""):
         path = self._extend_path(path)
-        return list(map(Path, self.fs.ls(path, detail=False)))
+        return list(self.fs.ls(path, detail=False))
 
     @staticmethod
     def _remove_prefix(s, prefix):
