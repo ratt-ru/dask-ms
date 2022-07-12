@@ -352,25 +352,26 @@ class Convert(Application):
 
         dask.compute(writes)
 
-    def _convert_casa_datasets(self, datasets, args):
+    def _expand_group_columns(self, datasets, args):
+        if not args.group_columns:
+            return datasets
+
         new_datasets = []
-        group_columns = args.group_columns or []
 
         for ds in datasets:
-            # Drop any ROWID columns
-            new_ds = ds.drop_vars("ROWID", errors="ignore")
-
             # Remove grouping attribute and recreate grouping columns
             new_group_vars = {}
-            row_chunks = new_ds.chunks["row"]
-            row_dims = new_ds.dims["row"]
+            row_chunks = ds.chunks["row"]
+            row_dims = ds.dims["row"]
+            attrs = ds.attrs
 
-            for column in group_columns:
-                value = new_ds.attrs.pop(column)
+            for column in args.group_columns:
+                value = attrs.pop(column)
                 group_column = da.full(row_dims, value, chunks=row_chunks)
                 new_group_vars[column] = (("row",), group_column)
 
-            new_datasets.append(new_ds.assign(**new_group_vars))
+            new_ds = ds.assign_attrs(attrs).assign(**new_group_vars)
+            new_datasets.append(new_ds)
 
         return new_datasets
 
@@ -387,7 +388,13 @@ class Convert(Application):
         datasets = reader(args.input, chunks=args.chunks)
 
         if isinstance(in_fmt, CasaFormat):
-            datasets = self._convert_casa_datasets(datasets, args)
+            # Drop any ROWID columns
+            datasets = [ds.drop_vars("ROWID", errors="ignore")
+                        for ds in datasets]
+
+        if isinstance(out_fmt, CasaFormat):
+            # Reintroduce any grouping columns
+            datasets = self._expand_group_columns(datasets, args)
 
         log.info("Input: '%s' %s", in_fmt, str(args.input))
         log.info("Output: '%s' %s", out_fmt, str(args.output))
