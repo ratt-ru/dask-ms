@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Support loading of storage_options in dask-ms convert (:pr:`231`)
 * Reintroduce group columns on output CASA format only" (:pr:`230`)
 * Stop converting results returned from DaskMSStore into Path objects (:pr:`229`)
 * Accept storage_options in dataset read/write methods (:pr:`228`)
