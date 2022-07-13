@@ -58,8 +58,7 @@ class TableFormat(abc.ABC):
         raise NotImplementedError
 
     @staticmethod
-    def from_path(path):
-        store = path if isinstance(path, DaskMSStore) else DaskMSStore(path)
+    def from_store(store):
         typ = store.type()
 
         if typ == "casa":
@@ -272,7 +271,7 @@ NONUNIFORM_SUBTABLES = ["SPECTRAL_WINDOW", "POLARIZATION", "FEED", "SOURCE"]
 
 
 def _check_input_path(input: str):
-    input_path = DaskMSStore(input)
+    input_path = DaskMSStore.from_url_and_kw(input, {})
 
     if not input_path.exists():
         raise ArgumentTypeError(f"{input} is an invalid path.")
@@ -281,7 +280,7 @@ def _check_input_path(input: str):
 
 
 def _check_output_path(output: str):
-    return DaskMSStore(output)
+    return DaskMSStore.from_url_and_kw(output, {})
 
 
 def parse_chunks(chunks: str):
@@ -376,7 +375,7 @@ class Convert(Application):
         return new_datasets
 
     def convert_table(self, args):
-        in_fmt = TableFormat.from_path(args.input)
+        in_fmt = TableFormat.from_store(args.input)
         out_fmt = TableFormat.from_type(args.format)
 
         reader = in_fmt.reader(
@@ -408,7 +407,7 @@ class Convert(Application):
                 continue
 
             in_store = args.input.subtable_store(table)
-            in_fmt = TableFormat.from_path(in_store)
+            in_fmt = TableFormat.from_store(in_store)
             out_store = args.output.subtable_store(table)
             out_fmt = TableFormat.from_type(args.format)
 
