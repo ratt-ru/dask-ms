@@ -65,10 +65,8 @@ class ParquetFragment:
 
     def write(self, chunk, *data):
 
-        if self.store.table:
-            table_path = self.key
-        else:
-            table_path = self.store.join(["MAIN", self.key])
+        table_path = (self.key if self.store.table else
+                      self.store.join(["MAIN", self.key]))
 
         with self.lock:
             self.store.makedirs(table_path, exist_ok=True)

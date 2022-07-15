@@ -39,8 +39,6 @@ class DaskMSStore:
         else:
             self.canonical_path = path
             self.full_path = path
-            # NOTE (JSKenyon): This may be the cause of our problems when
-            # attempting to access a zarr store without the :: notation.
             self.table = None
 
     def type(self):
@@ -130,7 +128,7 @@ class DaskMSStore:
         return self.map[key]
 
     def _extend_path(self, path=""):
-        return self.join([self.full_path, path])
+        return self.join([self.full_path, path]) if path else self.full_path
 
     def exists(self, path=""):
         return self.fs.exists(self._extend_path(path))
