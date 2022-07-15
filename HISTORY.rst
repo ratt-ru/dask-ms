@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Deprecate Python 3.7 support and test on Python 3.10 (:pr:`232`)
 * Support loading of storage_options in dask-ms convert (:pr:`231`)
 * Reintroduce group columns on output CASA format only" (:pr:`230`)
 * Stop converting results returned from DaskMSStore into Path objects (:pr:`229`)

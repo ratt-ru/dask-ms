@@ -66,6 +66,6 @@ setup(
     author="Simon Perkins",
     author_email="sperkins@ska.ac.za",
     packages=find_packages(),
-    python_requires=">=3.7",
+    python_requires=">=3.8",
     zip_safe=True,
 )
