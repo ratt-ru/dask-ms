@@ -26,8 +26,10 @@ class DaskMSStore:
 
         self.map = fsspec.get_mapper(url, **storage_options)
         self.fs = self.map.fs
+
+        full_url = self.fs.unstrip_protocol(self.map.root)
         self.storage_options = storage_options
-        protocol, path = fsspec.core.split_protocol(url)
+        protocol, path = fsspec.core.split_protocol(full_url)
         self.protocol = "file" if protocol is None else protocol
 
         if table:
