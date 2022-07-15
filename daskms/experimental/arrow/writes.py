@@ -49,11 +49,8 @@ class ParquetFragment:
         else:
             partition = tuple((p, schema.attrs[p]) for p, _ in partition)
 
-        key = Path(key)
-
         # Add the partitioning to the path
-        for field, value in partition:
-            key /= f"{field}={value}"
+        key = store.join([f"{f}={v}" for f, v in partition])
 
         self.dataset_id = dataset_id
         self.store = store
@@ -67,8 +64,12 @@ class ParquetFragment:
                                   self.schema, self.dataset_id))
 
     def write(self, chunk, *data):
+
+        table_path = (self.key if self.store.table else
+                      self.store.join(["MAIN", self.key]))
+
         with self.lock:
-            self.store.makedirs(self.key, exist_ok=True)
+            self.store.makedirs(table_path, exist_ok=True)
 
         table_data = {}
 
@@ -90,9 +91,11 @@ class ParquetFragment:
             table_data[column] = pa_data
 
         table = pa.table(table_data, schema=self.schema.to_arrow_schema())
-        parquet_filename = self.key / f"{chunk.item()}.parquet"
-        sf = self.store.open(parquet_filename, "wb")
-        pq.write_table(table, sf)
+        parts = [table_path, f"{chunk.item()}.parquet"]
+        parquet_filename = self.store.join(parts)
+
+        with self.store.open(parquet_filename, "wb") as sf:
+            pq.write_table(table, sf)
 
         return np.array([True], bool)
 

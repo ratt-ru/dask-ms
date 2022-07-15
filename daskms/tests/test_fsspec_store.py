@@ -37,7 +37,7 @@ def test_store_main_access(tmp_path_factory):
     assert store.url == f"file://{store_dir}"
     assert store.full_path == str(store_dir)
     assert store.canonical_path == str(store_dir)
-    assert store.table == "MAIN"
+    assert store.table is None
 
     with store.open("foo.txt", "w") as f:
         f.write("How now brown cow")

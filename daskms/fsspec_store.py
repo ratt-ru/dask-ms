@@ -7,6 +7,7 @@ from daskms.utils import freeze
 
 class DaskMSStore:
     def __init__(self, url, **storage_options):
+        # Convert path objects to strings to avoid weirdness.
         if isinstance(url, PurePath):
             url = str(url)
 
@@ -25,9 +26,10 @@ class DaskMSStore:
 
         self.map = fsspec.get_mapper(url, **storage_options)
         self.fs = self.map.fs
+
+        full_url = self.fs.unstrip_protocol(self.map.root)
         self.storage_options = storage_options
-        protocol, path = fsspec.core.split_protocol(url)
-        self.protocol = "file" if protocol is None else protocol
+        self.protocol, path = fsspec.core.split_protocol(full_url)
 
         if table:
             self.canonical_path = f"{path}::{table}"
@@ -36,7 +38,7 @@ class DaskMSStore:
         else:
             self.canonical_path = path
             self.full_path = path
-            self.table = "MAIN"
+            self.table = None
 
     def type(self):
         """
@@ -125,9 +127,7 @@ class DaskMSStore:
         return self.map[key]
 
     def _extend_path(self, path=""):
-        return (f"{self.full_path}{self.fs.sep}{path}"
-                if self.full_path
-                else self.full_path)
+        return self.join([self.full_path, path]) if path else self.full_path
 
     def exists(self, path=""):
         return self.fs.exists(self._extend_path(path))
@@ -170,3 +170,6 @@ class DaskMSStore:
 
     def __str__(self):
         return self.url
+
+    def join(self, parts):
+        return self.fs.sep.join(parts)
