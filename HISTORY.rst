@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Minor DaskMSStore changes to improve URL handling. (:pr:`233`)
 * Support loading of storage_options in dask-ms convert (:pr:`231`)
 * Reintroduce group columns on output CASA format only" (:pr:`230`)
 * Stop converting results returned from DaskMSStore into Path objects (:pr:`229`)
