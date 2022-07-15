@@ -103,8 +103,10 @@ def prepare_zarr_group(dataset_id, dataset, store):
         # Create, must not exist
         group = zarr.open_group(store=store.map, mode="w-")
 
-    group_name = f"{store.table}_{dataset_id}"
-    ds_group = group.require_group(store.table).require_group(group_name)
+    table_name = store.table if store.table else "MAIN"
+
+    group_name = f"{table_name}_{dataset_id}"
+    ds_group = group.require_group(table_name).require_group(group_name)
 
     schema = DatasetSchema.from_dataset(dataset)
     schema_chunks = schema.chunks
@@ -362,7 +364,8 @@ def xds_from_zarr(store, columns=None, chunks=None, **kwargs):
     # NOTE(JSKenyon): Iterating over all the zarr groups/arrays is VERY
     # expensive if the metadata has not been consolidated.
     zc.consolidate_metadata(store.map)
-    table_group = zarr.open_consolidated(store.map)[store.table]
+    table_name = store.table if store.table else "MAIN"
+    table_group = zarr.open_consolidated(store.map)[table_name]
 
     for g, (group_name, group) in enumerate(sorted(table_group.groups(),
                                                    key=group_sortkey)):

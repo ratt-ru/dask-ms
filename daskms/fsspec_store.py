@@ -7,6 +7,7 @@ from daskms.utils import freeze
 
 class DaskMSStore:
     def __init__(self, url, **storage_options):
+        # Convert path objects to strings to avoid weirdness.
         if isinstance(url, PurePath):
             url = str(url)
 
@@ -36,7 +37,9 @@ class DaskMSStore:
         else:
             self.canonical_path = path
             self.full_path = path
-            self.table = "MAIN"
+            # NOTE (JSKenyon): This may be the cause of our problems when
+            # attempting to access a zarr store without the :: notation.
+            self.table = None
 
     def type(self):
         """
@@ -125,9 +128,7 @@ class DaskMSStore:
         return self.map[key]
 
     def _extend_path(self, path=""):
-        return (f"{self.full_path}{self.fs.sep}{path}"
-                if self.full_path
-                else self.full_path)
+        return self.join([self.full_path, path])
 
     def exists(self, path=""):
         return self.fs.exists(self._extend_path(path))
@@ -170,3 +171,6 @@ class DaskMSStore:
 
     def __str__(self):
         return self.url
+
+    def join(self, parts):
+        return self.fs.sep.join(parts)
