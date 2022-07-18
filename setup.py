@@ -43,7 +43,7 @@ def readme():
 
 setup(
     name="dask-ms",
-    version="0.2.9",
+    version="0.2.10",
     description="xarray Datasets from CASA Tables.",
     long_description=readme(),
     url="http://github.com/ska-sa/dask-ms",
