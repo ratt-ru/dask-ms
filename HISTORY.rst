@@ -4,6 +4,10 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+*
+
+0.2.10 (2022-07-18)
+------------------
 * Minor DaskMSStore changes to improve URL handling. (:pr:`233`)
 * Deprecate Python 3.7 support and test on Python 3.10 (:pr:`232`)
 * Support loading of storage_options in dask-ms convert (:pr:`231`)
