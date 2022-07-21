@@ -19,6 +19,7 @@ class DaskMSStore:
                 if url.startswith(prefix):
                     assert isinstance(overrides, dict)
                     storage_options = overrides
+                    break
 
         if len(bits) == 1:
             url = bits[0]
