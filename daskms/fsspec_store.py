@@ -12,14 +12,14 @@ class DaskMSStore:
         if isinstance(url, PurePath):
             url = str(url)
 
-        bits = url.split("::", 1)
-
         if not storage_options:
             for prefix, overrides in config.get("storage_options", {}).items():
                 if url.startswith(prefix):
                     assert isinstance(overrides, dict)
                     storage_options = overrides
                     break
+
+        bits = url.split("::", 1)
 
         if len(bits) == 1:
             url = bits[0]
