@@ -145,8 +145,11 @@ def maybe_rechunk(dataset, group, rechunk=False):
     dataset_chunks = dataset.chunks
 
     for name, data in (*dataset.data_vars.items(), *dataset.coords.items()):
-        disk_chunks = tuple(group_chunks.get(d, dataset_chunks[d])
-                            for d in data.dims)
+        try:
+            disk_chunks = tuple(group_chunks.get(d, dataset_chunks[d])
+                                for d in data.dims)
+        except KeyError:  # Orphan coordinate (no chunks), handled elsewhere.
+            continue
         dask_chunks = data.chunks
 
         if dask_chunks and (dask_chunks != disk_chunks):
