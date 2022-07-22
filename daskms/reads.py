@@ -304,7 +304,7 @@ class DatasetFactory(object):
         if len(kwargs) > 0:
             raise ValueError(f"Unhandled kwargs: {kwargs}")
 
-    def _table_proxy_factory(self):
+    def table_proxy_factory(self):
         return TableProxy(pt.table, self.table_path, ack=False,
                           readonly=True, lockoptions='user',
                           __executor_key__=executor_key(self.canonical_name))
@@ -394,7 +394,7 @@ class DatasetFactory(object):
         return datasets
 
     def datasets(self):
-        table_proxy = self._table_proxy_factory()
+        table_proxy = self.table_proxy_factory()
 
         # No grouping case
         if len(self.group_cols) == 0:
