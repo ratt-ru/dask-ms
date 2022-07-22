@@ -4,7 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
-*
+* Assign custom fsspec storage options from url match in yaml configuration files. (:pr:`237`)
 
 0.2.10 (2022-07-18)
 ------------------
