@@ -20,25 +20,35 @@ STANDARD_EXECUTOR = "__standard_executor__"
 
 class ExecutorMetaClass(type):
     """ https://en.wikipedia.org/wiki/Multiton_pattern """
-    def __call__(cls, key=STANDARD_EXECUTOR):
+    def __call__(cls, key, typ):
+        cache_key = (key, typ)
+
         try:
-            return _executor_cache[key]
+            return _executor_cache[cache_key]
         except KeyError:
             pass
 
         with _executor_lock:
             try:
-                return _executor_cache[key]
+                return _executor_cache[cache_key]
             except KeyError:
-                instance = type.__call__(cls, key)
-                _executor_cache[key] = instance
+                instance = type.__call__(cls, key, typ)
+                _executor_cache[cache_key] = instance
                 return instance
 
 
 class Executor(object, metaclass=ExecutorMetaClass):
-    def __init__(self, key=STANDARD_EXECUTOR):
+    def __init__(self, key=STANDARD_EXECUTOR, typ="thread"):
         # Initialise a single thread
-        self.impl = impl = cf.ThreadPoolExecutor(1)
+
+        if typ == "thread":
+            impl = cf.ThreadPoolExecutor(1)
+        elif typ == "process":
+            impl = cf.ProcessPoolExecutor(1)
+        else:
+            raise ValueError(f"Invalid Executor type {typ}")
+
+        self.impl = impl
         self.key = key
 
         # Register a finaliser shutting down the

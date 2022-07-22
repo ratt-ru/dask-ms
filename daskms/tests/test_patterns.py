@@ -6,7 +6,11 @@ import numpy as np
 import pytest
 
 from daskms.patterns import (
-    Multiton, LazyProxy, LazyProxyMultiton)
+    Multiton,
+    PersistentLazyProxyMultiton,
+    PersistentMultiton,
+    LazyProxy,
+    LazyProxyMultiton)
 
 
 class DummyResource:
@@ -105,6 +109,233 @@ def test_lazy_resource(tmp_path):
                           meta=np.empty((0,), object))
     values.compute(scheduler="processes")
 
+
+class PersistentA(metaclass=PersistentMultiton):
+    def __init__(self, *args, **kwargs):
+        self.args = args
+        self.kwargs = kwargs
+
+    @classmethod
+    def from_args(cls, args, kwargs):
+        return cls(*args, **kwargs)
+
+    def __reduce__(self):
+        return (self.from_args, (self.args, self.kwargs))
+
+
+def test_persistent_multiton():
+    a = PersistentA(1)
+    assert a is PersistentA(1)
+    assert pickle.loads(pickle.dumps(a)) is PersistentA(1)
+
+    assert len(PersistentA._PersistentMultiton__cache) == 1
+    assert next(iter(PersistentA._PersistentMultiton__cache.values())) is a
+
+    a.__forget_multiton__()
+    assert len(PersistentA._PersistentMultiton__cache) == 0
+
+
+
+# CASA Table Locking Modes
+NOLOCK = 0
+READLOCK = 1
+WRITELOCK = 2
+
+# List of CASA Table methods to proxy and the appropriate locking mode
+_proxied_methods = [
+    # Queries
+    ("nrows", READLOCK),
+    ("colnames", READLOCK),
+    ("getcoldesc", READLOCK),
+    ("getdminfo", READLOCK),
+    ("iswritable", READLOCK),
+    # Modification
+    ("addrows", WRITELOCK),
+    ("addcols", WRITELOCK),
+    ("setmaxcachesize", WRITELOCK),
+    # Reads
+    ("getcol", READLOCK),
+    ("getcolslice", READLOCK),
+    ("getcolnp", READLOCK),
+    ("getvarcol", READLOCK),
+    ("getcell", READLOCK),
+    ("getcellslice", READLOCK),
+    ("getkeywords", READLOCK),
+    ("getcolkeywords", READLOCK),
+    # Writes
+    ("putcol", WRITELOCK),
+    ("putcolslice", WRITELOCK),
+    ("putcolnp", WRITELOCK),
+    ("putvarcol", WRITELOCK),
+    ("putcellslice", WRITELOCK),
+    ("putkeyword", WRITELOCK),
+    ("putkeywords", WRITELOCK),
+    ("putcolkeywords", WRITELOCK)]
+
+
+
+def proxied_method_factory(cls, method, locktype):
+    """
+    Proxy pyrap.tables.table.method calls.
+
+    Creates a private implementation function which performs
+    the call locked according to to ``locktype``.
+
+    The private implementation is accessed by a public ``method``
+    which submits a call to the implementation
+    on a concurrent.futures.ThreadPoolExecutor.
+    """
+    if locktype == NOLOCK:
+        runner = __nolock_runner
+    elif locktype == READLOCK:
+        runner = __read_runner
+    elif locktype == WRITELOCK:
+        runner = __write_runner
+    else:
+        raise ValueError(f"Invalid locktype {locktype}")
+
+    def public_method(self, *args, **kwargs):
+        """
+        Submits _impl(args, kwargs) to the executor
+        and returns a Future
+        """
+        return self._ex.submit(runner, self.proxy, method, args, kwargs)
+
+    public_method.__name__ = method
+    public_method.__doc__ = f"Call table.{method}"
+
+    return public_method
+
+
+
+def __nolock_runner(proxy, method, args, kwargs):
+    try:
+        return getattr(proxy, method)(*args, **kwargs)
+    except Exception as e:
+        print(str(e))
+
+def __read_runner(proxy, method, args, kwargs):
+    proxy.lock(False)
+
+    try:
+        return getattr(proxy, method)(*args, **kwargs)
+    except Exception as e:
+        print(str(e))
+    finally:
+        proxy.unlock()
+
+def __write_runner(proxy, method, args, kwargs):
+    proxy.lock(True)
+
+    try:
+        return getattr(proxy, method)(*args, **kwargs)
+    except Exception as e:
+        print(str(e))
+    finally:
+        proxy.unlock()
+
+class TableProxyMetaClass(Multiton):
+    def __new__(cls, name, bases, dct):
+        for method, locktype in _proxied_methods:
+            dct[method] = proxied_method_factory(cls, method, locktype)
+
+        return super().__new__(cls, name, bases, dct)
+
+class TableProxy(metaclass=TableProxyMetaClass):
+    def __init__(self, factory, *args, **kwargs):
+        import weakref
+        import concurrent.futures as cf
+        import multiprocessing
+
+        self.factory = factory
+        self.args = args
+        self.kwargs = kwargs
+        self.proxy = proxy = PersistentLazyProxyMultiton(
+                                            self.factory,
+                                            *self.args,
+                                            **self.kwargs)
+
+
+
+        spawn_ctx = multiprocessing.get_context("spawn")
+        self._ex = executor = cf.ProcessPoolExecutor(5, mp_context=spawn_ctx)
+        self._ex = executor = LazyProxyMultiton(cf.ProcessPoolExecutor, 5, mp_context=spawn_ctx)
+        #self._ex = executor = cf.ThreadPoolExecutor(1)
+
+        weakref.finalize(self, self.finaliser, proxy, executor)
+
+
+    @staticmethod
+    def finaliser(proxy, executor):
+        nprocess = len(executor._processes)
+        list(executor.map(proxy.__forget_multiton__, [None]*nprocess))
+        print(f"Finalising {proxy}")
+        proxy.__forget_multiton__()
+        executor.shutdown(wait=True)
+
+    @classmethod
+    def from_args(cls, factory, args, kwargs):
+        return cls(factory, *args, **kwargs)
+
+    def __reduce__(self):
+        return (self.from_args, (self.factory, self.args, self.kwargs))
+
+
+import os
+
+class Resource:
+    def __init__(self, *args, **kwargs):
+        self.args = args
+        self.kwargs = kwargs
+        print(f"Creating Resource in {os.getpid()} {args} {kwargs}")
+
+    def execute(self, *args, **kwargs):
+        print(f"execute in {os.getpid()} {args} {kwargs}")
+
+    def close(self):
+        print(f"Closing Resource in {os.getpid()} {self.args} {self.kwargs}")
+
+
+def process_fn(proxy, *args, **kwargs):
+    return proxy.execute(*args, **kwargs)
+
+def test_persistent_multiton_in_process_pool():
+    import concurrent.futures as cf
+    import multiprocessing
+    spawn_ctx = multiprocessing.get_context("spawn")
+
+    pool = cf.ProcessPoolExecutor(4, mp_context=spawn_ctx)
+    proxy = PersistentLazyProxyMultiton((Resource, Resource.close))
+
+    pool.submit(process_fn, proxy, 1, 2).result()
+    for r in pool.map(proxy.__forget_multiton__, [None]*len(pool._processes)):
+        print(r)
+
+    print("Shutting down")
+    pool.shutdown(wait=True)
+
+
+
+def test_ms_in_persistent_multiton(ms):
+    import pyrap.tables as pt
+    proxy = TableProxy(pt.table, ms, ack=True)
+    print(proxy.nrows().result())
+
+    def ranges(length, chunk):
+        n = 0
+
+        while n < length:
+            yield n, chunk
+            n += chunk
+
+
+
+    futures = [proxy.getcol("TIME", startrow=s, nrow=n)
+               for s, n in ranges(10, 1)]
+
+    import concurrent.futures as cf
+    for f in cf.as_completed(futures):
+        print(f.result())
 
 def test_multiton():
     class A(metaclass=Multiton):

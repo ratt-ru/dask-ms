@@ -1,6 +1,7 @@
 from collections import defaultdict
 import json
 from pathlib import Path
+import re
 from threading import Lock
 import weakref
 import warnings
@@ -53,6 +54,10 @@ else:
 _parquet_table_lock = Lock()
 _parquet_table_cache = weakref.WeakValueDictionary()
 
+
+def natural_order(key):
+    return tuple(int(c) if c.isdigit() else c.lower()
+                 for c in re.split("(\d+)", str(key)))
 
 class ParquetFileProxy(metaclass=Multiton):
     def __init__(self, store, key):

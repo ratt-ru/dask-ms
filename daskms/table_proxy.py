@@ -9,11 +9,9 @@ from dask.base import normalize_token
 import pyrap.tables as pt
 from daskms.table_executor import Executor, STANDARD_EXECUTOR
 from daskms.utils import arg_hasher
+from daskms.patterns import LazyProxyMultiton, Multiton
 
 log = logging.getLogger(__name__)
-
-_table_cache = weakref.WeakValueDictionary()
-_table_lock = Lock()
 
 # CASA Table Locking Modes
 NOLOCK = 0
@@ -139,33 +137,13 @@ def proxied_method_factory(method, locktype):
     return public_method
 
 
-class TableProxyMetaClass(type):
-    """
-    https://en.wikipedia.org/wiki/Multiton_pattern
-
-    """
+class TableProxyMetaClass(Multiton):
     def __new__(cls, name, bases, dct):
         for method, locktype in _proxied_methods:
             proxy_method = proxied_method_factory(method, locktype)
             dct[method] = proxy_method
 
-        return type.__new__(cls, name, bases, dct)
-
-    def __call__(cls, *args, **kwargs):
-        key = arg_hasher((cls,) + args + (kwargs,))
-
-        with _table_lock:
-            try:
-                return _table_cache[key]
-            except KeyError:
-                instance = type.__call__(cls, *args, **kwargs)
-                _table_cache[key] = instance
-                return instance
-
-
-def _map_create_proxy(cls, factory, args, kwargs):
-    """ Support pickling of kwargs in TableProxy.__reduce__ """
-    return cls(factory, *args, **kwargs)
+        return super().__new__(cls, name, bases, dct)
 
 
 class MismatchedLocks(Exception):
@@ -304,8 +282,9 @@ class TableProxy(object, metaclass=TableProxyMetaClass):
         **kwargs : dict
             Keyword arguments passed to factory.
         __executor_key__ : str, optional
-            Executor key. Identifies a unique threadpool
+            Executor key. Identifies a unique pool
             in which table operations will be performed.
+        __executor_type__: {"thread", "process"}
         """
 
         # Save the arguments as keys for pickling and tokenising
@@ -325,11 +304,13 @@ class TableProxy(object, metaclass=TableProxyMetaClass):
         # TableProxy(*args, ex_key=..., **kwargs)
         kwargs = kwargs.copy()
         self._ex_key = kwargs.pop("__executor_key__", STANDARD_EXECUTOR)
+        ex_type = kwargs.pop("__executor_type__", "thread")
 
         # Store a reference to the Executor wrapper class
         # so that the Executor is retained while this TableProxy
         # still lives
-        self._ex_wrapper = ex = Executor(key=self._ex_key)
+        self._ex_wrapper = ex = Executor(key=self._ex_key, typ=ex_type)
+
         self._table_future = table = ex.impl.submit(factory, *args, **kwargs)
 
         weakref.finalize(self, _table_future_finaliser, ex, table,
@@ -358,10 +339,13 @@ class TableProxy(object, metaclass=TableProxyMetaClass):
     def executor_key(self):
         return self._ex_key
 
+    @classmethod
+    def from_args(cls, factory, args, kwargs):
+        return cls(factory, *args, **kwargs)
+
     def __reduce__(self):
         """ Defer to _map_create_proxy to support kwarg pickling """
-        return (_map_create_proxy, (TableProxy, self._factory,
-                                    self._args, self._kwargs))
+        return (self.from_args, (self._factory, self._args, self._kwargs))
 
     def __enter__(self):
         return self
