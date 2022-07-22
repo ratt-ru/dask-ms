@@ -101,7 +101,7 @@ def test_storage_options_from_config(tmp_path, py_minio_client,
     filename = "test.txt"
     payload = "How now brown cow"
     py_minio_client.make_bucket(s3_bucket_name)
-    py_minio_client.put_object(s3_bucket_name, filename,
+    py_minio_client.put_object(s3_bucket_name, f"subdir/{filename}",
                                BytesIO(payload.encode("utf-8")),
                                len(payload))
 
@@ -123,10 +123,10 @@ def test_storage_options_from_config(tmp_path, py_minio_client,
     config.refresh(paths=config.paths + [str(tmp_path)])
 
     try:
-        store = DaskMSStore(url)
+        store = DaskMSStore(f"{url}/subdir")
         assert store.storage_options == opts
 
-        with store.open(f"{filename}", "rb") as f:
+        with store.open("test.txt", "rb") as f:
             assert f.read() == payload.encode("utf-8")
     finally:
         config.refresh()
