@@ -232,7 +232,7 @@ def descriptor_builder(table, descriptor):
 
 def _writable_table_proxy(table_name):
     return TableProxy(pt.table, table_name, ack=False,
-                      readonly=False, lockoptions='user',
+                      readonly=False, lockoptions="usernoread",
                       __executor_key__=executor_key(table_name))
 
 

@@ -306,7 +306,7 @@ class DatasetFactory(object):
 
     def _table_proxy_factory(self):
         return TableProxy(pt.table, self.table_path, ack=False,
-                          readonly=True, lockoptions='user',
+                          readonly=True, lockoptions="usernoread",
                           __executor_key__=executor_key(self.canonical_name))
 
     def _table_schema(self):

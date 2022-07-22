@@ -82,7 +82,7 @@ def proxied_method_factory(method, locktype):
     on a concurrent.futures.ThreadPoolExecutor.
     """
 
-    if locktype == NOLOCK:
+    if locktype in (NOLOCK, READLOCK):
         def _impl(table_future, args, kwargs):
             try:
                 return getattr(table_future.result(), method)(*args, **kwargs)
@@ -90,21 +90,6 @@ def proxied_method_factory(method, locktype):
                 if logging.DEBUG >= log.getEffectiveLevel():
                     log.exception("Exception in %s", method)
                 raise
-
-    elif locktype == READLOCK:
-        def _impl(table_future, args, kwargs):
-            table = table_future.result()
-            table.lock(write=False)
-
-            try:
-                return getattr(table, method)(*args, **kwargs)
-            except Exception:
-                if logging.DEBUG >= log.getEffectiveLevel():
-                    log.exception("Exception in %s", method)
-                raise
-            finally:
-                table.unlock()
-
     elif locktype == WRITELOCK:
         def _impl(table_future, args, kwargs):
             table = table_future.result()
@@ -177,21 +162,19 @@ def taql_factory(query, style='Python', tables=(), readonly=True):
     tables = [t._table_future.result() for t in tables]
 
     if isinstance(readonly, (tuple, list)):
-        it = zip_longest(tables, readonly[:len(tables)],
-                         fillvalue=readonly[-1])
+        it = list(zip_longest(tables, readonly[:len(tables)],
+                              fillvalue=readonly[-1]))
     elif isinstance(readonly, bool):
-        it = zip(tables, (readonly,)*len(tables))
+        it = list(zip(tables, (readonly,)*len(tables)))
     else:
         raise TypeError("readonly must be a bool or list of bools")
 
-    for t, ro in it:
-        t.lock(write=ro is False)
+    # See https://github.com/ska-sa/dask-ms/pull/141
+    if any(ro is False for ro in it):
+        raise ValueError(f"write-locking requested for '{query}'"
+                         f"but locking has been removed!")
 
-    try:
-        return pt.taql(query, style=style, tables=tables)
-    finally:
-        for t in tables:
-            t.unlock()
+    return pt.taql(query, style=style, tables=tables)
 
 
 def _nolock_runner(table_future, fn, args, kwargs):
@@ -201,20 +184,6 @@ def _nolock_runner(table_future, fn, args, kwargs):
         if logging.DEBUG >= log.getEffectiveLevel():
             log.exception("Exception in %s", fn.__name__)
         raise
-
-
-def _readlock_runner(table_future, fn, args, kwargs):
-    table = table_future.result()
-    table.lock(write=False)
-
-    try:
-        return fn(table, *args, **kwargs)
-    except Exception:
-        if logging.DEBUG >= log.getEffectiveLevel():
-            log.exception("Exception in %s", fn.__name__)
-        raise
-    finally:
-        table.unlock()
 
 
 def _writelock_runner(table_future, fn, args, kwargs):
@@ -391,11 +360,8 @@ class TableProxy(object, metaclass=TableProxyMetaClass):
         future : :class:`concurrent.futures.Future`
             Future containing the result of :code:`fn(table, *args, **kwargs)`
         """
-        if locktype == NOLOCK:
+        if locktype in (NOLOCK, READLOCK):
             return self._ex.submit(_nolock_runner, self._table_future,
-                                   fn, args, kwargs)
-        elif locktype == READLOCK:
-            return self._ex.submit(_readlock_runner, self._table_future,
                                    fn, args, kwargs)
         elif locktype == WRITELOCK:
             return self._ex.submit(_writelock_runner, self._table_future,
