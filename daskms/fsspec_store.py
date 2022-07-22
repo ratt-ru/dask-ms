@@ -1,7 +1,8 @@
-from pathlib import Path, PurePath
+from pathlib import PurePath
 
 import fsspec
 
+from daskms.config import config
 from daskms.utils import freeze
 
 
@@ -10,6 +11,13 @@ class DaskMSStore:
         # Convert path objects to strings to avoid weirdness.
         if isinstance(url, PurePath):
             url = str(url)
+
+        if not storage_options:
+            for prefix, overrides in config.get("storage_options", {}).items():
+                if url.startswith(prefix):
+                    assert isinstance(overrides, dict)
+                    storage_options = overrides
+                    break
 
         bits = url.split("::", 1)
 
@@ -84,25 +92,6 @@ class DaskMSStore:
     @staticmethod
     def from_reduce_args(url, storage_options):
         return DaskMSStore(url, **storage_options)
-
-    @staticmethod
-    def from_url_and_kw(url, kw):
-        if opts := kw.pop("storage_options", None):
-            pass
-        else:
-            import json
-            from appdirs import AppDirs
-
-            path = Path(AppDirs("dask-ms").user_config_dir)
-            path = path / "storage_options.json"
-
-            if not path.exists():
-                opts = {}
-            else:
-                with open(path, "r") as f:
-                    opts = json.loads(f.read())
-
-        return DaskMSStore(url, **opts)
 
     def __eq__(self, other):
         return (isinstance(other, DaskMSStore) and

@@ -271,7 +271,7 @@ NONUNIFORM_SUBTABLES = ["SPECTRAL_WINDOW", "POLARIZATION", "FEED", "SOURCE"]
 
 
 def _check_input_path(input: str):
-    input_path = DaskMSStore.from_url_and_kw(input, {})
+    input_path = DaskMSStore(input)
 
     if not input_path.exists():
         raise ArgumentTypeError(f"{input} is an invalid path.")
@@ -280,7 +280,7 @@ def _check_input_path(input: str):
 
 
 def _check_output_path(output: str):
-    return DaskMSStore.from_url_and_kw(output, {})
+    return DaskMSStore(output)
 
 
 def parse_chunks(chunks: str):

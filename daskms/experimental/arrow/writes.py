@@ -105,7 +105,7 @@ def xds_to_parquet(xds, store, columns=None, **kwargs):
     if isinstance(store, DaskMSStore):
         pass
     elif isinstance(store, (str, Path)):
-        store = DaskMSStore.from_url_and_kw(f"{store}", kwargs)
+        store = DaskMSStore(f"{store}", **kwargs.pop("storage_options", {}))
     else:
         raise TypeError(f"store '{store}' must be "
                         f"Path, str or DaskMSStore")

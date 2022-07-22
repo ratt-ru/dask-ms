@@ -241,7 +241,7 @@ def xds_to_zarr(xds, store, columns=None, rechunk=False, **kwargs):
     if isinstance(store, DaskMSStore):
         pass
     elif isinstance(store, (Path, str)):
-        store = DaskMSStore.from_url_and_kw(f"{store}", kwargs)
+        store = DaskMSStore(f"{store}", **kwargs.pop("storage_options", {}))
     else:
         raise TypeError(f"store '{store}' must be "
                         f"Path, str or DaskMSStore")
@@ -334,7 +334,7 @@ def xds_from_zarr(store, columns=None, chunks=None, **kwargs):
     if isinstance(store, DaskMSStore):
         pass
     elif isinstance(store, (Path, str)):
-        store = DaskMSStore.from_url_and_kw(f"{store}", kwargs)
+        store = DaskMSStore(f"{store}", **kwargs.pop("storage_options", {}))
     else:
         raise TypeError(f"store '{store}' must be "
                         f"Path, str or DaskMSStore")
