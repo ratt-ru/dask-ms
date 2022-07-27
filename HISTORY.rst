@@ -5,6 +5,7 @@ History
 X.Y.Z (YYYY-MM-DD)
 ------------------
 * Improve chunking in xds_to_zarr when rechunk==True. (:pr:`236`)
+* Assign custom fsspec storage options from url match in yaml configuration files. (:pr:`237`)
 
 0.2.10 (2022-07-18)
 ------------------

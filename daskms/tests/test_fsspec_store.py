@@ -1,8 +1,11 @@
+from io import BytesIO
 import pickle
 
 import numpy as np
+import yaml
 import pytest
 
+from daskms.config import config
 from daskms.fsspec_store import DaskMSStore
 
 try:
@@ -88,6 +91,45 @@ def test_minio_server(tmp_path, py_minio_client,
 
     with s3.open(f"{s3_bucket_name}/stuff.txt", "rb") as f:
         assert f.read() == payload.encode("utf-8")
+
+
+@pytest.mark.skipif(s3fs is None, reason="s3fs not installed")
+def test_storage_options_from_config(tmp_path, py_minio_client,
+                                     minio_admin, minio_alias,
+                                     minio_user_key, minio_url,
+                                     s3_bucket_name):
+    filename = "test.txt"
+    payload = "How now brown cow"
+    py_minio_client.make_bucket(s3_bucket_name)
+    py_minio_client.put_object(s3_bucket_name, f"subdir/{filename}",
+                               BytesIO(payload.encode("utf-8")),
+                               len(payload))
+
+    url = f"s3://{s3_bucket_name}"
+    config_file = tmp_path / "config.yaml"
+    opts = {
+        "key": minio_user_key,
+        "secret": minio_user_key,
+        "client_kwargs": {
+            "endpoint_url": minio_url.geturl(),
+            "region_name": "af-south-1",
+            "verify": False,
+        },
+    }
+
+    with open(config_file, "w") as f:
+        yaml.safe_dump({"storage_options": {url: opts}}, f)
+
+    config.refresh(paths=config.paths + [str(tmp_path)])
+
+    try:
+        store = DaskMSStore(f"{url}/subdir")
+        assert store.storage_options == opts
+
+        with store.open("test.txt", "rb") as f:
+            assert f.read() == payload.encode("utf-8")
+    finally:
+        config.refresh()
 
 
 @pytest.mark.skipif(s3fs is None, reason="s3fs not installed")
