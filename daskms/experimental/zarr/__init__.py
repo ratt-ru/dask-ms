@@ -95,7 +95,7 @@ def create_array(ds_group, column, column_schema,
     }
 
 
-def prepare_zarr_group(dataset_id, dataset, store):
+def prepare_zarr_group(dataset_id, dataset, store, rechunk=False):
     try:
         # Open in read/write, must exist
         group = zarr.open_group(store=store.map, mode="r+")
@@ -107,6 +107,8 @@ def prepare_zarr_group(dataset_id, dataset, store):
 
     group_name = f"{table_path}_{dataset_id}"
     ds_group = group.require_group(table_path).require_group(group_name)
+
+    dataset, ds_group = maybe_rechunk(dataset, ds_group, rechunk=rechunk)
 
     schema = DatasetSchema.from_dataset(dataset)
     schema_chunks = schema.chunks
@@ -122,22 +124,37 @@ def prepare_zarr_group(dataset_id, dataset, store):
         DASKMS_ATTR_KEY: {"chunks": dict(dataset.chunks)}
     })
 
-    return ds_group
+    return dataset, ds_group
+
+
+def get_group_chunks(group):
+
+    group_chunks = {}
+
+    for array in group.values():
+        array_chunks = normalize_chunks(array.chunks, array.shape)
+        array_dims = decode_attr(array.attrs[DASKMS_ATTR_KEY])["dims"]
+        group_chunks.update(dict(zip(array_dims, array_chunks)))
+
+    return group_chunks
 
 
 def maybe_rechunk(dataset, group, rechunk=False):
 
-    for field in (*dataset.data_vars.keys(), *dataset.coords.keys()):
-        zarr_array = group.get(field)
-        shape = zarr_array.shape
-        disk_chunks = normalize_chunks(zarr_array.chunks, shape)
-        dask_chunks = dataset[field].chunks
+    group_chunks = get_group_chunks(group)
+    dataset_chunks = dataset.chunks
+
+    for name, data in (*dataset.data_vars.items(), *dataset.coords.items()):
+        try:
+            disk_chunks = tuple(group_chunks.get(d, dataset_chunks[d])
+                                for d in data.dims)
+        except KeyError:  # Orphan coordinate (no chunks), handled elsewhere.
+            continue
+        dask_chunks = data.chunks
 
         if dask_chunks and (dask_chunks != disk_chunks):
             if rechunk:
-                dataset = dataset.assign(
-                    {field: dataset[field].chunk(disk_chunks)}
-                )
+                dataset = dataset.assign({name: data.chunk(disk_chunks)})
             else:
                 raise ValueError(
                     f"On disk (zarr) chunks: {disk_chunks} - don't match in "
@@ -272,9 +289,7 @@ def xds_to_zarr(xds, store, columns=None, rechunk=False, **kwargs):
         # Create a new ds which is consistent with what we want to write.
         ds = Dataset(data_vars, coords=coords, attrs=ds.attrs)
 
-        group = prepare_zarr_group(di, ds, store)
-
-        ds, group = maybe_rechunk(ds, group, rechunk=rechunk)
+        ds, group = prepare_zarr_group(di, ds, store, rechunk=rechunk)
 
         data_vars = dict(_gen_writes(ds.data_vars, ds.chunks, group))
         # Include coords in the write dataset so they're reified

@@ -275,7 +275,8 @@ def test_rechunking(ms, tmp_path_factory, prechunking, postchunking):
         ref_datasets[i] = ds.assign_coords(
             row=np.arange(row),
             chan=np.arange(chan),
-            corr=np.arange(corr)
+            corr=np.arange(corr),
+            dummy=np.arange(10)  # Orphan coordinate.
         )
 
     chunked_datasets = [ds.chunk(prechunking) for ds in ref_datasets]
@@ -289,3 +290,43 @@ def test_rechunking(ms, tmp_path_factory, prechunking, postchunking):
 
     assert all([ds.equals(rds)
                 for ds, rds in zip(rechunked_datasets, ref_datasets)])
+
+
+@pytest.mark.skipif(xarray is None, reason="depends on xarray")
+@pytest.mark.parametrize("prechunking", [{"row": -1, "chan": -1},
+                                         {"row": 1, "chan": 1},
+                                         {"row": 2, "chan": 7}])
+@pytest.mark.parametrize("postchunking", [{"row": -1, "chan": -1},
+                                          {"row": 1, "chan": 1},
+                                          {"row": 2, "chan": 7}])
+def test_add_datavars(ms, tmp_path_factory, prechunking, postchunking):
+    store = tmp_path_factory.mktemp("zarr_store")
+    ref_datasets = xds_from_ms(ms)
+
+    for i, ds in enumerate(ref_datasets):
+        chunks = ds.chunks
+        row = sum(chunks["row"])
+        chan = sum(chunks["chan"])
+        corr = sum(chunks["corr"])
+
+        ref_datasets[i] = ds.assign_coords(
+            row=np.arange(row),
+            chan=np.arange(chan),
+            corr=np.arange(corr),
+            dummy=np.arange(10)  # Orphan coordinate.
+        )
+
+    chunked_datasets = [ds.chunk(prechunking) for ds in ref_datasets]
+    dask.compute(xds_to_zarr(chunked_datasets, store))
+
+    rechunked_datasets = [ds.chunk(postchunking)
+                          for ds in xds_from_zarr(store)]
+    augmented_datasets = [ds.assign({"DUMMY": (("row", "chan", "corr"),
+                                    da.zeros_like(ds.DATA.data))})
+                          for ds in rechunked_datasets]
+    dask.compute(xds_to_zarr(augmented_datasets, store, rechunk=True))
+
+    augmented_datasets = xds_from_zarr(store)
+
+    assert all([ds.DUMMY.chunks == cds.DATA.chunks
+                for ds, cds in zip(augmented_datasets, chunked_datasets)])
