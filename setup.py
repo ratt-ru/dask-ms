@@ -10,7 +10,7 @@ extras_require = {
     "xarray": ["xarray > 0.12.0"],
     "zarr": ["zarr >= 2.6.1"],
     "s3": ["s3fs"],
-    "testing": ["minio", "pytest", "pytest-flake8 >= 1.0.6"],
+    "testing": ["minio", "pytest", "pytest-flake8 >= 1.0.6", "flake8 >= 4.0.0, < 5.0.0"],
 }
 
 extras_require["complete"] = set(
