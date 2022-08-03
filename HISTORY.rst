@@ -5,6 +5,7 @@ History
 X.Y.Z (YYYY-MM-DD)
 ------------------
 * Fail if ROWID dimensions don't match associated dataset arrays (:pr:`239`)
+* Pin flake8 to >= 4.0.0 and < 5.0.0 (:pr:`240`)
 
 0.2.11 (2022-07-27)
 -------------------
