@@ -2,6 +2,10 @@
 History
 =======
 
+X.Y.Z (YYYY-MM-DD)
+------------------
+* Pin flake8 to >= 4.0.0 and < 5.0.0 (:pr:`240`)
+
 0.2.11 (2022-07-27)
 -------------------
 * Improve chunking in xds_to_zarr when rechunk==True. (:pr:`236`)
