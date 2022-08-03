@@ -301,3 +301,22 @@ def test_write_array_names(ms, tmp_path):
         for k, v in ds.data_vars.items():
             prefix = "".join(("write~", k))
             assert key_split(v.data.name) == prefix
+
+
+def test_mismatched_rowid(ms):
+    xdsl = xds_from_ms(
+        ms,
+        group_cols=["SCAN_NUMBER"],
+        chunks={"row": -1},
+        columns=["DATA"]
+    )
+
+    # NOTE: Remove this line to make this test pass.
+    xds = xdsl[0]
+    xds = xds.assign_coords({
+        "ROWID": (("row",), da.arange(xds.dims["row"], chunks=2))
+    })
+    xds = xds.rename({"DATA": "BROKEN_DATA"})
+
+    with pytest.raises(ValueError, match="ROWID shape and chunking"):
+        xds_to_table(xds, ms, columns=["BROKEN_DATA"])
