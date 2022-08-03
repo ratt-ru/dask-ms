@@ -313,10 +313,9 @@ def test_mismatched_rowid(ms):
 
     # NOTE: Remove this line to make this test pass.
     xds = xdsl[0]
-    xds = xds.assign_coords({
+    xds = xds.assign_coords(**{
         "ROWID": (("row",), da.arange(xds.dims["row"], chunks=2))
     })
-    xds = xds.rename({"DATA": "BROKEN_DATA"})
 
     with pytest.raises(ValueError, match="ROWID shape and chunking"):
-        xds_to_table(xds, ms, columns=["BROKEN_DATA"])
+        xds_to_table(xds, ms, columns=["DATA"])
