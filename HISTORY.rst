@@ -4,6 +4,7 @@ History
 
 0.2.11 (2022-07-27)
 -------------------
+* Fail if ROWID dimensions don't match associated dataset arrays (:pr:`239`)
 * Improve chunking in xds_to_zarr when rechunk==True. (:pr:`236`)
 * Assign custom fsspec storage options from url match in yaml configuration files. (:pr:`237`)
 
