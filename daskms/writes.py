@@ -626,8 +626,8 @@ def _write_datasets(table, table_proxy, datasets, columns, descriptor,
 
             if (row_order.shape[0] != array.shape[0] or
                     row_order.chunks[0] != array.chunks[0]):
-                raise ValueError(f"ROWID shape and chunking does not "
-                                 f"match that of {column}")
+                raise ValueError(f"ROWID shape and/or chunking does "
+                                 f"not match that of {column}")
 
             if not all(len(c) == 1 for c in array.chunks[1:]):
                 # Add extent arrays

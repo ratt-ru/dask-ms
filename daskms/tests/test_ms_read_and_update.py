@@ -317,5 +317,5 @@ def test_mismatched_rowid(ms):
         "ROWID": (("row",), da.arange(xds.dims["row"], chunks=2))
     })
 
-    with pytest.raises(ValueError, match="ROWID shape and chunking"):
+    with pytest.raises(ValueError, match="ROWID shape and/or chunking"):
         xds_to_table(xds, ms, columns=["DATA"])
