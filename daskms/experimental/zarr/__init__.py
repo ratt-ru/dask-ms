@@ -375,12 +375,13 @@ def xds_from_zarr(store, columns=None, chunks=None, **kwargs):
 
     datasets = []
     numpy_vars = []
+    table_path = store.table if store.table else "MAIN"
 
     # NOTE(JSKenyon): Iterating over all the zarr groups/arrays is VERY
     # expensive if the metadata has not been consolidated.
-    zc.consolidate_metadata(store.map)
-    table_path = store.table if store.table else "MAIN"
-    table_group = zarr.open_consolidated(store.map)[table_path]
+    store_map = store.fs.get_mapper(f"{store.full_path}/{table_path}")
+    zc.consolidate_metadata(store_map)
+    table_group = zarr.open_consolidated(store_map)
 
     for g, (group_name, group) in enumerate(sorted(table_group.groups(),
                                                    key=group_sortkey)):
