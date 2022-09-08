@@ -69,6 +69,38 @@ def test_xds_to_zarr_coords(tmp_path_factory):
             assert_array_equal(v.data, getattr(nds, c).data)
 
 
+def test_metadata_consolidation(ms, spw_table, ant_table, tmp_path_factory):
+    zarr_dir = tmp_path_factory.mktemp("zarr_store") / "test.zarr"
+    spw_dir = zarr_dir.parent / f"{zarr_dir.name}::SPECTRAL_WINDOW"
+    ant_dir = zarr_dir.parent / f"{zarr_dir.name}::ANTENNA"
+
+    main_store = DaskMSStore(zarr_dir)
+    spw_store = DaskMSStore(spw_dir)
+    ant_store = DaskMSStore(ant_dir)
+
+    ms_datasets = xds_from_ms(ms)
+    spw_datasets = xds_from_table(spw_table, group_cols="__row__")
+    ant_datasets = xds_from_table(ant_table)
+
+    main_store_writes = xds_to_zarr(ms_datasets, main_store)
+    writes = [main_store_writes]
+    writes.extend(xds_to_zarr(spw_datasets, spw_store))
+    writes.extend(xds_to_zarr(ant_datasets, ant_store))
+    dask.compute(writes)
+
+    assert not main_store.exists("MAIN/.zmetadata")
+    xds_from_zarr(main_store)
+    assert main_store.exists("MAIN/.zmetadata")
+
+    assert not ant_store.exists(".zmetadata")
+    xds_from_zarr(ant_store)
+    assert ant_store.exists(".zmetadata")
+
+    assert not spw_store.exists(".zmetadata")
+    xds_from_zarr(spw_store)
+    assert spw_store.exists(".zmetadata")
+
+
 def zarr_tester(ms, spw_table, ant_table,
                 zarr_store, spw_store, ant_store):
 
