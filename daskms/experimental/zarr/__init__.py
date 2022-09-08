@@ -379,7 +379,7 @@ def xds_from_zarr(store, columns=None, chunks=None, **kwargs):
 
     # NOTE(JSKenyon): Iterating over all the zarr groups/arrays is VERY
     # expensive if the metadata has not been consolidated.
-    store_map = store.fs.get_mapper(f"{store.full_path}/{table_path}")
+    store_map = store.fs.get_mapper(f"{store.root}{store.fs.sep}{table_path}")
     zc.consolidate_metadata(store_map)
     table_group = zarr.open_consolidated(store_map)
 
