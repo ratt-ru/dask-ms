@@ -37,15 +37,15 @@ class DaskMSStore:
 
         full_url = self.fs.unstrip_protocol(self.map.root)
         self.storage_options = storage_options
-        self.protocol, path = fsspec.core.split_protocol(full_url)
+        self.protocol, self.root = fsspec.core.split_protocol(full_url)
 
         if table:
-            self.canonical_path = f"{path}::{table}"
-            self.full_path = f"{path}{self.fs.sep}{table}"
+            self.canonical_path = f"{self.root}::{table}"
+            self.full_path = f"{self.root}{self.fs.sep}{table}"
             self.table = table
         else:
-            self.canonical_path = path
-            self.full_path = path
+            self.canonical_path = self.root
+            self.full_path = self.root
             self.table = None
 
     def type(self):
