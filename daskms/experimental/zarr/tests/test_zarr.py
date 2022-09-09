@@ -69,36 +69,45 @@ def test_xds_to_zarr_coords(tmp_path_factory):
             assert_array_equal(v.data, getattr(nds, c).data)
 
 
-def test_metadata_consolidation(ms, spw_table, ant_table, tmp_path_factory):
+@pytest.mark.parametrize("consolidated", [True, False])
+def test_metadata_consolidation(ms, ant_table, tmp_path_factory, consolidated):
     zarr_dir = tmp_path_factory.mktemp("zarr_store") / "test.zarr"
-    spw_dir = zarr_dir.parent / f"{zarr_dir.name}::SPECTRAL_WINDOW"
     ant_dir = zarr_dir.parent / f"{zarr_dir.name}::ANTENNA"
 
     main_store = DaskMSStore(zarr_dir)
-    spw_store = DaskMSStore(spw_dir)
     ant_store = DaskMSStore(ant_dir)
 
     ms_datasets = xds_from_ms(ms)
-    spw_datasets = xds_from_table(spw_table, group_cols="__row__")
     ant_datasets = xds_from_table(ant_table)
 
-    main_store_writes = xds_to_zarr(ms_datasets, main_store)
+    for ds in ms_datasets:
+        ds.DATA.attrs["test-meta"] = {"payload": "foo"}
+
+    for ds in ant_datasets:
+        ds.POSITION.attrs["test-meta"] = {"payload": "foo"}
+
+    main_store_writes = xds_to_zarr(ms_datasets, main_store,
+                                    consolidated=consolidated)
     writes = [main_store_writes]
-    writes.extend(xds_to_zarr(spw_datasets, spw_store))
-    writes.extend(xds_to_zarr(ant_datasets, ant_store))
+    writes.extend(xds_to_zarr(ant_datasets, ant_store,
+                              consolidated=consolidated))
     dask.compute(writes)
 
-    assert not main_store.exists("MAIN/.zmetadata")
-    xds_from_zarr(main_store)
-    assert main_store.exists("MAIN/.zmetadata")
+    assert main_store.exists("MAIN/.zmetadata") is consolidated
+    assert ant_store.exists(".zmetadata") is consolidated
 
-    assert not ant_store.exists(".zmetadata")
-    xds_from_zarr(ant_store)
-    assert ant_store.exists(".zmetadata")
+    if consolidated:
+        with main_store.open("MAIN/.zmetadata") as f:
+            assert "test-meta".encode("utf8") in f.read()
 
-    assert not spw_store.exists(".zmetadata")
-    xds_from_zarr(spw_store)
-    assert spw_store.exists(".zmetadata")
+        with ant_store.open(".zmetadata") as f:
+            assert "test-meta".encode("utf8") in f.read()
+
+    for ds in xds_from_zarr(main_store, consolidated=consolidated):
+        assert "test-meta" in ds.DATA.attrs
+
+    for ds in xds_from_zarr(ant_store, consolidated=consolidated):
+        assert "test-meta" in ds.POSITION.attrs
 
 
 def zarr_tester(ms, spw_table, ant_table,

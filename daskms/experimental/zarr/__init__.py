@@ -89,6 +89,7 @@ def create_array(ds_group, column, column_schema,
                                      exact=True)
 
     array.attrs[DASKMS_ATTR_KEY] = {
+        **column_schema.attrs,
         "dims": column_schema.dims,
         "coordinate": coordinate,
         "array_type": encode_type(column_schema.type),
@@ -140,7 +141,6 @@ def get_group_chunks(group):
 
 
 def maybe_rechunk(dataset, group, rechunk=False):
-
     group_chunks = get_group_chunks(group)
     dataset_chunks = dataset.chunks
 
@@ -230,7 +230,8 @@ def _gen_writes(variables, chunks, factory, indirect_dims=False):
 
 @requires("pip install dask-ms[zarr] for zarr support",
           zarr_import_error)
-def xds_to_zarr(xds, store, columns=None, rechunk=False, **kwargs):
+def xds_to_zarr(xds, store, columns=None,
+                rechunk=False, consolidated=True, **kwargs):
     """
     Stores a dataset of list of datasets defined by `xds` in
     file location `store`.
@@ -248,6 +249,8 @@ def xds_to_zarr(xds, store, columns=None, rechunk=False, **kwargs):
     rechunk : bool
         Controls whether dask arrays should be automatically rechunked to be
         consistent with existing on-disk zarr arrays while writing to disk.
+    consolidated : bool
+        Controls whether metadata is consolidated
     **kwargs : optional
 
     Returns
@@ -283,7 +286,6 @@ def xds_to_zarr(xds, store, columns=None, rechunk=False, **kwargs):
     write_datasets = []
 
     for di, ds in enumerate(xds):
-
         data_vars, coords = select_vars_and_coords(ds, columns)
 
         # Create a new ds which is consistent with what we want to write.
@@ -307,6 +309,12 @@ def xds_to_zarr(xds, store, columns=None, rechunk=False, **kwargs):
 
         write_datasets.append(Dataset(data_vars, attrs=attrs))
 
+    if consolidated:
+        table_path = store.table if store.table else "MAIN"
+        store_path = f"{store.root}{store.fs.sep}{table_path}"
+        store_map = store.fs.get_mapper(store_path)
+        zc.consolidate_metadata(store_map)
+
     return write_datasets
 
 
@@ -324,7 +332,8 @@ def group_sortkey(element):
 
 @requires("pip install dask-ms[zarr] for zarr support",
           zarr_import_error)
-def xds_from_zarr(store, columns=None, chunks=None, **kwargs):
+def xds_from_zarr(store, columns=None, chunks=None,
+                  consolidated=True, **kwargs):
     """
     Reads the zarr data store in `store` and returns list of
     Dataset's containing the data.
@@ -338,6 +347,8 @@ def xds_from_zarr(store, columns=None, chunks=None, **kwargs):
         Otherwise, a list of columns should be supplied.
     chunks: dict or list of dicts
         chunking schema for each dataset
+    consolidated : bool
+        If True, attempt to read consolidated metadata
     **kwargs: optional
 
     Returns
@@ -377,11 +388,12 @@ def xds_from_zarr(store, columns=None, chunks=None, **kwargs):
     numpy_vars = []
     table_path = store.table if store.table else "MAIN"
 
-    # NOTE(JSKenyon): Iterating over all the zarr groups/arrays is VERY
-    # expensive if the metadata has not been consolidated.
     store_map = store.fs.get_mapper(f"{store.root}{store.fs.sep}{table_path}")
-    zc.consolidate_metadata(store_map)
-    table_group = zarr.open_consolidated(store_map)
+
+    try:
+        table_group = zarr.open_consolidated(store_map)
+    except KeyError:
+        table_group = zarr.open_group(store_map)
 
     for g, (group_name, group) in enumerate(sorted(table_group.groups(),
                                                    key=group_sortkey)):
