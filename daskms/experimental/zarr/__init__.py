@@ -1,3 +1,6 @@
+from functools import reduce
+from itertools import product
+from operator import mul
 from pathlib import Path
 
 import dask
@@ -81,6 +84,24 @@ def create_array(ds_group, column, column_schema,
         chunks = column_schema.chunks
 
     zchunks = zarr_chunks(column, column_schema.dims, chunks)
+
+    for chunk in product(zchunks):
+        if column_schema.dtype == object:
+            if reduce(mul, chunk, 32) > 2**(32 - 1):
+                raise ValueError(
+                    f"Column {column} has an object dtype. "
+                    f"Given an estimate of 32 bytes per entry "
+                    f"the chunk of dimensions {chunk}"
+                    f"may exceed zarr's 2GiB chunk limit"
+                )
+        else:
+            size = np.dtype(column_schema.dtype).itemsize
+            if reduce(mul, chunk, size) > 2**(32 - 1):
+                raise ValueError(
+                    f"Column {column} has a chunk of "
+                    f"dimension {chunk} that will exceed "
+                    f"zarr's 2GiB chunk limit"
+                )
 
     array = ds_group.require_dataset(column, column_schema.shape,
                                      chunks=zchunks,
