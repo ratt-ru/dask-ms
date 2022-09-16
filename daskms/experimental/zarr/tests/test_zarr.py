@@ -371,3 +371,24 @@ def test_add_datavars(ms, tmp_path_factory, prechunking, postchunking):
 
     assert all([ds.DUMMY.chunks == cds.DATA.chunks
                 for ds, cds in zip(augmented_datasets, chunked_datasets)])
+
+
+def test_zarr_2gb_limit(ms, tmp_path_factory):
+    store = tmp_path_factory.mktemp("zarr_store")
+
+    chunk = (1024, 1024, 1024)
+    datasets = Dataset({
+        "DATA": (("x", "y", "z"),
+                 da.zeros(chunk, chunks=chunk, dtype=np.uint16))
+    })
+
+    with pytest.raises(ValueError, match="2GiB chunk limit"):
+        xds_to_zarr(datasets, store)
+
+    chunk = (1024, 1024, 999)
+    datasets = Dataset({
+        "DATA": (("x", "y", "z"),
+                 da.zeros(chunk, chunks=chunk, dtype=np.uint16))
+    })
+
+    xds_to_zarr(datasets, store)
