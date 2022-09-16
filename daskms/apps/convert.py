@@ -1,6 +1,7 @@
 import abc
 import ast
 from argparse import ArgumentTypeError
+from collections import defaultdict
 from functools import partial
 import logging
 from pathlib import Path
@@ -283,6 +284,27 @@ def _check_output_path(output: str):
     return DaskMSStore(output)
 
 
+def _check_exclude_columns(columns: str):
+    outputs = defaultdict(list)
+
+    for column in (c.strip() for c in columns.split(",")):
+        bits = column.split("::")
+
+        if len(bits) == 2:
+            table, column = bits
+        elif len(bits) == 1:
+            table, column = "MAIN", bits
+        else:
+            raise ValueError(
+                f"Excluded columns must be of the form "
+                f"COLUMN or SUBTABLE::COLUMN. "
+                f"Received {column}")
+
+        outputs[table].append(column)
+
+    return outputs
+
+
 def parse_chunks(chunks: str):
     return ChunkTransformer().visit(ast.parse(chunks))
 
@@ -306,11 +328,20 @@ class Convert(Application):
         parser.add_argument("input", type=_check_input_path)
         parser.add_argument("-o", "--output", type=_check_output_path,
                             required=True)
+        parser.add_argument("-x", "--exclude", type=_check_exclude_columns,
+                            default="",
+                            help="Comma-separated list of columns to exclude. "
+                                 "For example 'CORRECTED_DATA,"
+                                 "SPECTRAL_WINDOW::EFFECTIVE_BW' "
+                                 "will exclude 'CORRECTED_DATA "
+                                 "from the main table and "
+                                 "EFFECTIVE_BW from the SPECTRAL_WINDOW "
+                                 "subtable")
         parser.add_argument("-g", "--group-columns",
                             type=Convert.col_converter,
                             default="",
-                            help="Columns to group or partition "
-                                 "the input dataset by. "
+                            help="Comma-separatred list of columns to group "
+                                 "or partition the input dataset by. "
                                  "This defaults to the default "
                                  "for the underlying storage mechanism."
                                  "This is only supported when converting "
@@ -392,6 +423,10 @@ class Convert(Application):
             datasets = [ds.drop_vars("ROWID", errors="ignore")
                         for ds in datasets]
 
+        for exclude_column in args.exclude.get("MAIN", []):
+            datasets = [ds.drop_vars(exclude_column, errors="ignore")
+                        for ds in datasets]
+
         if isinstance(out_fmt, CasaFormat):
             # Reintroduce any grouping columns
             datasets = self._expand_group_columns(datasets, args)
@@ -420,6 +455,10 @@ class Convert(Application):
                 datasets = reader(in_store, group_cols="__row__")
             else:
                 datasets = reader(in_store)
+
+            for exclude_column in args.exclude.get(table, []):
+                datasets = [ds.drop_vars(exclude_column, errors="ignore")
+                            for ds in datasets]
 
             if isinstance(in_fmt, CasaFormat):
                 datasets = [ds.drop_vars("ROWID", errors="ignore")

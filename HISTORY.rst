@@ -4,6 +4,8 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Add a ``--exclude`` argument to ``dask-ms convert`` that allows
+  columns to be excluded during conversion (:pr:`246`).
 * Make ``--output`` a required ``dask-ms convert`` argument.
 
 
