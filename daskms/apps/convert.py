@@ -304,7 +304,8 @@ class Convert(Application):
     @classmethod
     def setup_parser(cls, parser):
         parser.add_argument("input", type=_check_input_path)
-        parser.add_argument("-o", "--output", type=_check_output_path)
+        parser.add_argument("-o", "--output", type=_check_output_path,
+                            required=True)
         parser.add_argument("-g", "--group-columns",
                             type=Convert.col_converter,
                             default="",
