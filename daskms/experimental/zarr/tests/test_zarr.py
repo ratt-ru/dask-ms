@@ -373,7 +373,7 @@ def test_add_datavars(ms, tmp_path_factory, prechunking, postchunking):
                 for ds, cds in zip(augmented_datasets, chunked_datasets)])
 
 
-def test_zarr_2gb_limit(ms, tmp_path_factory):
+def test_zarr_2gb_limit(tmp_path_factory):
     store = tmp_path_factory.mktemp("zarr_store")
 
     chunk = (1024, 1024, 1024)
