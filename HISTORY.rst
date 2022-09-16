@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Fail if zarr chunks exceed 2GB (:pr:`247`)
 * Add a ``--exclude`` argument to ``dask-ms convert`` that allows
   columns to be excluded during conversion (:pr:`246`).
 * Make ``--output`` a required ``dask-ms convert`` argument (:pr:`245`).
