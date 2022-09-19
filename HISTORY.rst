@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Don't force conversion to tuple during attribute decoding (:pr:`248`)
 * Fail if zarr chunks exceed 2GB (:pr:`247`)
 * Add a ``--exclude`` argument to ``dask-ms convert`` that allows
   columns to be excluded during conversion (:pr:`246`).
