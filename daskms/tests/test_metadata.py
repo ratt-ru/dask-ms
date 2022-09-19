@@ -4,6 +4,7 @@ import pyrap.tables as pt
 from daskms.constants import DASKMS_METADATA
 from daskms import xds_from_storage_ms, xds_to_table
 
+
 def test_provenance(ms, tmp_path_factory):
     datasets = xds_from_storage_ms(ms)
 

@@ -363,7 +363,6 @@ class DatasetFactory(object):
             DASKMS_PARTITION_KEY: {}
         }
 
-
         return Dataset(variables, coords=coords, attrs=attrs)
 
     def _group_datasets(self, table_proxy, groups, exemplar_rows, orders):

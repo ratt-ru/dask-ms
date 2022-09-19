@@ -167,7 +167,8 @@ def test_ms_update(ms, group_cols, index_cols, select_cols):
         assert_array_equal(ds.STATE_ID.data, state)
         assert_array_equal(ds.DATA.data, data)
 
-        assert ds.attrs[DASKMS_PARTITION_KEY] == xds[i].attrs[DASKMS_PARTITION_KEY]
+        orig_part_key = xds[i].attrs[DASKMS_PARTITION_KEY]
+        assert ds.attrs[DASKMS_PARTITION_KEY] == orig_part_key
         assert ds.attrs[DASKMS_METADATA]["provenance"] == [ms]
         assert len(ds.attrs[DASKMS_PARTITION_KEY]) == len(group_cols)
 
