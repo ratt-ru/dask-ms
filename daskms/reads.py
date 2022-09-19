@@ -14,7 +14,7 @@ from daskms.columns import (
     dim_extents_array,
     infer_dtype,
 )
-from daskms.constants import DASKMS_PARTITION_KEY
+from daskms.constants import DASKMS_PARTITION_KEY, DASKMS_METADATA
 from daskms.ordering import (
     ordering_taql,
     row_ordering,
@@ -318,6 +318,20 @@ class DatasetFactory(object):
             __executor_key__=executor_key(self.canonical_name),
         )
 
+    def _metadata(self, table_proxy):
+        """ Create daskms metadata """
+        metadata = table_proxy.getdesc().result().get(DASKMS_METADATA, {})
+        provenance = metadata.setdefault("provenance", [])
+
+        try:
+            provenance.remove(self.table_path)
+        except ValueError:
+            pass
+
+        provenance.append(self.table_path)
+
+        return metadata
+
     def _table_schema(self):
         return lookup_table_schema(self.canonical_name, self.table_schema)
 
@@ -344,7 +358,11 @@ class DatasetFactory(object):
         else:
             coords = {"ROWID": rowid}
 
-        attrs = {DASKMS_PARTITION_KEY: ()}
+        attrs = {
+            DASKMS_METADATA: self._metadata(table_proxy),
+            DASKMS_PARTITION_KEY: {}
+        }
+
 
         return Dataset(variables, coords=coords, attrs=attrs)
 
@@ -400,7 +418,10 @@ class DatasetFactory(object):
             partitions = tuple(
                 (c, g.dtype.name) for c, g in zip(self.group_cols, group_id)
             )
-            attrs = {DASKMS_PARTITION_KEY: partitions}
+            attrs = {
+                DASKMS_METADATA: self._metadata(table_proxy),
+                DASKMS_PARTITION_KEY: partitions
+            }
 
             # Use python types which are json serializable
             group_id = [gid.item() for gid in group_id]

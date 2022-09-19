@@ -29,6 +29,7 @@ _proxied_methods = [
     ("nrows", READLOCK),
     ("colnames", READLOCK),
     ("getcoldesc", READLOCK),
+    ("getdesc", READLOCK),
     ("getdminfo", READLOCK),
     ("iswritable", READLOCK),
     # Modification

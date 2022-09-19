@@ -10,7 +10,7 @@ import numpy as np
 import pyrap.tables as pt
 
 from daskms.columns import dim_extents_array
-from daskms.constants import DASKMS_PARTITION_KEY
+from daskms.constants import DASKMS_METADATA, DASKMS_PARTITION_KEY
 from daskms.dataset import Dataset
 from daskms.dataset_schema import DatasetSchema
 from daskms.descriptors.builder import AbstractDescriptorBuilder
@@ -20,7 +20,7 @@ from daskms.ordering import row_run_factory
 from daskms.table import table_exists
 from daskms.table_executor import executor_key
 from daskms.table_proxy import TableProxy, WRITELOCK
-from daskms.utils import table_path_split
+from daskms.utils import table_path_split, freeze
 
 
 log = logging.getLogger(__name__)
@@ -566,6 +566,17 @@ def _write_datasets(
     table_name = "::".join((table_name, subtable)) if subtable else table_name
     row_orders = []
 
+    fmeta = set(freeze(ds.attrs.get(DASKMS_METADATA, {})) for ds in datasets)
+
+    if not len(fmeta) == 1:
+        raise ValueError(f"{DASKMS_METADATA} is not consistent across datasets")
+
+    table_keywords = table_keywords or {}
+    table_metadata = table_keywords.get(DASKMS_METADATA, {})
+    table_keywords[DASKMS_METADATA] = {**datasets[0].attrs[DASKMS_METADATA], **table_metadata}
+    provenance = table_keywords[DASKMS_METADATA].setdefault("provenance", [])
+    provenance.append(table)
+
     # Put table and column keywords
     table_proxy.submit(
         _put_keywords, WRITELOCK, table_keywords, column_keywords
@@ -709,14 +720,14 @@ DELKW = object()
 
 
 def _put_keywords(table, table_keywords, column_keywords):
-    if table_keywords is not None:
+    if table_keywords:
         for k, v in table_keywords.items():
             if v == DELKW:
                 table.removekeyword(k)
             else:
                 table.putkeyword(k, v)
 
-    if column_keywords is not None:
+    if column_keywords:
         for column, keywords in column_keywords.items():
             for k, v in keywords.items():
                 if v == DELKW:

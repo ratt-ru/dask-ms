@@ -14,7 +14,7 @@ try:
 except ImportError:
     from dask.utils import key_split
 
-from daskms.constants import DASKMS_PARTITION_KEY
+from daskms.constants import DASKMS_PARTITION_KEY, DASKMS_METADATA
 from daskms.dask_ms import xds_from_ms, xds_from_table, xds_to_table
 from daskms.query import orderby_clause, where_clause
 from daskms.table_proxy import TableProxy, taql_factory
@@ -146,12 +146,14 @@ def test_ms_update(ms, group_cols, index_cols, select_cols):
         for k, _ in nds.attrs[DASKMS_PARTITION_KEY]:
             assert getattr(write, k) == getattr(nds, k)
 
+        assert ds.attrs[DASKMS_METADATA]["provenance"] == [ms]
+
         writes.append(write)
 
     # Do all writes in parallel
     dask.compute(writes)
 
-    xds = xds_from_ms(
+    rxds = xds_from_ms(
         ms,
         columns=select_cols,
         group_cols=group_cols,
@@ -160,11 +162,14 @@ def test_ms_update(ms, group_cols, index_cols, select_cols):
     )
 
     # Check that state and data have been correctly written
-    it = enumerate(zip(xds, written_states, written_data))
+    it = enumerate(zip(rxds, written_states, written_data))
     for i, (ds, state, data) in it:
         assert_array_equal(ds.STATE_ID.data, state)
         assert_array_equal(ds.DATA.data, data)
 
+        assert ds.attrs[DASKMS_PARTITION_KEY] == xds[i].attrs[DASKMS_PARTITION_KEY]
+        assert ds.attrs[DASKMS_METADATA]["provenance"] == [ms]
+        assert len(ds.attrs[DASKMS_PARTITION_KEY]) == len(group_cols)
 
 @pytest.mark.parametrize(
     "index_cols",
