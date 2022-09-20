@@ -15,6 +15,7 @@ jobs:
           ${{ toJson(github.event) }}
           MESSAGE
   lint:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -50,7 +51,6 @@ jobs:
 
       - name: Lint
         run: poetry run black daskms/
-
 
   test:
     needs: check_skip
