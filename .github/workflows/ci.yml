@@ -31,12 +31,14 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Cache Poetry Install
+        id: cache-poetry
         uses: actions/cache@v2
         with:
           path: ~/.local
           key: poetry-${{ matrix.poetry-version }}-0
 
       - name: Install Poetry
+        if: ${{ steps.cache-poetry.outputs.cache-hit != 'true' }}
         uses: abatilo/actions-poetry@v2
         with:
           poetry-version: ${{ matrix.poetry-version }}
