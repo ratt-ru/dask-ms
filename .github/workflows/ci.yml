@@ -30,12 +30,12 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Cache Poetry Install
-        id: cache-poetry
-        uses: actions/cache@v2
+      - name: Cache Installations
+        id: cache-installs
+        uses: actions/cache@v3
         with:
           path: ~/.local
-          key: poetry-${{ matrix.poetry-version }}-0
+          key: poetry-${{ matrix.python-version }}-${{ ${{ matrix.poetry-version }}-0
 
       - name: Install Poetry
         if: ${{ steps.cache-poetry.outputs.cache-hit != 'true' }}
@@ -52,16 +52,29 @@ jobs:
           fetch-depth: 1
 
       - name: Install dask-ms base
-        run: poetry install --extras testing
+        run: poetry install --extras testing arrow zarr
 
       - name: Test dask-ms base
         run: poetry run py.test -s -vvv daskms/
 
-      # - name: Install dask-ms
-      #   run: pipenv install .[testing,arrow,zarr]
+      - name: Install dask-ms base
+        run: poetry install --extras testing arrow zarr s3 xarray
 
-      # - name: Run base test suite
-      #   run: pipenv run py.test --flake8 -s -vvv daskms/
+      - name: Install Minio Server and Client
+        run: |
+          mkdir -p ~/.local/bin
+          cd ~/.local/bin
+          wget -q -c https://dl.min.io/server/minio/release/linux-amd64/minio
+          wget -q -c https://dl.min.io/client/mc/release/linux-amd64/mc
+          chmod a+x minio
+          chmod a+x mc
+          echo ~/.local/bin" >> $GITHUB_PATH
+
+      - name: Run minio
+        run: |
+          pipenv run minio --help
+          pipenv run mc --help
+
 
       # - name: Install dask-ms with xarray support
       #   run: pipenv install .[testing,arrow,xarray,zarr,s3]
