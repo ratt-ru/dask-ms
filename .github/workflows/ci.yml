@@ -99,13 +99,13 @@ jobs:
 
       - name: Install Minio Server and Client
         run: |
-          mkdir -p ${HOME}/.local/bin
-          cd ${HOME}/.local/bin
+          mkdir -p "${HOME}/.local/bin"
+          cd "${HOME}/.local/bin"
           wget -q -c https://dl.min.io/server/minio/release/linux-amd64/minio
           wget -q -c https://dl.min.io/client/mc/release/linux-amd64/mc
           chmod a+x minio
           chmod a+x mc
-          echo ${HOME}/.local/bin" >> $GITHUB_PATH
+          echo "${HOME}/.local/bin" >> $GITHUB_PATH
 
       - name: Test minio run
         run: |
