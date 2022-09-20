@@ -20,12 +20,17 @@ jobs:
       fail-fast: false
       matrix:
         poetry-version: ["1.2.1"]
-        python-version: ["3.8", "3.9", "3.10"]
+        python-version: ["3.8"]
     steps:
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
+
+      - name: Checkout source
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
 
       - name: Cache Installations
         id: cache-installs
