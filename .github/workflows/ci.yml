@@ -44,17 +44,16 @@ jobs:
       - name: View poetry --help
         run: poetry --help
 
-      # - name: Upgrade pip and setuptools
-      #   run: >
-      #     python -m pip install -U
-      #     pip
-      #     setuptools
-      #     pipenv
+      - name: Checkout source
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
 
-      # - name: Checkout source
-      #   uses: actions/checkout@v2
-      #   with:
-      #     fetch-depth: 1
+      - name: Install dask-ms base
+        run: poetry install --extras testing
+
+      - name: Test dask-ms base
+        run: poetry run py.test -s -vvv daskms/
 
       # - name: Install dask-ms
       #   run: pipenv install .[testing,arrow,zarr]
