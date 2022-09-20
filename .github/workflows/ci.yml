@@ -2,6 +2,9 @@ name: Ubuntu CI
 
 on: [push, pull_request]
 
+env:
+  POETRY_VERSION: 1.2.1
+
 jobs:
   check_skip:
     runs-on: ubuntu-latest
@@ -20,7 +23,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        poetry-version: ["1.2.1"]
         python-version: ["3.8"]
     steps:
       - name: Set up Python ${{ matrix.python-version }}
@@ -38,13 +40,13 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.local
-          key: poetry-${{ matrix.python-version }}-${{ matrix.poetry-version }}-0
+          key: poetry-${{ matrix.python-version }}-${{ env.POETRY_VERSION }}-0
 
       - name: Install Poetry
         if: ${{ steps.cache-poetry.outputs.cache-hit != 'true' }}
         uses: abatilo/actions-poetry@v2
         with:
-          poetry-version: ${{ matrix.poetry-version }}
+          poetry-version: ${{ env.POETRY_VERSION }}
 
       - name: Install dev dependencies
         run: poetry install --with dev
@@ -78,13 +80,13 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.local
-          key: poetry-${{ matrix.python-version }}-${{ matrix.poetry-version }}-0
+          key: poetry-${{ matrix.python-version }}-${{ env.POETRY_VERSION }}-0
 
       - name: Install Poetry
         if: ${{ steps.cache-poetry.outputs.cache-hit != 'true' }}
         uses: abatilo/actions-poetry@v2
         with:
-          poetry-version: ${{ matrix.poetry-version }}
+          poetry-version: ${{ env.POETRY_VERSION }}
 
       - name: Checkout source
         uses: actions/checkout@v2
