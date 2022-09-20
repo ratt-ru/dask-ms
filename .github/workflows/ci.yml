@@ -32,7 +32,7 @@ jobs:
 
       - name: Cache Installations
         id: cache-installs
-        uses: actions/cache@v3
+        uses: actions/cache@v2
         with:
           path: ~/.local
           key: poetry-${{ matrix.python-version }}-${{ ${{ matrix.poetry-version }}-0
