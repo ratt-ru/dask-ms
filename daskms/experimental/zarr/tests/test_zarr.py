@@ -247,7 +247,7 @@ def test_xarray_to_zarr(ms, tmp_path_factory):
 
 
 def _fasteners_runner(lockfile):
-    fasteners = pytest.importorskip("fasteners")
+    import fasteners
     from pathlib import Path
     import json
 
@@ -274,6 +274,7 @@ def _fasteners_runner(lockfile):
 
 
 def test_fasteners(ms, tmp_path_factory):
+    fasteners = pytest.importorskip("fasteners")
     lockfile = tmp_path_factory.mktemp("fasteners-") / "dir" / ".lock"
 
     from pprint import pprint
