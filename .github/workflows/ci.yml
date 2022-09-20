@@ -52,13 +52,13 @@ jobs:
           fetch-depth: 1
 
       - name: Install dask-ms base
-        run: poetry install --extras testing arrow zarr
+        run: poetry install --extras "testing arrow zarr"
 
       - name: Test dask-ms base
         run: poetry run py.test -s -vvv daskms/
 
       - name: Install dask-ms base
-        run: poetry install --extras testing arrow zarr s3 xarray
+        run: poetry install --extras "complete"
 
       - name: Install Minio Server and Client
         run: |
