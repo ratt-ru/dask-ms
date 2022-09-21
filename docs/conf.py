@@ -34,14 +34,14 @@ class Mock(MagicMock):
     @classmethod
     def __getattr__(cls, name):
         obj = MagicMock()
-        obj.__name__ = "name"
+        obj.__name__ = name
         obj.__doc__ = "doc"
         return obj
 
-autodoc_mock_imports = ["appdirs", "dask", "donfig", "fsspec", "numpy", "pyrap", "s3fs", "xarray"]
+#autodoc_mock_imports = ["appdirs", "dask", "donfig", "fsspec", "numpy", "pyrap", "s3fs", "xarray"]
 
 MOCK_MODULES = {}
-_MOCK_MODULES = ['appdirs', 'dask', 'dask.array', 'dask.base', 'dask.sizeof', 'dask.utils',
+_MOCK_MODULES = ['appdirs', 'dask',
                  'donfig', 'fsspec', 'numpy', 'pyrap', 'pyrap.tables',
                  's3fs', 'xarray']
 
@@ -55,7 +55,7 @@ for m in _MOCK_MODULES:
     except ImportError:
         MOCK_MODULES[m] = Mock()
 
-# sys.modules.update((k, v) for k, v in MOCK_MODULES.items())
+sys.modules.update((k, v) for k, v in MOCK_MODULES.items())
 
 import daskms  # noqa
 
