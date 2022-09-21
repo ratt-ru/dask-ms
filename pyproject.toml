@@ -36,17 +36,9 @@ tbump = "^6.9.0"
 pre-commit = "^2.20.0"
 black = "^22.8.0"
 
-
 [tool.poetry.group.docs.dependencies]
 Sphinx = "^5.1.1"
 numpydoc = "^1.4.0"
-numpy = "^1.23.3"
-dask = "^2022.9.1"
-donfig = "^0.7.0"
-s3fs = "^2022.8.2"
-fsspec = "^2022.8.2"
-xarray = "^2022.6.0"
-appdirs = "^1.4.4"
 
 [build-system]
 requires = ["setuptools", "poetry-core"]
