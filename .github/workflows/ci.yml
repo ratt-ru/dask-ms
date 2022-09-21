@@ -4,6 +4,9 @@ on: [push, pull_request]
 
 env:
   POETRY_VERSION: 1.2.1
+  MINIO_SERVER_URL: https://dl.min.io/server/minio/release/linux-amd64/minio_20220917000945.0.0_amd64.deb
+  MINIO_CLIENT_URL: https://dl.min.io/client/mc/release/linux-amd64/archive/mcli_20220916091647.0.0_amd64.deb
+  GHA_ENV_FILENAME: ~/.gha_env.txt
 
 jobs:
   check_skip:
@@ -25,6 +28,15 @@ jobs:
       matrix:
         python-version: ["3.8"]
     steps:
+      - name: Create environment file
+        run: |
+          cat << EOF > ${{ env.GHA_ENV_FILENAME }}
+          ${{ env.POETRY_VERSION }}
+          ${{ env.MINIO_SERVER_URL }}
+          ${{ env.MINIO_CLIENT_URL }}
+          ${{ matrix.python-version }}
+          EOF
+
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
         with:
@@ -40,7 +52,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.local
-          key: poetry-${{ matrix.python-version }}-${{ env.POETRY_VERSION }}-0
+          key: local-${{ hashFiles(env.GHA_ENV_FILENAME) }}-0
 
       - name: Install Poetry
         if: ${{ steps.cache-poetry.outputs.cache-hit != 'true' }}
@@ -64,6 +76,15 @@ jobs:
         python-version: ["3.8", "3.9", "3.10"]
 
     steps:
+      - name: Create environment file
+        run: |
+          cat << EOF > ${{ env.GHA_ENV_FILENAME }}
+          ${{ env.POETRY_VERSION }}
+          ${{ env.MINIO_SERVER_URL }}
+          ${{ env.MINIO_CLIENT_URL }}
+          ${{ matrix.python-version }}
+          EOF
+
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
         with:
@@ -79,7 +100,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.local
-          key: poetry-${{ matrix.python-version }}-${{ env.POETRY_VERSION }}-0
+          key: local-${{ hashFiles(env.GHA_ENV_FILENAME) }}-0
 
       - name: Install Poetry
         if: ${{ steps.cache-poetry.outputs.cache-hit != 'true' }}
