@@ -40,8 +40,9 @@ class Mock(MagicMock):
 
 
 MOCK_MODULES = {}
-_MOCK_MODULES = ['dask', 'dask.array', 'dask.sizeof', 'numpy',
-                 'pyrap', 'pyrap.tables', 'xarray']
+_MOCK_MODULES = ['dask', 'dask.array', 'dask.sizeof', 'fsspec',
+                 'numpy', 'pyrap', 'pyrap.tables', 'xarray',
+                 's3fs']
 
 # Don't mock if we can import it.
 # This allows us to build locally without
