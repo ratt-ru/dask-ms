@@ -41,9 +41,7 @@ class Mock(MagicMock):
 #autodoc_mock_imports = ["appdirs", "dask", "donfig", "fsspec", "numpy", "pyrap", "s3fs", "xarray"]
 
 MOCK_MODULES = {}
-_MOCK_MODULES = ['appdirs', 'dask',
-                 'donfig', 'fsspec', 'numpy', 'pyrap', 'pyrap.tables',
-                 's3fs', 'xarray']
+_MOCK_MODULES = ['pyrap', 'pyrap.tables']
 
 # Don't mock if we can import it.
 # This allows us to build locally without
