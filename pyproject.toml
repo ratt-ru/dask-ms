@@ -36,6 +36,12 @@ tbump = "^6.9.0"
 pre-commit = "^2.20.0"
 black = "^22.8.0"
 
+
+[tool.poetry.group.docs.dependencies]
+Sphinx = "^5.1.1"
+numpydoc = "^1.4.0"
+numpy = "^1.23.3"
+
 [build-system]
 requires = ["setuptools", "poetry-core"]
 build-backend = "poetry.core.masonry.api"
