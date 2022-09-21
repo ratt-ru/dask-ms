@@ -4,9 +4,8 @@ on: [push, pull_request]
 
 env:
   POETRY_VERSION: 1.2.1
-  MINIO_SERVER_URL: https://dl.min.io/server/minio/release/linux-amd64/minio_20220917000945.0.0_amd64.deb
-  MINIO_CLIENT_URL: https://dl.min.io/client/mc/release/linux-amd64/archive/mcli_20220916091647.0.0_amd64.deb
-  GHA_ENV_FILENAME: ~/.gha_env.txt
+  MINIO_SERVER_DOWNLOAD_URL: https://dl.min.io/server/minio/release/linux-amd64/minio_20220917000945.0.0_amd64.deb
+  MINIO_CLIENT_DOWNLOAD_URL: https://dl.min.io/client/mc/release/linux-amd64/archive/mcli_20220916091647.0.0_amd64.deb
 
 jobs:
   check_skip:
@@ -28,14 +27,10 @@ jobs:
       matrix:
         python-version: ["3.8"]
     steps:
-      - name: Create environment file
+      - name: Create Cache hash
         run: |
-          cat << EOF > ${{ env.GHA_ENV_FILENAME }}
-          ${{ env.POETRY_VERSION }}
-          ${{ env.MINIO_SERVER_URL }}
-          ${{ env.MINIO_CLIENT_URL }}
-          ${{ matrix.python-version }}
-          EOF
+          export HASH=$(sha256sum ${{ env.poetry.version }}) | cut -c -16
+          echo "LINT_CACHE_HASH=$HASH" >> $GITHUB_ENV
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
@@ -52,7 +47,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.local
-          key: local-${{ hashFiles(env.GHA_ENV_FILENAME) }}-0
+          key: install-${{ env.LINT_CACHE_HASH }}
 
       - name: Install Poetry
         if: ${{ steps.cache-poetry.outputs.cache-hit != 'true' }}
@@ -76,14 +71,15 @@ jobs:
         python-version: ["3.8", "3.9", "3.10"]
 
     steps:
-      - name: Create environment file
+      - name: Create Cache Hash
         run: |
-          cat << EOF > ${{ env.GHA_ENV_FILENAME }}
+          export HASH=$(sha256sum <<EOT | cut -c -16
           ${{ env.POETRY_VERSION }}
-          ${{ env.MINIO_SERVER_URL }}
-          ${{ env.MINIO_CLIENT_URL }}
-          ${{ matrix.python-version }}
-          EOF
+          ${{ env.MINIO_SERVER_DOWNLOAD_URL }}
+          ${{ env.MINIO_CLIENT_DOWNLOAD_URL }}
+          EOT
+          )
+          echo "INSTALL_CACHE_HASH=$HASH" >> $GITHUB_ENV
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
@@ -100,24 +96,13 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.local
-          key: local-${{ hashFiles(env.GHA_ENV_FILENAME) }}-0
+          key: install-${{ env.INSTALL_CACHE_HASH }}-0
 
       - name: Install Poetry
-        if: ${{ steps.cache-poetry.outputs.cache-hit != 'true' }}
+        if: ${{ steps.cache_installs.outputs.cache-hit != 'true' }}
         uses: abatilo/actions-poetry@v2
         with:
           poetry-version: ${{ env.POETRY_VERSION }}
-
-      - name: Checkout source
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 1
-
-      - name: Install dask-ms base
-        run: poetry install --extras "testing arrow zarr"
-
-      - name: Test dask-ms base
-        run: poetry run py.test -s -vvv daskms/
 
       - name: Install Minio Server and Client
         run: |
@@ -134,11 +119,29 @@ jobs:
           poetry run minio --help
           poetry run mc --help
 
+      - name: Print PATH
+        run: python -c "import os; print(os.environ['PATH'].split(os.pathsep))"
+
+      - name: Checkout source
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+
+      # - name: Install dask-ms base
+      #   run: poetry install --extras "testing arrow zarr"
+
+      # - name: Test dask-ms base
+      #   run: poetry run py.test -s -vvv daskms/
+
       - name: Install dask-ms complete
         run: poetry install --extras "testing complete"
 
       - name: Test dask-ms complete
-        run: poetry run py.test -s -vvv daskms/
+        run: poetry run py.test -s -vvv daskms/ -k test_xds_to_zarr_s3
+
+      # - name: Debug with tmate on failure
+      #   if: ${{ failure() }}
+      #   uses: mxschmitt/action-tmate@v3
 
   deploy:
     needs: [test]
