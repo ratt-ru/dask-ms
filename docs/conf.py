@@ -40,7 +40,7 @@ class Mock(MagicMock):
 
 
 MOCK_MODULES = {}
-_MOCK_MODULES = ['appdirs', 'dask', 'dask.array', 'dask.sizeof',
+_MOCK_MODULES = ['appdirs', 'dask', 'dask.array', 'dask.sizeof', 'dask.utils',
                  'donfig', 'fsspec', 'numpy', 'pyrap', 'pyrap.tables',
                  's3fs', 'xarray']
 
