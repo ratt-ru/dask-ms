@@ -105,39 +105,39 @@ jobs:
           poetry-version: ${{ env.POETRY_VERSION }}
 
       - name: Install Minio Server and Client
+        if: ${{ steps.cache_installs.outputs.cache-hit != 'true' }}
         run: |
+          cd /tmp
+          wget -q -c ${{ env.MINIO_SERVER_DOWNLOAD_URL }} -O minio.deb
+          wget -q -c ${{ env.MINIO_CLIENT_DOWNLOAD_URL }} -O mcli.deb
+          dpkg-deb --extract minio.deb /tmp/minio
+          dpkg-deb --extract mcli.deb /tmp/mcli
           mkdir -p "${HOME}/.local/bin"
-          cd "${HOME}/.local/bin"
-          wget -q -c https://dl.min.io/server/minio/release/linux-amd64/minio
-          wget -q -c https://dl.min.io/client/mc/release/linux-amd64/mc
-          chmod a+x minio
-          chmod a+x mc
           echo "${HOME}/.local/bin" >> $GITHUB_PATH
+          install /tmp/minio/usr/local/bin/minio "${HOME}/.local/bin/minio"
+          install /tmp/mcli/usr/local/bin/mcli "${HOME}/.local/bin/mc"
 
       - name: Test minio run
         run: |
           poetry run minio --help
           poetry run mc --help
 
-      - name: Print PATH
-        run: python -c "import os; print(os.environ['PATH'].split(os.pathsep))"
-
       - name: Checkout source
         uses: actions/checkout@v2
         with:
           fetch-depth: 1
 
-      # - name: Install dask-ms base
-      #   run: poetry install --extras "testing arrow zarr"
+      - name: Install dask-ms base
+        run: poetry install --extras "testing arrow zarr"
 
-      # - name: Test dask-ms base
-      #   run: poetry run py.test -s -vvv daskms/
+      - name: Test dask-ms base
+        run: poetry run py.test -s -vvv daskms/
 
       - name: Install dask-ms complete
         run: poetry install --extras "testing complete"
 
       - name: Test dask-ms complete
-        run: poetry run py.test -s -vvv daskms/ -k test_xds_to_zarr_s3
+        run: poetry run py.test -s -vvv daskms/
 
       # - name: Debug with tmate on failure
       #   if: ${{ failure() }}
