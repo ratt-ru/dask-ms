@@ -19,48 +19,6 @@ jobs:
           github.event:
           ${{ toJson(github.event) }}
           MESSAGE
-  lint:
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.8"]
-    steps:
-      - name: Create Cache hash
-        run: |
-          export HASH=$(sha256sum ${{ env.poetry.version }}) | cut -c -16
-          echo "LINT_CACHE_HASH=$HASH" >> $GITHUB_ENV
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Checkout source
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 1
-
-      - name: Cache Installations
-        id: cache-installs
-        uses: actions/cache@v3
-        with:
-          path: ~/.local
-          key: install-${{ env.LINT_CACHE_HASH }}
-
-      - name: Install Poetry
-        if: ${{ steps.cache-poetry.outputs.cache-hit != 'true' }}
-        uses: abatilo/actions-poetry@v2
-        with:
-          poetry-version: ${{ env.POETRY_VERSION }}
-
-      - name: Install dev dependencies
-        run: poetry install --with dev
-
-      - name: Lint
-        run: poetry run black daskms/
-
   test:
     needs: check_skip
     runs-on: ubuntu-latest
