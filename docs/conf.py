@@ -163,7 +163,3 @@ intersphinx_mapping = {
     'python': ('https://docs.python.org/3/', None),
     'xarray': ('https://xarray.pydata.org/en/stable', None),
 }
-
-def setup(app):
-    app.add_css_file("css/dark.css")
-
