@@ -34,13 +34,16 @@ class ArrowSchema(DatasetSchema):
 
         for i, (dims, shape) in enumerate(it):
             if len(dims) == 0:
-                log.warning(f"Ignoring column {column} with "
-                            f"zero-length dims {schema.dims}")
+                log.warning(
+                    f"Ignoring column {column} with " f"zero-length dims {schema.dims}"
+                )
                 continue
 
             if dims[0] != "row":
-                log.warning(f"Ignoring column {column} without "
-                            f"'row' as the starting dimension {schema.dims}")
+                log.warning(
+                    f"Ignoring column {column} without "
+                    f"'row' as the starting dimension {schema.dims}"
+                )
                 continue
 
             new_dims.append(dims[1:])
@@ -66,8 +69,9 @@ class ArrowSchema(DatasetSchema):
         chunks = None
         attrs = {}
 
-        return ColumnSchema(typ.pop(), dims.pop(), dtype.pop(),
-                            chunks, shape.pop(), attrs)
+        return ColumnSchema(
+            typ.pop(), dims.pop(), dtype.pop(), chunks, shape.pop(), attrs
+        )
 
     @classmethod
     def unify_attrs(cls, attrs):
@@ -87,8 +91,9 @@ class ArrowSchema(DatasetSchema):
         set_attrs = set(attrs)
 
         if len(set_attrs) != 1:
-            raise ArrowUnificationError(f"Inconsistent dataset "
-                                        f"attributes {set_attrs}")
+            raise ArrowUnificationError(
+                f"Inconsistent dataset " f"attributes {set_attrs}"
+            )
 
         if next(iter(set_attrs)) == ():
             return {}
@@ -100,10 +105,10 @@ class ArrowSchema(DatasetSchema):
         schemas = list(map(DatasetSchema.from_dataset, datasets))
         unified_schema = unify_schemas(schemas)
 
-        data_vars = {c: cls.unify_column(c, s) for c, s
-                     in unified_schema.data_vars.items()}
-        coords = {c: cls.unify_column(c, s) for c, s
-                  in unified_schema.coords.items()}
+        data_vars = {
+            c: cls.unify_column(c, s) for c, s in unified_schema.data_vars.items()
+        }
+        coords = {c: cls.unify_column(c, s) for c, s in unified_schema.coords.items()}
 
         attrs = cls.unify_attrs(unified_schema.attrs)
 
@@ -125,7 +130,8 @@ class ArrowSchema(DatasetSchema):
                 schema.dtype,
                 schema.chunks,
                 schema.shape,
-                {**ds_column.attrs, **schema.attrs})
+                {**ds_column.attrs, **schema.attrs},
+            )
 
         for column, schema in self.coords.items():
             try:
@@ -139,7 +145,8 @@ class ArrowSchema(DatasetSchema):
                 schema.dtype,
                 schema.chunks,
                 schema.shape,
-                {**ds_column.attrs, **schema.attrs})
+                {**ds_column.attrs, **schema.attrs},
+            )
 
         attrs = {**dataset.attrs, **self.attrs}
 
@@ -149,8 +156,7 @@ class ArrowSchema(DatasetSchema):
     def to_arrow_schema(self):
         fields = []
 
-        variables = itertools.chain(self.data_vars.items(),
-                                    self.coords.items())
+        variables = itertools.chain(self.data_vars.items(), self.coords.items())
 
         for column, var in variables:
             if var.dtype == np.dtype(np.complex64):

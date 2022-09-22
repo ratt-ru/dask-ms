@@ -20,7 +20,7 @@ from daskms.utils import assert_liveness
 
 
 def test_table_proxy(ms):
-    """ Base table proxy test """
+    """Base table proxy test"""
     tp = TableProxy(pt.table, ms, ack=False, readonly=False)
     tq = TableProxy(pt.taql, f"SELECT UNIQUE ANTENNA1 FROM '{ms}'")
 
@@ -38,7 +38,7 @@ def test_table_proxy(ms):
 
 
 def test_table_proxy_pickling(ms):
-    """ Test table pickling """
+    """Test table pickling"""
     proxy = TableProxy(pt.table, ms, ack=False, readonly=False)
     proxy2 = pickle.loads(pickle.dumps(proxy))
 
@@ -54,7 +54,7 @@ def test_table_proxy_pickling(ms):
 
 
 def test_taql_proxy_pickling(ms):
-    """ Test taql pickling """
+    """Test taql pickling"""
     proxy = TableProxy(pt.taql, f"SELECT UNIQUE ANTENNA1 FROM '{ms}'")
     proxy2 = pickle.loads(pickle.dumps(proxy))
 
@@ -69,7 +69,7 @@ def test_taql_proxy_pickling(ms):
 
 @pytest.mark.parametrize("reverse", [True, False])
 def test_embedding_table_proxy_in_taql(ms, reverse):
-    """ Test using a TableProxy to create a TAQL TableProxy """
+    """Test using a TableProxy to create a TAQL TableProxy"""
     proxy = TableProxy(pt.table, ms, ack=False, readonly=True)
     query = "SELECT UNIQUE ANTENNA1 FROM $1"
     taql_proxy = TableProxy(taql_factory, query, tables=[proxy])
@@ -101,11 +101,12 @@ def test_proxy_dask_embedding(ms):
     Test that an embedded proxy in the graph stays alive
     and dies at the appropriate times
     """
+
     def _ant1_factory(ms):
         proxy = TableProxy(pt.table, ms, ack=False, readonly=False)
         nrows = proxy.nrows().result()
 
-        name = 'ant1'
+        name = "ant1"
         row_chunk = 2
         layers = {}
         chunks = []
@@ -146,40 +147,43 @@ def test_proxy_dask_embedding(ms):
 # that the cases produce the right results.
 # This isn't likely a big deal as the taql_factory readonly kwarg
 # exists to fix https://github.com/ska-sa/dask-ms/issues/73
-@pytest.mark.parametrize("readonly", [
-    # Boolean version
-    True,
-    False,
-    # Single value, gets expanded
-    [True],
-    [False],
-    # Double values
-    [True, False],
-    [True, True],
-    # Too many values, truncated
-    [True, False, True],
-])
+@pytest.mark.parametrize(
+    "readonly",
+    [
+        # Boolean version
+        True,
+        False,
+        # Single value, gets expanded
+        [True],
+        [False],
+        # Double values
+        [True, False],
+        [True, True],
+        # Too many values, truncated
+        [True, False, True],
+    ],
+)
 def test_taql_factory(ms, ant_table, readonly):
-    """ Test that we can do a somewhat complicated taql query """
+    """Test that we can do a somewhat complicated taql query"""
     ms_proxy = TableProxy(pt.table, ms, ack=False, readonly=True)
     ant_proxy = TableProxy(pt.table, ant_table, ack=False, readonly=True)
     query = "SELECT [SELECT NAME FROM $2][ANTENNA1] AS NAME FROM $1 "
-    taql_proxy = TableProxy(taql_factory, query, tables=[ms_proxy, ant_proxy],
-                            readonly=readonly)
+    taql_proxy = TableProxy(
+        taql_factory, query, tables=[ms_proxy, ant_proxy], readonly=readonly
+    )
 
     ant1 = ms_proxy.getcol("ANTENNA1").result()
     actual_ant_row_names = taql_proxy.getcol("NAME").result()
-    expected_ant_row_names = ['ANTENNA-%d' % i for i in ant1]
+    expected_ant_row_names = ["ANTENNA-%d" % i for i in ant1]
 
     assert_array_equal(actual_ant_row_names, expected_ant_row_names)
 
 
-ASCII_TABLE = (
-"""U     V      W         TIME        ANT1       ANT2      DATA
+ASCII_TABLE = """U     V      W         TIME        ANT1       ANT2      DATA
 R     R      R          D           I          I        X1,0
 124.011 54560.0  3477.1  43456789.0990    1      2        4.327 -0.1132
 34561.0 45629.3  3900.5  43456789.0990    1      3        5.398 0.4521
-""")  # noqa
+"""  # noqa
 
 
 @pytest.mark.parametrize("epochs", [10])
@@ -193,10 +197,10 @@ def test_proxy_finalization(tmpdir_factory, epochs, iterations):
     correctly finalized
     """
 
-    data_path = tmpdir_factory.mktemp('data')
-    ascii_desc = data_path.join('ascii.txt')
+    data_path = tmpdir_factory.mktemp("data")
+    ascii_desc = data_path.join("ascii.txt")
 
-    with open(str(ascii_desc), 'w') as f:
+    with open(str(ascii_desc), "w") as f:
         f.write(ASCII_TABLE)
 
     futures = []
@@ -210,9 +214,14 @@ def test_proxy_finalization(tmpdir_factory, epochs, iterations):
             for i in range(iterations):
                 path = data_path.join("CASA-%d-%d.table" % (e, i))
 
-                tab_fut = pool.submit(TableProxy, pt.tablefromascii,
-                                      str(path), str(ascii_desc), ack=False,
-                                      __executor_key__="epoch-%d" % i)
+                tab_fut = pool.submit(
+                    TableProxy,
+                    pt.tablefromascii,
+                    str(path),
+                    str(ascii_desc),
+                    ack=False,
+                    __executor_key__="epoch-%d" % i,
+                )
                 data = pool.submit(_getcol, tab_fut, "DATA")
                 u = pool.submit(_getcol, tab_fut, "U")
                 futures.append(data)

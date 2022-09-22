@@ -20,11 +20,7 @@ NOLOCK = 0
 READLOCK = 1
 WRITELOCK = 2
 
-_LOCKTYPE_STRINGS = {
-    0: 'NOLOCK',
-    1: 'READLOCK',
-    2: 'WRITELOCK'
-}
+_LOCKTYPE_STRINGS = {0: "NOLOCK", 1: "READLOCK", 2: "WRITELOCK"}
 
 
 # List of CASA Table methods to proxy and the appropriate locking mode
@@ -56,10 +52,11 @@ _proxied_methods = [
     ("putcellslice", WRITELOCK),
     ("putkeyword", WRITELOCK),
     ("putkeywords", WRITELOCK),
-    ("putcolkeywords", WRITELOCK)]
+    ("putcolkeywords", WRITELOCK),
+]
 
 
-_PROXY_DOCSTRING = ("""
+_PROXY_DOCSTRING = """
 Proxies calls to :func:`~pyrap.tables.table.%s`
 via a :class:`~concurrent.futures.ThreadPoolExecutor`
 
@@ -67,7 +64,7 @@ Returns
 -------
 future : :class:`concurrent.futures.Future`
     Future containing the result of the call
-""")
+"""
 
 
 def proxied_method_factory(method, locktype):
@@ -83,6 +80,7 @@ def proxied_method_factory(method, locktype):
     """
 
     if locktype == NOLOCK:
+
         def _impl(table_future, args, kwargs):
             try:
                 return getattr(table_future.result(), method)(*args, **kwargs)
@@ -92,6 +90,7 @@ def proxied_method_factory(method, locktype):
                 raise
 
     elif locktype == READLOCK:
+
         def _impl(table_future, args, kwargs):
             table = table_future.result()
             table.lock(write=False)
@@ -106,6 +105,7 @@ def proxied_method_factory(method, locktype):
                 table.unlock()
 
     elif locktype == WRITELOCK:
+
         def _impl(table_future, args, kwargs):
             table = table_future.result()
             table.lock(write=True)
@@ -123,8 +123,10 @@ def proxied_method_factory(method, locktype):
         raise ValueError(f"Invalid locktype {locktype}")
 
     _impl.__name__ = method + "_impl"
-    _impl.__doc__ = ("Calls table.%s, wrapped in a %s." %
-                     (method, _LOCKTYPE_STRINGS[locktype]))
+    _impl.__doc__ = "Calls table.%s, wrapped in a %s." % (
+        method,
+        _LOCKTYPE_STRINGS[locktype],
+    )
 
     def public_method(self, *args, **kwargs):
         """
@@ -144,6 +146,7 @@ class TableProxyMetaClass(type):
     https://en.wikipedia.org/wiki/Multiton_pattern
 
     """
+
     def __new__(cls, name, bases, dct):
         for method, locktype in _proxied_methods:
             proxy_method = proxied_method_factory(method, locktype)
@@ -164,7 +167,7 @@ class TableProxyMetaClass(type):
 
 
 def _map_create_proxy(cls, factory, args, kwargs):
-    """ Support pickling of kwargs in TableProxy.__reduce__ """
+    """Support pickling of kwargs in TableProxy.__reduce__"""
     return cls(factory, *args, **kwargs)
 
 
@@ -172,15 +175,14 @@ class MismatchedLocks(Exception):
     pass
 
 
-def taql_factory(query, style='Python', tables=(), readonly=True):
-    """ Calls pt.taql, converting TableProxy's in tables to pyrap tables """
+def taql_factory(query, style="Python", tables=(), readonly=True):
+    """Calls pt.taql, converting TableProxy's in tables to pyrap tables"""
     tables = [t._table_future.result() for t in tables]
 
     if isinstance(readonly, (tuple, list)):
-        it = zip_longest(tables, readonly[:len(tables)],
-                         fillvalue=readonly[-1])
+        it = zip_longest(tables, readonly[: len(tables)], fillvalue=readonly[-1])
     elif isinstance(readonly, bool):
-        it = zip(tables, (readonly,)*len(tables))
+        it = zip(tables, (readonly,) * len(tables))
     else:
         raise TypeError("readonly must be a bool or list of bools")
 
@@ -332,8 +334,7 @@ class TableProxy(object, metaclass=TableProxyMetaClass):
         self._ex_wrapper = ex = Executor(key=self._ex_key)
         self._table_future = table = ex.impl.submit(factory, *args, **kwargs)
 
-        weakref.finalize(self, _table_future_finaliser, ex, table,
-                         args, kwargs)
+        weakref.finalize(self, _table_future_finaliser, ex, table, args, kwargs)
 
         # Reference to the internal ThreadPoolExecutor
         self._ex = ex.impl
@@ -342,7 +343,7 @@ class TableProxy(object, metaclass=TableProxyMetaClass):
         self._write = False
         self._writeable = ex.impl.submit(_iswriteable, table).result()
 
-        should_be_writeable = not kwargs.get('readonly', True)
+        should_be_writeable = not kwargs.get("readonly", True)
 
         if self._writeable is False and should_be_writeable:
             # NOTE(sjperkins)
@@ -351,17 +352,21 @@ class TableProxy(object, metaclass=TableProxyMetaClass):
             # with readonly=False.
             # Solution is to open WSRT.MS/SUBTABLE to avoid the locking,
             # which may introduce it's own set of issues
-            raise RuntimeError("%s was opened as readonly=False but "
-                               "table.iswritable()==False" % table.name())
+            raise RuntimeError(
+                "%s was opened as readonly=False but "
+                "table.iswritable()==False" % table.name()
+            )
 
     @property
     def executor_key(self):
         return self._ex_key
 
     def __reduce__(self):
-        """ Defer to _map_create_proxy to support kwarg pickling """
-        return (_map_create_proxy, (TableProxy, self._factory,
-                                    self._args, self._kwargs))
+        """Defer to _map_create_proxy to support kwarg pickling"""
+        return (
+            _map_create_proxy,
+            (TableProxy, self._factory, self._args, self._kwargs),
+        )
 
     def __enter__(self):
         return self
@@ -392,14 +397,15 @@ class TableProxy(object, metaclass=TableProxyMetaClass):
             Future containing the result of :code:`fn(table, *args, **kwargs)`
         """
         if locktype == NOLOCK:
-            return self._ex.submit(_nolock_runner, self._table_future,
-                                   fn, args, kwargs)
+            return self._ex.submit(_nolock_runner, self._table_future, fn, args, kwargs)
         elif locktype == READLOCK:
-            return self._ex.submit(_readlock_runner, self._table_future,
-                                   fn, args, kwargs)
+            return self._ex.submit(
+                _readlock_runner, self._table_future, fn, args, kwargs
+            )
         elif locktype == WRITELOCK:
-            return self._ex.submit(_writelock_runner, self._table_future,
-                                   fn, args, kwargs)
+            return self._ex.submit(
+                _writelock_runner, self._table_future, fn, args, kwargs
+            )
         else:
             raise ValueError(f"Invalid locktype {locktype}")
 
@@ -408,13 +414,13 @@ class TableProxy(object, metaclass=TableProxyMetaClass):
             self._ex_key,
             self._factory.__name__,
             ",".join(str(s) for s in self._args),
-            ",".join("%s=%s" % (str(k), str(v))
-                     for k, v in self._kwargs.items()))
+            ",".join("%s=%s" % (str(k), str(v)) for k, v in self._kwargs.items()),
+        )
 
     __str__ = __repr__
 
 
 @normalize_token.register(TableProxy)
 def _normalize_table_proxy_tokens(tp):
-    """ Generate tokens based on TableProxy arguments """
+    """Generate tokens based on TableProxy arguments"""
     return (tp._factory, tp._args, tp._kwargs)

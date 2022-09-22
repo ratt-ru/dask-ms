@@ -209,4 +209,3 @@ Keywords can be added to the target table and columns:
     >>> xds_to_table(datasets, "test.ms", [],
                      table_keywords={"foo":"bar"},
                      column_keywords={"DATA": {"foo": "bar"}})
-

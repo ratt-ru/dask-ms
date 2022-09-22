@@ -24,15 +24,17 @@ if __name__ == "__main__":
 
     with scheduler_context(args):
         # Create a dataset representing the entire antenna table
-        ant_table = '::'.join((args.ms, 'ANTENNA'))
+        ant_table = "::".join((args.ms, "ANTENNA"))
 
         for ant_ds in xds_from_table(ant_table):
-            print(dask.compute(ant_ds.NAME.data,
-                               ant_ds.POSITION.data,
-                               ant_ds.DISH_DIAMETER.data))
+            print(
+                dask.compute(
+                    ant_ds.NAME.data, ant_ds.POSITION.data, ant_ds.DISH_DIAMETER.data
+                )
+            )
 
         # Create datasets representing each row of the spw table
-        spw_table = '::'.join((args.ms, 'SPECTRAL_WINDOW'))
+        spw_table = "::".join((args.ms, "SPECTRAL_WINDOW"))
 
         for spw_ds in xds_from_table(spw_table, group_cols="__row__"):
             print(spw_ds)
@@ -40,7 +42,7 @@ if __name__ == "__main__":
             print(spw_ds.CHAN_FREQ.values)
 
         # Create datasets from a partioning of the MS
-        datasets = list(xds_from_ms(args.ms, chunks={'row': args.chunks}))
+        datasets = list(xds_from_ms(args.ms, chunks={"row": args.chunks}))
 
         writes = []
 
@@ -48,7 +50,7 @@ if __name__ == "__main__":
             print(ds)
 
             # Try write the STATE_ID column back
-            write = xds_to_table(ds, args.ms, 'STATE_ID')
+            write = xds_to_table(ds, args.ms, "STATE_ID")
             writes.append(write)
 
         with ExitStack() as stack:

@@ -38,15 +38,14 @@ def _tensor_to_array(obj, pa_dtype):
         child_array = pa.array(flat_array)
     else:
         child_buf = pa.py_buffer(obj)
-        child_array = pa.Array.from_buffers(pa_dtype, total_elements,
-                                            [None, child_buf])
+        child_array = pa.Array.from_buffers(pa_dtype, total_elements, [None, child_buf])
 
     offsets = np.int32([i * num_elements for i in range(batch_size + 1)])
     offset_buf = pa.py_buffer(offsets)
 
-    storage = pa.Array.from_buffers(pa.list_(pa_dtype), batch_size,
-                                    [None, offset_buf],
-                                    children=[child_array])
+    storage = pa.Array.from_buffers(
+        pa.list_(pa_dtype), batch_size, [None, offset_buf], children=[child_array]
+    )
 
     tensor_type = TensorType(element_shape, pa_dtype)
     return pa.ExtensionArray.from_storage(tensor_type, storage)
@@ -58,8 +57,7 @@ class TensorType(ExtensionType):
             pyarrow_dtype = pa.type_for_alias(str(pyarrow_dtype))
 
         self._element_shape = tuple(element_shape)
-        pa.ExtensionType.__init__(self, pa.list_(pyarrow_dtype),
-                                  "dask-ms.tensor_type")
+        pa.ExtensionType.__init__(self, pa.list_(pyarrow_dtype), "dask-ms.tensor_type")
 
     def __reduce__(self):
         return TensorType, (self._element_shape, self.storage_type.value_type)
@@ -68,9 +66,11 @@ class TensorType(ExtensionType):
         return self.storage_type.value_type.to_pandas_dtype()
 
     def __eq__(self, other):
-        return (isinstance(other, TensorType) and
-                self._element_shape == other._element_shape and
-                self.storage_type == other.storage_type)
+        return (
+            isinstance(other, TensorType)
+            and self._element_shape == other._element_shape
+            and self.storage_type == other.storage_type
+        )
 
     def __hash__(self):
         return hash((self._element_shape, self.storage_type))
@@ -84,8 +84,7 @@ class TensorType(ExtensionType):
 
     @classmethod
     def __arrow_ext_deserialize__(cls, storage_type, serialized):
-        return TensorType(json.loads(serialized)["shape"],
-                          storage_type.value_type)
+        return TensorType(json.loads(serialized)["shape"], storage_type.value_type)
 
     def __arrow_ext_class__(self):
         return TensorArray
@@ -144,15 +143,9 @@ class TensorArray(ExtensionArray):
             # may be slower than other types as it is not zero-copy.
             numpy_size = np.prod(shape)
             arrow_size = int(np.ceil(numpy_size / 8))  # 8 bits in a byte.
-            packed_array = np.ndarray(
-                arrow_size,
-                buffer=bufs[3],
-                dtype=np.uint8
-            )
+            packed_array = np.ndarray(arrow_size, buffer=bufs[3], dtype=np.uint8)
             unpacked_array = np.unpackbits(
-                packed_array,
-                count=numpy_size,
-                bitorder='little'
+                packed_array, count=numpy_size, bitorder="little"
             )
             return unpacked_array.view(np.bool_).reshape(shape)
         else:
@@ -188,15 +181,13 @@ class ComplexType(ExtensionType):
             subtype = pa.type_for_alias(str(subtype))
 
         self._subtype = subtype
-        pa.ExtensionType.__init__(self, pa.list_(subtype, 2),
-                                  "dask-ms.complex")
+        pa.ExtensionType.__init__(self, pa.list_(subtype, 2), "dask-ms.complex")
 
     def to_pandas_dtype(self):
         return np.result_type(self._subtype.to_pandas_dtype(), np.complex64)
 
     def __eq__(self, other):
-        return (isinstance(other, ComplexType) and
-                self._subtype == other._subtype)
+        return isinstance(other, ComplexType) and self._subtype == other._subtype
 
     def __arrow_ext_serialize__(self):
         return b""

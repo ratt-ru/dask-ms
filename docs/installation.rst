@@ -71,5 +71,3 @@ with the following contents:
 .. code-block:: ini
 
     measures.directory: ~/opt/casacore/data/
-
-

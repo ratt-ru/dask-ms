@@ -28,8 +28,7 @@ except ImportError:
 def test_zarr_string_array(tmp_path_factory):
     zarr_store = tmp_path_factory.mktemp("string-arrays") / "test.zarr"
 
-    data = ["hello", "this", "strange new world",
-            "full of", "interesting", "stuff"]
+    data = ["hello", "this", "strange new world", "full of", "interesting", "stuff"]
     data = np.array(data, dtype=object).reshape(3, 2)
     data = da.from_array(data, chunks=((2, 1), (1, 1)))
 
@@ -91,11 +90,9 @@ def test_metadata_consolidation(ms, ant_table, tmp_path_factory, consolidated):
     for ds in ant_datasets:
         ds.POSITION.attrs["test-meta"] = {"payload": "foo"}
 
-    main_store_writes = xds_to_zarr(ms_datasets, main_store,
-                                    consolidated=consolidated)
+    main_store_writes = xds_to_zarr(ms_datasets, main_store, consolidated=consolidated)
     writes = [main_store_writes]
-    writes.extend(xds_to_zarr(ant_datasets, ant_store,
-                              consolidated=consolidated))
+    writes.extend(xds_to_zarr(ant_datasets, ant_store, consolidated=consolidated))
     dask.compute(writes)
 
     assert main_store.exists("MAIN/.zmetadata") is consolidated
@@ -115,8 +112,7 @@ def test_metadata_consolidation(ms, ant_table, tmp_path_factory, consolidated):
         assert "test-meta" in ds.POSITION.attrs
 
 
-def zarr_tester(ms, spw_table, ant_table,
-                zarr_store, spw_store, ant_store):
+def zarr_tester(ms, spw_table, ant_table, zarr_store, spw_store, ant_store):
 
     ms_datasets = xds_from_ms(ms)
     spw_datasets = xds_from_table(spw_table, group_cols="__row__")
@@ -126,13 +122,16 @@ def zarr_tester(ms, spw_table, ant_table,
         dims = ds.dims
         row, chan, corr = (dims[d] for d in ("row", "chan", "corr"))
 
-        ms_datasets[i] = ds.assign_coords(**{
-            "chan": (("chan",), np.arange(chan)),
-            "corr": (("corr",), np.arange(corr)),
-        })
+        ms_datasets[i] = ds.assign_coords(
+            **{
+                "chan": (("chan",), np.arange(chan)),
+                "corr": (("corr",), np.arange(corr)),
+            }
+        )
 
-    main_zarr_writes = xds_to_zarr(ms_datasets, zarr_store.url,
-                                   storage_options=zarr_store.storage_options)
+    main_zarr_writes = xds_to_zarr(
+        ms_datasets, zarr_store.url, storage_options=zarr_store.storage_options
+    )
     assert len(ms_datasets) == len(main_zarr_writes)
 
     for ms_ds, zw_ds in zip(ms_datasets, main_zarr_writes):
@@ -174,33 +173,38 @@ def test_xds_to_zarr_local(ms, spw_table, ant_table, tmp_path_factory):
     spw_store = zarr_store.parent / f"{zarr_store.name}::SPECTRAL_WINDOW"
     ant_store = zarr_store.parent / f"{zarr_store.name}::ANTENNA"
 
-    return zarr_tester(ms, spw_table, ant_table,
-                       DaskMSStore(zarr_store),
-                       DaskMSStore(spw_store),
-                       DaskMSStore(ant_store))
+    return zarr_tester(
+        ms,
+        spw_table,
+        ant_table,
+        DaskMSStore(zarr_store),
+        DaskMSStore(spw_store),
+        DaskMSStore(ant_store),
+    )
 
 
 @pytest.mark.skipif(s3fs is None, reason="s3fs not installed")
-def test_xds_to_zarr_s3(ms, spw_table, ant_table,
-                        py_minio_client, minio_user_key,
-                        minio_url, s3_bucket_name):
+def test_xds_to_zarr_s3(
+    ms, spw_table, ant_table, py_minio_client, minio_user_key, minio_url, s3_bucket_name
+):
     py_minio_client.make_bucket(s3_bucket_name)
 
-    zarr_store = DaskMSStore(f"s3://{s3_bucket_name}/measurementset.MS",
-                             key=minio_user_key,
-                             secret=minio_user_key,
-                             client_kwargs={
-                                 "endpoint_url": minio_url.geturl(),
-                                 "region_name": "af-cpt",
-                             })
+    zarr_store = DaskMSStore(
+        f"s3://{s3_bucket_name}/measurementset.MS",
+        key=minio_user_key,
+        secret=minio_user_key,
+        client_kwargs={
+            "endpoint_url": minio_url.geturl(),
+            "region_name": "af-cpt",
+        },
+    )
 
     # NOTE(sjperkins)
     # Review this interface
     spw_store = zarr_store.subtable_store("SPECTRAL_WINDOW")
     ant_store = zarr_store.subtable_store("ANTENNA")
 
-    return zarr_tester(ms, spw_table, ant_table,
-                       zarr_store, spw_store, ant_store)
+    return zarr_tester(ms, spw_table, ant_table, zarr_store, spw_store, ant_store)
 
 
 @pytest.mark.skipif(xarray is None, reason="Needs xarray to rechunk")
@@ -243,9 +247,8 @@ def test_xarray_to_zarr(ms, tmp_path_factory):
         corr = sum(chunks["corr"])
 
         datasets[i] = ds.assign_coords(
-            row=np.arange(row),
-            chan=np.arange(chan),
-            corr=np.arange(corr))
+            row=np.arange(row), chan=np.arange(chan), corr=np.arange(corr)
+        )
 
     for i, ds in enumerate(datasets):
         ds.to_zarr(str(store / f"ds-{i}.zarr"))
@@ -285,8 +288,7 @@ def test_fasteners(ms, tmp_path_factory):
     from pprint import pprint
 
     with Pool(4) as pool:
-        results = [pool.apply_async(_fasteners_runner, (lockfile,))
-                   for _ in range(4)]
+        results = [pool.apply_async(_fasteners_runner, (lockfile,)) for _ in range(4)]
         pprint([r.get() for r in results])
 
 
@@ -295,7 +297,7 @@ def test_basic_roundtrip(tmp_path):
     path = tmp_path / "test.zarr"
 
     # We need >10 datasets to be sure roundtripping is consistent.
-    xdsl = [Dataset({'x': (('y',), da.ones(i))}) for i in range(1, 12)]
+    xdsl = [Dataset({"x": (("y",), da.ones(i))}) for i in range(1, 12)]
     dask.compute(xds_to_zarr(xdsl, path))
 
     xdsl = xds_from_zarr(path)
@@ -303,12 +305,14 @@ def test_basic_roundtrip(tmp_path):
 
 
 @pytest.mark.skipif(xarray is None, reason="depends on xarray")
-@pytest.mark.parametrize("prechunking", [{"row": -1, "chan": -1},
-                                         {"row": 1, "chan": 1},
-                                         {"row": 2, "chan": 7}])
-@pytest.mark.parametrize("postchunking", [{"row": -1, "chan": -1},
-                                          {"row": 1, "chan": 1},
-                                          {"row": 2, "chan": 7}])
+@pytest.mark.parametrize(
+    "prechunking",
+    [{"row": -1, "chan": -1}, {"row": 1, "chan": 1}, {"row": 2, "chan": 7}],
+)
+@pytest.mark.parametrize(
+    "postchunking",
+    [{"row": -1, "chan": -1}, {"row": 1, "chan": 1}, {"row": 2, "chan": 7}],
+)
 def test_rechunking(ms, tmp_path_factory, prechunking, postchunking):
     store = tmp_path_factory.mktemp("zarr_store")
     ref_datasets = xds_from_ms(ms)
@@ -323,29 +327,29 @@ def test_rechunking(ms, tmp_path_factory, prechunking, postchunking):
             row=np.arange(row),
             chan=np.arange(chan),
             corr=np.arange(corr),
-            dummy=np.arange(10)  # Orphan coordinate.
+            dummy=np.arange(10),  # Orphan coordinate.
         )
 
     chunked_datasets = [ds.chunk(prechunking) for ds in ref_datasets]
     dask.compute(xds_to_zarr(chunked_datasets, store))
 
-    rechunked_datasets = [ds.chunk(postchunking)
-                          for ds in xds_from_zarr(store)]
+    rechunked_datasets = [ds.chunk(postchunking) for ds in xds_from_zarr(store)]
     dask.compute(xds_to_zarr(rechunked_datasets, store, rechunk=True))
 
     rechunked_datasets = xds_from_zarr(store)
 
-    assert all([ds.equals(rds)
-                for ds, rds in zip(rechunked_datasets, ref_datasets)])
+    assert all([ds.equals(rds) for ds, rds in zip(rechunked_datasets, ref_datasets)])
 
 
 @pytest.mark.skipif(xarray is None, reason="depends on xarray")
-@pytest.mark.parametrize("prechunking", [{"row": -1, "chan": -1},
-                                         {"row": 1, "chan": 1},
-                                         {"row": 2, "chan": 7}])
-@pytest.mark.parametrize("postchunking", [{"row": -1, "chan": -1},
-                                          {"row": 1, "chan": 1},
-                                          {"row": 2, "chan": 7}])
+@pytest.mark.parametrize(
+    "prechunking",
+    [{"row": -1, "chan": -1}, {"row": 1, "chan": 1}, {"row": 2, "chan": 7}],
+)
+@pytest.mark.parametrize(
+    "postchunking",
+    [{"row": -1, "chan": -1}, {"row": 1, "chan": 1}, {"row": 2, "chan": 7}],
+)
 def test_add_datavars(ms, tmp_path_factory, prechunking, postchunking):
     store = tmp_path_factory.mktemp("zarr_store")
     ref_datasets = xds_from_ms(ms)
@@ -360,41 +364,43 @@ def test_add_datavars(ms, tmp_path_factory, prechunking, postchunking):
             row=np.arange(row),
             chan=np.arange(chan),
             corr=np.arange(corr),
-            dummy=np.arange(10)  # Orphan coordinate.
+            dummy=np.arange(10),  # Orphan coordinate.
         )
 
     chunked_datasets = [ds.chunk(prechunking) for ds in ref_datasets]
     dask.compute(xds_to_zarr(chunked_datasets, store))
 
-    rechunked_datasets = [ds.chunk(postchunking)
-                          for ds in xds_from_zarr(store)]
-    augmented_datasets = [ds.assign({"DUMMY": (("row", "chan", "corr"),
-                                    da.zeros_like(ds.DATA.data))})
-                          for ds in rechunked_datasets]
+    rechunked_datasets = [ds.chunk(postchunking) for ds in xds_from_zarr(store)]
+    augmented_datasets = [
+        ds.assign({"DUMMY": (("row", "chan", "corr"), da.zeros_like(ds.DATA.data))})
+        for ds in rechunked_datasets
+    ]
     dask.compute(xds_to_zarr(augmented_datasets, store, rechunk=True))
 
     augmented_datasets = xds_from_zarr(store)
 
-    assert all([ds.DUMMY.chunks == cds.DATA.chunks
-                for ds, cds in zip(augmented_datasets, chunked_datasets)])
+    assert all(
+        [
+            ds.DUMMY.chunks == cds.DATA.chunks
+            for ds, cds in zip(augmented_datasets, chunked_datasets)
+        ]
+    )
 
 
 def test_zarr_2gb_limit(tmp_path_factory):
     store = tmp_path_factory.mktemp("zarr_store")
 
     chunk = (1024, 1024, 1024)
-    datasets = Dataset({
-        "DATA": (("x", "y", "z"),
-                 da.zeros(chunk, chunks=chunk, dtype=np.uint16))
-    })
+    datasets = Dataset(
+        {"DATA": (("x", "y", "z"), da.zeros(chunk, chunks=chunk, dtype=np.uint16))}
+    )
 
     with pytest.raises(ValueError, match="2GiB chunk limit"):
         xds_to_zarr(datasets, store)
 
     chunk = (1024, 1024, 999)
-    datasets = Dataset({
-        "DATA": (("x", "y", "z"),
-                 da.zeros(chunk, chunks=chunk, dtype=np.uint16))
-    })
+    datasets = Dataset(
+        {"DATA": (("x", "y", "z"), da.zeros(chunk, chunks=chunk, dtype=np.uint16))}
+    )
 
     xds_to_zarr(datasets, store)

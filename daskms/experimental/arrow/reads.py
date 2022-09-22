@@ -11,8 +11,7 @@ import numpy as np
 
 from daskms.dataset import Dataset
 from daskms.fsspec_store import DaskMSStore
-from daskms.experimental.utils import (promote_columns,
-                                       column_iterator)
+from daskms.experimental.utils import promote_columns, column_iterator
 from daskms.experimental.arrow.arrow_schema import DASKMS_METADATA
 from daskms.experimental.arrow.extension_types import TensorType
 from daskms.experimental.arrow.require_arrow import requires_arrow
@@ -85,14 +84,18 @@ class ParquetFileProxy(metaclass=Multiton):
         return self.file.metadata
 
     def __eq__(self, other):
-        return (isinstance(other, ParquetFileProxy) and
-                self.store == other.store and
-                self.key == other.key)
+        return (
+            isinstance(other, ParquetFileProxy)
+            and self.store == other.store
+            and self.key == other.key
+        )
 
     def __lt__(self, other):
-        return (isinstance(other, ParquetFileProxy) and
-                self.store == other.store and
-                natural_order(self.key) < natural_order(other.key))
+        return (
+            isinstance(other, ParquetFileProxy)
+            and self.store == other.store
+            and natural_order(self.key) < natural_order(other.key)
+        )
 
     def read_column(self, column, start=None, end=None):
         chunks = self.file.read(columns=[column]).column(column).chunks
@@ -110,9 +113,11 @@ def _partition_values(partition_strings, partition_meta):
         field, value = (s.strip() for s in ps.split("="))
 
         if field != pf:
-            raise ValueError(f"Column name {field} in partition string "
-                             f"{partition_strings} does not match "
-                             f"metadata column name {pf}")
+            raise ValueError(
+                f"Column name {field} in partition string "
+                f"{partition_strings} does not match "
+                f"metadata column name {pf}"
+            )
 
         # NOTE(JSKenyon): Use item to get a python type. Coercing to numpy
         # type is not used for the other formats and causes serialization
@@ -140,8 +145,11 @@ def partition_chunking(partition, fragment_rows, chunks):
         unhandled_dims = set(partition_chunks.keys()) - {"row"}
 
         if len(unhandled_dims) != 0:
-            warnings.warn(f"{unhandled_dims} chunking dimensions are "
-                          f"currently ignored for arrow", UserWarning)
+            warnings.warn(
+                f"{unhandled_dims} chunking dimensions are "
+                f"currently ignored for arrow",
+                UserWarning,
+            )
 
         # Get any user specified row chunking, defaulting to
         row_chunks = partition_chunks.get("row", fragment_rows)
@@ -158,8 +166,8 @@ def partition_chunking(partition, fragment_rows, chunks):
 
     for c, (lower, upper) in enumerate(it):
 
-        si = np.searchsorted(intervals, lower, side='right') - 1
-        ei = np.searchsorted(intervals, upper, side='left')
+        si = np.searchsorted(intervals, lower, side="right") - 1
+        ei = np.searchsorted(intervals, upper, side="left")
 
         if si == ei:
             raise ValueError("si == ei, arrays may have zero chunks")
@@ -190,7 +198,7 @@ def fragment_reader(fragments, ranges, column, shape, dtype):
         for fragment, (start, end) in zip(fragments, ranges):
             sel = slice(offset, offset + (end - start))
             arr[sel] = fragment.read_column(column, start, end)
-            offset += (end - start)
+            offset += end - start
     else:
         fragment = fragments[0]
         start, end = ranges[0]
@@ -206,15 +214,15 @@ def xds_from_parquet(store, columns=None, chunks=None, **kwargs):
     elif isinstance(store, (str, Path)):
         store = DaskMSStore(f"{store}", **kwargs.pop("storage_options", {}))
     else:
-        raise TypeError(f"store '{store}' must be "
-                        f"Path, str or DaskMSStore")
+        raise TypeError(f"store '{store}' must be " f"Path, str or DaskMSStore")
 
     # If any kwargs are added, they should be popped prior to this check.
     if len(kwargs) > 0:
         warnings.warn(
             f"The following unsupported kwargs were ignored in "
             f"xds_from_parquet: {kwargs}",
-            UserWarning)
+            UserWarning,
+        )
 
     columns = promote_columns(columns)
 
@@ -277,8 +285,9 @@ def xds_from_parquet(store, columns=None, chunks=None, **kwargs):
             # NOTE(JSKenyon): This assumes that the schema/fields are
             # consistent between fragments. This should be ok.
             exemplar_schema = chunk_metas[0].schema.to_arrow_schema()
-            exemplar_fields = {n: exemplar_schema.field(n)
-                               for n in exemplar_schema.names}
+            exemplar_fields = {
+                n: exemplar_schema.field(n) for n in exemplar_schema.names
+            }
 
             for column, field in column_iterator(exemplar_fields, columns):
                 field_metadata = field.metadata[DASKMS_METADATA.encode()]
@@ -293,18 +302,26 @@ def xds_from_parquet(store, columns=None, chunks=None, **kwargs):
                 assert len(shape) == len(dims)
 
                 dtype = field.type.to_pandas_dtype()
-                meta = np.empty((0,)*len(dims), dtype)
+                meta = np.empty((0,) * len(dims), dtype)
                 new_axes = {d: s for d, s in zip(dims, shape)}
 
-                read = da.blockwise(fragment_reader, dims,
-                                    chunk_fragments, None,
-                                    chunk_ranges, None,
-                                    column, None,
-                                    shape, None,
-                                    dtype, None,
-                                    adjust_chunks={"row": rows},
-                                    new_axes=new_axes,
-                                    meta=meta)
+                read = da.blockwise(
+                    fragment_reader,
+                    dims,
+                    chunk_fragments,
+                    None,
+                    chunk_ranges,
+                    None,
+                    column,
+                    None,
+                    shape,
+                    None,
+                    dtype,
+                    None,
+                    adjust_chunks={"row": rows},
+                    new_axes=new_axes,
+                    meta=meta,
+                )
 
                 column_arrays[column].append((read, dims))
 
@@ -315,8 +332,9 @@ def xds_from_parquet(store, columns=None, chunks=None, **kwargs):
             array_dims = set(array_dims)
 
             if not len(array_dims) == 1:
-                raise ValueError(f"Inconsistent array dimensions "
-                                 f"{array_dims} for {column}")
+                raise ValueError(
+                    f"Inconsistent array dimensions " f"{array_dims} for {column}"
+                )
 
             data_vars[column] = (array_dims.pop(), da.concatenate(arrays))
 

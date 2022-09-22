@@ -27,16 +27,18 @@ class ChunkInferenceError(ValueError):
 
 
 def data_var_dims(data_vars):
-    """ Returns a {dim: size} dictionary constructed from `data_vars` """
+    """Returns a {dim: size} dictionary constructed from `data_vars`"""
     dims = {}
 
     for k, var in data_vars.items():
         for d, s in zip(var.dims, var.shape):
             if d in dims and not np.isnan(s) and s != dims[d]:
-                raise DimensionInferenceError("Existing dimension size %s for "
-                                              "dimension '%s' is inconsistent "
-                                              "with same dimension %s of "
-                                              "array %s" % (s, d, dims[d], k))
+                raise DimensionInferenceError(
+                    "Existing dimension size %s for "
+                    "dimension '%s' is inconsistent "
+                    "with same dimension %s of "
+                    "array %s" % (s, d, dims[d], k)
+                )
 
             dims[d] = s
 
@@ -44,7 +46,7 @@ def data_var_dims(data_vars):
 
 
 def data_var_chunks(data_vars):
-    """ Returns a {dim: chunks} dictionary constructed from `data_vars` """
+    """Returns a {dim: chunks} dictionary constructed from `data_vars`"""
     chunks = {}
 
     for k, var in data_vars.items():
@@ -53,11 +55,12 @@ def data_var_chunks(data_vars):
 
         for d, c in zip(var.dims, var.chunks):
             if d in chunks and c != chunks[d]:
-                raise ChunkInferenceError("Existing chunking %s for "
-                                          "dimension '%s' is inconsistent "
-                                          "with chunking %s for the "
-                                          "same dimension of array %s" %
-                                          (c, d, chunks[d], k))
+                raise ChunkInferenceError(
+                    "Existing chunking %s for "
+                    "dimension '%s' is inconsistent "
+                    "with chunking %s for the "
+                    "same dimension of array %s" % (c, d, chunks[d], k)
+                )
 
             chunks[d] = c
 
@@ -72,15 +75,17 @@ def as_variable(args):
         return Variable(*args)
     except TypeError as e:
         if "takes at most" in str(e):
-            raise TypeError("Invalid number of arguments in Variable tuple. "
-                            "Must be a size 2 to 5 tuple of the form "
-                            "(dims, array[, attrs[, encoding[, fastpath]]]) ")
+            raise TypeError(
+                "Invalid number of arguments in Variable tuple. "
+                "Must be a size 2 to 5 tuple of the form "
+                "(dims, array[, attrs[, encoding[, fastpath]]]) "
+            )
 
         raise
 
 
 def _convert_to_variable(k, v):
-    """ Converts ``v`` to a :class:`daskms.dataset.Variable` """
+    """Converts ``v`` to a :class:`daskms.dataset.Variable`"""
     if isinstance(v, Variable):
         return v
 
@@ -88,9 +93,11 @@ def _convert_to_variable(k, v):
         return as_variable((v.dims, v.data, v.attrs))
 
     if not isinstance(v, (tuple, list)):
-        raise ValueError("'%s' must be a size 2 to 5 tuple of the form"
-                         "(dims, array[, attrs[, encoding[, fastpath]]]) "
-                         "tuple. Got '%s' instead," % (k, type(v)))
+        raise ValueError(
+            "'%s' must be a size 2 to 5 tuple of the form"
+            "(dims, array[, attrs[, encoding[, fastpath]]]) "
+            "tuple. Got '%s' instead," % (k, type(v))
+        )
 
     return as_variable(v)
 
@@ -106,6 +113,7 @@ else:
         Wrapper around an object implementing the Mapping interface
         to make it immutable.
         """
+
         __slots__ = "mapping"
 
         def __init__(self, mapping):
@@ -157,12 +165,12 @@ else:
 
         @property
         def dtype(self):
-            """ Array data type """
+            """Array data type"""
             return self.data.dtype
 
         @property
         def chunks(self):
-            """ Array chunks if wrapping a dask array else None """
+            """Array chunks if wrapping a dask array else None"""
             if isinstance(self.data, da.Array):
                 return self.data.chunks
 
@@ -170,7 +178,7 @@ else:
 
         @property
         def values(self):
-            """ Returns actual array values """
+            """Returns actual array values"""
             if isinstance(self.data, da.Array):
                 return self.data.compute()
 
@@ -178,12 +186,12 @@ else:
 
         @property
         def shape(self):
-            """ Array shape """
+            """Array shape"""
             return self.data.shape
 
         @property
         def ndim(self):
-            """ Number of array dimensions """
+            """Number of array dimensions"""
             return self.data.ndim
 
         def __dask_keys__(self):
@@ -213,8 +221,7 @@ else:
         def __dask_postcompute__(self):
             fn, args = self.data.__dask_postcompute__()
 
-            name = (self.data.name if isinstance(self.data, da.Array)
-                    else None)
+            name = self.data.name if isinstance(self.data, da.Array) else None
             args = (fn, args, name, self.dims, self.attrs)
             return (self.finalize_compute, args)
 
@@ -251,12 +258,14 @@ else:
             attrs : dict, optional
                 Dictionary of Dataset attributes
             """
-            self._data_vars = {k: _convert_to_variable(k, v)
-                               for k, v in data_vars.items()}
+            self._data_vars = {
+                k: _convert_to_variable(k, v) for k, v in data_vars.items()
+            }
 
             if coords is not None:
-                self._coords = {k: _convert_to_variable(k, v)
-                                for k, v in coords.items()}
+                self._coords = {
+                    k: _convert_to_variable(k, v) for k, v in coords.items()
+                }
             else:
                 self._coords = {}
 
@@ -264,29 +273,29 @@ else:
 
         @property
         def attrs(self):
-            """ Dataset attributes """
+            """Dataset attributes"""
             return self._attrs
 
         @property
         def dims(self):
-            """ A :code:`{dim: size}` dictionary """
+            """A :code:`{dim: size}` dictionary"""
             return data_var_dims(self._data_vars)
 
         sizes = dims
 
         @property
         def chunks(self):
-            """ A :code:`{dim: chunks}` dictionary """
+            """A :code:`{dim: chunks}` dictionary"""
             return data_var_chunks(self._data_vars)
 
         @property
         def data_vars(self):
-            """ Dataset variables """
+            """Dataset variables"""
             return Frozen(self._data_vars)
 
         @property
         def coords(self):
-            """ Dataset coordinates """
+            """Dataset coordinates"""
             return Frozen(self._coords)
 
         def compute(self, **kwargs):
@@ -315,9 +324,7 @@ else:
             if len(dask_data) > 0:
                 data_vars.update(da.compute(dask_data, **kwargs)[0])
 
-            return Dataset(data_vars,
-                           coords=self._coords,
-                           attrs=self._attrs.copy())
+            return Dataset(data_vars, coords=self._coords, attrs=self._attrs.copy())
 
         def assign(self, **kwargs):
             r"""
@@ -333,9 +340,7 @@ else:
             data_vars = self._data_vars.copy()
             data_vars.update(**kwargs)
 
-            return Dataset(data_vars,
-                           attrs=self._attrs.copy(),
-                           coords=self._coords)
+            return Dataset(data_vars, attrs=self._attrs.copy(), coords=self._coords)
 
         def assign_coords(self, **kwargs):
             r"""
@@ -385,8 +390,7 @@ else:
             elif errors == "ignore":
                 return {k: v for k, v in mapping.items() if k not in names}
             else:
-                raise ValueError(f"errors '{errors}' not in "
-                                 f"('raise', 'ignore')")
+                raise ValueError(f"errors '{errors}' not in " f"('raise', 'ignore')")
 
         def drop_vars(self, names, *, errors):
             """Drop variables from the Dataset
@@ -442,10 +446,10 @@ else:
                 raise AttributeError(f"Invalid Attribute {name}")
 
         def copy(self):
-            """ Returns a copy of the Dataset """
-            return Dataset(self._data_vars,
-                           coords=self._coords,
-                           attrs=self._attrs.copy())
+            """Returns a copy of the Dataset"""
+            return Dataset(
+                self._data_vars, coords=self._coords, attrs=self._attrs.copy()
+            )
 
         def __dask_graph__(self):
             graphs = {k: v.__dask_graph__() for k, v in self.data_vars.items()}
@@ -458,14 +462,21 @@ else:
             return None
 
         def __dask_keys__(self):
-            return [v.__dask_keys__()
-                    for v in self._data_vars.values()
-                    if dask.is_dask_collection(v)]
+            return [
+                v.__dask_keys__()
+                for v in self._data_vars.values()
+                if dask.is_dask_collection(v)
+            ]
 
         def __dask_layers__(self):
-            return sum([v.__dask_layers__()
-                        for v in self._data_vars.values()
-                        if dask.is_dask_collection(v)], ())
+            return sum(
+                [
+                    v.__dask_layers__()
+                    for v in self._data_vars.values()
+                    if dask.is_dask_collection(v)
+                ],
+                (),
+            )
 
         @property
         def __dask_optimize__(self):
@@ -497,11 +508,7 @@ else:
                 else (False, k, v)
                 for k, v in self._data_vars.items()
             ]
-            return self.finalize_compute, (
-                data_info,
-                self._coords,
-                self._attrs
-            )
+            return self.finalize_compute, (data_info, self._coords, self._attrs)
 
         @staticmethod
         def finalize_persist(graph, info, coords, attrs):
@@ -523,7 +530,4 @@ else:
                 else (False, k, v)
                 for k, v in self._data_vars.items()
             ]
-            return self.finalize_persist, (
-                data_info,
-                self._coords,
-                self._attrs)
+            return self.finalize_persist, (data_info, self._coords, self._attrs)

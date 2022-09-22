@@ -9,14 +9,15 @@ import pyrap.tables as pt
 import pytest
 
 from daskms.dataset import Variable
-from daskms.descriptors.builder import (DefaultDescriptorBuilder,
-                                        variable_column_descriptor)
+from daskms.descriptors.builder import (
+    DefaultDescriptorBuilder,
+    variable_column_descriptor,
+)
 
 
-@pytest.mark.parametrize("chunks", [
-    {"row": (2, 2, 2, 2, 2),
-     "chan": (4, 4, 4, 4),
-     "corr": (2, 2)}])
+@pytest.mark.parametrize(
+    "chunks", [{"row": (2, 2, 2, 2, 2), "chan": (4, 4, 4, 4), "corr": (2, 2)}]
+)
 def test_default_plugin(tmp_path, chunks):
     filename = str(tmp_path / "test_default_plugin.table")
 
@@ -42,9 +43,9 @@ def test_default_plugin(tmp_path, chunks):
         assert set(variables.keys()) == set(T.colnames())
 
 
-@pytest.mark.parametrize("chunks", [{'row': (5, 5),
-                                     'chan': (4, 4, 4, 4),
-                                     'corr': (4,)}])
+@pytest.mark.parametrize(
+    "chunks", [{"row": (5, 5), "chan": (4, 4, 4, 4), "corr": (4,)}]
+)
 @pytest.mark.parametrize("dtype", [np.complex128, np.float32])
 def test_variable_column_descriptor(chunks, dtype, tmp_path):
     column_meta = []
@@ -75,7 +76,7 @@ def test_variable_column_descriptor(chunks, dtype, tmp_path):
 
     with pt.table(fn, tabdesc, readonly=False, ack=False) as T:
         # Add rows
-        T.addrows(shapes['row'])
+        T.addrows(shapes["row"])
 
         str_list = np_str_array.tolist()
 

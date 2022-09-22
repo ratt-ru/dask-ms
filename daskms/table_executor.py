@@ -19,7 +19,8 @@ STANDARD_EXECUTOR = "__standard_executor__"
 
 
 class ExecutorMetaClass(type):
-    """ https://en.wikipedia.org/wiki/Multiton_pattern """
+    """https://en.wikipedia.org/wiki/Multiton_pattern"""
+
     def __call__(cls, key=STANDARD_EXECUTOR):
         try:
             return _executor_cache[key]

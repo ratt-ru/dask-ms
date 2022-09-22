@@ -12,7 +12,8 @@ class ParseFunctionCallError(Exception):
             "Expected a single function call composed of "
             "python literals. "
             "For example: \"fn(1, 'bob', 2.0, c=2, d='hello')\". "
-            "Got %s" % fn_str)
+            "Got %s" % fn_str
+        )
 
 
 def parse_function_call_string(fn_str):
@@ -53,8 +54,7 @@ def parse_function_call_string(fn_str):
             raise ParseFunctionCallError(fn_str)
 
         try:
-            kwargs = {kw.arg: ast.literal_eval(kw.value)
-                      for kw in node.keywords}
+            kwargs = {kw.arg: ast.literal_eval(kw.value) for kw in node.keywords}
         except ValueError:
             raise ParseFunctionCallError(fn_str)
 
@@ -88,17 +88,20 @@ def filename_builder_factory(filename):
     _, table, subtable = table_path_split(filename)
 
     # Does this look like an MS
-    if not subtable and table[-3:].upper().endswith('.MS'):
+    if not subtable and table[-3:].upper().endswith(".MS"):
         from daskms.descriptors.ms import MSDescriptorBuilder
+
         return MSDescriptorBuilder()
 
     # Perhaps its an MS subtable?
     if subtable in SUBTABLES:
         from daskms.descriptors.ms_subtable import MSSubTableDescriptorBuilder
+
         return MSSubTableDescriptorBuilder(subtable)
 
     # Just a standard CASA Table I guess
     from daskms.descriptors.builder import DefaultDescriptorBuilder
+
     return DefaultDescriptorBuilder()
 
 
@@ -139,8 +142,10 @@ def string_builder_factory(builder_str):
     else:
         return builder_cls(*args, **kwargs)
 
-    raise ValueError("No builders registered for "
-                     "builder string '%s'. "
-                     "Perhaps the appropriate python module "
-                     "registering the builder has not yet "
-                     "been imported." % builder_str)
+    raise ValueError(
+        "No builders registered for "
+        "builder string '%s'. "
+        "Perhaps the appropriate python module "
+        "registering the builder has not yet "
+        "been imported." % builder_str
+    )

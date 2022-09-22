@@ -11,7 +11,7 @@ from daskms.table_executor import Executor, _executor_cache, executor_key
 
 
 def test_executor():
-    """ Test the executor """
+    """Test the executor"""
     ex = Executor()
     ex2 = Executor()
     assert ex is ex2
@@ -22,13 +22,13 @@ def test_executor():
 
     assert len(_executor_cache) == 1
 
-    assert ex.impl.submit(lambda x: x*2, 4).result() == 8
+    assert ex.impl.submit(lambda x: x * 2, 4).result() == 8
     ex.impl.shutdown(wait=True)
     ex3.impl.shutdown(wait=False)
 
     # Executor should be shutdown at this point
     with pytest.raises(RuntimeError):
-        ex2.impl.submit(lambda x: x*2, 4)
+        ex2.impl.submit(lambda x: x * 2, 4)
 
     assert len(_executor_cache) == 1
 
@@ -40,7 +40,7 @@ def test_executor():
 
 
 def test_executor_keys():
-    """ Test executor keys """
+    """Test executor keys"""
     ex = Executor("foo")
     ex2 = Executor("bar")
     ex3 = Executor("foo")
@@ -58,13 +58,16 @@ def test_executor_keys():
     assert len(_executor_cache) == 0
 
 
-@pytest.mark.parametrize("key, result", [
-    ('/home/moriarty/test.ms/', '/home/moriarty/test.ms'),
-    ('/home/moriarty/test.ms', '/home/moriarty/test.ms'),
-    ('/home/moriarty/test.ms/::FIELD', '/home/moriarty/test.ms'),
-    ('/home/moriarty/test.ms::FIELD', '/home/moriarty/test.ms'),
-    ('/home/moriarty/test.ms::FIELD/', '/home/moriarty/test.ms'),
-    ('/home/moriarty/test.ms::QUX/', '/home/moriarty/test.ms'),
-])
+@pytest.mark.parametrize(
+    "key, result",
+    [
+        ("/home/moriarty/test.ms/", "/home/moriarty/test.ms"),
+        ("/home/moriarty/test.ms", "/home/moriarty/test.ms"),
+        ("/home/moriarty/test.ms/::FIELD", "/home/moriarty/test.ms"),
+        ("/home/moriarty/test.ms::FIELD", "/home/moriarty/test.ms"),
+        ("/home/moriarty/test.ms::FIELD/", "/home/moriarty/test.ms"),
+        ("/home/moriarty/test.ms::QUX/", "/home/moriarty/test.ms"),
+    ],
+)
 def test_executor_key(key, result):
     assert executor_key(key) == result

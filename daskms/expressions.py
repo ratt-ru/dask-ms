@@ -9,7 +9,7 @@ operators = {
     ast.FloorDiv: da.floor_divide,
     ast.Add: da.add,
     ast.Sub: da.subtract,
-    ast.USub: da.negative
+    ast.USub: da.negative,
 }
 
 
@@ -18,9 +18,12 @@ class Visitor(ast.NodeTransformer):
         self.dataset = dataset
 
     if sys.version_info[1] >= 8:
+
         def visit_Constant(self, node):
             return node.n
+
     else:
+
         def visit_Num(self, node):
             return node.n
 

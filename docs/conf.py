@@ -22,7 +22,7 @@ from datetime import date
 import os
 import sys
 
-sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.abspath(".."))
 import daskms  # noqa
 
 autodoc_mock_imports = ["pyrap", "s3fs", "xarray"]
@@ -31,34 +31,37 @@ autodoc_mock_imports = ["pyrap", "s3fs", "xarray"]
 
 # If your documentation needs a minimal Sphinx version, state it here.
 #
-needs_sphinx = '5.0'
+needs_sphinx = "5.0"
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = [
     "sphinx_copybutton",
-    'sphinx.ext.autodoc',
-    'sphinx.ext.autosummary',
-    'sphinx.ext.doctest',
-    'sphinx.ext.intersphinx',
-    'sphinx.ext.extlinks',
-    'numpydoc']
+    "sphinx.ext.autodoc",
+    "sphinx.ext.autosummary",
+    "sphinx.ext.doctest",
+    "sphinx.ext.intersphinx",
+    "sphinx.ext.extlinks",
+    "numpydoc",
+]
 
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
 #
 # source_suffix = ['.rst', '.md']
-source_suffix = '.rst'
+source_suffix = ".rst"
 
 # The master toctree document.
-master_doc = 'index'
+master_doc = "index"
 
 # General information about the project.
-project = u'dask-ms'
-copyright = (f"{date.today().year}, "
-             f"South African Radio Astronomy Observatory, "
-             f"National Research Foundation")
-author = u"Simon Perkins"
+project = "dask-ms"
+copyright = (
+    f"{date.today().year}, "
+    f"South African Radio Astronomy Observatory, "
+    f"National Research Foundation"
+)
+author = "Simon Perkins"
 
 # The version info for the project you're documenting, acts as replacement
 # for |version| and |release|, also used in various other places throughout
@@ -74,16 +77,16 @@ release = daskms.__version__
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = 'en'
+language = "en"
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This patterns also effect to html_static_path and html_extra_path
-exclude_patterns = ['_build']
+exclude_patterns = ["_build"]
 
 # The name of the Pygments (syntax highlighting) style to use.
-pygments_style = 'default'
-#furo_pygments = 'default'
+pygments_style = "default"
+# furo_pygments = 'default'
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = False
@@ -94,7 +97,7 @@ todo_include_todos = False
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'furo'
+html_theme = "furo"
 
 # Theme options are theme-specific and customize the look and feel of a
 # theme further.  For a list of options available for each theme, see the
@@ -105,30 +108,30 @@ html_theme_options = {}
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+html_static_path = ["_static"]
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ['_templates']
+templates_path = ["_templates"]
 
 # -- Options for HTMLHelp output ---------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'daskmsdoc'
+htmlhelp_basename = "daskmsdoc"
 
 napoleon_numpy_docstring = True
 napoleon_google_docstring = False
 numpydoc_show_class_members = False
 
 extlinks = {
-    'issue': ('https://github.com/ska-sa/dask-ms/issues/%s', 'GH#'),
-    'pr': ('https://github.com/ska-sa/dask-ms/pull/%s', 'GH#')
+    "issue": ("https://github.com/ska-sa/dask-ms/issues/%s", "GH#"),
+    "pr": ("https://github.com/ska-sa/dask-ms/pull/%s", "GH#"),
 }
 
 # Example configuration for intersphinx: refer to the Python standard library.
 intersphinx_mapping = {
-    'dask': ('https://dask.pydata.org/en/stable', None),
-    'numpy': ('https://docs.scipy.org/doc/numpy/', None),
-    'pyrap': ('https://casacore.github.io/python-casacore', None),
-    'python': ('https://docs.python.org/3/', None),
-    'xarray': ('https://xarray.pydata.org/en/stable', None),
+    "dask": ("https://dask.pydata.org/en/stable", None),
+    "numpy": ("https://docs.scipy.org/doc/numpy/", None),
+    "pyrap": ("https://casacore.github.io/python-casacore", None),
+    "python": ("https://docs.python.org/3/", None),
+    "xarray": ("https://xarray.pydata.org/en/stable", None),
 }

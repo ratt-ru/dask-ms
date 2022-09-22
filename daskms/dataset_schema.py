@@ -29,12 +29,11 @@ def decode_type(typ: str):
     try:
         return getattr(mod, typ_str)
     except AttributeError:
-        raise ValueError(f"{typ_str} is not an "
-                         f"attribute of {mod_str}")
+        raise ValueError(f"{typ_str} is not an " f"attribute of {mod_str}")
 
 
 def encode_attr(arg):
-    """ Convert arg into something acceptable to json """
+    """Convert arg into something acceptable to json"""
     if isinstance(arg, tuple):
         return tuple(map(encode_attr, arg))
     elif isinstance(arg, list):
@@ -69,24 +68,18 @@ class DatasetSchema:
         self.attrs = attrs
 
     def __eq__(self, other):
-        return (isinstance(other, DatasetSchema) and
-                self.data_vars == other.data_vars and
-                self.coords == other.coords and
-                self.attrs == other.attrs)
+        return (
+            isinstance(other, DatasetSchema)
+            and self.data_vars == other.data_vars
+            and self.coords == other.coords
+            and self.attrs == other.attrs
+        )
 
     def __reduce__(self):
         return (DatasetSchema, (self.data_vars, self.coords, self.attrs))
 
     def __hash__(self):
-        return hash(
-            freeze(
-                (
-                    self.data_vars,
-                    self.coords,
-                    self.attrs
-                )
-            )
-        )
+        return hash(freeze((self.data_vars, self.coords, self.attrs)))
 
     def drop_dim(self, dim):
         return DatasetSchema(
@@ -107,12 +100,8 @@ class DatasetSchema:
         else:
             columns = set(columns)
 
-        data_vars = {
-            c: ColumnSchema.from_var(v) for c, v
-            in dv.items() if c in columns}
-        coords = {
-            c: ColumnSchema.from_var(v) for c, v
-            in co.items() if c in columns}
+        data_vars = {c: ColumnSchema.from_var(v) for c, v in dv.items() if c in columns}
+        coords = {c: ColumnSchema.from_var(v) for c, v in co.items() if c in columns}
 
         return DatasetSchema(data_vars, coords, dict(dataset.attrs))
 
@@ -137,8 +126,7 @@ class DatasetSchema:
 
         for d, sizes in dims.items():
             if len(sizes) > 1:
-                raise ValueError(f"Inconsistent sizes {sizes} "
-                                 f"for dimension {d}")
+                raise ValueError(f"Inconsistent sizes {sizes} " f"for dimension {d}")
 
             ret[d] = next(iter(sizes))
 
@@ -159,8 +147,9 @@ class DatasetSchema:
 
         for d, dim_chunks in chunks.items():
             if len(dim_chunks) > 1:
-                raise ValueError(f"Inconsistent chunks {dim_chunks}"
-                                 f"for dimension {d}")
+                raise ValueError(
+                    f"Inconsistent chunks {dim_chunks}" f"for dimension {d}"
+                )
 
             ret[d] = next(iter(dim_chunks))
 
@@ -173,7 +162,7 @@ class DatasetSchema:
         return {
             "data_vars": data_vars,
             "coords": coords,
-            "attributes": encode_attr(self.attrs)
+            "attributes": encode_attr(self.attrs),
         }
 
 
@@ -218,21 +207,24 @@ class ColumnSchema:
         if isinstance(obj, typ):
             return
 
-        if (isinstance(obj, (set, list, tuple)) and
-                all(isinstance(o, typ) for o in obj)):
+        if isinstance(obj, (set, list, tuple)) and all(isinstance(o, typ) for o in obj):
             return
 
-        raise TypeError(f"{name} '{obj}' is not {typ.__name__} "
-                        f"or a (tuple, list, set) of {typ.__name__}")
+        raise TypeError(
+            f"{name} '{obj}' is not {typ.__name__} "
+            f"or a (tuple, list, set) of {typ.__name__}"
+        )
 
     def __eq__(self, other):
-        return (isinstance(other, ColumnSchema) and
-                self.type == other.type and
-                self.dims == other.dims and
-                self.dtype == other.dtype and
-                self.chunks == other.chunks and
-                self.shape == other.shape and
-                self.attrs == other.attrs)
+        return (
+            isinstance(other, ColumnSchema)
+            and self.type == other.type
+            and self.dims == other.dims
+            and self.dtype == other.dtype
+            and self.chunks == other.chunks
+            and self.shape == other.shape
+            and self.attrs == other.attrs
+        )
 
     def __reduce__(self):
         return (
@@ -244,7 +236,7 @@ class ColumnSchema:
                 self.chunks,
                 self.shape,
                 self.attrs,
-            )
+            ),
         )
 
     def __hash__(self):
@@ -261,12 +253,7 @@ class ColumnSchema:
 
     def copy(self):
         return ColumnSchema(
-            self.type,
-            self.dims,
-            self.dtype,
-            self.chunks,
-            self.shape,
-            self.attrs.copy()
+            self.type, self.dims, self.dtype, self.chunks, self.shape, self.attrs.copy()
         )
 
     @property
@@ -281,7 +268,8 @@ class ColumnSchema:
             var.dtype,
             var.chunks if isinstance(var.data, da.Array) else None,
             var.shape,
-            var.attrs)
+            var.attrs,
+        )
 
     @classmethod
     def from_dict(self, d):
@@ -293,7 +281,8 @@ class ColumnSchema:
             np.dtype(d["dtype"]),
             tuple(map(tuple, chunks)) if chunks is not None else None,
             tuple(d["shape"]),
-            d["attrs"].copy())
+            d["attrs"].copy(),
+        )
 
     def to_dict(self):
         return {
@@ -321,8 +310,9 @@ def unify_schemas(dataset_schemas):
         dataset_schemas = [dataset_schemas]
 
     if not all(isinstance(ds, DatasetSchema) for ds in dataset_schemas):
-        raise TypeError("dataset_schemas must be a "
-                        "DatasetSchema or list of DatasetSchema's")
+        raise TypeError(
+            "dataset_schemas must be a " "DatasetSchema or list of DatasetSchema's"
+        )
 
     unified_data_vars = defaultdict(lambda: defaultdict(list))
     unified_coords = defaultdict(lambda: defaultdict(list))

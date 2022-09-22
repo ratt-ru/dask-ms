@@ -9,15 +9,14 @@ def test_expressions(ms):
 
     for i, ds in enumerate(datasets):
         dims = ds.DATA.dims
-        datasets[i] = ds.assign(DIR1_DATA=(dims, ds.DATA.data),
-                                DIR2_DATA=(dims, ds.DATA.data),
-                                DIR3_DATA=(dims, ds.DATA.data))
+        datasets[i] = ds.assign(
+            DIR1_DATA=(dims, ds.DATA.data),
+            DIR2_DATA=(dims, ds.DATA.data),
+            DIR3_DATA=(dims, ds.DATA.data),
+        )
 
     results = [
-        ds.DATA.data / (
-            -ds.DIR1_DATA.data +
-            ds.DIR2_DATA.data +
-            ds.DIR3_DATA.data) * 4
+        ds.DATA.data / (-ds.DIR1_DATA.data + ds.DIR2_DATA.data + ds.DIR3_DATA.data) * 4
         for ds in datasets
     ]
 

@@ -39,6 +39,7 @@ class Multiton(type):
     Instantiation of object instances is thread-safe.
 
     """
+
     MISSING = object()
 
     def __init__(self, *args, **kwargs):
@@ -48,18 +49,23 @@ class Multiton(type):
 
     def __call__(cls, *args, **kwargs):
         signature = inspect.signature(cls.__init__)
-        positional_in_kwargs = [p.name for p in signature.parameters.values()
-                                if p.kind == p.POSITIONAL_OR_KEYWORD
-                                and p.default == p.empty
-                                and p.name in kwargs]
+        positional_in_kwargs = [
+            p.name
+            for p in signature.parameters.values()
+            if p.kind == p.POSITIONAL_OR_KEYWORD
+            and p.default == p.empty
+            and p.name in kwargs
+        ]
 
         if positional_in_kwargs:
-            warn(f"Positional arguments {positional_in_kwargs} were "
-                 f"supplied as keyword arguments to "
-                 f"{cls.__init__}{signature}. "
-                 f"This may create separate Multiton instances "
-                 f"for what is intended to be a unique set of "
-                 f"arguments.")
+            warn(
+                f"Positional arguments {positional_in_kwargs} were "
+                f"supplied as keyword arguments to "
+                f"{cls.__init__}{signature}. "
+                f"This may create separate Multiton instances "
+                f"for what is intended to be a unique set of "
+                f"arguments."
+            )
 
         key = freeze(args + (kwargs if kwargs else Multiton.MISSING,))
 
@@ -214,7 +220,7 @@ class LazyProxy:
         "__lazy_kwargs__",
         "__lazy_object__",
         "__lazy_lock__",
-        "__weakref__"
+        "__weakref__",
     )
 
     __lazy_members__ = set(__slots__)
@@ -223,8 +229,7 @@ class LazyProxy:
         ex = ValueError("fn must be a callable or a tuple of two callables")
 
         if isinstance(fn, tuple):
-            if (len(fn) != 2 or not callable(fn[0])
-                    or (fn[1] and not callable(fn[1]))):
+            if len(fn) != 2 or not callable(fn[0]) or (fn[1] and not callable(fn[1])):
                 raise ex
 
             self.__lazy_fn__, self.__lazy_finaliser__ = fn
@@ -239,18 +244,19 @@ class LazyProxy:
 
     def __lazy_eq__(self, other):
         return (
-            isinstance(other, LazyProxy) and
-            self.__lazy_fn__ == other.__lazy_fn__ and
-            self.__lazy_finaliser__ == other.__lazy_finaliser__ and
-            self.__lazy_args__ == other.__lazy_args__ and
-            self.__lazy_kwargs__ == other.__lazy_kwargs__)
+            isinstance(other, LazyProxy)
+            and self.__lazy_fn__ == other.__lazy_fn__
+            and self.__lazy_finaliser__ == other.__lazy_finaliser__
+            and self.__lazy_args__ == other.__lazy_args__
+            and self.__lazy_kwargs__ == other.__lazy_kwargs__
+        )
 
     def __lazy_hash__(self):
         return (
             self.__lazy_fn__,
             self.__lazy_finaliser__,
             self.__lazy_args__,
-            frozenset(self.__lazy_kwargs__.items())
+            frozenset(self.__lazy_kwargs__.items()),
         ).__hash__()
 
     @classmethod
@@ -280,12 +286,13 @@ class LazyProxy:
         ------
         InvalidLazyContext:
             Raised if the call stack contains a call to a
-            problematic function (like `dask.array.blockwise`)        """
+            problematic function (like `dask.array.blockwise`)"""
         while frame and depth > 0:
             if frame.f_code in INVALID_LAZY_CONTEXTS:
                 raise InvalidLazyContext(
                     f"Attempted to create a LazyObject within a call "
-                    f"to {frame.f_code.co_name}")
+                    f"to {frame.f_code.co_name}"
+                )
 
             depth -= 1
             frame = frame.f_back
@@ -318,15 +325,14 @@ class LazyProxy:
                 cls.__lazy_raise_on_invalid_frames__(inspect.currentframe())
 
                 # Create __lazy_object__
-                lazy_obj = proxy.__lazy_fn__(*proxy.__lazy_args__,
-                                             **proxy.__lazy_kwargs__)
+                lazy_obj = proxy.__lazy_fn__(
+                    *proxy.__lazy_args__, **proxy.__lazy_kwargs__
+                )
                 proxy.__lazy_object__ = lazy_obj
 
                 # Create finaliser if provided
                 if proxy.__lazy_finaliser__:
-                    weakref.finalize(proxy,
-                                     proxy.__lazy_finaliser__,
-                                     lazy_obj)
+                    weakref.finalize(proxy, proxy.__lazy_finaliser__, lazy_obj)
 
             return lazy_obj
 
@@ -350,10 +356,18 @@ class LazyProxy:
         return object.__delattr__(self.__lazy_object__, name)
 
     def __reduce__(self):
-        return (self.__lazy_from_args__,
-                (((self.__lazy_fn__, self.__lazy_finaliser__)
-                 if self.__lazy_finaliser__ else self.__lazy_fn__),
-                 self.__lazy_args__, self.__lazy_kwargs__))
+        return (
+            self.__lazy_from_args__,
+            (
+                (
+                    (self.__lazy_fn__, self.__lazy_finaliser__)
+                    if self.__lazy_finaliser__
+                    else self.__lazy_fn__
+                ),
+                self.__lazy_args__,
+                self.__lazy_kwargs__,
+            ),
+        )
 
 
 class LazyProxyMultiton(LazyProxy, metaclass=Multiton):

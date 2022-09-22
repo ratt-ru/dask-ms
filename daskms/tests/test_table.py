@@ -12,4 +12,4 @@ def test_table_exists(tmp_path):
     ant_path.mkdir(parents=True, exist_ok=False)
     # Both the directory and canonical subtable access forms work
     assert table_exists(str(ant_path))
-    assert table_exists('::'.join((str(ms_path), "ANTENNA")))
+    assert table_exists("::".join((str(ms_path), "ANTENNA")))

@@ -6,11 +6,13 @@ import platform
 
 import pytest
 
-from daskms.utils import (promote_columns,
-                          natural_order,
-                          table_path_split,
-                          requires,
-                          filter_kwargs)
+from daskms.utils import (
+    promote_columns,
+    natural_order,
+    table_path_split,
+    requires,
+    filter_kwargs,
+)
 
 
 def test_natural_order():
@@ -36,29 +38,31 @@ def test_promotion(columns, default):
     assert promote_columns(None, default) == default
 
 
-_root_path = Path("C:/" if platform.system() == "Windows" else os.sep,
-                  "home", "moriarty")
+_root_path = Path(
+    "C:/" if platform.system() == "Windows" else os.sep, "home", "moriarty"
+)
 
 
-@pytest.mark.parametrize("path, root, table, subtable", [
-    # Table access
-    (_root_path / "test.ms",
-     _root_path, "test.ms", ""),
-    (_root_path / f"test.ms{os.sep}",
-     _root_path, "test.ms", ""),
-    (_root_path / "test.ms{s}{s}".format(s=os.sep),
-     _root_path, "test.ms", ""),
-    # Indirect subtable access
-    (_root_path / "test.ms::SOURCE",
-     _root_path, "test.ms", "SOURCE"),
-    (_root_path / f"test.ms::SOURCE{os.sep}",
-     _root_path, "test.ms", "SOURCE"),
-    # Direct subtable access
-    (_root_path / "test.ms" / "SOURCE",
-     _root_path / "test.ms", "SOURCE", ""),
-    (_root_path / "test.ms" / f"SOURCE{os.sep}",
-     _root_path / "test.ms", "SOURCE", "")
-])
+@pytest.mark.parametrize(
+    "path, root, table, subtable",
+    [
+        # Table access
+        (_root_path / "test.ms", _root_path, "test.ms", ""),
+        (_root_path / f"test.ms{os.sep}", _root_path, "test.ms", ""),
+        (_root_path / "test.ms{s}{s}".format(s=os.sep), _root_path, "test.ms", ""),
+        # Indirect subtable access
+        (_root_path / "test.ms::SOURCE", _root_path, "test.ms", "SOURCE"),
+        (_root_path / f"test.ms::SOURCE{os.sep}", _root_path, "test.ms", "SOURCE"),
+        # Direct subtable access
+        (_root_path / "test.ms" / "SOURCE", _root_path / "test.ms", "SOURCE", ""),
+        (
+            _root_path / "test.ms" / f"SOURCE{os.sep}",
+            _root_path / "test.ms",
+            "SOURCE",
+            "",
+        ),
+    ],
+)
 def test_table_path_split(path, root, table, subtable):
     assert (root, table, subtable) == table_path_split(path)
 
@@ -67,8 +71,9 @@ def test_requires():
     def fn(*args, **kwargs):
         return 1
 
-    decorator = requires(ImportError("foo"), ImportError("bar"),
-                         "need foo", "need bar")(fn)
+    decorator = requires(
+        ImportError("foo"), ImportError("bar"), "need foo", "need bar"
+    )(fn)
 
     with pytest.raises(ImportError) as e:
         decorator()
@@ -82,7 +87,6 @@ def test_requires():
 
 
 def test_filter_kwargs():
-
     def f(arg0, arg1=None, arg2=None):
         return
 

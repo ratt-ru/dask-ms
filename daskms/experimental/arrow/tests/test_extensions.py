@@ -3,7 +3,11 @@ from numpy.testing import assert_array_equal
 import pytest
 
 from daskms.experimental.arrow.extension_types import (
-    ComplexType, ComplexArray, TensorType, TensorArray)
+    ComplexType,
+    ComplexArray,
+    TensorType,
+    TensorArray,
+)
 
 pa = pytest.importorskip("pyarrow")
 
@@ -30,21 +34,15 @@ def test_data(shape, dtype):
 singleton_xfail = pytest.mark.xfail(reason="Singletons not handled yet")
 
 
-@pytest.mark.parametrize("dtype", [
-    bool,
-    np.int32,
-    np.float32,
-    np.float64,
-    np.complex64,
-    np.complex128])
-@pytest.mark.parametrize("shape", [
-    pytest.param((), marks=singleton_xfail),
-    (10,),
-    (10, 16, 4)
-])
+@pytest.mark.parametrize(
+    "dtype", [bool, np.int32, np.float32, np.float64, np.complex64, np.complex128]
+)
+@pytest.mark.parametrize(
+    "shape", [pytest.param((), marks=singleton_xfail), (10,), (10, 16, 4)]
+)
 def test_arrow_numpy_conversion(test_data):
     pa_data = TensorArray.from_numpy(test_data)
-    assert isinstance(pa_data,  TensorArray)
+    assert isinstance(pa_data, TensorArray)
     assert isinstance(pa_data.type, TensorType)
     pa_type = pa_data.type.storage_type.value_type
 
@@ -58,14 +56,10 @@ def test_arrow_numpy_conversion(test_data):
     assert_array_equal(test_data, pa_data.to_numpy())
 
 
-@pytest.mark.parametrize("dtype", [
-    np.complex64,
-    np.complex128])
-@pytest.mark.parametrize("shape", [
-    pytest.param((), marks=singleton_xfail),
-    (10,),
-    (20,)
-])
+@pytest.mark.parametrize("dtype", [np.complex64, np.complex128])
+@pytest.mark.parametrize(
+    "shape", [pytest.param((), marks=singleton_xfail), (10,), (20,)]
+)
 def test_complex_type_conversion(test_data):
     array = ComplexArray.from_numpy(test_data)
     assert_array_equal(array.to_numpy(), test_data)
