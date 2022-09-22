@@ -62,7 +62,7 @@ import daskms  # noqa
 
 # If your documentation needs a minimal Sphinx version, state it here.
 #
-# needs_sphinx = '1.0'
+needs_sphinx = '5.0'
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
@@ -163,3 +163,7 @@ intersphinx_mapping = {
     'python': ('https://docs.python.org/3/', None),
     'xarray': ('https://xarray.pydata.org/en/stable', None),
 }
+
+def setup(app):
+    app.add_css_file("css/dark.css")
+
