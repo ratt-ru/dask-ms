@@ -78,14 +78,17 @@ class DaskMSStore:
         return f"{self.fs.unstrip_protocol(self.canonical_path)}"
 
     def subdirectories(self):
-        return [d["name"] for d
-                in self.fs.listdir(self.full_path, detail=True)
-                if d["type"] == "directory"]
+        return [
+            d["name"]
+            for d in self.fs.listdir(self.full_path, detail=True)
+            if d["type"] == "directory"
+        ]
 
     def casa_path(self):
         if self.protocol != "file":
-            raise ValueError(f"CASA Tables are incompatible with the "
-                             f"{self.protocol} protocol")
+            raise ValueError(
+                f"CASA Tables are incompatible with the " f"{self.protocol} protocol"
+            )
 
         return self.canonical_path
 
@@ -94,9 +97,11 @@ class DaskMSStore:
         return DaskMSStore(url, **storage_options)
 
     def __eq__(self, other):
-        return (isinstance(other, DaskMSStore) and
-                self.url == other.url and
-                self.storage_options == other.storage_options)
+        return (
+            isinstance(other, DaskMSStore)
+            and self.url == other.url
+            and self.storage_options == other.storage_options
+        )
 
     def __hash__(self):
         return hash(
@@ -109,8 +114,7 @@ class DaskMSStore:
         )
 
     def __reduce__(self):
-        return (DaskMSStore.from_reduce_args,
-                (self.url, self.storage_options))
+        return (DaskMSStore.from_reduce_args, (self.url, self.storage_options))
 
     def __getitem__(self, key):
         return self.map[key]
@@ -127,7 +131,7 @@ class DaskMSStore:
 
     @staticmethod
     def _remove_prefix(s, prefix):
-        return s[len(prefix):] if s.startswith(prefix) else s
+        return s[len(prefix) :] if s.startswith(prefix) else s
 
     def rglob(self, pattern, **kwargs):
         sep = self.fs.sep

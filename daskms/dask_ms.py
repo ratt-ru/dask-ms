@@ -14,9 +14,15 @@ _DEFAULT_GROUP_COLUMNS = ["FIELD_ID", "DATA_DESC_ID"]
 log = logging.getLogger(__name__)
 
 
-def xds_to_table(xds, table_name, columns="ALL", descriptor=None,
-                 table_keywords=None, column_keywords=None,
-                 table_proxy=False):
+def xds_to_table(
+    xds,
+    table_name,
+    columns="ALL",
+    descriptor=None,
+    table_keywords=None,
+    column_keywords=None,
+    table_proxy=False,
+):
     """
     Generates a list of Datasets representing a write operations from the
     specified arrays in :class:`xarray.Dataset`'s into
@@ -93,11 +99,15 @@ def xds_to_table(xds, table_name, columns="ALL", descriptor=None,
             columns = [columns]
 
     # Write the datasets
-    out_ds = write_datasets(table_name, xds, columns,
-                            descriptor=descriptor,
-                            table_keywords=table_keywords,
-                            column_keywords=column_keywords,
-                            table_proxy=table_proxy)
+    out_ds = write_datasets(
+        table_name,
+        xds,
+        columns,
+        descriptor=descriptor,
+        table_keywords=table_keywords,
+        column_keywords=column_keywords,
+        table_proxy=table_proxy,
+    )
 
     # Unpack table proxy if it was requested
     if table_proxy is True:
@@ -114,9 +124,9 @@ def xds_to_table(xds, table_name, columns="ALL", descriptor=None,
     return out_ds
 
 
-def xds_from_table(table_name, columns=None,
-                   index_cols=None, group_cols=None,
-                   **kwargs):
+def xds_from_table(
+    table_name, columns=None, index_cols=None, group_cols=None, **kwargs
+):
     """
     Create multiple :class:`xarray.Dataset` objects
     from CASA table ``table_name`` with the rows lexicographically
@@ -278,9 +288,9 @@ def xds_from_table(table_name, columns=None,
     index_cols = promote_columns(index_cols, [])
     group_cols = promote_columns(group_cols, [])
 
-    return DatasetFactory(table_name, columns,
-                          group_cols, index_cols,
-                          **kwargs).datasets()
+    return DatasetFactory(
+        table_name, columns, group_cols, index_cols, **kwargs
+    ).datasets()
 
 
 def xds_from_ms(ms, columns=None, index_cols=None, group_cols=None, **kwargs):
@@ -317,10 +327,9 @@ def xds_from_ms(ms, columns=None, index_cols=None, group_cols=None, **kwargs):
 
     kwargs.setdefault("table_schema", "MS")
 
-    return xds_from_table(ms, columns=columns,
-                          index_cols=index_cols,
-                          group_cols=group_cols,
-                          **kwargs)
+    return xds_from_table(
+        ms, columns=columns, index_cols=index_cols, group_cols=group_cols, **kwargs
+    )
 
 
 def xds_from_storage_table(store, **kwargs):
@@ -333,9 +342,11 @@ def xds_from_storage_table(store, **kwargs):
         return xds_from_table(store, **kwargs)
     elif typ == "zarr":
         from daskms.experimental.zarr import xds_from_zarr
+
         return xds_from_zarr(store, **kwargs)
     elif typ == "parquet":
         from daskms.experimental.arrow import xds_from_parquet
+
         return xds_from_parquet(store, **kwargs)
     else:
         raise TypeError(f"Unknown dataset {typ}")
@@ -351,9 +362,11 @@ def xds_from_storage_ms(store, **kwargs):
         return xds_from_ms(store, **kwargs)
     elif typ == "zarr":
         from daskms.experimental.zarr import xds_from_zarr
+
         return xds_from_zarr(store, **kwargs)
     elif typ == "parquet":
         from daskms.experimental.arrow import xds_from_parquet
+
         return xds_from_parquet(store, **kwargs)
     else:
         raise TypeError(f"Unknown dataset {typ}")
@@ -367,13 +380,15 @@ def xds_to_storage_table(xds, store, **kwargs):
 
     if typ == "casa":
         filter_kwargs(xds_to_table, kwargs)
-        return xds_to_table(xds, store,  **kwargs)
+        return xds_to_table(xds, store, **kwargs)
     elif typ == "zarr":
         from daskms.experimental.zarr import xds_to_zarr
+
         filter_kwargs(xds_to_zarr, kwargs)
         return xds_to_zarr(xds, store, **kwargs)
     elif typ == "parquet":
         from daskms.experimental.arrow import xds_to_parquet
+
         filter_kwargs(xds_to_parquet, kwargs)
         return xds_to_parquet(xds, store, **kwargs)
     else:
@@ -385,7 +400,8 @@ def xds_to_storage_table(xds, store, **kwargs):
 # ``python -OO`` strips docstrings
 try:
     xds_from_ms.__doc__ %= {
-        'indices': _DEFAULT_INDEX_COLUMNS,
-        'groups': _DEFAULT_GROUP_COLUMNS}
+        "indices": _DEFAULT_INDEX_COLUMNS,
+        "groups": _DEFAULT_GROUP_COLUMNS,
+    }
 except AttributeError:
     pass

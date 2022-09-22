@@ -5,8 +5,7 @@ import pickle
 import numpy as np
 import pytest
 
-from daskms.patterns import (
-    Multiton, LazyProxy, LazyProxyMultiton)
+from daskms.patterns import Multiton, LazyProxy, LazyProxyMultiton
 
 
 class DummyResource:
@@ -98,11 +97,17 @@ def test_lazy_resource(tmp_path):
         out = pool_proxy.apply(int, args=("123456",))  # noqa
         return np.array(list(map(int, values))) + other + out
 
-    values = da.blockwise(reader, "r",
-                          file_proxy, None,
-                          pool_proxy, None,
-                          da.arange(100, chunks=10), "r",
-                          meta=np.empty((0,), object))
+    values = da.blockwise(
+        reader,
+        "r",
+        file_proxy,
+        None,
+        pool_proxy,
+        None,
+        da.arange(100, chunks=10),
+        "r",
+        meta=np.empty((0,), object),
+    )
     values.compute(scheduler="processes")
 
 

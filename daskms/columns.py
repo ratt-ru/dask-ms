@@ -12,63 +12,70 @@ import numpy as np
 log = logging.getLogger(__name__)
 
 # Map column string types to numpy/python types
-_TABLE_TO_PY = OrderedDict({
-    'BOOL': 'bool',
-    'BOOLEAN': 'bool',
-    'BYTE': 'uint8',
-    'UCHAR': 'uint8',
-    'SMALLINT': 'int16',
-    'SHORT': 'int16',
-    'USMALLINT': 'uint16',
-    'USHORT': 'uint16',
-    'INT': 'int32',
-    'INTEGER': 'int32',
-    'UINTEGER': 'uint32',
-    'UINT': 'uint32',
-    'FLOAT': 'float32',
-    'DOUBLE': 'float64',
-    'FCOMPLEX': 'complex64',
-    'COMPLEX': 'complex64',
-    'DCOMPLEX': 'complex128',
-    'STRING': 'object',
-})
+_TABLE_TO_PY = OrderedDict(
+    {
+        "BOOL": "bool",
+        "BOOLEAN": "bool",
+        "BYTE": "uint8",
+        "UCHAR": "uint8",
+        "SMALLINT": "int16",
+        "SHORT": "int16",
+        "USMALLINT": "uint16",
+        "USHORT": "uint16",
+        "INT": "int32",
+        "INTEGER": "int32",
+        "UINTEGER": "uint32",
+        "UINT": "uint32",
+        "FLOAT": "float32",
+        "DOUBLE": "float64",
+        "FCOMPLEX": "complex64",
+        "COMPLEX": "complex64",
+        "DCOMPLEX": "complex128",
+        "STRING": "object",
+    }
+)
 
 
 # Map numpy/python types to column string types
-_PY_TO_TABLE = OrderedDict({
-    'bool': 'BOOLEAN',
-    'uint8': 'UCHAR',
-    'int16': 'SHORT',
-    'uint16': 'USHORT',
-    'uint32': 'UINT',
-    'int32': 'INTEGER',
-    'float32': 'FLOAT',
-    'float64': 'DOUBLE',
-    'complex64': 'COMPLEX',
-    'complex128': 'DCOMPLEX',
-    'object': 'STRING'
-})
+_PY_TO_TABLE = OrderedDict(
+    {
+        "bool": "BOOLEAN",
+        "uint8": "UCHAR",
+        "int16": "SHORT",
+        "uint16": "USHORT",
+        "uint32": "UINT",
+        "int32": "INTEGER",
+        "float32": "FLOAT",
+        "float64": "DOUBLE",
+        "complex64": "COMPLEX",
+        "complex128": "DCOMPLEX",
+        "object": "STRING",
+    }
+)
 
 
 def infer_dtype(column, coldesc):
     # Extract valueType
     try:
-        value_type = coldesc['valueType']
+        value_type = coldesc["valueType"]
     except KeyError:
-        raise ValueError("Cannot infer dtype for column '%s'. "
-                         "Table Column Description is missing "
-                         "valueType. Description is '%s'" %
-                         (column, coldesc))
+        raise ValueError(
+            "Cannot infer dtype for column '%s'. "
+            "Table Column Description is missing "
+            "valueType. Description is '%s'" % (column, coldesc)
+        )
 
     # Try conversion to numpy/python type
     try:
         np_type_str = _TABLE_TO_PY[value_type.upper()]
     except KeyError:
-        raise ValueError("No known conversion from CASA Table type '%s' "
-                         "to python/numpy type. "
-                         "Perhaps it needs to be added "
-                         "to _TABLE_TO_PY?:\n"
-                         "%s" % (value_type, pformat(dict(_TABLE_TO_PY))))
+        raise ValueError(
+            "No known conversion from CASA Table type '%s' "
+            "to python/numpy type. "
+            "Perhaps it needs to be added "
+            "to _TABLE_TO_PY?:\n"
+            "%s" % (value_type, pformat(dict(_TABLE_TO_PY)))
+        )
     else:
         return np.dtype(np_type_str)
 
@@ -77,19 +84,20 @@ def infer_casa_type(dtype):
     try:
         return _PY_TO_TABLE[np.dtype(dtype).name]
     except KeyError:
-        raise ValueError("No known conversion from numpy dtype '%s' "
-                         "to CASA Table Type. "
-                         "Perhaps it needs to be added "
-                         "to _TABLE_TO_PY?:\n"
-                         "%s" % (dtype, pformat(dict(_TABLE_TO_PY))))
+        raise ValueError(
+            "No known conversion from numpy dtype '%s' "
+            "to CASA Table Type. "
+            "Perhaps it needs to be added "
+            "to _TABLE_TO_PY?:\n"
+            "%s" % (dtype, pformat(dict(_TABLE_TO_PY)))
+        )
 
 
 class ColumnMetadataError(Exception):
     pass
 
 
-ColumnMetadata = namedtuple("ColumnMetadata",
-                            ["shape", "dims", "chunks", "dtype"])
+ColumnMetadata = namedtuple("ColumnMetadata", ["shape", "dims", "chunks", "dtype"])
 
 
 def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
@@ -133,43 +141,48 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
     coldesc = table_proxy.getcoldesc(column).result()
     dtype = infer_dtype(column, coldesc)
     # missing ndim implies only row dimension
-    ndim = coldesc.get('ndim', 'row')
+    ndim = coldesc.get("ndim", "row")
 
     try:
-        option = coldesc['option']
+        option = coldesc["option"]
     except KeyError:
-        raise ColumnMetadataError("Column '%s' has no option "
-                                  "in the column descriptor" % column)
+        raise ColumnMetadataError(
+            "Column '%s' has no option " "in the column descriptor" % column
+        )
 
     # Each row is a scalar
     # TODO(sjperkins)
     # Probably could be handled by getCell/putCell calls,
     # but the effort may not be worth it
     if ndim == 0:
-        raise ColumnMetadataError("Scalars in column '%s' "
-                                  "(ndim == %d) are not currently handled"
-                                  % (column, ndim))
+        raise ColumnMetadataError(
+            "Scalars in column '%s' "
+            "(ndim == %d) are not currently handled" % (column, ndim)
+        )
     # Only row dimensions
-    elif ndim == 'row':
+    elif ndim == "row":
         shape = ()
     # FixedShape
     elif option & 4:
         try:
-            shape = tuple(coldesc['shape'])
+            shape = tuple(coldesc["shape"])
         except KeyError:
-            raise ColumnMetadataError("'%s' column descriptor option '%d' "
-                                      "specifies a FixedShape but no 'shape' "
-                                      "attribute was found in the "
-                                      "column descriptor" % (column, option))
+            raise ColumnMetadataError(
+                "'%s' column descriptor option '%d' "
+                "specifies a FixedShape but no 'shape' "
+                "attribute was found in the "
+                "column descriptor" % (column, option)
+            )
     # Variably shaped...
     else:
         try:
             # Get an exemplar row and infer the shape
             exemplar = table_proxy.getcell(column, exemplar_row).result()
         except Exception as e:
-            raise ColumnMetadataError("Unable to infer shape of "
-                                      "column '%s' due to:\n'%s'"
-                                      % (column, str(e)))
+            raise ColumnMetadataError(
+                "Unable to infer shape of "
+                "column '%s' due to:\n'%s'" % (column, str(e))
+            )
 
         # Try figure out the shape
         if isinstance(exemplar, np.ndarray):
@@ -177,32 +190,37 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
 
             # Double-check the dtype
             if dtype != exemplar.dtype:
-                raise ColumnMetadataError("Inferred dtype '%s' does not match "
-                                          "the exemplar dtype '%s'" %
-                                          (dtype, exemplar.dtype))
+                raise ColumnMetadataError(
+                    "Inferred dtype '%s' does not match "
+                    "the exemplar dtype '%s'" % (dtype, exemplar.dtype)
+                )
         elif isinstance(exemplar, list):
             shape = (len(exemplar),)
             assert dtype == object
         else:
-            raise ColumnMetadataError(f"Unhandled exemplar type "
-                                      f"'{type(exemplar)}'")
+            raise ColumnMetadataError(f"Unhandled exemplar type " f"'{type(exemplar)}'")
 
         # NOTE(sjperkins)
         # -1 implies each row can be any shape whatsoever
         # Log a warning
         if ndim == -1:
-            log.warning("The shape of column '%s' is unconstrained "
-                        "(ndim == -1). Assuming shape is %s from "
-                        "exemplar", column, shape)
+            log.warning(
+                "The shape of column '%s' is unconstrained "
+                "(ndim == -1). Assuming shape is %s from "
+                "exemplar",
+                column,
+                shape,
+            )
         # Otherwise confirm the shape and ndim
         elif len(shape) != ndim:
-            raise ColumnMetadataError("'ndim=%d' in column descriptor doesn't "
-                                      "match shape of exemplar=%s" %
-                                      (ndim, shape))
+            raise ColumnMetadataError(
+                "'ndim=%d' in column descriptor doesn't "
+                "match shape of exemplar=%s" % (ndim, shape)
+            )
 
     # Extract dimension schema
     try:
-        dims = table_schema[column]['dims']
+        dims = table_schema[column]["dims"]
     except KeyError:
         dims = tuple("%s-%d" % (column, i) for i in range(1, len(shape) + 1))
 
@@ -220,9 +238,10 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
             dim_chunks.append(dc[0])
 
     if not (len(shape) == len(dims) == len(dim_chunks)):
-        raise ColumnMetadataError("The length of shape '%s' dims '%s' and "
-                                  "dim_chunks '%s' do not agree." %
-                                  (shape, dims, dim_chunks))
+        raise ColumnMetadataError(
+            "The length of shape '%s' dims '%s' and "
+            "dim_chunks '%s' do not agree." % (shape, dims, dim_chunks)
+        )
 
     return ColumnMetadata(shape, dims, dim_chunks, dtype)
 

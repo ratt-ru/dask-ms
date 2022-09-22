@@ -13,8 +13,7 @@ from daskms.fsspec_store import DaskMSStore
 from daskms.experimental.arrow.arrow_schema import ArrowSchema
 from daskms.experimental.arrow.extension_types import TensorArray
 from daskms.experimental.arrow.require_arrow import requires_arrow
-from daskms.experimental.utils import (promote_columns,
-                                       column_iterator)
+from daskms.experimental.utils import promote_columns, column_iterator
 
 try:
     import pyarrow as pa
@@ -42,10 +41,8 @@ class ParquetFragment:
             schema = ArrowSchema(
                 schema.data_vars,
                 schema.coords,
-                {
-                    **schema.attrs,
-                    DASKMS_PARTITION_KEY: (("DATASET", "int32"),)
-                })
+                {**schema.attrs, DASKMS_PARTITION_KEY: (("DATASET", "int32"),)},
+            )
         else:
             partition = tuple((p, schema.attrs[p]) for p, _ in partition)
 
@@ -60,13 +57,13 @@ class ParquetFragment:
         self.lock = Lock()
 
     def __reduce__(self):
-        return (ParquetFragment, (self.store, self.key,
-                                  self.schema, self.dataset_id))
+        return (ParquetFragment, (self.store, self.key, self.schema, self.dataset_id))
 
     def write(self, chunk, *data):
 
-        table_path = (self.key if self.store.table else
-                      self.store.join(["MAIN", self.key]))
+        table_path = (
+            self.key if self.store.table else self.store.join(["MAIN", self.key])
+        )
 
         with self.lock:
             self.store.makedirs(table_path, exist_ok=True)
@@ -76,8 +73,9 @@ class ParquetFragment:
         for column, var in zip(data[::2], data[1::2]):
             while type(var) is list:
                 if len(var) != 1:
-                    raise ValueError("Multiple chunks in blockwise "
-                                     "on non-row dimension")
+                    raise ValueError(
+                        "Multiple chunks in blockwise " "on non-row dimension"
+                    )
                 var = var[0]
 
             if var.ndim == 1:
@@ -85,8 +83,7 @@ class ParquetFragment:
             elif var.ndim > 1:
                 pa_data = TensorArray.from_numpy(var)
             else:
-                raise NotImplementedError("Scalar array writing "
-                                          "not implemented")
+                raise NotImplementedError("Scalar array writing " "not implemented")
 
             table_data[column] = pa_data
 
@@ -107,15 +104,15 @@ def xds_to_parquet(xds, store, columns=None, **kwargs):
     elif isinstance(store, (str, Path)):
         store = DaskMSStore(f"{store}", **kwargs.pop("storage_options", {}))
     else:
-        raise TypeError(f"store '{store}' must be "
-                        f"Path, str or DaskMSStore")
+        raise TypeError(f"store '{store}' must be " f"Path, str or DaskMSStore")
 
     # If any kwargs are added, they should be popped prior to this check.
     if len(kwargs) > 0:
         warnings.warn(
             f"The following unsupported kwargs were ignored in "
             f"xds_to_parquet: {kwargs}",
-            UserWarning)
+            UserWarning,
+        )
 
     columns = promote_columns(columns)
 
@@ -141,25 +138,28 @@ def xds_to_parquet(xds, store, columns=None, **kwargs):
 
         for column, variable in itertools.chain(data_var_it, coord_it):
             if not isinstance(variable.data, da.Array):
-                raise ValueError(f"Column {column} does not "
-                                 f"contain a dask Array")
+                raise ValueError(f"Column {column} does not " f"contain a dask Array")
 
             if len(variable.dims[0]) == 0 or variable.dims[0] != "row":
-                raise ValueError(f"Column {column} dimensions "
-                                 f"{variable.dims} don't start with 'row'")
+                raise ValueError(
+                    f"Column {column} dimensions "
+                    f"{variable.dims} don't start with 'row'"
+                )
 
             args.extend((column, None, variable.data, variable.dims))
 
             for dim, chunk in zip(variable.dims[1:], variable.data.chunks[1:]):
                 if len(chunk) != 1:
-                    raise ValueError(f"Chunking in {dim} is not yet "
-                                     f"supported.")
+                    raise ValueError(f"Chunking in {dim} is not yet " f"supported.")
 
-        writes = da.blockwise(fragment.write, ("row",),
-                              *args,
-                              align_arrays=False,
-                              adjust_chunks={"row": 1},
-                              meta=np.empty((0,), bool))
+        writes = da.blockwise(
+            fragment.write,
+            ("row",),
+            *args,
+            align_arrays=False,
+            adjust_chunks={"row": 1},
+            meta=np.empty((0,), bool),
+        )
 
         writes = inlined_array(writes, chunk_ids)
 
@@ -169,8 +169,10 @@ def xds_to_parquet(xds, store, columns=None, **kwargs):
         if not partition:
             attrs = None
         else:
-            attrs = {DASKMS_PARTITION_KEY: partition,
-                     **{k: getattr(ds, k) for k, _ in partition}}
+            attrs = {
+                DASKMS_PARTITION_KEY: partition,
+                **{k: getattr(ds, k) for k, _ in partition},
+            }
 
         datasets.append(Dataset({"WRITE": (("row",), writes)}, attrs=attrs))
 

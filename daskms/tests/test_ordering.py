@@ -7,28 +7,30 @@ import pyrap.tables as pt
 import pytest
 
 from daskms.table_proxy import TableProxy
-from daskms.ordering import (ordering_taql,
-                             row_ordering,
-                             group_ordering_taql,
-                             group_row_ordering)
+from daskms.ordering import (
+    ordering_taql,
+    row_ordering,
+    group_ordering_taql,
+    group_row_ordering,
+)
 from daskms.utils import group_cols_str, index_cols_str, assert_liveness
 
 
 def table_proxy(ms):
-    return TableProxy(pt.table, ms, ack=False,
-                      lockoptions='user', readonly=True)
+    return TableProxy(pt.table, ms, ack=False, lockoptions="user", readonly=True)
 
 
-@pytest.mark.parametrize("group_cols", [
-    ["FIELD_ID", "SCAN_NUMBER"]],
-    ids=group_cols_str)
-@pytest.mark.parametrize("index_cols", [
-    ["TIME", "ANTENNA1", "ANTENNA2"]],
-    ids=index_cols_str)
+@pytest.mark.parametrize(
+    "group_cols", [["FIELD_ID", "SCAN_NUMBER"]], ids=group_cols_str
+)
+@pytest.mark.parametrize(
+    "index_cols", [["TIME", "ANTENNA1", "ANTENNA2"]], ids=index_cols_str
+)
 def test_ordering_query_taql_where_strings(ms, group_cols, index_cols):
-    taql = group_ordering_taql(table_proxy(ms), group_cols, index_cols,
-                               taql_where="ANTENNA1 != ANTENNA2")
-    assert taql._args[0].replace("\t", " "*4) == (
+    taql = group_ordering_taql(
+        table_proxy(ms), group_cols, index_cols, taql_where="ANTENNA1 != ANTENNA2"
+    )
+    assert taql._args[0].replace("\t", " " * 4) == (
         "SELECT\n"
         "    FIELD_ID,\n"
         "    SCAN_NUMBER,\n"
@@ -44,10 +46,11 @@ def test_ordering_query_taql_where_strings(ms, group_cols, index_cols):
         "    ANTENNA1 != ANTENNA2\n"
         "GROUPBY\n"
         "    FIELD_ID,\n"
-        "    SCAN_NUMBER")
+        "    SCAN_NUMBER"
+    )
 
     taql = group_ordering_taql(table_proxy(ms), group_cols, index_cols)
-    assert taql._args[0].replace("\t", " "*4) == (
+    assert taql._args[0].replace("\t", " " * 4) == (
         "SELECT\n"
         "    FIELD_ID,\n"
         "    SCAN_NUMBER,\n"
@@ -61,10 +64,11 @@ def test_ordering_query_taql_where_strings(ms, group_cols, index_cols):
         "    $1\n"
         "GROUPBY\n"
         "    FIELD_ID,\n"
-        "    SCAN_NUMBER")
+        "    SCAN_NUMBER"
+    )
 
     taql = group_ordering_taql(table_proxy(ms), group_cols, [])
-    assert taql._args[0].replace("\t", " "*4) == (
+    assert taql._args[0].replace("\t", " " * 4) == (
         "SELECT\n"
         "    FIELD_ID,\n"
         "    SCAN_NUMBER,\n"
@@ -75,11 +79,11 @@ def test_ordering_query_taql_where_strings(ms, group_cols, index_cols):
         "    $1\n"
         "GROUPBY\n"
         "    FIELD_ID,\n"
-        "    SCAN_NUMBER")
+        "    SCAN_NUMBER"
+    )
 
-    taql = ordering_taql(table_proxy(ms), index_cols,
-                         taql_where="ANTENNA1 != ANTENNA2")
-    assert taql._args[0].replace("\t", " "*4) == (
+    taql = ordering_taql(table_proxy(ms), index_cols, taql_where="ANTENNA1 != ANTENNA2")
+    assert taql._args[0].replace("\t", " " * 4) == (
         "SELECT\n"
         "    ROWID() as __tablerow__\n"
         "FROM\n"
@@ -89,10 +93,11 @@ def test_ordering_query_taql_where_strings(ms, group_cols, index_cols):
         "ORDERBY\n"
         "    TIME,\n"
         "    ANTENNA1,\n"
-        "    ANTENNA2")
+        "    ANTENNA2"
+    )
 
     taql = ordering_taql(table_proxy(ms), index_cols)
-    assert taql._args[0].replace("\t", " "*4) == (
+    assert taql._args[0].replace("\t", " " * 4) == (
         "SELECT\n"
         "    ROWID() as __tablerow__\n"
         "FROM\n"
@@ -100,27 +105,25 @@ def test_ordering_query_taql_where_strings(ms, group_cols, index_cols):
         "ORDERBY\n"
         "    TIME,\n"
         "    ANTENNA1,\n"
-        "    ANTENNA2")
+        "    ANTENNA2"
+    )
 
     taql = ordering_taql(table_proxy(ms), [])
-    assert taql._args[0].replace("\t", " "*4) == (
-        "SELECT\n"
-        "    ROWID() as __tablerow__\n"
-        "FROM\n"
-        "    $1\n")
+    assert taql._args[0].replace("\t", " " * 4) == (
+        "SELECT\n" "    ROWID() as __tablerow__\n" "FROM\n" "    $1\n"
+    )
 
 
-@pytest.mark.parametrize("group_cols", [
-    ["FIELD_ID", "SCAN_NUMBER"]],
-    ids=group_cols_str)
-@pytest.mark.parametrize("index_cols", [
-    ["TIME", "ANTENNA1", "ANTENNA2"]],
-    ids=index_cols_str)
+@pytest.mark.parametrize(
+    "group_cols", [["FIELD_ID", "SCAN_NUMBER"]], ids=group_cols_str
+)
+@pytest.mark.parametrize(
+    "index_cols", [["TIME", "ANTENNA1", "ANTENNA2"]], ids=index_cols_str
+)
 def test_ordering_multiple_groups(ms, group_cols, index_cols):
     group_taql = group_ordering_taql(table_proxy(ms), group_cols, index_cols)
     assert_liveness(2, 1)
-    orders = group_row_ordering(group_taql, group_cols,
-                                index_cols, [{'row': 2}])
+    orders = group_row_ordering(group_taql, group_cols, index_cols, [{"row": 2}])
     assert_liveness(2, 1)
     first_rows = group_taql.getcol("__firstrow__").result()
     assert_liveness(2, 1)
@@ -143,14 +146,14 @@ def test_ordering_multiple_groups(ms, group_cols, index_cols):
     assert_liveness(0, 0)
 
 
-@pytest.mark.parametrize("index_cols", [
-    ["TIME", "ANTENNA1", "ANTENNA2"]],
-    ids=index_cols_str)
-@pytest.mark.parametrize("chunks", [
-    {'row': 2},
-    {'row': (2, 3, 4, 1)},
-    {'row': (5, 3, 2)}],
-    ids=lambda c: f'chunks={c}')
+@pytest.mark.parametrize(
+    "index_cols", [["TIME", "ANTENNA1", "ANTENNA2"]], ids=index_cols_str
+)
+@pytest.mark.parametrize(
+    "chunks",
+    [{"row": 2}, {"row": (2, 3, 4, 1)}, {"row": (5, 3, 2)}],
+    ids=lambda c: f"chunks={c}",
+)
 def test_row_ordering_no_group(ms, index_cols, chunks):
     order_taql = ordering_taql(table_proxy(ms), index_cols)
     assert_liveness(2, 1)
@@ -158,7 +161,7 @@ def test_row_ordering_no_group(ms, index_cols, chunks):
     assert_liveness(2, 1)
 
     # Normalise chunks to match that of the output array
-    expected_chunks = da.core.normalize_chunks(chunks['row'], (10,))
+    expected_chunks = da.core.normalize_chunks(chunks["row"], (10,))
 
     assert orders[0].chunks == expected_chunks
 
@@ -171,20 +174,21 @@ def test_row_ordering_no_group(ms, index_cols, chunks):
 
 # Grouping on DATA_DESC_ID gives us two groups
 # one with 7 rows and the other with 3
-@pytest.mark.parametrize("group_cols", [
-    ["DATA_DESC_ID"]],
-    ids=group_cols_str)
-@pytest.mark.parametrize("index_cols", [
-    ["TIME", "ANTENNA1", "ANTENNA2"]],
-    ids=index_cols_str)
-@pytest.mark.parametrize("chunks", [
-    [{'row': 2}, {'row': 2}],
-    [{'row': (3, 4)}, {'row': 3}],
-    [{'row': (2, 3, 2)}, {'row': (2, 1)}],
-    [{'row': 2}]],
-    ids=lambda c: f'chunks={c}')
-def test_row_ordering_multiple_groups(ms, group_cols,
-                                      index_cols, chunks):
+@pytest.mark.parametrize("group_cols", [["DATA_DESC_ID"]], ids=group_cols_str)
+@pytest.mark.parametrize(
+    "index_cols", [["TIME", "ANTENNA1", "ANTENNA2"]], ids=index_cols_str
+)
+@pytest.mark.parametrize(
+    "chunks",
+    [
+        [{"row": 2}, {"row": 2}],
+        [{"row": (3, 4)}, {"row": 3}],
+        [{"row": (2, 3, 2)}, {"row": (2, 1)}],
+        [{"row": 2}],
+    ],
+    ids=lambda c: f"chunks={c}",
+)
+def test_row_ordering_multiple_groups(ms, group_cols, index_cols, chunks):
     group_taql = group_ordering_taql(table_proxy(ms), group_cols, index_cols)
     assert_liveness(2, 1)
     orders = group_row_ordering(group_taql, group_cols, index_cols, chunks)
@@ -202,13 +206,13 @@ def test_row_ordering_multiple_groups(ms, group_cols,
     # Check the two resulting groups
 
     # Normalise chunks to match that of the output array
-    row_chunks = chunks[0]['row']
+    row_chunks = chunks[0]["row"]
     expected_chunks = da.core.normalize_chunks(row_chunks, (7,))
     assert_array_equal(rowids[0], [6, 5, 4, 3, 2, 1, 0])
     assert rowid_arrays[0].chunks == expected_chunks
 
     # If chunks only supplied for the first group, re-use it's chunking
-    row_chunks = chunks[0]['row'] if len(chunks) == 1 else chunks[1]['row']
+    row_chunks = chunks[0]["row"] if len(chunks) == 1 else chunks[1]["row"]
     expected_chunks = da.core.normalize_chunks(row_chunks, (3,))
     assert_array_equal(rowids[1], [9, 8, 7])
     assert rowid_arrays[1].chunks == expected_chunks

@@ -11,12 +11,14 @@ def test_github_98():
     ms = "/home/sperkins/data/AF0236_spw01.ms/"
 
     if not os.path.exists(ms):
-        pytest.skip("AF0236_spw01.ms on which this "
-                    "test depends is not present")
+        pytest.skip("AF0236_spw01.ms on which this " "test depends is not present")
 
-    datasets = xds_from_ms(ms, columns=['DATA', 'ANTENNA1', 'ANTENNA2'],
-                           group_cols=['DATA_DESC_ID'],
-                           taql_where='ANTENNA1 == 5 || ANTENNA2 == 5')
+    datasets = xds_from_ms(
+        ms,
+        columns=["DATA", "ANTENNA1", "ANTENNA2"],
+        group_cols=["DATA_DESC_ID"],
+        taql_where="ANTENNA1 == 5 || ANTENNA2 == 5",
+    )
 
     assert len(datasets) == 2
     assert datasets[0].DATA_DESC_ID == 0

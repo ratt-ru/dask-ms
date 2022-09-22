@@ -16,11 +16,13 @@ def test_dataset_schema(ms):
 
     ds = ds.assign(**{"CORRECTED_DATA": (("row", "chan", "corr"), cdata)})
 
-    ds = ds.assign_coords(**{
-        "row": ("row", np.arange(row)),
-        "chan": ("chan", np.arange(chan)),
-        "corr": ("corr", np.arange(corr)),
-    })
+    ds = ds.assign_coords(
+        **{
+            "row": ("row", np.arange(row)),
+            "chan": ("chan", np.arange(chan)),
+            "corr": ("corr", np.arange(corr)),
+        }
+    )
 
     # We can shift between objects and dict representation
     ds_schema = DatasetSchema.from_dataset(ds)

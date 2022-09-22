@@ -22,8 +22,9 @@ def test_ms_subtable_builder(tmp_path, table):
     dminfo = builder.dminfo(tab_desc)
 
     # These columns must always be present on an MS
-    required_cols = {k for k in pt.required_ms_desc(table).keys()
-                     if not k.startswith('_')}
+    required_cols = {
+        k for k in pt.required_ms_desc(table).keys() if not k.startswith("_")
+    }
 
     filename = str(tmp_path / (f"{table}.table"))
 

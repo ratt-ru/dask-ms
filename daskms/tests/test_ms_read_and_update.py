@@ -15,43 +15,55 @@ except ImportError:
     from dask.utils import key_split
 
 from daskms.constants import DASKMS_PARTITION_KEY
-from daskms.dask_ms import (xds_from_ms,
-                            xds_from_table,
-                            xds_to_table)
+from daskms.dask_ms import xds_from_ms, xds_from_table, xds_to_table
 from daskms.query import orderby_clause, where_clause
 from daskms.table_proxy import TableProxy, taql_factory
-from daskms.utils import (group_cols_str, index_cols_str,
-                          select_cols_str,
-                          table_path_split)
+from daskms.utils import (
+    group_cols_str,
+    index_cols_str,
+    select_cols_str,
+    table_path_split,
+)
 
 
 PY_37_GTE = sys.version_info[:2] >= (3, 7)
 
 
-@pytest.mark.parametrize('group_cols', [
-    [],
-    ["FIELD_ID", "DATA_DESC_ID"],
-    ["DATA_DESC_ID"],
-    ["DATA_DESC_ID", "SCAN_NUMBER"]],
-    ids=group_cols_str)
-@pytest.mark.parametrize('index_cols', [
-    ["ANTENNA2", "ANTENNA1", "TIME"],
-    ["TIME", "ANTENNA1", "ANTENNA2"],
-    ["ANTENNA1", "ANTENNA2", "TIME"]],
-    ids=index_cols_str)
-@pytest.mark.parametrize('select_cols', [
-    ['TIME', 'ANTENNA1', 'DATA']],
-    ids=select_cols_str)
+@pytest.mark.parametrize(
+    "group_cols",
+    [
+        [],
+        ["FIELD_ID", "DATA_DESC_ID"],
+        ["DATA_DESC_ID"],
+        ["DATA_DESC_ID", "SCAN_NUMBER"],
+    ],
+    ids=group_cols_str,
+)
+@pytest.mark.parametrize(
+    "index_cols",
+    [
+        ["ANTENNA2", "ANTENNA1", "TIME"],
+        ["TIME", "ANTENNA1", "ANTENNA2"],
+        ["ANTENNA1", "ANTENNA2", "TIME"],
+    ],
+    ids=index_cols_str,
+)
+@pytest.mark.parametrize(
+    "select_cols", [["TIME", "ANTENNA1", "DATA"]], ids=select_cols_str
+)
 def test_ms_read(ms, group_cols, index_cols, select_cols):
-    xds = xds_from_ms(ms, columns=select_cols,
-                      group_cols=group_cols,
-                      index_cols=index_cols,
-                      chunks={"row": 2})
+    xds = xds_from_ms(
+        ms,
+        columns=select_cols,
+        group_cols=group_cols,
+        index_cols=index_cols,
+        chunks={"row": 2},
+    )
 
     order = orderby_clause(index_cols)
     np_column_data = []
 
-    with TableProxy(pt.table, ms, lockoptions='auto', ack=False) as T:
+    with TableProxy(pt.table, ms, lockoptions="auto", ack=False) as T:
         for ds in xds:
             assert "ROWID" in ds.coords
             group_col_values = [ds.attrs[a] for a in group_cols]
@@ -70,33 +82,42 @@ def test_ms_read(ms, group_cols, index_cols, select_cols):
             assert_array_equal(column_data[c], dask_data)
 
 
-@pytest.mark.parametrize('group_cols', [
-    [],
-    ["FIELD_ID", "DATA_DESC_ID"],
-    ["DATA_DESC_ID"],
-    ["DATA_DESC_ID", "SCAN_NUMBER"]],
-    ids=group_cols_str)
-@pytest.mark.parametrize('index_cols', [
-    ["ANTENNA2", "ANTENNA1", "TIME"],
-    ["TIME", "ANTENNA1", "ANTENNA2"],
-    ["ANTENNA1", "ANTENNA2", "TIME"]],
-    ids=index_cols_str)
-@pytest.mark.parametrize('select_cols', [
-    ['DATA', 'STATE_ID']])
+@pytest.mark.parametrize(
+    "group_cols",
+    [
+        [],
+        ["FIELD_ID", "DATA_DESC_ID"],
+        ["DATA_DESC_ID"],
+        ["DATA_DESC_ID", "SCAN_NUMBER"],
+    ],
+    ids=group_cols_str,
+)
+@pytest.mark.parametrize(
+    "index_cols",
+    [
+        ["ANTENNA2", "ANTENNA1", "TIME"],
+        ["TIME", "ANTENNA1", "ANTENNA2"],
+        ["ANTENNA1", "ANTENNA2", "TIME"],
+    ],
+    ids=index_cols_str,
+)
+@pytest.mark.parametrize("select_cols", [["DATA", "STATE_ID"]])
 def test_ms_update(ms, group_cols, index_cols, select_cols):
     # Zero everything to be sure
-    with TableProxy(pt.table, ms, readonly=False,
-                    lockoptions='auto', ack=False) as T:
+    with TableProxy(pt.table, ms, readonly=False, lockoptions="auto", ack=False) as T:
         nrows = T.nrows().result()
         T.putcol("STATE_ID", np.full(nrows, 0, dtype=np.int32)).result()
         data = np.zeros_like(T.getcol("DATA").result())
         data_dtype = data.dtype
         T.putcol("DATA", data).result()
 
-    xds = xds_from_ms(ms, columns=select_cols,
-                      group_cols=group_cols,
-                      index_cols=index_cols,
-                      chunks={"row": 2})
+    xds = xds_from_ms(
+        ms,
+        columns=select_cols,
+        group_cols=group_cols,
+        index_cols=index_cols,
+        chunks={"row": 2},
+    )
 
     written_states = []
     written_data = []
@@ -110,16 +131,17 @@ def test_ms_update(ms, group_cols, index_cols, select_cols):
         state = state.astype(np.int32)
         written_states.append(state)
 
-        data = da.arange(i, i + dims["row"]*dims["chan"]*dims["corr"])
+        data = da.arange(i, i + dims["row"] * dims["chan"] * dims["corr"])
         data = data.reshape(dims["row"], dims["chan"], dims["corr"])
         data = data.rechunk((chunks["row"], chunks["chan"], chunks["corr"]))
         data = data.astype(data_dtype)
         written_data.append(data)
 
-        nds = ds.assign(STATE_ID=(("row",), state),
-                        DATA=(("row", "chan", "corr"), data))
+        nds = ds.assign(
+            STATE_ID=(("row",), state), DATA=(("row", "chan", "corr"), data)
+        )
 
-        write, = xds_to_table(nds, ms, ["STATE_ID", "DATA"])
+        (write,) = xds_to_table(nds, ms, ["STATE_ID", "DATA"])
 
         for k, _ in nds.attrs[DASKMS_PARTITION_KEY]:
             assert getattr(write, k) == getattr(nds, k)
@@ -129,10 +151,13 @@ def test_ms_update(ms, group_cols, index_cols, select_cols):
     # Do all writes in parallel
     dask.compute(writes)
 
-    xds = xds_from_ms(ms, columns=select_cols,
-                      group_cols=group_cols,
-                      index_cols=index_cols,
-                      chunks={"row": 2})
+    xds = xds_from_ms(
+        ms,
+        columns=select_cols,
+        group_cols=group_cols,
+        index_cols=index_cols,
+        chunks={"row": 2},
+    )
 
     # Check that state and data have been correctly written
     it = enumerate(zip(xds, written_states, written_data))
@@ -141,13 +166,17 @@ def test_ms_update(ms, group_cols, index_cols, select_cols):
         assert_array_equal(ds.DATA.data, data)
 
 
-@pytest.mark.parametrize('index_cols', [
-    ["ANTENNA2", "ANTENNA1", "TIME"],
-    ["TIME", "ANTENNA1", "ANTENNA2"],
-    ["ANTENNA1", "ANTENNA2", "TIME"]],
-    ids=index_cols_str)
+@pytest.mark.parametrize(
+    "index_cols",
+    [
+        ["ANTENNA2", "ANTENNA1", "TIME"],
+        ["TIME", "ANTENNA1", "ANTENNA2"],
+        ["ANTENNA1", "ANTENNA2", "TIME"],
+    ],
+    ids=index_cols_str,
+)
 def test_row_query(ms, index_cols):
-    T = TableProxy(pt.table, ms, readonly=True, lockoptions='auto', ack=False)
+    T = TableProxy(pt.table, ms, readonly=True, lockoptions="auto", ack=False)
 
     # Get the expected row ordering by lexically
     # sorting the indexing columns
@@ -156,33 +185,40 @@ def test_row_query(ms, index_cols):
 
     del T
 
-    xds = xds_from_ms(ms, columns=index_cols,
-                      group_cols="__row__",
-                      index_cols=index_cols,
-                      chunks={"row": 2})
+    xds = xds_from_ms(
+        ms,
+        columns=index_cols,
+        group_cols="__row__",
+        index_cols=index_cols,
+        chunks={"row": 2},
+    )
 
     actual_rows = da.concatenate([ds.ROWID.data for ds in xds])
     assert_array_equal(actual_rows, expected_rows)
 
 
-@pytest.mark.parametrize('index_cols', [
-    ["TIME", "ANTENNA1", "ANTENNA2"]],
-    ids=index_cols_str)
+@pytest.mark.parametrize(
+    "index_cols", [["TIME", "ANTENNA1", "ANTENNA2"]], ids=index_cols_str
+)
 def test_taql_where(ms, index_cols):
     # three cases test here, corresponding to the
     # if-elif-else ladder in xds_from_table
 
     # No group_cols case
-    xds = xds_from_table(ms, taql_where="FIELD_ID >= 0 AND FIELD_ID < 2",
-                         columns=["FIELD_ID"])
+    xds = xds_from_table(
+        ms, taql_where="FIELD_ID >= 0 AND FIELD_ID < 2", columns=["FIELD_ID"]
+    )
 
     assert len(xds) == 1
     assert_array_equal(xds[0].FIELD_ID.data, [0, 0, 0, 1, 1, 1, 1])
 
     # Group columns case
-    xds = xds_from_table(ms, taql_where="FIELD_ID >= 0 AND FIELD_ID < 2",
-                         group_cols=["DATA_DESC_ID", "SCAN_NUMBER"],
-                         columns=["FIELD_ID"])
+    xds = xds_from_table(
+        ms,
+        taql_where="FIELD_ID >= 0 AND FIELD_ID < 2",
+        group_cols=["DATA_DESC_ID", "SCAN_NUMBER"],
+        columns=["FIELD_ID"],
+    )
 
     assert len(xds) == 2
 
@@ -195,9 +231,12 @@ def test_taql_where(ms, index_cols):
     assert_array_equal(fields, [0, 0, 1, 1, 0, 1, 1])
 
     # Group columns case
-    xds = xds_from_table(ms, taql_where="FIELD_ID >= 0 AND FIELD_ID < 2",
-                         group_cols=["DATA_DESC_ID", "FIELD_ID"],
-                         columns=["FIELD_ID"])
+    xds = xds_from_table(
+        ms,
+        taql_where="FIELD_ID >= 0 AND FIELD_ID < 2",
+        group_cols=["DATA_DESC_ID", "FIELD_ID"],
+        columns=["FIELD_ID"],
+    )
 
     assert len(xds) == 2
 
@@ -207,9 +246,12 @@ def test_taql_where(ms, index_cols):
     assert xds[1].DATA_DESC_ID == 0 and xds[1].FIELD_ID == 1
 
     # Group on each row
-    xds = xds_from_table(ms, taql_where="FIELD_ID >= 0 AND FIELD_ID < 2",
-                         group_cols=["__row__"],
-                         columns=["FIELD_ID"])
+    xds = xds_from_table(
+        ms,
+        taql_where="FIELD_ID >= 0 AND FIELD_ID < 2",
+        group_cols=["__row__"],
+        columns=["FIELD_ID"],
+    )
 
     assert len(xds) == 7
 
@@ -240,6 +282,7 @@ def _proc_map_fn(args):
 @pytest.mark.parametrize("nprocs", [3])
 def test_multiprocess_table(ms, nprocs):
     from multiprocessing import get_context
+
     pool = get_context("spawn").Pool(nprocs)
 
     try:
@@ -249,26 +292,28 @@ def test_multiprocess_table(ms, nprocs):
         pool.close()
 
 
-@pytest.mark.parametrize('group_cols', [
-    ["FIELD_ID", "DATA_DESC_ID"],
-    ["DATA_DESC_ID", "SCAN_NUMBER"]],
-    ids=group_cols_str)
-@pytest.mark.parametrize('index_cols', [
-    ["TIME", "ANTENNA1", "ANTENNA2"]],
-    ids=index_cols_str)
+@pytest.mark.parametrize(
+    "group_cols",
+    [["FIELD_ID", "DATA_DESC_ID"], ["DATA_DESC_ID", "SCAN_NUMBER"]],
+    ids=group_cols_str,
+)
+@pytest.mark.parametrize(
+    "index_cols", [["TIME", "ANTENNA1", "ANTENNA2"]], ids=index_cols_str
+)
 def test_multireadwrite(ms, group_cols, index_cols):
     xds = xds_from_ms(ms, group_cols=group_cols, index_cols=index_cols)
 
     nds = [ds.copy() for ds in xds]
-    writes = [xds_to_table(sds, ms,
-                           [k for k in sds.data_vars.keys() if k != "ROWID"])
-              for sds in nds]
+    writes = [
+        xds_to_table(sds, ms, [k for k in sds.data_vars.keys() if k != "ROWID"])
+        for sds in nds
+    ]
 
     da.compute(writes)
 
 
 def test_column_promotion(ms):
-    """ Test singleton columns promoted to lists """
+    """Test singleton columns promoted to lists"""
     xds = xds_from_ms(ms, group_cols="SCAN_NUMBER", columns=("DATA",))
 
     for ds in xds:
@@ -283,8 +328,7 @@ def test_read_array_names(ms):
 
     for ds in datasets:
         for k, v in ds.data_vars.items():
-            product = ("~[" + str(ds.FIELD_ID) +
-                       "," + str(ds.DATA_DESC_ID) + "]")
+            product = "~[" + str(ds.FIELD_ID) + "," + str(ds.DATA_DESC_ID) + "]"
             prefix = "".join(("read~", k, product))
             assert key_split(v.data.name) == prefix
 
@@ -305,17 +349,14 @@ def test_write_array_names(ms, tmp_path):
 
 def test_mismatched_rowid(ms):
     xdsl = xds_from_ms(
-        ms,
-        group_cols=["SCAN_NUMBER"],
-        chunks={"row": -1},
-        columns=["DATA"]
+        ms, group_cols=["SCAN_NUMBER"], chunks={"row": -1}, columns=["DATA"]
     )
 
     # NOTE: Remove this line to make this test pass.
     xds = xdsl[0]
-    xds = xds.assign_coords(**{
-        "ROWID": (("row",), da.arange(xds.dims["row"], chunks=2))
-    })
+    xds = xds.assign_coords(
+        **{"ROWID": (("row",), da.arange(xds.dims["row"], chunks=2))}
+    )
 
     with pytest.raises(ValueError, match="ROWID shape and/or chunking"):
         xds_to_table(xds, ms, columns=["DATA"])

@@ -16,7 +16,7 @@ descriptor_builders = {}
 
 def is_valid_variable_name(name):
     try:
-        parse(f'{name} = None')
+        parse(f"{name} = None")
         return True
     except (SyntaxError, ValueError, TypeError):
         return False
@@ -25,8 +25,7 @@ def is_valid_variable_name(name):
 def register_descriptor_builder(name):
     def decorator(cls):
         if name in descriptor_builders:
-            raise ValueError(f"'{name}' already registered as "
-                             f"a descriptor builder")
+            raise ValueError(f"'{name}' already registered as " f"a descriptor builder")
 
         if not is_valid_variable_name(name):
             raise ValueError(f"'{name}' is not a valid Python variable name.")
@@ -62,9 +61,11 @@ class AbstractDescriptorBuilder(metaclass=abc.ABCMeta):
             schemas = list(schemas)
 
         if not all(isinstance(s, DatasetSchema) for s in schemas):
-            raise TypeError(f"'schemas' must be a DataSchema or "
-                            f"a tuple/list of  DatasetSchemas "
-                            f"Got {list(map(type, schemas))}.")
+            raise TypeError(
+                f"'schemas' must be a DataSchema or "
+                f"a tuple/list of  DatasetSchemas "
+                f"Got {list(map(type, schemas))}."
+            )
 
         for schema in schemas:
             for column, variable in schema.data_vars.items():
@@ -137,15 +138,17 @@ def variable_column_descriptor(column, column_schema):
             ndims.append(0)
         else:
             if not v.dims[0] == "row":
-                raise ValueError(f"'row' is not the first dimension in the "
-                                 f"dimensions {v.dims} of column {column}. "
-                                 f"Column cannot be added to MAIN table.")
+                raise ValueError(
+                    f"'row' is not the first dimension in the "
+                    f"dimensions {v.dims} of column {column}. "
+                    f"Column cannot be added to MAIN table."
+                )
 
             # Row only, so ndim must be removed from the descriptor
             # Add a marker to distinguish in case of multiple
             # shapes
             if v.ndim == 1:
-                ndims.add('row')
+                ndims.add("row")
             # Other dims, add dimension data, excluding the row
             else:
                 ndims.add(v.ndim - 1)
@@ -153,20 +156,24 @@ def variable_column_descriptor(column, column_schema):
 
     # Fail on multiple dtypes
     if len(dtypes) > 1:
-        raise TypeError("Inconsistent data types %s found in dataset "
-                        "variables for column %s. CASA Table columns "
-                        "must have a single type" % (list(dtypes), column))
+        raise TypeError(
+            "Inconsistent data types %s found in dataset "
+            "variables for column %s. CASA Table columns "
+            "must have a single type" % (list(dtypes), column)
+        )
 
     casa_type = infer_casa_type(dtypes.pop())
 
-    desc = {'_c_order': True,
-            'comment': f'{column} column',
-            'dataManagerGroup': 'StandardStMan',
-            'dataManagerType': 'StandardStMan',
-            'keywords': {},
-            'maxlen': 0,
-            'option': 0,
-            'valueType': casa_type}
+    desc = {
+        "_c_order": True,
+        "comment": f"{column} column",
+        "dataManagerGroup": "StandardStMan",
+        "dataManagerType": "StandardStMan",
+        "keywords": {},
+        "maxlen": 0,
+        "option": 0,
+        "valueType": casa_type,
+    }
 
     if len(ndims) == 0:
         raise ValueError("No dimensionality information found")
@@ -174,20 +181,22 @@ def variable_column_descriptor(column, column_schema):
         # Add any non-row dimension information to the descriptor
         ndim = ndims.pop()
 
-        if ndim != 'row':
-            desc['ndim'] = ndim
+        if ndim != "row":
+            desc["ndim"] = ndim
 
             # If there's only one shape, we can create a FixedShape column
             if len(shapes) == 1:
                 shape = shapes.pop()
                 assert len(shape) == ndim
-                desc['shape'] = shape
+                desc["shape"] = shape
     else:
         # Anything goes...
-        log.warning(f"Multiple dimensions {ndims} found in dataset variables "
-                    f"for column {column}. You appear to be attempting "
-                    f"something exotic!")
+        log.warning(
+            f"Multiple dimensions {ndims} found in dataset variables "
+            f"for column {column}. You appear to be attempting "
+            f"something exotic!"
+        )
 
-        desc['ndim'] = -1
+        desc["ndim"] = -1
 
     return desc

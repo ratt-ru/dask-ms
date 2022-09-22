@@ -26,7 +26,7 @@ def pytest_unconfigure(config):
 
 @pytest.fixture(autouse=True)
 def xms_always_gc():
-    """ Force garbage collection after each test """
+    """Force garbage collection after each test"""
     try:
         yield
     finally:
@@ -57,7 +57,7 @@ def big_ms(tmp_path_factory, request):
 
     rs = np.random.RandomState(42)
     data_shape = (row, chan, corr)
-    data = rs.random_sample(data_shape) + rs.random_sample(data_shape)*1j
+    data = rs.random_sample(data_shape) + rs.random_sample(data_shape) * 1j
 
     # Create the table
     with pt.taql(create_table_query) as ms:
@@ -106,21 +106,21 @@ def ms(tmp_path_factory):
     """
 
     # Common grouping columns
-    field = [0,   0,   0,   1,   1,   1,   1,   2,   2,   2]
-    ddid = [0,   0,   0,   0,   0,   0,   0,   1,   1,   1]
-    scan = [0,   1,   0,   1,   0,   1,   0,   1,   0,   1]
+    field = [0, 0, 0, 1, 1, 1, 1, 2, 2, 2]
+    ddid = [0, 0, 0, 0, 0, 0, 0, 1, 1, 1]
+    scan = [0, 1, 0, 1, 0, 1, 0, 1, 0, 1]
 
     # Common indexing columns
     time = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1]
-    ant1 = [0,   0,   1,   1,   1,   2,   1,   0,   0,   1]
-    ant2 = [1,   2,   2,   3,   2,   1,   0,   1,   1,   2]
+    ant1 = [0, 0, 1, 1, 1, 2, 1, 0, 0, 1]
+    ant2 = [1, 2, 2, 3, 2, 1, 0, 1, 1, 2]
 
     # Column we'll write to
-    state = [0,   0,   0,   0,   0,   0,   0,   0,   0,   0]
+    state = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
     rs = np.random.RandomState(42)
     data_shape = (len(state), 16, 4)
-    data = rs.random_sample(data_shape) + rs.random_sample(data_shape)*1j
+    data = rs.random_sample(data_shape) + rs.random_sample(data_shape) * 1j
     uvw = rs.random_sample((len(state), 3)).astype(np.float64)
 
     # Create the table
@@ -145,14 +145,16 @@ def ms(tmp_path_factory):
 
 @pytest.fixture
 def spw_chan_freqs():
-    return (np.linspace(.856e9, 2*.856e9, 8),
-            np.linspace(.856e9, 2*.856e9, 16),
-            np.linspace(.856e9, 2*.856e9, 32))
+    return (
+        np.linspace(0.856e9, 2 * 0.856e9, 8),
+        np.linspace(0.856e9, 2 * 0.856e9, 16),
+        np.linspace(0.856e9, 2 * 0.856e9, 32),
+    )
 
 
 @pytest.fixture
 def spw_table(tmp_path_factory, spw_chan_freqs):
-    """ Simulate a SPECTRAL_WINDOW table with two spectral windows """
+    """Simulate a SPECTRAL_WINDOW table with two spectral windows"""
     spw_dir = tmp_path_factory.mktemp("spw_dir", numbered=True)
     fn = os.path.join(str(spw_dir), "SPECTRAL_WINDOW")
 
@@ -161,15 +163,18 @@ def spw_table(tmp_path_factory, spw_chan_freqs):
     [NUM_CHAN I4,
      CHAN_FREQ R8 [NDIM=1]]
     LIMIT %d
-    """ % (fn, len(spw_chan_freqs))
+    """ % (
+        fn,
+        len(spw_chan_freqs),
+    )
 
     with pt.taql(create_table_query) as spw:
-        spw.putvarcol("NUM_CHAN", {"r%d" % i: s.shape[0]
-                                   for i, s
-                                   in enumerate(spw_chan_freqs)})
-        spw.putvarcol("CHAN_FREQ", {"r%d" % i: s[None, :]
-                                    for i, s
-                                    in enumerate(spw_chan_freqs)})
+        spw.putvarcol(
+            "NUM_CHAN", {"r%d" % i: s.shape[0] for i, s in enumerate(spw_chan_freqs)}
+        )
+        spw.putvarcol(
+            "CHAN_FREQ", {"r%d" % i: s[None, :] for i, s in enumerate(spw_chan_freqs)}
+        )
 
     yield fn
 
@@ -181,23 +186,26 @@ def spw_table(tmp_path_factory, spw_chan_freqs):
 
 @pytest.fixture
 def wsrt_antenna_positions():
-    """ Westerbork antenna positions """
-    return np.array([
-        [3828763.10544699,   442449.10566454,  5064923.00777],
-        [3828746.54957258,   442592.13950824,  5064923.00792],
-        [3828729.99081359,   442735.17696417,  5064923.00829],
-        [3828713.43109885,   442878.2118934,  5064923.00436],
-        [3828696.86994428,   443021.24917264,  5064923.00397],
-        [3828680.31391933,   443164.28596862,  5064923.00035],
-        [3828663.75159173,   443307.32138056,  5064923.00204],
-        [3828647.19342757,   443450.35604638,  5064923.0023],
-        [3828630.63486201,   443593.39226634,  5064922.99755],
-        [3828614.07606798,   443736.42941621,  5064923.],
-        [3828609.94224429,   443772.19450029,  5064922.99868],
-        [3828601.66208572,   443843.71178407,  5064922.99963],
-        [3828460.92418735,   445059.52053929,  5064922.99071],
-        [3828452.64716351,   445131.03744105,  5064922.98793]],
-        dtype=np.float64)
+    """Westerbork antenna positions"""
+    return np.array(
+        [
+            [3828763.10544699, 442449.10566454, 5064923.00777],
+            [3828746.54957258, 442592.13950824, 5064923.00792],
+            [3828729.99081359, 442735.17696417, 5064923.00829],
+            [3828713.43109885, 442878.2118934, 5064923.00436],
+            [3828696.86994428, 443021.24917264, 5064923.00397],
+            [3828680.31391933, 443164.28596862, 5064923.00035],
+            [3828663.75159173, 443307.32138056, 5064923.00204],
+            [3828647.19342757, 443450.35604638, 5064923.0023],
+            [3828630.63486201, 443593.39226634, 5064922.99755],
+            [3828614.07606798, 443736.42941621, 5064923.0],
+            [3828609.94224429, 443772.19450029, 5064922.99868],
+            [3828601.66208572, 443843.71178407, 5064922.99963],
+            [3828460.92418735, 445059.52053929, 5064922.99071],
+            [3828452.64716351, 445131.03744105, 5064922.98793],
+        ],
+        dtype=np.float64,
+    )
 
 
 @pytest.fixture
@@ -210,7 +218,10 @@ def ant_table(tmp_path_factory, wsrt_antenna_positions):
     [POSITION R8 [NDIM=1, SHAPE=[3]],
      NAME S]
     LIMIT %d
-    """ % (fn, wsrt_antenna_positions.shape[0])
+    """ % (
+        fn,
+        wsrt_antenna_positions.shape[0],
+    )
 
     names = ["ANTENNA-%d" % i for i in range(wsrt_antenna_positions.shape[0])]
 
@@ -261,11 +272,10 @@ def minio_server(tmp_path_factory):
     server_path = find_executable("minio")
 
     if not server_path:
-        pytest.skip("Unable to find \"minio\" server binary")
+        pytest.skip('Unable to find "minio" server binary')
 
     data_dir = tmp_path_factory.mktemp("data")
-    args = [str(server_path), "server",
-            str(data_dir), f"--address={MINIO_URL.netloc}"]
+    args = [str(server_path), "server", str(data_dir), f"--address={MINIO_URL.netloc}"]
 
     # Start the server process and read a line from stdout so that we know
     # it's started
@@ -279,8 +289,7 @@ def minio_server(tmp_path_factory):
         retcode = server_process.poll()
 
         if retcode is not None:
-            raise ValueError(f"Server failed to start "
-                             f"with return code {retcode}")
+            raise ValueError(f"Server failed to start " f"with return code {retcode}")
 
         yield server_process
     finally:
@@ -297,11 +306,18 @@ def minio_client(minio_server, minio_alias):
     client_path = find_executable("mc")
 
     if not client_path:
-        pytest.skip("Unable to find \"mc\" binary")
+        pytest.skip('Unable to find "mc" binary')
 
     # Set the server alias on the client
-    args = [str(client_path), "alias", "set", minio_alias,
-            MINIO_URL.geturl(), "minioadmin", "minioadmin"]
+    args = [
+        str(client_path),
+        "alias",
+        "set",
+        minio_alias,
+        MINIO_URL.geturl(),
+        "minioadmin",
+        "minioadmin",
+    ]
 
     ctx = multiprocessing.get_context("spawn")  # noqa
     with Popen(args, shell=False, stdout=PIPE, stderr=PIPE) as client_process:
@@ -331,7 +347,9 @@ def minio_admin(minio_client, minio_alias, minio_user_key):
 @pytest.fixture
 def py_minio_client(minio_client, minio_admin, minio_alias, minio_user_key):
     minio = pytest.importorskip("minio")
-    yield minio.Minio(MINIO_URL.netloc,
-                      access_key=minio_user_key,
-                      secret_key=minio_user_key,
-                      secure=MINIO_URL.scheme == "https")
+    yield minio.Minio(
+        MINIO_URL.netloc,
+        access_key=minio_user_key,
+        secret_key=minio_user_key,
+        secure=MINIO_URL.scheme == "https",
+    )

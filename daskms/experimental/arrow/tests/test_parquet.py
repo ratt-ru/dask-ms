@@ -32,7 +32,7 @@ except ImportError:
 
 
 def test_parquet_roundtrip(tmp_path_factory):
-    """ Test round-trip via parquet file with custom Extension Types """
+    """Test round-trip via parquet file with custom Extension Types"""
     time = np.linspace(0, 1.0, 10)
     ant1, ant2 = (a.astype(np.int32) for a in np.triu_indices(7, 1))
 
@@ -47,7 +47,7 @@ def test_parquet_roundtrip(tmp_path_factory):
     nchan = 16
     ncorr = 4
     shape = (nrow, nchan, ncorr)
-    data = np.random.random(shape) + np.random.random(shape)*1j
+    data = np.random.random(shape) + np.random.random(shape) * 1j
     uvw = np.random.random((nrow, 3))
     flag = np.random.randint(0, 2, shape).astype(np.bool_)
 
@@ -77,9 +77,14 @@ def test_parquet_roundtrip(tmp_path_factory):
 @pytest.mark.parametrize("row_chunks", [[2, 3, 4]])
 @pytest.mark.parametrize("user_chunks", [{"row": 2, "chan": 4}])
 def test_partition_chunks(row_chunks, user_chunks):
-    expected = [(0, (0, 2)),
-                (1, (0, 2)), (1, (2, 3)),
-                (2, (0, 1)), (2, (1, 3)), (2, (3, 4))]
+    expected = [
+        (0, (0, 2)),
+        (1, (0, 2)),
+        (1, (2, 3)),
+        (2, (0, 1)),
+        (2, (1, 3)),
+        (2, (3, 4)),
+    ]
 
     partition_chunks = partition_chunking(0, row_chunks, [user_chunks])
 
@@ -120,8 +125,7 @@ def parquet_tester(ms, store):
     # spw_datasets = xds_from_table(spw_table, group_cols="__row__")
     # ant_datasets = xds_from_table(ant_table, group_cols="__row__")
 
-    writes = xds_to_parquet(datasets, store.url,
-                            storage_options=store.storage_options)
+    writes = xds_to_parquet(datasets, store.url, storage_options=store.storage_options)
     # TODO(sjperkins)
     # Fix arrow shape unification errors
     # writes.extend(xds_to_parquet(spw_datasets, spw_store))
@@ -159,19 +163,21 @@ def test_xds_to_parquet_local(ms, tmp_path_factory, spw_table, ant_table):
 
 
 @pytest.mark.skipif(s3fs is None, reason="s3fs not installed")
-def test_xds_to_parquet_s3(ms, spw_table, ant_table,
-                           py_minio_client, minio_user_key,
-                           minio_url, s3_bucket_name):
+def test_xds_to_parquet_s3(
+    ms, spw_table, ant_table, py_minio_client, minio_user_key, minio_url, s3_bucket_name
+):
 
     py_minio_client.make_bucket(s3_bucket_name)
 
-    store = DaskMSStore(f"s3://{s3_bucket_name}/measurementset.MS",
-                        key=minio_user_key,
-                        secret=minio_user_key,
-                        client_kwargs={
-                            "endpoint_url": minio_url.geturl(),
-                            "region_name": "af-cpt",
-                        })
+    store = DaskMSStore(
+        f"s3://{s3_bucket_name}/measurementset.MS",
+        key=minio_user_key,
+        secret=minio_user_key,
+        client_kwargs={
+            "endpoint_url": minio_url.geturl(),
+            "region_name": "af-cpt",
+        },
+    )
 
     # NOTE(sjperkins)
     # Review this interface
@@ -199,8 +205,8 @@ def parquet_ms(ms, tmp_path_factory, request):
 @pytest.mark.parametrize("rc", [1, 2, 3, 4])
 def test_xds_from_parquet_chunks(ms, parquet_ms, rc):
 
-    xdsl = xds_from_parquet(parquet_ms, chunks={'row': rc})
+    xdsl = xds_from_parquet(parquet_ms, chunks={"row": rc})
 
-    chunks = chain.from_iterable([xds.chunks['row'] for xds in xdsl])
+    chunks = chain.from_iterable([xds.chunks["row"] for xds in xdsl])
 
     assert all([c <= rc for c in chunks])

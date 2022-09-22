@@ -2,8 +2,10 @@
 
 import pyrap.tables as pt
 
-from daskms.descriptors.builder import (register_descriptor_builder,
-                                        AbstractDescriptorBuilder)
+from daskms.descriptors.builder import (
+    register_descriptor_builder,
+    AbstractDescriptorBuilder,
+)
 from daskms.table_schemas import SUBTABLES
 
 
@@ -11,8 +13,9 @@ from daskms.table_schemas import SUBTABLES
 class MSSubTableDescriptorBuilder(AbstractDescriptorBuilder):
     def __init__(self, subtable):
         if subtable not in SUBTABLES:
-            raise ValueError(f"'{subtable}' is not a valid "
-                             f"Measurement Set sub-table")
+            raise ValueError(
+                f"'{subtable}' is not a valid " f"Measurement Set sub-table"
+            )
 
         self.subtable = subtable
         self.DEFAULT_TABLE_DESC = pt.required_ms_desc(subtable)

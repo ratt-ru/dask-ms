@@ -28,9 +28,7 @@ def test_local_store(tmp_path):
     assert store.map[filename] == payload.encode("utf-8")
 
     root = zarr.group(store=store.map)
-    data = root.require_dataset("MODEL_DATA",  # noqa
-                                shape=1000,
-                                dtype=np.complex128)
+    data = root.require_dataset("MODEL_DATA", shape=1000, dtype=np.complex128)  # noqa
 
 
 def test_store_main_access(tmp_path_factory):
@@ -67,43 +65,52 @@ def test_store_subtable_access(tmp_path_factory):
     assert (table_dir / "foo.txt").exists()
 
 
-def test_minio_server(tmp_path, py_minio_client,
-                      minio_admin, minio_alias,
-                      minio_user_key, minio_url,
-                      s3_bucket_name):
+def test_minio_server(
+    tmp_path,
+    py_minio_client,
+    minio_admin,
+    minio_alias,
+    minio_user_key,
+    minio_url,
+    s3_bucket_name,
+):
     payload = "How now brown cow"
     stuff = tmp_path / "stuff.txt"
     stuff.write_text(payload)
 
     py_minio_client.make_bucket(s3_bucket_name)
-    py_minio_client.fput_object(s3_bucket_name,
-                                "stuff.txt",
-                                str(stuff))
+    py_minio_client.fput_object(s3_bucket_name, "stuff.txt", str(stuff))
 
     s3fs = pytest.importorskip("s3fs")
     s3 = s3fs.S3FileSystem(
         key=minio_user_key,
         secret=minio_user_key,
-        client_kwargs={
-            "endpoint_url": minio_url.geturl(),
-            "region_name": "af-cpt"
-        })
+        client_kwargs={"endpoint_url": minio_url.geturl(), "region_name": "af-cpt"},
+    )
 
     with s3.open(f"{s3_bucket_name}/stuff.txt", "rb") as f:
         assert f.read() == payload.encode("utf-8")
 
 
 @pytest.mark.skipif(s3fs is None, reason="s3fs not installed")
-def test_storage_options_from_config(tmp_path, py_minio_client,
-                                     minio_admin, minio_alias,
-                                     minio_user_key, minio_url,
-                                     s3_bucket_name):
+def test_storage_options_from_config(
+    tmp_path,
+    py_minio_client,
+    minio_admin,
+    minio_alias,
+    minio_user_key,
+    minio_url,
+    s3_bucket_name,
+):
     filename = "test.txt"
     payload = "How now brown cow"
     py_minio_client.make_bucket(s3_bucket_name)
-    py_minio_client.put_object(s3_bucket_name, f"subdir/{filename}",
-                               BytesIO(payload.encode("utf-8")),
-                               len(payload))
+    py_minio_client.put_object(
+        s3_bucket_name,
+        f"subdir/{filename}",
+        BytesIO(payload.encode("utf-8")),
+        len(payload),
+    )
 
     url = f"s3://{s3_bucket_name}"
     config_file = tmp_path / "config.yaml"
@@ -134,11 +141,15 @@ def test_storage_options_from_config(tmp_path, py_minio_client,
 
 @pytest.mark.skipif(s3fs is None, reason="s3fs not installed")
 def test_store_pickle():
-    store = DaskMSStore("s3://binface", key="foo", secret="bar",
-                        client_kwargs={
-                           "endpoint_url": "http://127.0.0.1:9000",
-                           "region_name": "af-cpt"
-                        })
+    store = DaskMSStore(
+        "s3://binface",
+        key="foo",
+        secret="bar",
+        client_kwargs={
+            "endpoint_url": "http://127.0.0.1:9000",
+            "region_name": "af-cpt",
+        },
+    )
 
     pstore = pickle.loads(pickle.dumps(store))
     assert pstore == store

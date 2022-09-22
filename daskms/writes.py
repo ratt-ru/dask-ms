@@ -27,7 +27,7 @@ log = logging.getLogger(__name__)
 
 
 def ndarray_putcol(row_runs, table_future, column, data):
-    """ Put data into the table """
+    """Put data into the table"""
     table = table_future.result()
     putcol = table.putcol
     rr = 0
@@ -36,7 +36,7 @@ def ndarray_putcol(row_runs, table_future, column, data):
 
     try:
         for rs, rl in row_runs:
-            putcol(column, data[rr:rr + rl], startrow=rs, nrow=rl)
+            putcol(column, data[rr : rr + rl], startrow=rs, nrow=rl)
             rr += rl
 
         table.flush()
@@ -46,7 +46,7 @@ def ndarray_putcol(row_runs, table_future, column, data):
 
 
 def multidim_str_putcol(row_runs, table_future, column, data):
-    """ Put multidimensional string data into the table """
+    """Put multidimensional string data into the table"""
     table = table_future.result()
     putcol = table.putcol
 
@@ -57,8 +57,8 @@ def multidim_str_putcol(row_runs, table_future, column, data):
     try:
         for rs, rl in row_runs:
             # Construct a dict with the shape and a flattened list
-            chunk = data[rr:rr + rl]
-            chunk = {'shape': chunk.shape, 'array': chunk.ravel().tolist()}
+            chunk = data[rr : rr + rl]
+            chunk = {"shape": chunk.shape, "array": chunk.ravel().tolist()}
             putcol(column, chunk, startrow=rs, nrow=rl)
             rr += rl
 
@@ -69,7 +69,7 @@ def multidim_str_putcol(row_runs, table_future, column, data):
 
 
 def ndarray_putcolslice(row_runs, blc, trc, table_future, column, data):
-    """ Put data into the table """
+    """Put data into the table"""
     table = table_future.result()
     putcolslice = table.putcolslice
     rr = 0
@@ -78,8 +78,7 @@ def ndarray_putcolslice(row_runs, blc, trc, table_future, column, data):
 
     try:
         for rs, rl in row_runs:
-            putcolslice(column, data[rr:rr + rl], blc, trc,
-                        startrow=rs, nrow=rl)
+            putcolslice(column, data[rr : rr + rl], blc, trc, startrow=rs, nrow=rl)
             rr += rl
 
         table.flush()
@@ -89,7 +88,7 @@ def ndarray_putcolslice(row_runs, blc, trc, table_future, column, data):
 
 
 def multidim_str_putcolslice(row_runs, blc, trc, table_future, column, data):
-    """ Put multidimensional string data into the table """
+    """Put multidimensional string data into the table"""
     table = table_future.result()
     putcol = table.putcol
     rr = 0
@@ -99,8 +98,8 @@ def multidim_str_putcolslice(row_runs, blc, trc, table_future, column, data):
     try:
         for rs, rl in row_runs:
             # Construct a dict with the shape and a flattened list
-            chunk = data[rr:rr + rl]
-            chunk = {'shape': chunk.shape, 'array': chunk.ravel().tolist()}
+            chunk = data[rr : rr + rl]
+            chunk = {"shape": chunk.shape, "array": chunk.ravel().tolist()}
             putcol(column, chunk, blc, trc, startrow=rs, nrow=rl)
             rr += rl
 
@@ -111,7 +110,7 @@ def multidim_str_putcolslice(row_runs, blc, trc, table_future, column, data):
 
 
 def multidim_dict_putvarcol(row_runs, blc, trc, table_future, column, data):
-    """ Put data into the table """
+    """Put data into the table"""
     if row_runs.shape[0] != 1:
         raise ValueError("Row runs unsupported for dictionary data")
 
@@ -127,8 +126,7 @@ def multidim_dict_putvarcol(row_runs, blc, trc, table_future, column, data):
 
 
 def dict_putvarcol(row_runs, table_future, column, data):
-    return multidim_dict_putvarcol(row_runs, None, None,
-                                   table_future, column, data)
+    return multidim_dict_putvarcol(row_runs, None, None, table_future, column, data)
 
 
 def putter_wrapper(row_orders, *args):
@@ -172,15 +170,18 @@ def putter_wrapper(row_orders, *args):
         # Dimension slicing is also not supported as
         # putvarcol doesn't support it in any case.
         if nextent_args > 0:
-            raise ValueError("Chunked writes for secondary dimensions "
-                             "unsupported for dictionary data")
+            raise ValueError(
+                "Chunked writes for secondary dimensions "
+                "unsupported for dictionary data"
+            )
 
         out_shape = (1,) * max(len(v.shape) for v in data.values())
         dict_data = True
 
         if resort is not None:
-            data = {"r%d" % (i+1): data["r%d" % (s+1)]
-                    for i, s in enumerate(resort)}
+            data = {
+                "r%d" % (i + 1): data["r%d" % (s + 1)] for i, s in enumerate(resort)
+            }
 
     elif isinstance(data, np.ndarray):
         # Infer output shape
@@ -204,19 +205,27 @@ def putter_wrapper(row_orders, *args):
     # There are other dimensions beside row
     if nextent_args > 0:
         blc, trc = zip(*args[:nextent_args])
-        fn = (multidim_str_putcolslice if multidim_str else
-              multidim_dict_putvarcol if dict_data else
-              ndarray_putcolslice)
-        table_proxy._ex.submit(fn, row_runs, blc, trc,
-                               table_proxy._table_future,
-                               column, data).result()
+        fn = (
+            multidim_str_putcolslice
+            if multidim_str
+            else multidim_dict_putvarcol
+            if dict_data
+            else ndarray_putcolslice
+        )
+        table_proxy._ex.submit(
+            fn, row_runs, blc, trc, table_proxy._table_future, column, data
+        ).result()
     else:
-        fn = (multidim_str_putcol if multidim_str else
-              dict_putvarcol if dict_data else
-              ndarray_putcol)
-        table_proxy._ex.submit(fn, row_runs,
-                               table_proxy._table_future,
-                               column, data).result()
+        fn = (
+            multidim_str_putcol
+            if multidim_str
+            else dict_putvarcol
+            if dict_data
+            else ndarray_putcol
+        )
+        table_proxy._ex.submit(
+            fn, row_runs, table_proxy._table_future, column, data
+        ).result()
 
     return np.full(out_shape, True)
 
@@ -231,9 +240,14 @@ def descriptor_builder(table, descriptor):
 
 
 def _writable_table_proxy(table_name):
-    return TableProxy(pt.table, table_name, ack=False,
-                      readonly=False, lockoptions='user',
-                      __executor_key__=executor_key(table_name))
+    return TableProxy(
+        pt.table,
+        table_name,
+        ack=False,
+        readonly=False,
+        lockoptions="user",
+        __executor_key__=executor_key(table_name),
+    )
 
 
 def _create_table(table_name, datasets, columns, descriptor):
@@ -266,8 +280,9 @@ def _create_table(table_name, datasets, columns, descriptor):
 
         # Create the subtable
         if isinstance(builder, MSSubTableDescriptorBuilder):
-            with pt.default_ms_subtable(subtable, subtable_path,
-                                        tabdesc=table_desc, dminfo=dminfo):
+            with pt.default_ms_subtable(
+                subtable, subtable_path, tabdesc=table_desc, dminfo=dminfo
+            ):
                 pass
         else:
             with pt.table(subtable_path, table_desc, dminfo=dminfo, ack=False):
@@ -312,16 +327,14 @@ def _updated_table(table, datasets, columns, descriptor):
         table_desc = builder.descriptor(variables, default_desc)
 
         # Original Data Manager Groups
-        odminfo = {g['NAME'] for g in table_proxy.getdminfo()
-                                                 .result()
-                                                 .values()}
+        odminfo = {g["NAME"] for g in table_proxy.getdminfo().result().values()}
 
         # NOTE(JSKenyon): Add columns one at a time - this avoids issues when
         # adding multiple columns with different managers.
         for col in missing:
             _table_desc = {col: table_desc[col]}
             _dminfo = builder.dminfo(_table_desc)
-            _dminfo = {} if _dminfo['*1']['NAME'] in odminfo else _dminfo
+            _dminfo = {} if _dminfo["*1"]["NAME"] in odminfo else _dminfo
             table_proxy.addcols(_table_desc, dminfo=_dminfo).result()
 
     return table_proxy
@@ -331,8 +344,7 @@ def _add_row_wrapper(table, rows, checkrow=-1):
     startrow = table.nrows()
 
     if checkrow != -1 and startrow != checkrow:
-        raise ValueError("Inconsistent starting row %d %d"
-                         % (startrow, checkrow))
+        raise ValueError("Inconsistent starting row %d %d" % (startrow, checkrow))
 
     table.addrows(rows)
 
@@ -395,17 +407,13 @@ def add_row_orders(data, table_proxy, prev=None):
 
     # This is the first link in the chain
     if prev is None:
-        return (table_proxy.submit(_add_row_wrapper,
-                                   WRITELOCK, rows, -1)
-                .result())
+        return table_proxy.submit(_add_row_wrapper, WRITELOCK, rows, -1).result()
     else:
         # There's a previous link in the chain
         prev_runs, _ = prev
         startrow = prev_runs.sum()
 
-        return (table_proxy.submit(_add_row_wrapper,
-                                   WRITELOCK, rows, startrow)
-                .result())
+        return table_proxy.submit(_add_row_wrapper, WRITELOCK, rows, startrow).result()
 
 
 def add_row_order_factory(table_proxy, datasets):
@@ -441,23 +449,21 @@ def add_row_order_factory(table_proxy, datasets):
             array = v.data
 
             # Need something with a row dimension
-            if not dims[0] == 'row':
+            if not dims[0] == "row":
                 continue
 
             found = True
             token = dask.base.tokenize(array)
-            name = '-'.join(('add-rows', str(di), token))
+            name = "-".join(("add-rows", str(di), token))
             layers = {}
 
             for b in range(array.numblocks[0]):
                 key = (name, b)
-                array_key = (array.name, b) + (0,)*(array.ndim - 1)
-                layers[key] = (add_row_orders, array_key,
-                               table_proxy, prev_key)
+                array_key = (array.name, b) + (0,) * (array.ndim - 1)
+                layers[key] = (add_row_orders, array_key, table_proxy, prev_key)
                 prev_key = key
 
-            graph = HighLevelGraph.from_collections(name, layers,
-                                                    prev_deps + [array])
+            graph = HighLevelGraph.from_collections(name, layers, prev_deps + [array])
             chunks = (array.chunks[0],)
             row_adds = da.Array(graph, name, chunks, dtype=object)
             row_add_ops.append(row_adds)
@@ -466,9 +472,11 @@ def add_row_order_factory(table_proxy, datasets):
             break
 
         if not found:
-            raise ValueError("Couldn't find an array with "
-                             "which to establish a row ordering "
-                             "in dataset %d" % di)
+            raise ValueError(
+                "Couldn't find an array with "
+                "which to establish a row ordering "
+                "in dataset %d" % di
+            )
 
     return row_add_ops
 
@@ -505,60 +513,71 @@ def cached_row_order(rowid):
     if len(layers) == 1:
         layer_name = list(layers.keys())[0]
 
-        if (not layer_name.startswith("row-") and
-                not layer_name.startswith("group-rows-")):
+        if not layer_name.startswith("row-") and not layer_name.startswith(
+            "group-rows-"
+        ):
 
-            log.warning("Unusual ROWID layer %s. "
-                        "This is probably OK but "
-                        "could foreshadow incorrect "
-                        "behaviour.", layer_name)
+            log.warning(
+                "Unusual ROWID layer %s. "
+                "This is probably OK but "
+                "could foreshadow incorrect "
+                "behaviour.",
+                layer_name,
+            )
     # daskms.ordering.group_row_ordering case with rechunking
     # Check for standard layers
     elif len(layers) == 2:
         layer_names = list(sorted(layers.keys()))
 
-        if not (layer_names[0].startswith('group-rows-') and
-                layer_names[1].startswith('rechunk-merge-')):
+        if not (
+            layer_names[0].startswith("group-rows-")
+            and layer_names[1].startswith("rechunk-merge-")
+        ):
 
-            log.warning("Unusual ROWID layers %s for "
-                        "the group ordering case. "
-                        "This is probably OK but "
-                        "could foreshadow incorrect "
-                        "behaviour.", layer_names)
+            log.warning(
+                "Unusual ROWID layers %s for "
+                "the group ordering case. "
+                "This is probably OK but "
+                "could foreshadow incorrect "
+                "behaviour.",
+                layer_names,
+            )
     # ROWID has been extended or modified somehow, warn
     else:
         layer_names = list(sorted(layers.keys()))
-        log.warning("Unusual number of ROWID layers > 2 "
-                    "%s. This is probably OK but "
-                    "could foreshadow incorrect "
-                    "behaviour or sub-par performance if "
-                    "the ROWID graph is large.",
-                    layer_names)
+        log.warning(
+            "Unusual number of ROWID layers > 2 "
+            "%s. This is probably OK but "
+            "could foreshadow incorrect "
+            "behaviour or sub-par performance if "
+            "the ROWID graph is large.",
+            layer_names,
+        )
 
-    row_order = rowid.map_blocks(row_run_factory,
-                                 sort_dir="write",
-                                 dtype=object)
+    row_order = rowid.map_blocks(row_run_factory, sort_dir="write", dtype=object)
 
     return cached_array(row_order)
 
 
-def _write_datasets(table, table_proxy, datasets, columns, descriptor,
-                    table_keywords, column_keywords):
+def _write_datasets(
+    table, table_proxy, datasets, columns, descriptor, table_keywords, column_keywords
+):
     _, table_name, subtable = table_path_split(table)
-    table_name = '::'.join((table_name, subtable)) if subtable else table_name
+    table_name = "::".join((table_name, subtable)) if subtable else table_name
     row_orders = []
 
     # Put table and column keywords
-    table_proxy.submit(_put_keywords, WRITELOCK,
-                       table_keywords, column_keywords).result()
+    table_proxy.submit(
+        _put_keywords, WRITELOCK, table_keywords, column_keywords
+    ).result()
 
     # Sort datasets on (not has "ROWID", index) such that
     # datasets with ROWID's are handled first, while
     # those without (which imply appends to the MS)
     # are handled last
-    sorted_datasets = sorted(enumerate(datasets),
-                             key=lambda t: ("ROWID" not in t[1].data_vars,
-                                            t[0]))
+    sorted_datasets = sorted(
+        enumerate(datasets), key=lambda t: ("ROWID" not in t[1].data_vars, t[0])
+    )
 
     # Establish row orders for each dataset
     for di, ds in sorted_datasets:
@@ -605,16 +624,17 @@ def _write_datasets(table, table_proxy, datasets, columns, descriptor,
             try:
                 variable = ds.data_vars[column]
             except KeyError:
-                log.warning("Ignoring '%s' not present "
-                            "on dataset %d" % (column, di))
+                log.warning("Ignoring '%s' not present " "on dataset %d" % (column, di))
                 continue
             else:
                 full_dims = variable.dims
                 array = variable.data
 
             if not isinstance(array, da.Array):
-                raise TypeError("%s on dataset %d is not a dask Array "
-                                "but a %s" % (column, di, type(array)))
+                raise TypeError(
+                    "%s on dataset %d is not a dask Array "
+                    "but a %s" % (column, di, type(array))
+                )
 
             args = [row_order, ("row",)]
 
@@ -624,10 +644,13 @@ def _write_datasets(table, table_proxy, datasets, columns, descriptor,
 
             inlinable_arrays = [row_order]
 
-            if (row_order.shape[0] != array.shape[0] or
-                    row_order.chunks[0] != array.chunks[0]):
-                raise ValueError(f"ROWID shape and/or chunking does "
-                                 f"not match that of {column}")
+            if (
+                row_order.shape[0] != array.shape[0]
+                or row_order.chunks[0] != array.chunks[0]
+            ):
+                raise ValueError(
+                    f"ROWID shape and/or chunking does " f"not match that of {column}"
+                )
 
             if not all(len(c) == 1 for c in array.chunks[1:]):
                 # Add extent arrays
@@ -638,22 +661,23 @@ def _write_datasets(table, table_proxy, datasets, columns, descriptor,
                     args.append((d,))
 
             # Add other variables
-            args.extend([table_proxy, None,
-                         column, None,
-                         array, full_dims])
+            args.extend([table_proxy, None, column, None, array, full_dims])
 
             # Name of the dask array representing this column
             token = dask.base.tokenize(di, args)
             name = "".join(("write~", column, "-", table_name, "-", token))
 
-            write_col = da.blockwise(putter_wrapper, full_dims,
-                                     *args,
-                                     # All dims shrink to 1,
-                                     # a single bool is returned
-                                     adjust_chunks={d: 1 for d in full_dims},
-                                     name=name,
-                                     align_arrays=False,
-                                     dtype=bool)
+            write_col = da.blockwise(
+                putter_wrapper,
+                full_dims,
+                *args,
+                # All dims shrink to 1,
+                # a single bool is returned
+                adjust_chunks={d: 1 for d in full_dims},
+                name=name,
+                align_arrays=False,
+                dtype=bool,
+            )
 
             if inline:
                 write_col = inlined_array(write_col, inlinable_arrays)
@@ -666,8 +690,10 @@ def _write_datasets(table, table_proxy, datasets, columns, descriptor,
         if not partition:
             attrs = None
         else:
-            attrs = {DASKMS_PARTITION_KEY: partition,
-                     **{k: getattr(ds, k) for k, _ in partition}}
+            attrs = {
+                DASKMS_PARTITION_KEY: partition,
+                **{k: getattr(ds, k) for k, _ in partition},
+            }
 
         # Append a dataset with the write operations
         datasets.append(Dataset(write_vars, attrs=attrs))
@@ -701,9 +727,15 @@ def _put_keywords(table, table_keywords, column_keywords):
     return True
 
 
-def write_datasets(table, datasets, columns, descriptor=None,
-                   table_keywords=None, column_keywords=None,
-                   table_proxy=False):
+def write_datasets(
+    table,
+    datasets,
+    columns,
+    descriptor=None,
+    table_keywords=None,
+    column_keywords=None,
+    table_proxy=False,
+):
     # Promote datasets to list
     if isinstance(datasets, tuple):
         datasets = list(datasets)
@@ -722,10 +754,15 @@ def write_datasets(table, datasets, columns, descriptor=None,
     else:
         tp = _updated_table(table, datasets, columns, descriptor)
 
-    write_datasets = _write_datasets(table, tp, datasets, columns,
-                                     descriptor=descriptor,
-                                     table_keywords=table_keywords,
-                                     column_keywords=column_keywords)
+    write_datasets = _write_datasets(
+        table,
+        tp,
+        datasets,
+        columns,
+        descriptor=descriptor,
+        table_keywords=table_keywords,
+        column_keywords=column_keywords,
+    )
 
     if table_proxy:
         return write_datasets, tp

@@ -10,20 +10,14 @@ from daskms.dataset import Variable
 from daskms.descriptors.ms import MSDescriptorBuilder
 
 
-@pytest.fixture(params=[
-    [
-        {
-            "row": (2, 3, 2, 2),
-            "chan": (4, 4, 4, 4),
-            "corr": (2, 2)
-        },
-        {
-            "row": (4, 3),
-            "chan": (4, 4, 4, 4),
-            "corr": (2, 2)
-        },
-    ],
-])
+@pytest.fixture(
+    params=[
+        [
+            {"row": (2, 3, 2, 2), "chan": (4, 4, 4, 4), "corr": (2, 2)},
+            {"row": (4, 3), "chan": (4, 4, 4, 4), "corr": (2, 2)},
+        ],
+    ]
+)
 def dataset_chunks(request):
     return request.param
 
@@ -35,14 +29,20 @@ def _variable_factory(dims, dtype, chunks):
     return Variable(dims, dask_array, {})
 
 
-@pytest.fixture(params=[
-    [("DATA", ("row", "chan", "corr"), np.complex64)],
-    [("DATA", ("row", "chan", "corr"), np.complex128),
-     ("MODEL_DATA", ("row", "chan", "corr"), np.complex128)],
-    [("IMAGING_WEIGHT", ("row", "chan"), np.float32),
-     ("SIGMA_SPECTRUM", ("row", "chan", "corr"), float)],
-
-], ids=lambda v: f"variables={v}")
+@pytest.fixture(
+    params=[
+        [("DATA", ("row", "chan", "corr"), np.complex64)],
+        [
+            ("DATA", ("row", "chan", "corr"), np.complex128),
+            ("MODEL_DATA", ("row", "chan", "corr"), np.complex128),
+        ],
+        [
+            ("IMAGING_WEIGHT", ("row", "chan"), np.float32),
+            ("SIGMA_SPECTRUM", ("row", "chan", "corr"), float),
+        ],
+    ],
+    ids=lambda v: f"variables={v}",
+)
 def column_schema(request):
     return request.param
 
@@ -54,9 +54,10 @@ def variables(column_schema, dataset_chunks):
     assert len(set(c["chan"] for c in dataset_chunks)) == 1
     assert len(set(c["corr"] for c in dataset_chunks)) == 1
 
-    return {column: [_variable_factory(dims, dtype, chunks)
-                     for chunks in dataset_chunks]
-            for column, dims, dtype in column_schema}
+    return {
+        column: [_variable_factory(dims, dtype, chunks) for chunks in dataset_chunks]
+        for column, dims, dtype in column_schema
+    }
 
 
 @pytest.mark.parametrize("fixed", [True, False])
@@ -69,8 +70,7 @@ def test_ms_builder(tmp_path, variables, fixed):
     dminfo = builder.dminfo(tab_desc)
 
     # These columns must always be present on an MS
-    required_cols = {k for k in pt.required_ms_desc().keys()
-                     if not k.startswith('_')}
+    required_cols = {k for k in pt.required_ms_desc().keys() if not k.startswith("_")}
 
     filename = str(tmp_path / "test_plugin.ms")
 
@@ -80,15 +80,17 @@ def test_ms_builder(tmp_path, variables, fixed):
         assert set(T.colnames()) == set.union(var_names, required_cols)
 
         if fixed:
-            original_dminfo = {v['NAME']: v for v in dminfo.values()}
-            table_dminfo = {v['NAME']: v for v in T.getdminfo().values()}
+            original_dminfo = {v["NAME"]: v for v in dminfo.values()}
+            table_dminfo = {v["NAME"]: v for v in T.getdminfo().values()}
 
             for column in variables.keys():
                 try:
                     column_group = table_dminfo[column + "_GROUP"]
                 except KeyError:
-                    raise ValueError(f"{column} should be fixed but no "
-                                     f"Data Manager Group was created")
+                    raise ValueError(
+                        f"{column} should be fixed but no "
+                        f"Data Manager Group was created"
+                    )
 
                 assert column in column_group["COLUMNS"]
                 assert column_group["TYPE"] == "TiledColumnStMan"
@@ -97,10 +99,10 @@ def test_ms_builder(tmp_path, variables, fixed):
 
             for dm_name, dm_group in table_dminfo.items():
                 odm_group = original_dminfo[dm_name]
-                assert odm_group['TYPE'] == dm_group['TYPE']
-                assert set(odm_group['COLUMNS']) == set(dm_group['COLUMNS'])
+                assert odm_group["TYPE"] == dm_group["TYPE"]
+                assert set(odm_group["COLUMNS"]) == set(dm_group["COLUMNS"])
 
-                if dm_group['TYPE'] == 'TiledColumnStMan':
-                    original_tile = odm_group['SPEC']['DEFAULTTILESHAPE']
-                    table_tile = dm_group['SPEC']['DEFAULTTILESHAPE']
+                if dm_group["TYPE"] == "TiledColumnStMan":
+                    original_tile = odm_group["SPEC"]["DEFAULTTILESHAPE"]
+                    table_tile = dm_group["SPEC"]["DEFAULTTILESHAPE"]
                     assert_array_equal(original_tile, table_tile)

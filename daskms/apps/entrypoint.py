@@ -25,8 +25,9 @@ class EntryPoint:
         try:
             cmd_klass = app_klasses[args.command]
         except KeyError:
-            raise ValueError(f"No implementation class found "
-                             f"for command {args.command}")
+            raise ValueError(
+                f"No implementation class found " f"for command {args.command}"
+            )
 
         cmd = cmd_klass(args, log)
         cmd.execute()
@@ -34,6 +35,7 @@ class EntryPoint:
     @classmethod
     def _application_classes(cls):
         from daskms.apps.convert import Convert
+
         return {"convert": Convert}
 
     @classmethod
@@ -61,6 +63,5 @@ class EntryPoint:
     def _setup_logging(cls):
         assert cls.LOGGING_INI.exists()
 
-        logging.config.fileConfig(fname=cls.LOGGING_INI,
-                                  disable_existing_loggers=False)
+        logging.config.fileConfig(fname=cls.LOGGING_INI, disable_existing_loggers=False)
         return logging.getLogger(__name__)

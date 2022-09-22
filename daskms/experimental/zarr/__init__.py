@@ -11,16 +11,13 @@ import warnings
 
 from daskms.constants import DASKMS_PARTITION_KEY
 from daskms.dataset import Dataset, Variable
-from daskms.dataset_schema import (
-    DatasetSchema,
-    encode_type,
-    decode_type,
-    decode_attr)
+from daskms.dataset_schema import DatasetSchema, encode_type, decode_type, decode_attr
 from daskms.experimental.utils import (
     extent_args,
     select_vars_and_coords,
     column_iterator,
-    promote_columns)
+    promote_columns,
+)
 from daskms.optimisation import inlined_array
 from daskms.utils import requires
 from daskms.fsspec_store import DaskMSStore
@@ -48,7 +45,8 @@ def zarr_chunks(column, dims, chunks):
             raise NotImplementedError(
                 f"Column {column} has nan chunks "
                 f"{dim_chunks} in dimension {dim} "
-                f"This is not currently supported")
+                f"This is not currently supported"
+            )
 
         unique_chunks = set(dim_chunks[:-1])
 
@@ -60,14 +58,15 @@ def zarr_chunks(column, dims, chunks):
             raise NotImplementedError(
                 f"Column {column} has heterogenous chunks "
                 f"{dim_chunks} in dimension {dim} "
-                f"zarr does not currently support this")
+                f"zarr does not currently support this"
+            )
 
     return tuple(zchunks)
 
 
-def create_array(ds_group, column, column_schema,
-                 schema_chunks, coordinate=False):
+def create_array(ds_group, column, column_schema, schema_chunks, coordinate=False):
     import numcodecs
+
     codec = numcodecs.Pickle() if column_schema.dtype == object else None
 
     if column_schema.chunks is None:
@@ -84,7 +83,7 @@ def create_array(ds_group, column, column_schema,
     zchunks = zarr_chunks(column, column_schema.dims, chunks)
 
     if column_schema.dtype == object:
-        if reduce(mul, zchunks, 32) >= 2**(32 - 1):
+        if reduce(mul, zchunks, 32) >= 2 ** (32 - 1):
             raise ValueError(
                 f"Column {column} has an object dtype. "
                 f"Given an estimate of 32 bytes per entry "
@@ -93,18 +92,21 @@ def create_array(ds_group, column, column_schema,
             )
     else:
         size = np.dtype(column_schema.dtype).itemsize
-        if reduce(mul, zchunks, size) >= 2**(32 - 1):
+        if reduce(mul, zchunks, size) >= 2 ** (32 - 1):
             raise ValueError(
                 f"Column {column} has a chunk of "
                 f"dimension {zchunks} that will exceed "
                 f"zarr's 2GiB chunk limit"
             )
 
-    array = ds_group.require_dataset(column, column_schema.shape,
-                                     chunks=zchunks,
-                                     dtype=column_schema.dtype,
-                                     object_codec=codec,
-                                     exact=True)
+    array = ds_group.require_dataset(
+        column,
+        column_schema.shape,
+        chunks=zchunks,
+        dtype=column_schema.dtype,
+        object_codec=codec,
+        exact=True,
+    )
 
     array.attrs[DASKMS_ATTR_KEY] = {
         **column_schema.attrs,
@@ -138,10 +140,9 @@ def prepare_zarr_group(dataset_id, dataset, store, rechunk=False):
     for column, column_schema in schema.coords.items():
         create_array(ds_group, column, column_schema, schema_chunks, True)
 
-    ds_group.attrs.update({
-        **schema.attrs,
-        DASKMS_ATTR_KEY: {"chunks": dict(dataset.chunks)}
-    })
+    ds_group.attrs.update(
+        {**schema.attrs, DASKMS_ATTR_KEY: {"chunks": dict(dataset.chunks)}}
+    )
 
     return dataset, ds_group
 
@@ -164,8 +165,9 @@ def maybe_rechunk(dataset, group, rechunk=False):
 
     for name, data in (*dataset.data_vars.items(), *dataset.coords.items()):
         try:
-            disk_chunks = tuple(group_chunks.get(d, dataset_chunks[d])
-                                for d in data.dims)
+            disk_chunks = tuple(
+                group_chunks.get(d, dataset_chunks[d]) for d in data.dims
+            )
         except KeyError:  # Orphan coordinate (no chunks), handled elsewhere.
             continue
         dask_chunks = data.chunks
@@ -180,7 +182,8 @@ def maybe_rechunk(dataset, group, rechunk=False):
                     f"data corruption as described in "
                     f"https://zarr.readthedocs.io/en/stable/tutorial.html"
                     f"#parallel-computing-and-synchronization. Consider "
-                    f"setting 'rechunk=True' in 'xds_to_zarr'.")
+                    f"setting 'rechunk=True' in 'xds_to_zarr'."
+                )
 
     try:
         dataset.chunks
@@ -188,9 +191,7 @@ def maybe_rechunk(dataset, group, rechunk=False):
         raise e
 
     # This makes the attributes consistent with the final chunking.
-    group.attrs.update({
-        DASKMS_ATTR_KEY: {"chunks": dict(dataset.chunks)}
-    })
+    group.attrs.update({DASKMS_ATTR_KEY: {"chunks": dict(dataset.chunks)}})
 
     return dataset, group
 
@@ -203,7 +204,7 @@ def zarr_setter(data, name, group, *extents):
 
     selection = tuple(slice(start, end) for start, end in extents)
     zarray[selection] = data
-    return np.full((1,)*len(extents), True)
+    return np.full((1,) * len(extents), True)
 
 
 def _gen_writes(variables, chunks, factory, indirect_dims=False):
@@ -217,27 +218,32 @@ def _gen_writes(variables, chunks, factory, indirect_dims=False):
             except KeyError:
                 var_chunks = tuple((s,) for s in var.shape)
             ext_args = extent_args(var.dims, var_chunks)
-            var_data = da.from_array(var.data, chunks=var_chunks,
-                                     inline_array=True, name=False)
+            var_data = da.from_array(
+                var.data, chunks=var_chunks, inline_array=True, name=False
+            )
         else:
-            raise NotImplementedError(f"Writing {type(var.data)} "
-                                      f"unsupported")
+            raise NotImplementedError(f"Writing {type(var.data)} " f"unsupported")
 
         if var_data.nbytes == 0:
             continue
 
-        token_name = (f"write~{name}-"
-                      f"{tokenize(var_data, name, factory, *ext_args)}")
+        token_name = f"write~{name}-" f"{tokenize(var_data, name, factory, *ext_args)}"
 
-        write = da.blockwise(zarr_setter, var.dims,
-                             var_data, var.dims,
-                             name, None,
-                             factory, None,
-                             *ext_args,
-                             adjust_chunks={d: 1 for d in var.dims},
-                             concatenate=False,
-                             name=token_name,
-                             meta=np.empty((1,)*len(var.dims), bool))
+        write = da.blockwise(
+            zarr_setter,
+            var.dims,
+            var_data,
+            var.dims,
+            name,
+            None,
+            factory,
+            None,
+            *ext_args,
+            adjust_chunks={d: 1 for d in var.dims},
+            concatenate=False,
+            name=token_name,
+            meta=np.empty((1,) * len(var.dims), bool),
+        )
         write = inlined_array(write, ext_args[::2])
 
         # Alter the dimension names to preserve laziness on coordinates.
@@ -246,10 +252,8 @@ def _gen_writes(variables, chunks, factory, indirect_dims=False):
         yield name, (dims, write, var.attrs)
 
 
-@requires("pip install dask-ms[zarr] for zarr support",
-          zarr_import_error)
-def xds_to_zarr(xds, store, columns=None,
-                rechunk=False, consolidated=True, **kwargs):
+@requires("pip install dask-ms[zarr] for zarr support", zarr_import_error)
+def xds_to_zarr(xds, store, columns=None, rechunk=False, consolidated=True, **kwargs):
     """
     Stores a dataset of list of datasets defined by `xds` in
     file location `store`.
@@ -281,15 +285,15 @@ def xds_to_zarr(xds, store, columns=None,
     elif isinstance(store, (Path, str)):
         store = DaskMSStore(f"{store}", **kwargs.pop("storage_options", {}))
     else:
-        raise TypeError(f"store '{store}' must be "
-                        f"Path, str or DaskMSStore")
+        raise TypeError(f"store '{store}' must be " f"Path, str or DaskMSStore")
 
     # If any kwargs are added, they should be popped prior to this check.
     if len(kwargs) > 0:
         warnings.warn(
             f"The following unsupported kwargs were ignored in "
             f"xds_to_zarr: {kwargs}",
-            UserWarning)
+            UserWarning,
+        )
 
     columns = promote_columns(columns)
 
@@ -313,8 +317,9 @@ def xds_to_zarr(xds, store, columns=None,
 
         data_vars = dict(_gen_writes(ds.data_vars, ds.chunks, group))
         # Include coords in the write dataset so they're reified
-        data_vars.update(dict(_gen_writes(ds.coords, ds.chunks, group,
-                                          indirect_dims=True)))
+        data_vars.update(
+            dict(_gen_writes(ds.coords, ds.chunks, group, indirect_dims=True))
+        )
 
         # Transfer any partition information over to the write dataset
         partition = ds.attrs.get(DASKMS_PARTITION_KEY, False)
@@ -322,8 +327,10 @@ def xds_to_zarr(xds, store, columns=None,
         if not partition:
             attrs = None
         else:
-            attrs = {DASKMS_PARTITION_KEY: partition,
-                     **{k: getattr(ds, k) for k, _ in partition}}
+            attrs = {
+                DASKMS_PARTITION_KEY: partition,
+                **{k: getattr(ds, k) for k, _ in partition},
+            }
 
         write_datasets.append(Dataset(data_vars, attrs=attrs))
 
@@ -345,13 +352,11 @@ def zarr_getter(zarray, *extents):
 
 
 def group_sortkey(element):
-    return int(element[0].split('_')[-1])
+    return int(element[0].split("_")[-1])
 
 
-@requires("pip install dask-ms[zarr] for zarr support",
-          zarr_import_error)
-def xds_from_zarr(store, columns=None, chunks=None,
-                  consolidated=True, **kwargs):
+@requires("pip install dask-ms[zarr] for zarr support", zarr_import_error)
+def xds_from_zarr(store, columns=None, chunks=None, consolidated=True, **kwargs):
     """
     Reads the zarr data store in `store` and returns list of
     Dataset's containing the data.
@@ -380,15 +385,15 @@ def xds_from_zarr(store, columns=None, chunks=None,
     elif isinstance(store, (Path, str)):
         store = DaskMSStore(f"{store}", **kwargs.pop("storage_options", {}))
     else:
-        raise TypeError(f"store '{store}' must be "
-                        f"Path, str or DaskMSStore")
+        raise TypeError(f"store '{store}' must be " f"Path, str or DaskMSStore")
 
     # If any kwargs are added, they should be popped prior to this check.
     if len(kwargs) > 0:
         warnings.warn(
             f"The following unsupported kwargs were ignored in "
             f"xds_from_zarr: {kwargs}",
-            UserWarning)
+            UserWarning,
+        )
 
     columns = promote_columns(columns)
 
@@ -413,8 +418,9 @@ def xds_from_zarr(store, columns=None, chunks=None,
     except KeyError:
         table_group = zarr.open_group(store_map)
 
-    for g, (group_name, group) in enumerate(sorted(table_group.groups(),
-                                                   key=group_sortkey)):
+    for g, (group_name, group) in enumerate(
+        sorted(table_group.groups(), key=group_sortkey)
+    ):
         group_attrs = decode_attr(dict(group.attrs))
         dask_ms_attrs = group_attrs.pop(DASKMS_ATTR_KEY)
         natural_chunks = dask_ms_attrs["chunks"]
@@ -435,19 +441,24 @@ def xds_from_zarr(store, columns=None, chunks=None,
             attrs = decode_attr(dict(zarray.attrs[DASKMS_ATTR_KEY]))
             dims = attrs["dims"]
             coordinate = attrs.get("coordinate", False)
-            array_chunks = tuple(group_chunks.get(d, s) for d, s
-                                 in zip(dims, zarray.shape))
+            array_chunks = tuple(
+                group_chunks.get(d, s) for d, s in zip(dims, zarray.shape)
+            )
 
             array_chunks = da.core.normalize_chunks(array_chunks, zarray.shape)
             ext_args = extent_args(dims, array_chunks)
             token_name = f"read~{name}-{tokenize(zarray, *ext_args)}"
 
-            read = da.blockwise(zarr_getter, dims,
-                                zarray, None,
-                                *ext_args,
-                                concatenate=False,
-                                name=token_name,
-                                meta=np.empty((0,)*zarray.ndim, zarray.dtype))
+            read = da.blockwise(
+                zarr_getter,
+                dims,
+                zarray,
+                None,
+                *ext_args,
+                concatenate=False,
+                name=token_name,
+                meta=np.empty((0,) * zarray.ndim, zarray.dtype),
+            )
 
             read = inlined_array(read, ext_args[::2])
             var = Variable(dims, read, attrs)

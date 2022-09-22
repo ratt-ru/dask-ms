@@ -36,7 +36,7 @@ def column_iterator(variables, columns):
         for k, v in variables.items():
             yield k, v
     else:
-        for c in (set(columns) & set(variables.keys())):
+        for c in set(columns) & set(variables.keys()):
             yield c, variables[c]
 
 
@@ -51,8 +51,9 @@ def promote_columns(columns):
     elif isinstance(columns, str):
         return [columns]
     else:
-        raise TypeError(f"'columns' must be None or str "
-                        f"or list of str. Got {columns}")
+        raise TypeError(
+            f"'columns' must be None or str " f"or list of str. Got {columns}"
+        )
 
 
 def select_vars_and_coords(dataset, columns):
@@ -79,9 +80,11 @@ def select_vars_and_coords(dataset, columns):
         coord_names = set(coords.keys())
 
         if not column_set.issubset((data_var_names | coord_names)):
-            raise ValueError(f"User requested writes on the following "
-                             f"columns: {column_set}. Some or all of these "
-                             f"are not present on the datasets. Aborting.")
+            raise ValueError(
+                f"User requested writes on the following "
+                f"columns: {column_set}. Some or all of these "
+                f"are not present on the datasets. Aborting."
+            )
 
         data_sel = column_set & data_var_names
         coord_sel = column_set & coord_names

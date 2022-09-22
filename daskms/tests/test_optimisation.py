@@ -10,12 +10,14 @@ from numpy.testing import assert_array_almost_equal, assert_array_equal
 import pytest
 
 from daskms import xds_from_ms
-from daskms.optimisation import (inlined_array,
-                                 cached_array,
-                                 ArrayCache,
-                                 Key,
-                                 _key_cache,
-                                 _array_cache_cache)
+from daskms.optimisation import (
+    inlined_array,
+    cached_array,
+    ArrayCache,
+    Key,
+    _key_cache,
+    _array_cache_cache,
+)
 
 
 def test_optimisation_identity():
@@ -87,7 +89,7 @@ def test_inlined_array():
 
 
 def test_cached_array(ms):
-    ds = xds_from_ms(ms, group_cols=[], chunks={'row': 1, 'chan': 4})[0]
+    ds = xds_from_ms(ms, group_cols=[], chunks={"row": 1, "chan": 4})[0]
 
     data = ds.DATA.data
     cached_data = cached_array(data)

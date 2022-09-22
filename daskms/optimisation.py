@@ -19,6 +19,7 @@ class KeyMetaClass(type):
     Ensures that Key identities are the same,
     given the same constructor arguments
     """
+
     def __call__(cls, key):
         try:
             return _key_cache[key]
@@ -39,6 +40,7 @@ class Key(metaclass=KeyMetaClass):
     (or other dask key type) in a WeakKeyDictionary.
     Uniques of key identity guaranteed by KeyMetaClass
     """
+
     __slots__ = ("key", "__weakref__")
 
     def __init__(self, key):
@@ -74,6 +76,7 @@ class ArrayCacheMetaClass(type):
     Ensures that Array Cache identities are the same,
     given the same constructor arguments
     """
+
     def __call__(cls, token):
         key = (cls, token)
 
@@ -152,7 +155,7 @@ def cached_array(array, token=None):
 
 
 def inlined_array(a, inline_arrays=None):
-    """ Flatten underlying graph """
+    """Flatten underlying graph"""
     agraph = a.__dask_graph__()
     akeys = set(flatten(a.__dask_keys__()))
 
@@ -172,15 +175,17 @@ def inlined_array(a, inline_arrays=None):
         inline_arrays = list(inline_arrays)
 
     if not isinstance(inline_arrays, list):
-        raise TypeError("Invalid inline_arrays, must be "
-                        "(None, list, tuple, dask.array.Array)")
+        raise TypeError(
+            "Invalid inline_arrays, must be " "(None, list, tuple, dask.array.Array)"
+        )
 
     inline_names = set(a.name for a in inline_arrays)
     layers = agraph.layers.copy()
     deps = {k: v.copy() for k, v in agraph.dependencies.items()}
     # We want to inline layers that depend on the inlined arrays
-    inline_layers = set(k for k, v in deps.items()
-                        if len(inline_names.intersection(v)) > 0)
+    inline_layers = set(
+        k for k, v in deps.items() if len(inline_names.intersection(v)) > 0
+    )
 
     for layer_name in inline_layers:
         dsk = dict(layers[layer_name])
