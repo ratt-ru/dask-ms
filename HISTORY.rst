@@ -13,9 +13,9 @@ X.Y.Z (YYYY-MM-DD)
 
 
 0.2.12 (2022-09-09)
-------------------
+-------------------
 * Consolidate metadata by default during ``xds_to_zarr`` and always attempt to
-  read consolidated metadata in ``xds_from_zarr` (:pr:`243`)
+  read consolidated metadata in ``xds_from_zarr`` (:pr:`243`).
 * Fail if ROWID dimensions don't match associated dataset arrays (:pr:`239`)
 * Pin flake8 to >= 4.0.0 and < 5.0.0 (:pr:`240`)
 
