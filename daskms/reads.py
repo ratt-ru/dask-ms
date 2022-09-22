@@ -319,7 +319,7 @@ class DatasetFactory(object):
         )
 
     def _metadata(self, table_proxy):
-        """ Create daskms metadata """
+        """Create daskms metadata"""
         metadata = table_proxy.getdesc().result().get(DASKMS_METADATA, {})
         provenance = metadata.setdefault("provenance", [])
 
@@ -358,10 +358,7 @@ class DatasetFactory(object):
         else:
             coords = {"ROWID": rowid}
 
-        attrs = {
-            DASKMS_METADATA: self._metadata(table_proxy),
-            DASKMS_PARTITION_KEY: {}
-        }
+        attrs = {DASKMS_METADATA: self._metadata(table_proxy), DASKMS_PARTITION_KEY: {}}
 
         return Dataset(variables, coords=coords, attrs=attrs)
 
@@ -419,7 +416,7 @@ class DatasetFactory(object):
             )
             attrs = {
                 DASKMS_METADATA: self._metadata(table_proxy),
-                DASKMS_PARTITION_KEY: partitions
+                DASKMS_PARTITION_KEY: partitions,
             }
 
             # Use python types which are json serializable

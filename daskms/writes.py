@@ -569,13 +569,14 @@ def _write_datasets(
     fmeta = set(freeze(ds.attrs.get(DASKMS_METADATA, {})) for ds in datasets)
 
     if not len(fmeta) == 1:
-        raise ValueError(
-            f"{DASKMS_METADATA} is not consistent across datasets")
+        raise ValueError(f"{DASKMS_METADATA} is not consistent across datasets")
 
     table_keywords = table_keywords or {}
     table_metadata = table_keywords.get(DASKMS_METADATA, {})
     table_keywords[DASKMS_METADATA] = {
-        **datasets[0].attrs[DASKMS_METADATA], **table_metadata}
+        **datasets[0].attrs[DASKMS_METADATA],
+        **table_metadata,
+    }
     provenance = table_keywords[DASKMS_METADATA].setdefault("provenance", [])
     provenance.append(table)
 

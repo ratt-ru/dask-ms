@@ -172,6 +172,7 @@ def test_ms_update(ms, group_cols, index_cols, select_cols):
         assert ds.attrs[DASKMS_METADATA]["provenance"] == [ms]
         assert len(ds.attrs[DASKMS_PARTITION_KEY]) == len(group_cols)
 
+
 @pytest.mark.parametrize(
     "index_cols",
     [
