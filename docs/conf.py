@@ -18,6 +18,7 @@
 # relative to the documentation root, use os.path.abspath to make it
 # absolute, like shown here.
 #
+from datetime import date
 import importlib
 import os
 import sys
@@ -87,8 +88,9 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'dask-ms'
-copyright = (u"2019, South African Radio Astronomy Observatory, "
-             "National Research Foundation")
+copyright = (f"{date.today().year}, "
+             f"South African Radio Astronomy Observatory, "
+             f"National Research Foundation")
 author = u"Simon Perkins"
 
 # The version info for the project you're documenting, acts as replacement
