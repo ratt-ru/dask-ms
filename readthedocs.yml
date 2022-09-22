@@ -1,5 +1,20 @@
-python:
-    version: 3
-    pip_install: true
+# Read the Docs configuration file
+# See https://docs.readthedocs.io/en/stable/config-file/v2.html for details
 
-requirements_file: "requirements.readthedocs.txt"
+# Required
+version: 2
+
+# Set the version of Python and other tools you might need
+build:
+  os: ubuntu-20.04
+  tools: {python: "3.8"}
+  jobs:
+    post_install:
+      - pip install poetry==1.2.1
+      - poetry config virtualenvs.create false
+      - poetry install --with docs
+
+# Build documentation in the docs/ directory with Sphinx
+sphinx:
+  configuration: docs/conf.py
+  fail_on_warning: false

@@ -25,6 +25,11 @@ try:
 except ImportError:
     xarray = None
 
+try:
+    import s3fs
+except ImportError:
+    s3fs = None
+
 
 def test_parquet_roundtrip(tmp_path_factory):
     """ Test round-trip via parquet file with custom Extension Types """
@@ -153,6 +158,7 @@ def test_xds_to_parquet_local(ms, tmp_path_factory, spw_table, ant_table):
     return parquet_tester(ms, DaskMSStore(store))
 
 
+@pytest.mark.skipif(s3fs is None, reason="s3fs not installed")
 def test_xds_to_parquet_s3(ms, spw_table, ant_table,
                            py_minio_client, minio_user_key,
                            minio_url, s3_bucket_name):

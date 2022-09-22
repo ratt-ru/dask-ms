@@ -6,7 +6,6 @@ import dask
 import dask.array as da
 from dask.array.core import normalize_chunks
 from dask.base import tokenize
-import numcodecs
 import numpy as np
 import warnings
 
@@ -68,7 +67,7 @@ def zarr_chunks(column, dims, chunks):
 
 def create_array(ds_group, column, column_schema,
                  schema_chunks, coordinate=False):
-
+    import numcodecs
     codec = numcodecs.Pickle() if column_schema.dtype == object else None
 
     if column_schema.chunks is None:

@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Manage dask-ms with python poetry (:pr:`250`)
 * Don't force conversion to tuple during attribute decoding (:pr:`248`)
 * Fail if zarr chunks exceed 2GB (:pr:`247`)
 * Add a ``--exclude`` argument to ``dask-ms convert`` that allows
@@ -12,9 +13,9 @@ X.Y.Z (YYYY-MM-DD)
 
 
 0.2.12 (2022-09-09)
-------------------
+-------------------
 * Consolidate metadata by default during ``xds_to_zarr`` and always attempt to
-  read consolidated metadata in ``xds_from_zarr` (:pr:`243`)
+  read consolidated metadata in ``xds_from_zarr`` (:pr:`243`).
 * Fail if ROWID dimensions don't match associated dataset arrays (:pr:`239`)
 * Pin flake8 to >= 4.0.0 and < 5.0.0 (:pr:`240`)
 
@@ -28,7 +29,7 @@ X.Y.Z (YYYY-MM-DD)
 * Minor DaskMSStore changes to improve URL handling. (:pr:`233`)
 * Deprecate Python 3.7 support and test on Python 3.10 (:pr:`232`)
 * Support loading of storage_options in dask-ms convert (:pr:`231`)
-* Reintroduce group columns on output CASA format only" (:pr:`230`)
+* Reintroduce group columns on output CASA format only (:pr:`230`)
 * Stop converting results returned from DaskMSStore into Path objects (:pr:`229`)
 * Accept storage_options in dataset read/write methods (:pr:`228`)
 * Add ``__repr__`` and ``__str__`` for ``DaskMSStore`` (:pr:`224`)
@@ -58,7 +59,7 @@ X.Y.Z (YYYY-MM-DD)
 * Ignore unsupported kwargs in ``xds_from_storage_*`` functions. (:pr:`192`)
 * Improve handling of subtables with variably sized rows in daskms-convert. (:pr:`191`)
 * Ensure that ``xds_from_zarr`` sorts groups as integers and not strings (:pr:`188`)
-* Ensure Natural Ordering for parquet files (:pr:`183)
+* Ensure Natural Ordering for parquet files (:pr:`183`)
 * Fix ``xds_from_zarr`` and ``xds_from_parquet`` chunking behaviour (:pr:`182`)
 * Add LazyProxy and LazyProxyMultiton patterns to dask-ms (:pr:`177`)
 * Support cloud native storage formats via fsspec (:pr:`174`)

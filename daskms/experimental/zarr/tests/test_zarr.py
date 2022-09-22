@@ -19,6 +19,11 @@ try:
 except ImportError:
     xarray = None
 
+try:
+    import s3fs
+except ImportError:
+    s3fs = None
+
 
 def test_zarr_string_array(tmp_path_factory):
     zarr_store = tmp_path_factory.mktemp("string-arrays") / "test.zarr"
@@ -175,10 +180,10 @@ def test_xds_to_zarr_local(ms, spw_table, ant_table, tmp_path_factory):
                        DaskMSStore(ant_store))
 
 
+@pytest.mark.skipif(s3fs is None, reason="s3fs not installed")
 def test_xds_to_zarr_s3(ms, spw_table, ant_table,
                         py_minio_client, minio_user_key,
                         minio_url, s3_bucket_name):
-
     py_minio_client.make_bucket(s3_bucket_name)
 
     zarr_store = DaskMSStore(f"s3://{s3_bucket_name}/measurementset.MS",
@@ -247,7 +252,7 @@ def test_xarray_to_zarr(ms, tmp_path_factory):
 
 
 def _fasteners_runner(lockfile):
-    fasteners = pytest.importorskip("fasteners")
+    import fasteners
     from pathlib import Path
     import json
 
@@ -274,6 +279,7 @@ def _fasteners_runner(lockfile):
 
 
 def test_fasteners(ms, tmp_path_factory):
+    pytest.importorskip("fasteners")
     lockfile = tmp_path_factory.mktemp("fasteners-") / "dir" / ".lock"
 
     from pprint import pprint
