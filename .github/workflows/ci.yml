@@ -153,13 +153,15 @@ jobs:
        github.event.ref == 'refs/heads/master')
 
     steps:
-      - name: Set up Python 3.6
-        uses: actions/setup-python@v2
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v4
         with:
-          python-version: 3.6
+          python-version: 3.8
 
-      - name: Install latest setuptools, wheel, pip
-        run: python3 -m pip install -U pip setuptools wheel
+      - name: Install Poetry
+        uses: abatilo/actions-poetry@v2
+        with:
+          poetry-version: ${{ env.POETRY_VERSION }}
 
       - name: Checkout source
         uses: actions/checkout@v2
@@ -167,7 +169,7 @@ jobs:
           fetch-depth: 1
 
       - name: Build distributions
-        run: python setup.py sdist bdist_wheel
+        run: poetry build
 
       - name: Publish distribution 📦 to Test PyPI
         uses: pypa/gh-action-pypi-publish@master
