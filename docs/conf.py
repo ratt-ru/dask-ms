@@ -167,41 +167,6 @@ latex_elements = {
     # 'figure_align': 'htbp',
 }
 
-# Grouping the document tree into LaTeX files. List of tuples
-# (source start file, target name, title, author, documentclass
-# [howto, manual, or own class]).
-latex_documents = [
-    (master_doc, 'daskms.tex',
-     u'dask-ms Documentation',
-     u'Simon Perkins', 'manual'),
-]
-
-
-# -- Options for manual page output ------------------------------------
-
-# One entry per manual page. List of tuples
-# (source start file, name, description, authors, manual section).
-man_pages = [
-    (master_doc, 'daskms',
-     u'dask-ms Documentation',
-     [author], 1)
-]
-
-
-# -- Options for Texinfo output ----------------------------------------
-
-# Grouping the document tree into Texinfo files. List of tuples
-# (source start file, target name, title, author,
-#  dir menu entry, description, category)
-texinfo_documents = [
-    (master_doc, 'daskms',
-     u'dask-ms Documentation',
-     author,
-     'daskms',
-     'One line description of project.',
-     'Miscellaneous'),
-]
-
 napoleon_numpy_docstring = True
 napoleon_google_docstring = False
 numpydoc_show_class_members = False
