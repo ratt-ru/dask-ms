@@ -37,8 +37,9 @@ pre-commit = "^2.20.0"
 black = "^22.8.0"
 
 [tool.poetry.group.docs.dependencies]
-numpydoc = "^1.4.0"
 furo = "^2022.9.15"
+Sphinx = "^5.1.1"
+numpydoc = "^1.4.0"
 
 [build-system]
 requires = ["setuptools", "poetry-core"]
