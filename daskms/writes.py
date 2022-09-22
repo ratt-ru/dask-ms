@@ -578,6 +578,12 @@ def _write_datasets(
         **table_metadata,
     }
     provenance = table_keywords[DASKMS_METADATA].setdefault("provenance", [])
+
+    try:
+        provenance.remove(table)
+    except ValueError:
+        pass
+
     provenance.append(table)
 
     # Put table and column keywords
