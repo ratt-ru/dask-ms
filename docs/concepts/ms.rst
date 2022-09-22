@@ -204,4 +204,3 @@ of the MAIN table and its sub-tables. The full structure of the
 Measurement Set and it's sub-tables
 is defined in the `Measurement Set v2.0 Specification
 <https://casacore.github.io/casacore-notes/229.html>`_.
-

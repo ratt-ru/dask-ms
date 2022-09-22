@@ -389,5 +389,3 @@ It is possible to request both the table and column keywords:
       'MEASINFO': {'type': 'epoch', 'Ref': 'UTC'}},
      'DATA': {'UNIT': 'Jy'},
      'MODEL_DATA': {'CHANNEL_SELECTION': array([[ 0, 64]], dtype=int32)}}
-
-

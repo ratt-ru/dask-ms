@@ -7,4 +7,3 @@ Tutorial
     tutorial/reads.rst
     tutorial/datasets.rst
     tutorial/writes.rst
-
