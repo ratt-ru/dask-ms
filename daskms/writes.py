@@ -8,6 +8,7 @@ from daskms.optimisation import cached_array, inlined_array
 from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 import pyrap.tables as pt
+from math import isnan
 
 from daskms.columns import dim_extents_array
 from daskms.constants import DASKMS_PARTITION_KEY
@@ -644,13 +645,22 @@ def _write_datasets(
 
             inlinable_arrays = [row_order]
 
-            if (
-                row_order.shape[0] != array.shape[0]
-                or row_order.chunks[0] != array.chunks[0]
-            ):
-                raise ValueError(
-                    f"ROWID shape and/or chunking does " f"not match that of {column}"
-                )
+            if isnan(row_order.shape[0]):  # Dealing with nan chunks/dims.
+                if not (
+                    isnan(row_order.shape[0]) == isnan(array.shape[0])
+                    and len(row_order.chunks[0]) == len(array.chunks[0])
+                ):
+                    raise ValueError(
+                        f"ROWID shape and/or chunking does " f"not match that of {column}"
+                    )
+            else:
+                if (
+                    row_order.shape[0] != array.shape[0]
+                    or row_order.chunks[0] != array.chunks[0]
+                ):
+                    raise ValueError(
+                        f"ROWID shape and/or chunking does " f"not match that of {column}"
+                    )
 
             if not all(len(c) == 1 for c in array.chunks[1:]):
                 # Add extent arrays
