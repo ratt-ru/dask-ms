@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Handle nan row-chunks during writes (:pr:`256`)
 * Apply black to the code base (:pr:`252`)
 * Manage dask-ms with python poetry (:pr:`250`)
 * Don't force conversion to tuple during attribute decoding (:pr:`248`)
