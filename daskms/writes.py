@@ -651,7 +651,8 @@ def _write_datasets(
                     and len(row_order.chunks[0]) == len(array.chunks[0])
                 ):
                     raise ValueError(
-                        f"ROWID shape and/or chunking does " f"not match that of {column}"
+                        f"ROWID shape and/or chunking does "
+                        f"not match that of {column}"
                     )
             else:
                 if (
@@ -659,7 +660,8 @@ def _write_datasets(
                     or row_order.chunks[0] != array.chunks[0]
                 ):
                     raise ValueError(
-                        f"ROWID shape and/or chunking does " f"not match that of {column}"
+                        f"ROWID shape and/or chunking does "
+                        f"not match that of {column}"
                     )
 
             if not all(len(c) == 1 for c in array.chunks[1:]):
