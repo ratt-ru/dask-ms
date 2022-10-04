@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Fix for nan chunks/dims breaking writes (:pr:`255`)
 * Fix minio deb download URL (:pr:`257`)
 * Apply black to the code base (:pr:`252`)
 * Manage dask-ms with python poetry (:pr:`250`)
