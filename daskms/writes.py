@@ -8,7 +8,6 @@ from daskms.optimisation import cached_array, inlined_array
 from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 import pyrap.tables as pt
-from math import isnan
 
 from daskms.columns import dim_extents_array
 from daskms.constants import DASKMS_PARTITION_KEY
@@ -645,9 +644,9 @@ def _write_datasets(
 
             inlinable_arrays = [row_order]
 
-            if isnan(row_order.shape[0]):  # Dealing with nan chunks/dims.
+            if np.isnan(row_order.shape[0]):  # Dealing with nan chunks/dims.
                 if not (
-                    isnan(row_order.shape[0]) == isnan(array.shape[0])
+                    np.isnan(row_order.shape[0]) == np.isnan(array.shape[0])
                     and len(row_order.chunks[0]) == len(array.chunks[0])
                 ):
                     raise ValueError(
