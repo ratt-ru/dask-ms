@@ -8,6 +8,7 @@ except ImportError:
 from collections import OrderedDict
 
 import dask
+from daskms.constants import DASKMS_METADATA
 import dask.array as da
 from dask.highlevelgraph import HighLevelGraph
 import numpy as np
@@ -103,7 +104,7 @@ def _convert_to_variable(k, v):
 
 
 if xr is not None:
-    from xarray import Dataset, Variable
+    from xarray import Dataset as BaseDataset, Variable
 else:
     # This class duplicates xarray's Frozen class in
     # https://github.com/pydata/xarray/blob/master/xarray/core/utils.py
@@ -235,7 +236,7 @@ else:
             args = (fn, args, self.data.name, self.dims, self.attrs)
             return (self.finalize_persist, args)
 
-    class Dataset:
+    class BaseDataset:
         """
         Replicates a minimal subset of `xarray Dataset
         <http://xarray.pydata.org/en/stable/generated/xarray.Dataset.html#xarray.Dataset>`_'s
@@ -531,3 +532,9 @@ else:
                 for k, v in self._data_vars.items()
             ]
             return self.finalize_persist, (data_info, self._coords, self._attrs)
+
+
+class Dataset(BaseDataset):
+    def __init__(self, data_vars, coords=None, attrs=None):
+        attrs = {DASKMS_METADATA: {}, **(attrs or {})}
+        super().__init__(data_vars, coords=coords, attrs=attrs)

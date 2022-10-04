@@ -566,17 +566,18 @@ def _write_datasets(
     table_name = "::".join((table_name, subtable)) if subtable else table_name
     row_orders = []
 
-    fmeta = set(freeze(ds.attrs.get(DASKMS_METADATA, {})) for ds in datasets)
+    frozen_meta = set(freeze(ds.attrs.get(DASKMS_METADATA, {})) for ds in datasets)
 
-    if not len(fmeta) == 1:
+    if len(frozen_meta) == 0:
+        metadata = {}
+    elif len(frozen_meta) == 1:
+        metadata = datasets[0].attrs.get(DASKMS_METADATA, {})
+    else:
         raise ValueError(f"{DASKMS_METADATA} is not consistent across datasets")
 
     table_keywords = table_keywords or {}
     table_metadata = table_keywords.get(DASKMS_METADATA, {})
-    table_keywords[DASKMS_METADATA] = {
-        **datasets[0].attrs[DASKMS_METADATA],
-        **table_metadata,
-    }
+    table_keywords[DASKMS_METADATA] = {**metadata, **table_metadata}
     provenance = table_keywords[DASKMS_METADATA].setdefault("provenance", [])
 
     try:
