@@ -2,7 +2,7 @@
 History
 =======
 
-0.2.13 (2022-10-04)
+0.2.14 (2022-10-04)
 -------------------
 * Fix for nan chunks/dims breaking writes (:pr:`255`)
 * Fix minio deb download URL (:pr:`257`)
