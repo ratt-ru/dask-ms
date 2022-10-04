@@ -17,7 +17,7 @@ regex = '''
 
 [git]
 message_template = "Bump to {new_version}"
-tag_template = "v{new_version}"
+tag_template = "{new_version}"
 
 # For each file to patch, add a [[file]] config
 # section containing the path of the file, relative to the
