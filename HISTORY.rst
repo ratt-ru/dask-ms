@@ -2,6 +2,10 @@
 History
 =======
 
+X.Y.Z (YYYY-MM-DD)
+------------------
+* Fail on reads if non-existent or invalid store type found (:pr:`259`)
+
 0.2.14 (2022-10-04)
 -------------------
 * Fix for nan chunks/dims breaking writes (:pr:`255`)
