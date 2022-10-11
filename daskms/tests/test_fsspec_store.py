@@ -6,12 +6,42 @@ import yaml
 import pytest
 
 from daskms.config import config
-from daskms.fsspec_store import DaskMSStore
+from daskms.fsspec_store import DaskMSStore, UnknownStoreTypeError
 
 try:
     import s3fs
 except ImportError:
     s3fs = None
+
+
+def test_store_type(tmp_path_factory):
+    path = tmp_path_factory.mktemp("casa")
+
+    with open(path / "table.dat", "w") as f:
+        f.write("dummy")
+
+    assert DaskMSStore(path).type() == "casa"
+
+    path = tmp_path_factory.mktemp("zarr")
+    (path / "subdir").mkdir(parents=True, exist_ok=True)
+
+    with open(path / "subdir" / ".zgroup", "w") as f:
+        f.write("dummy")
+
+    assert DaskMSStore(path).type() == "zarr"
+
+    path = tmp_path_factory.mktemp("parquet")
+    (path / "subdir").mkdir(parents=True, exist_ok=True)
+
+    with open(path / "subdir" / "dummy.parquet", "w") as f:
+        f.write("dummy")
+
+    assert DaskMSStore(path).type() == "parquet"
+
+    path = tmp_path_factory.mktemp("empty")
+
+    with pytest.raises(UnknownStoreTypeError) as e:
+        DaskMSStore(path).type()
 
 
 def test_local_store(tmp_path):

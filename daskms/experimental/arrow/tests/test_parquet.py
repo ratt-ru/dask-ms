@@ -210,3 +210,10 @@ def test_xds_from_parquet_chunks(ms, parquet_ms, rc):
     chunks = chain.from_iterable([xds.chunks["row"] for xds in xdsl])
 
     assert all([c <= rc for c in chunks])
+
+
+def test_xds_from_parquet_assert_on_empty_store(tmp_path_factory):
+    path = tmp_path_factory.mktemp("parquet_store") / "test.parquet"
+
+    with pytest.raises(AssertionError, match="Unable to infer table type"):
+        xds_from_parquet(path)
