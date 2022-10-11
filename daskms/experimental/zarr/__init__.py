@@ -387,6 +387,8 @@ def xds_from_zarr(store, columns=None, chunks=None, consolidated=True, **kwargs)
     else:
         raise TypeError(f"store '{store}' must be " f"Path, str or DaskMSStore")
 
+    store.assert_type("zarr")
+
     # If any kwargs are added, they should be popped prior to this check.
     if len(kwargs) > 0:
         warnings.warn(

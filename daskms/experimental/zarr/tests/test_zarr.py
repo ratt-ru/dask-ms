@@ -404,3 +404,10 @@ def test_zarr_2gb_limit(tmp_path_factory):
     )
 
     xds_to_zarr(datasets, store)
+
+
+def test_xds_from_zarr_assert_on_empty_store(tmp_path_factory, ms):
+    path = tmp_path_factory.mktemp("zarr_store") / "test.zarr"
+
+    with pytest.raises(AssertionError, match="Unable to infer table type"):
+        xds_from_zarr(path)

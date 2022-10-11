@@ -216,6 +216,8 @@ def xds_from_parquet(store, columns=None, chunks=None, **kwargs):
     else:
         raise TypeError(f"store '{store}' must be " f"Path, str or DaskMSStore")
 
+    store.assert_type("parquet")
+
     # If any kwargs are added, they should be popped prior to this check.
     if len(kwargs) > 0:
         warnings.warn(
