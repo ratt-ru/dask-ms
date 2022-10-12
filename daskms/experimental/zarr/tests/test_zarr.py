@@ -12,7 +12,7 @@ from daskms import xds_from_ms, xds_from_table, xds_from_storage_ms
 from daskms.constants import DASKMS_PARTITION_KEY
 from daskms.dataset import Dataset
 from daskms.experimental.zarr import xds_from_zarr, xds_to_zarr
-from daskms.fsspec_store import DaskMSStore
+from daskms.fsspec_store import DaskMSStore, UnknownStoreTypeError
 
 try:
     import xarray
@@ -409,5 +409,5 @@ def test_zarr_2gb_limit(tmp_path_factory):
 def test_xds_from_zarr_assert_on_empty_store(tmp_path_factory, ms):
     path = tmp_path_factory.mktemp("zarr_store") / "test.zarr"
 
-    with pytest.raises(AssertionError, match="Unable to infer table type"):
+    with pytest.raises(UnknownStoreTypeError, match="Unable to infer table type"):
         xds_from_zarr(path)

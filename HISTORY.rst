@@ -4,7 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
-* Fail on reads if non-existent or invalid store type found (:pr:`259`)
+* Fail on reads if non-existent or invalid store type found (:pr:`259`, :pr:`260`)
 
 0.2.14 (2022-10-04)
 -------------------

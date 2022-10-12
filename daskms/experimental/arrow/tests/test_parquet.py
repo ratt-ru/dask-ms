@@ -10,7 +10,7 @@ import pytest
 from daskms import xds_from_storage_ms
 from daskms.dask_ms import xds_from_ms
 from daskms.dataset import Dataset
-from daskms.fsspec_store import DaskMSStore
+from daskms.fsspec_store import DaskMSStore, UnknownStoreTypeError
 from daskms.experimental.arrow.extension_types import TensorArray
 from daskms.experimental.arrow.reads import xds_from_parquet
 from daskms.experimental.arrow.reads import partition_chunking
@@ -215,5 +215,5 @@ def test_xds_from_parquet_chunks(ms, parquet_ms, rc):
 def test_xds_from_parquet_assert_on_empty_store(tmp_path_factory):
     path = tmp_path_factory.mktemp("parquet_store") / "test.parquet"
 
-    with pytest.raises(AssertionError, match="Unable to infer table type"):
+    with pytest.raises(UnknownStoreTypeError, match="Unable to infer table type"):
         xds_from_parquet(path)

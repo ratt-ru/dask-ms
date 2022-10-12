@@ -10,6 +10,10 @@ class UnknownStoreTypeError(ValueError):
     pass
 
 
+class InvalidStoreTypeError(ValueError):
+    pass
+
+
 class DaskMSStore:
     def __init__(self, url, **storage_options):
         # Convert path objects to strings to avoid weirdness.
@@ -78,16 +82,13 @@ class DaskMSStore:
         raise UnknownStoreTypeError(f"Unable to infer table type at {self.full_path}")
 
     def assert_type(self, store_type):
-        try:
-            discovered_type = self.type()
-        except UnknownStoreTypeError as e:
-            raise AssertionError(*e.args)
-        else:
-            if store_type != discovered_type:
-                raise AssertionError(
-                    f"Store at {self.full_path} is a {discovered_type} store. "
-                    f"A {store_type} was expected"
-                )
+        discovered_type = self.type()
+
+        if store_type != discovered_type:
+            raise InvalidStoreTypeError(
+                f"Store at {self.full_path} is a {discovered_type} store. "
+                f"A {store_type} was expected"
+            )
 
     @property
     def url(self):
