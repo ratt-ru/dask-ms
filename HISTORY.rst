@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* xds_from_zarr should always open zarr groups in read mode (:pr:`262`)
 * Fail on reads if non-existent or invalid store type found (:pr:`259`, :pr:`260`)
 
 0.2.14 (2022-10-04)
