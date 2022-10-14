@@ -14,7 +14,7 @@ from daskms.columns import (
     dim_extents_array,
     infer_dtype,
 )
-from daskms.constants import DASKMS_PARTITION_KEY
+from daskms.constants import DASKMS_METADATA, DASKMS_PARTITION_KEY, CASA_METADATA
 from daskms.ordering import (
     ordering_taql,
     row_ordering,
@@ -268,9 +268,10 @@ def _dataset_variable_factory(
         )
 
         dask_array = inlined_array(dask_array)
+        array_attrs = {DASKMS_METADATA: {CASA_METADATA: {"keywords": meta.keywords}}}
 
         # Assign into variable and dimension dataset
-        dataset_vars[column] = (full_dims, dask_array)
+        dataset_vars[column] = (full_dims, dask_array, array_attrs)
 
     return dataset_vars
 
