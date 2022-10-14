@@ -211,7 +211,7 @@ class ZarrFormat(BaseTableFormat):
         return self._subtables
 
     def reader(self, **kw):
-        for arg in ("group_columns", "index_columns", "taql_where"):
+        for arg in Convert.CASA_INPUT_ONLY_ARGS:
             if kw.pop(arg, False):
                 raise ValueError(f'"{arg}" is not supported for zarr inputs')
 
@@ -251,7 +251,7 @@ class ParquetFormat(BaseTableFormat):
         return self._subtables
 
     def reader(self, **kw):
-        for arg in ("group_columns", "index_columns", "taql_where"):
+        for arg in Convert.CASA_INPUT_ONLY_ARGS:
             if kw.pop(arg, False):
                 raise ValueError(f'"{arg}" is not supported for parquet inputs')
 
@@ -315,6 +315,7 @@ def parse_chunks(chunks: str):
 
 class Convert(Application):
     TABLE_KEYWORD_PREFIX = "Table: "
+    CASA_INPUT_ONLY_ARGS = ("group_columns", "index_columns", "taql_where")
 
     def __init__(self, args, log):
         self.log = log
