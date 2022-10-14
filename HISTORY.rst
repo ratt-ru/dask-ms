@@ -4,6 +4,13 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* xds_from_zarr should always open zarr groups in read mode (:pr:`262`)
+* Fail on reads if non-existent or invalid store type found (:pr:`259`, :pr:`260`)
+
+0.2.14 (2022-10-04)
+-------------------
+* Fix for nan chunks/dims breaking writes (:pr:`255`)
+* Fix minio deb download URL (:pr:`257`)
 * Apply black to the code base (:pr:`252`)
 * Manage dask-ms with python poetry (:pr:`250`)
 * Don't force conversion to tuple during attribute decoding (:pr:`248`)

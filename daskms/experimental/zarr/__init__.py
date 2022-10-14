@@ -387,6 +387,8 @@ def xds_from_zarr(store, columns=None, chunks=None, consolidated=True, **kwargs)
     else:
         raise TypeError(f"store '{store}' must be " f"Path, str or DaskMSStore")
 
+    store.assert_type("zarr")
+
     # If any kwargs are added, they should be popped prior to this check.
     if len(kwargs) > 0:
         warnings.warn(
@@ -414,13 +416,11 @@ def xds_from_zarr(store, columns=None, chunks=None, consolidated=True, **kwargs)
     store_map = store.fs.get_mapper(f"{store.root}{store.fs.sep}{table_path}")
 
     try:
-        table_group = zarr.open_consolidated(store_map)
+        table_group = zarr.open_consolidated(store_map, mode="r")
     except KeyError:
-        table_group = zarr.open_group(store_map)
+        table_group = zarr.open_group(store_map, mode="r")
 
-    for g, (group_name, group) in enumerate(
-        sorted(table_group.groups(), key=group_sortkey)
-    ):
+    for g, (_, group) in enumerate(sorted(table_group.groups(), key=group_sortkey)):
         group_attrs = decode_attr(dict(group.attrs))
         dask_ms_attrs = group_attrs.pop(DASKMS_ATTR_KEY)
         natural_chunks = dask_ms_attrs["chunks"]

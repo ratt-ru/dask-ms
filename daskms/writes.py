@@ -665,12 +665,17 @@ def _write_datasets(
 
             inlinable_arrays = [row_order]
 
-            if (
-                row_order.shape[0] != array.shape[0]
-                or row_order.chunks[0] != array.chunks[0]
+            if not (
+                np.isnan(row_order.shape[0])
+                if np.isnan(array.shape[0])
+                else row_order.shape[0] == array.shape[0]
+                and all(
+                    np.isnan(a) if np.isnan(b) else a == b
+                    for a, b in zip(row_order.chunks[0], array.chunks[0])
+                )
             ):
                 raise ValueError(
-                    f"ROWID shape and/or chunking does " f"not match that of {column}"
+                    f"ROWID shape and/or chunking does not match that of {column}"
                 )
 
             if not all(len(c) == 1 for c in array.chunks[1:]):

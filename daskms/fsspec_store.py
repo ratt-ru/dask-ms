@@ -6,6 +6,14 @@ from daskms.config import config
 from daskms.utils import freeze
 
 
+class UnknownStoreTypeError(ValueError):
+    pass
+
+
+class InvalidStoreTypeError(ValueError):
+    pass
+
+
 class DaskMSStore:
     def __init__(self, url, **storage_options):
         # Convert path objects to strings to avoid weirdness.
@@ -57,7 +65,7 @@ class DaskMSStore:
 
         Raises
         ------
-        TypeError
+        UnknownStoreTypeError
             If it was not possible to infer the type of dataset
         """
         # From shallowest to deepest recursion
@@ -71,7 +79,16 @@ class DaskMSStore:
                     elif f.endswith(".parquet"):
                         return "parquet"
 
-        raise ValueError(f"Unable to infer table type at {self.full_path}")
+        raise UnknownStoreTypeError(f"Unable to infer table type at {self.full_path}")
+
+    def assert_type(self, store_type):
+        discovered_type = self.type()
+
+        if store_type != discovered_type:
+            raise InvalidStoreTypeError(
+                f"Store at {self.full_path} is a {discovered_type} store. "
+                f"A {store_type} was expected"
+            )
 
     @property
     def url(self):
