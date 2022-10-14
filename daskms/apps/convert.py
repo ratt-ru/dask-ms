@@ -158,12 +158,16 @@ class CasaFormat(BaseTableFormat):
         try:
             group_cols = kw.pop("group_columns", None)
             index_cols = kw.pop("index_columns", None)
+            taql_where = kw.pop("taql_where", "")
 
             if self.is_measurement_set():
                 from daskms import xds_from_ms
 
                 return partial(
-                    xds_from_ms, group_cols=group_cols, index_cols=index_cols
+                    xds_from_ms,
+                    group_cols=group_cols,
+                    index_cols=index_cols,
+                    taql_where=taql_where,
                 )
             else:
                 from daskms import xds_from_table
@@ -207,13 +211,10 @@ class ZarrFormat(BaseTableFormat):
         return self._subtables
 
     def reader(self, **kw):
-        group_columns = kw.pop("group_columns", False)
-        index_columns = kw.pop("index_columns", False)
+        for arg in ("group_columns", "index_columns", "taql_where"):
+            if kw.pop(arg, False):
+                raise ValueError(f'"{arg}" is not supported for zarr inputs')
 
-        if group_columns:
-            raise ValueError('"group_columns" is not supported ' "for zarr inputs")
-        if index_columns:
-            raise ValueError('"index_columns" is not supported ' "for zarr inputs")
         try:
             from daskms.experimental.zarr import xds_from_zarr
 
@@ -250,13 +251,9 @@ class ParquetFormat(BaseTableFormat):
         return self._subtables
 
     def reader(self, **kw):
-        group_columns = kw.pop("group_columns", False)
-        index_columns = kw.pop("index_columns", False)
-
-        if group_columns:
-            raise ValueError('"group_column" is not supported ' "for parquet inputs")
-        if index_columns:
-            raise ValueError('"index_columns" is not supported ' "for parquet inputs")
+        for arg in ("group_columns", "index_columns", "taql_where"):
+            if kw.pop(arg, False):
+                raise ValueError(f'"{arg}" is not supported for parquet inputs')
 
         try:
             from daskms.experimental.arrow.reads import xds_from_parquet
@@ -372,6 +369,14 @@ class Convert(Application):
             "from casa format.",
         )
         parser.add_argument(
+            "--taql-where",
+            default="",
+            help="TAQL where clause. "
+            "Only useable with CASA inputs. "
+            "For example, to exclude auto-correlations "
+            '"ANTENNA1 != ANTENNA2"',
+        )
+        parser.add_argument(
             "-f",
             "--format",
             choices=["ms", "casa", "zarr", "parquet"],
@@ -438,7 +443,9 @@ class Convert(Application):
         out_fmt = TableFormat.from_type(args.format)
 
         reader = in_fmt.reader(
-            group_columns=args.group_columns, index_columns=args.index_columns
+            group_columns=args.group_columns,
+            index_columns=args.index_columns,
+            taql_where=args.taql_where,
         )
         writer = out_fmt.writer()
 
