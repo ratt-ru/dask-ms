@@ -28,11 +28,12 @@ class ArrowUnificationError(ValueError):
 class ArrowSchema(DatasetSchema):
     @classmethod
     def unify_column(cls, column, schema):
-        it = zip(schema.dims, schema.shape)
+        it = zip(schema.dims, schema.shape, schema.attrs)
         new_dims = []
         new_shape = []
+        new_attrs = []
 
-        for i, (dims, shape) in enumerate(it):
+        for i, (dims, shape, attrs) in enumerate(it):
             if len(dims) == 0:
                 log.warning(
                     f"Ignoring column {column} with " f"zero-length dims {schema.dims}"
@@ -48,6 +49,7 @@ class ArrowSchema(DatasetSchema):
 
             new_dims.append(dims[1:])
             new_shape.append(shape[1:])
+            new_attrs.append(attrs)
 
         typ = set(schema.type)
         dtype = set(schema.dtype)
@@ -55,19 +57,22 @@ class ArrowSchema(DatasetSchema):
         shape = set(new_shape)
 
         if len(typ) != 1:
-            raise ArrowUnificationError(f"Inconsistent dataset types {typ}")
+            raise ArrowUnificationError(f"Inconsistent column types {typ}")
 
         if len(dtype) != 1:
-            raise ArrowUnificationError(f"Inconsistent dataset dtypes {dtype}")
+            raise ArrowUnificationError(f"Inconsistent column dtypes {dtype}")
 
         if len(dims) != 1:
-            raise ArrowUnificationError(f"Inconsistent dataset dims {dims}")
+            raise ArrowUnificationError(f"Inconsistent column dims {dims}")
 
         if len(shape) != 1:
-            raise ArrowUnificationError(f"Inconsistent dataset shapes {shape}")
+            raise ArrowUnificationError(f"Inconsistent column shapes {shape}")
+
+        if not all(new_attrs[0] == a for a in new_attrs[1:]):
+            raise ArrowUnificationError(f"Inconsistent column attributes {new_attrs}")
 
         chunks = None
-        attrs = {}
+        attrs = new_attrs[0]
 
         return ColumnSchema(
             typ.pop(), dims.pop(), dtype.pop(), chunks, shape.pop(), attrs
