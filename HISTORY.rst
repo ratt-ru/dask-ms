@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Fix poetry install and cache hit detection on CI (:pr:`266`)
 * Support --taql-where for Measurement Sets in dask-ms convert (:pr:`264`)
 * xds_from_zarr should always open zarr groups in read mode (:pr:`262`)
 * Fail on reads if non-existent or invalid store type found (:pr:`259`, :pr:`260`)
