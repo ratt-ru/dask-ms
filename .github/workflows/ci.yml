@@ -54,12 +54,12 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.local
-          key: install-${{ env.INSTALL_CACHE_HASH }}-1
+          key: install-${{ env.INSTALL_CACHE_HASH }}-2
 
       - name: Install Poetry
-        uses: abatilo/actions-poetry@v2
-        with:
-          poetry-version: ${{ env.POETRY_VERSION }}
+        if: steps.cache-installs.outputs.cache-hit != 'true'
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 - --version ${{ env.POETRY_VERSION }}
 
       - name: Install Minio Server and Client
         if: steps.cache-installs.outputs.cache-hit != 'true'
