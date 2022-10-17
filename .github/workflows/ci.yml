@@ -54,16 +54,18 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.local
-          key: install-${{ env.INSTALL_CACHE_HASH }}-0
+          key: install-${{ env.INSTALL_CACHE_HASH }}-2
 
       - name: Install Poetry
-        if: ${{ steps.cache_installs.outputs.cache-hit != 'true' }}
-        uses: abatilo/actions-poetry@v2
-        with:
-          poetry-version: ${{ env.POETRY_VERSION }}
+        if: steps.cache-installs.outputs.cache-hit != 'true'
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 - --version ${{ env.POETRY_VERSION }}
+
+      - name: Test poetry run
+        run: poetry --version
 
       - name: Install Minio Server and Client
-        if: ${{ steps.cache_installs.outputs.cache-hit != 'true' }}
+        if: steps.cache-installs.outputs.cache-hit != 'true'
         run: |
           cd /tmp
           wget -q -c ${{ env.MINIO_SERVER_DOWNLOAD_URL }} -O minio.deb
@@ -77,8 +79,8 @@ jobs:
 
       - name: Test minio run
         run: |
-          poetry run minio --help
-          poetry run mc --help
+          minio --help
+          mc --help
 
       - name: Checkout source
         uses: actions/checkout@v2
