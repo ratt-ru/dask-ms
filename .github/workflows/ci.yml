@@ -54,7 +54,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.local
-          key: install-${{ env.INSTALL_CACHE_HASH }}-0
+          key: install-${{ env.INSTALL_CACHE_HASH }}-1
 
       - name: Install Poetry
         if: steps.cache-installs.outputs.cache-hit != 'true'
