@@ -79,8 +79,8 @@ jobs:
 
       - name: Test minio run
         run: |
-          run minio --help
-          run mc --help
+          minio --help
+          mc --help
 
       - name: Checkout source
         uses: actions/checkout@v2
