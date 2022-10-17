@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 
 import dask
+import numpy as np
 import pyrap.tables as pt
 import pytest
 
 from daskms.example_data import example_ms
 from daskms.table_proxy import TableProxy
-from daskms import xds_to_table, xds_from_ms
+from daskms import xds_to_table, xds_from_ms, xds_from_table
 from daskms.dataset import Dataset
 
 
@@ -115,3 +116,36 @@ def test_write_table_proxy_keyword(ms):
     writes = xds_to_table(datasets, ms, [], table_proxy=False)
     assert isinstance(writes, list)
     assert all(isinstance(w, Dataset) for w in writes)
+
+
+def test_dataset_and_column_keywords(keyword_ms):
+    spw_ds = xds_from_table(f"{keyword_ms}::SPECTRAL_WINDOW")
+
+    assert spw_ds[0].REF_FREQUENCY.attrs == {
+        "__daskms_metadata__": {
+            "__casa_keywords__": {
+                "keywords": {
+                    "QuantumUnits": ["Hz"],
+                    "MEASINFO": {
+                        "type": "frequency",
+                        "VarRefCol": "MEAS_FREQ_REF",
+                        "TabRefTypes": [
+                            "REST",
+                            "LSRK",
+                            "LSRD",
+                            "BARY",
+                            "GEO",
+                            "TOPO",
+                            "GALACTO",
+                            "LGROUP",
+                            "CMB",
+                            "Undefined",
+                        ],
+                        "TabRefCodes": np.array(
+                            [0, 1, 2, 3, 4, 5, 6, 7, 8, 64], dtype=np.uint32
+                        ),
+                    },
+                }
+            }
+        }
+    }
