@@ -345,7 +345,10 @@ class DatasetFactory(object):
         else:
             coords = {"ROWID": rowid}
 
-        attrs = {DASKMS_PARTITION_KEY: ()}
+        attrs = {
+            DASKMS_PARTITION_KEY: (),
+            DASKMS_METADATA: {CASA_KEYWORDS: table_proxy.getkeywords().result()},
+        }
 
         return Dataset(variables, coords=coords, attrs=attrs)
 
@@ -401,7 +404,10 @@ class DatasetFactory(object):
             partitions = tuple(
                 (c, g.dtype.name) for c, g in zip(self.group_cols, group_id)
             )
-            attrs = {DASKMS_PARTITION_KEY: partitions}
+            attrs = {
+                DASKMS_PARTITION_KEY: partitions,
+                DASKMS_METADATA: {CASA_KEYWORDS: table_proxy.getkeywords().result()},
+            }
 
             # Use python types which are json serializable
             group_id = [gid.item() for gid in group_id]
