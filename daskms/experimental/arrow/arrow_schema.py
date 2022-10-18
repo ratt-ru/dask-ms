@@ -87,7 +87,7 @@ class ArrowSchema(DatasetSchema):
 
         for i, a in enumerate(attrs):
             try:
-                partition_key = a[DASKMS_PARTITION_KEY]
+                metadata = a.get(DASKMS_METADATA, {})[DASKMS_PARTITION_KEY]
             except KeyError:
                 attrs[i] = ()
             else:

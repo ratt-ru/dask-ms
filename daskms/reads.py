@@ -268,7 +268,7 @@ def _dataset_variable_factory(
         )
 
         dask_array = inlined_array(dask_array)
-        array_attrs = {DASKMS_METADATA: {CASA_KEYWORDS: {"keywords": meta.keywords}}}
+        array_attrs = {DASKMS_METADATA: {CASA_KEYWORDS: meta.keywords}}
 
         # Assign into variable and dimension dataset
         dataset_vars[column] = (full_dims, dask_array, array_attrs)
@@ -346,8 +346,10 @@ class DatasetFactory(object):
             coords = {"ROWID": rowid}
 
         attrs = {
-            DASKMS_PARTITION_KEY: (),
-            DASKMS_METADATA: {CASA_KEYWORDS: table_proxy.getkeywords().result()},
+            DASKMS_METADATA: {
+                CASA_KEYWORDS: table_proxy.getkeywords().result(),
+                DASKMS_PARTITION_KEY: (),
+            }
         }
 
         return Dataset(variables, coords=coords, attrs=attrs)
@@ -405,8 +407,10 @@ class DatasetFactory(object):
                 (c, g.dtype.name) for c, g in zip(self.group_cols, group_id)
             )
             attrs = {
-                DASKMS_PARTITION_KEY: partitions,
-                DASKMS_METADATA: {CASA_KEYWORDS: table_proxy.getkeywords().result()},
+                DASKMS_METADATA: {
+                    CASA_KEYWORDS: table_proxy.getkeywords().result(),
+                    DASKMS_PARTITION_KEY: partitions,
+                }
             }
 
             # Use python types which are json serializable
