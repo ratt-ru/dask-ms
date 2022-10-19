@@ -2,6 +2,10 @@
 History
 =======
 
+X.Y.Z (YYYY-MM-DD)
+------------------
+* Support reading CASA Keywords at both Table => Dataset and Column => Variable level (:pr:`265`)
+
 0.2.15 (2022-10-19)
 -------------------
 * Fix poetry install and cache hit detection on CI (:pr:`266`)

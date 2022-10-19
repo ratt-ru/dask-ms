@@ -10,7 +10,7 @@ import numpy as np
 import pyrap.tables as pt
 
 from daskms.columns import dim_extents_array
-from daskms.constants import DASKMS_PARTITION_KEY
+from daskms.constants import DASKMS_PARTITION_KEY, DASKMS_METADATA
 from daskms.dataset import Dataset
 from daskms.dataset_schema import DatasetSchema
 from daskms.descriptors.builder import AbstractDescriptorBuilder
@@ -690,7 +690,7 @@ def _write_datasets(
             write_vars[column] = (full_dims, write_col)
 
         # Transfer any partition information over to the write dataset
-        partition = ds.attrs.get(DASKMS_PARTITION_KEY, False)
+        partition = ds.attrs.get(DASKMS_METADATA, {}).get(DASKMS_PARTITION_KEY, False)
 
         if not partition:
             attrs = None

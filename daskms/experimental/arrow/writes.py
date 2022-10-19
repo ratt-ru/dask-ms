@@ -1,3 +1,4 @@
+from copy import deepcopy
 import itertools
 from pathlib import Path
 from threading import Lock
@@ -8,7 +9,7 @@ import numpy as np
 
 from daskms.dataset import Dataset
 from daskms.optimisation import inlined_array
-from daskms.constants import DASKMS_PARTITION_KEY
+from daskms.constants import DASKMS_PARTITION_KEY, DASKMS_METADATA
 from daskms.fsspec_store import DaskMSStore
 from daskms.experimental.arrow.arrow_schema import ArrowSchema
 from daskms.experimental.arrow.extension_types import TensorArray
@@ -32,17 +33,17 @@ else:
 
 class ParquetFragment:
     def __init__(self, store, key, schema, dataset_id):
-        partition = schema.attrs.get(DASKMS_PARTITION_KEY, False)
+        partition = schema.attrs.get(DASKMS_METADATA, {}).get(
+            DASKMS_PARTITION_KEY, False
+        )
 
         if not partition:
             # There's no specific partitioning schema,
             # make one up
+            attrs = deepcopy(schema.attrs)
+            attrs[DASKMS_METADATA][DASKMS_PARTITION_KEY] = (("DATASET", "int32"),)
+            schema = ArrowSchema(schema.data_vars, schema.coords, attrs)
             partition = (("DATASET", dataset_id),)
-            schema = ArrowSchema(
-                schema.data_vars,
-                schema.coords,
-                {**schema.attrs, DASKMS_PARTITION_KEY: (("DATASET", "int32"),)},
-            )
         else:
             partition = tuple((p, schema.attrs[p]) for p, _ in partition)
 
@@ -60,7 +61,6 @@ class ParquetFragment:
         return (ParquetFragment, (self.store, self.key, self.schema, self.dataset_id))
 
     def write(self, chunk, *data):
-
         table_path = (
             self.key if self.store.table else self.store.join(["MAIN", self.key])
         )
@@ -164,15 +164,14 @@ def xds_to_parquet(xds, store, columns=None, **kwargs):
         writes = inlined_array(writes, chunk_ids)
 
         # Transfer any partition information over to the write dataset
-        partition = ds.attrs.get(DASKMS_PARTITION_KEY, False)
+        metadata = ds.attrs.get(DASKMS_METADATA, {})
+        partition = metadata.get(DASKMS_PARTITION_KEY, False)
 
         if not partition:
-            attrs = None
+            attrs = ds.attrs
         else:
-            attrs = {
-                DASKMS_PARTITION_KEY: partition,
-                **{k: getattr(ds, k) for k, _ in partition},
-            }
+            attrs = ds.attrs.copy()
+            attrs.update((k, getattr(ds, k)) for k, _ in partition)
 
         datasets.append(Dataset({"WRITE": (("row",), writes)}, attrs=attrs))
 
