@@ -2,8 +2,8 @@
 History
 =======
 
-X.Y.Z (YYYY-MM-DD)
-------------------
+0.2.15 (2022-10-19)
+-------------------
 * Fix poetry install and cache hit detection on CI (:pr:`266`)
 * Support --taql-where for Measurement Sets in dask-ms convert (:pr:`264`)
 * xds_from_zarr should always open zarr groups in read mode (:pr:`262`)
