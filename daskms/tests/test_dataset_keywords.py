@@ -120,35 +120,31 @@ def test_write_table_proxy_keyword(ms):
 
 def test_dataset_and_column_keywords(keyword_ms):
     spw_ds = xds_from_table(f"{keyword_ms}::SPECTRAL_WINDOW")
-
-    np.testing.assert_equal(
-        spw_ds[0].REF_FREQUENCY.attrs,
-        {
-            "__daskms_metadata__": {
-                "__casa_keywords__": {
-                    "keywords": {
-                        "QuantumUnits": ["Hz"],
-                        "MEASINFO": {
-                            "type": "frequency",
-                            "VarRefCol": "MEAS_FREQ_REF",
-                            "TabRefTypes": [
-                                "REST",
-                                "LSRK",
-                                "LSRD",
-                                "BARY",
-                                "GEO",
-                                "TOPO",
-                                "GALACTO",
-                                "LGROUP",
-                                "CMB",
-                                "Undefined",
-                            ],
-                            "TabRefCodes": np.array(
-                                [0, 1, 2, 3, 4, 5, 6, 7, 8, 64], dtype=np.uint32
-                            ),
-                        },
-                    }
-                }
+    expected = {
+        "__daskms_metadata__": {
+            "__casa_keywords__": {
+                "QuantumUnits": ["Hz"],
+                "MEASINFO": {
+                    "type": "frequency",
+                    "VarRefCol": "MEAS_FREQ_REF",
+                    "TabRefTypes": [
+                        "REST",
+                        "LSRK",
+                        "LSRD",
+                        "BARY",
+                        "GEO",
+                        "TOPO",
+                        "GALACTO",
+                        "LGROUP",
+                        "CMB",
+                        "Undefined",
+                    ],
+                    "TabRefCodes": np.array(
+                        [0, 1, 2, 3, 4, 5, 6, 7, 8, 64], dtype=np.uint32
+                    ),
+                },
             }
-        },
-    )
+        }
+    }
+
+    np.testing.assert_equal(spw_ds[0].REF_FREQUENCY.attrs, expected)

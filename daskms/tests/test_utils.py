@@ -6,8 +6,10 @@ import platform
 
 import pytest
 
+from daskms.constants import DASKMS_METADATA, DASKMS_PARTITION_KEY, CASA_KEYWORDS
 from daskms.utils import (
     promote_columns,
+    merge_dicts,
     natural_order,
     table_path_split,
     requires,
@@ -96,3 +98,38 @@ def test_filter_kwargs():
         filter_kwargs(f, kwargs)
 
     assert "arg3" not in kwargs
+
+
+def test_merge_dicts():
+    lhs = {
+        DASKMS_METADATA: {
+            DASKMS_PARTITION_KEY: (("FIELD_ID", "int32"), ("DATA_DESC_ID", "int32")),
+            CASA_KEYWORDS: {"foo": "bar"},
+        },
+        "FIELD_ID": 0,
+        "DATA_DESC_ID": 0,
+    }
+
+    rhs = {
+        DASKMS_METADATA: {
+            CASA_KEYWORDS: {"foo": "qux"},
+        },
+    }
+
+    assert merge_dicts(lhs, rhs) == {
+        DASKMS_METADATA: {
+            DASKMS_PARTITION_KEY: (("FIELD_ID", "int32"), ("DATA_DESC_ID", "int32")),
+            CASA_KEYWORDS: {"foo": "qux"},
+        },
+        "FIELD_ID": 0,
+        "DATA_DESC_ID": 0,
+    }
+
+    assert merge_dicts(lhs, rhs, prefer="left") == {
+        DASKMS_METADATA: {
+            DASKMS_PARTITION_KEY: (("FIELD_ID", "int32"), ("DATA_DESC_ID", "int32")),
+            CASA_KEYWORDS: {"foo": "bar"},
+        },
+        "FIELD_ID": 0,
+        "DATA_DESC_ID": 0,
+    }

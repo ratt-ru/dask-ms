@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 from collections import OrderedDict
-from frozendict import frozendict
 import logging
 from pathlib import PurePath, Path
 import re
@@ -264,3 +263,31 @@ def filter_kwargs(func, kwargs):
             f"{unhandled_kwargs}.",
             UserWarning,
         )
+
+
+def merge_dicts(lhs, rhs, prefer="right"):
+    result = {}
+
+    for k in set(lhs) | set(rhs):
+        try:
+            lv = lhs[k]
+        except KeyError:
+            result[k] = rhs[k]
+            continue
+
+        try:
+            rv = rhs[k]
+        except KeyError:
+            result[k] = lv
+            continue
+
+        if isinstance(lv, dict) and isinstance(rv, dict):
+            result[k] = merge_dicts(lv, rv, prefer=prefer)
+        elif prefer == "right":
+            result[k] = rv
+        elif prefer == "left":
+            result[k] = lv
+        else:
+            raise ValueError(f"{k}: {lv} != {rv}")
+
+    return result

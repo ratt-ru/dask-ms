@@ -9,7 +9,7 @@ from numpy.testing import assert_array_equal
 import pytest
 
 from daskms import xds_from_ms, xds_from_table, xds_from_storage_ms
-from daskms.constants import DASKMS_PARTITION_KEY
+from daskms.constants import DASKMS_PARTITION_KEY, DASKMS_METADATA
 from daskms.dataset import Dataset
 from daskms.experimental.zarr import xds_from_zarr, xds_to_zarr
 from daskms.fsspec_store import DaskMSStore, UnknownStoreTypeError
@@ -135,7 +135,7 @@ def zarr_tester(ms, spw_table, ant_table, zarr_store, spw_store, ant_store):
     assert len(ms_datasets) == len(main_zarr_writes)
 
     for ms_ds, zw_ds in zip(ms_datasets, main_zarr_writes):
-        for k, _ in ms_ds.attrs[DASKMS_PARTITION_KEY]:
+        for k, _ in ms_ds.attrs[DASKMS_METADATA][DASKMS_PARTITION_KEY]:
             assert getattr(ms_ds, k) == getattr(zw_ds, k)
 
     writes = [main_zarr_writes]
