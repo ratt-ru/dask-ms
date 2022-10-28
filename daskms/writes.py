@@ -751,7 +751,7 @@ def _put_keywords(table, table_keywords, column_keywords):
                 if v == DELKW:
                     table.removecolkeyword(column, k)
                 else:
-                    table.putcolkeyword(column, k, v, makesubrecord=True)
+                    table.putcolkeyword(column, k, v)
 
     return True
 
