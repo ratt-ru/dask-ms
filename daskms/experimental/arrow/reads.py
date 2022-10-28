@@ -12,10 +12,10 @@ import numpy as np
 from daskms.dataset import Dataset
 from daskms.fsspec_store import DaskMSStore
 from daskms.experimental.utils import promote_columns, column_iterator
-from daskms.experimental.arrow.arrow_schema import DASKMS_METADATA
+from daskms.experimental.arrow.arrow_schema import DASKMS_METADATA, ARROW_METADATA
 from daskms.experimental.arrow.extension_types import TensorType
 from daskms.experimental.arrow.require_arrow import requires_arrow
-from daskms.constants import DASKMS_PARTITION_KEY
+from daskms.constants import ARROW_METADATA, DASKMS_PARTITION_KEY
 from daskms.patterns import Multiton
 from daskms.utils import natural_order
 
@@ -251,8 +251,8 @@ def xds_from_parquet(store, columns=None, chunks=None, **kwargs):
         *partitions, _ = fragment.relative_to(Path(table_path)).parts
         fragment = ParquetFileProxy(store, str(fragment))
         fragment_meta = fragment.metadata
-        metadata = json.loads(fragment_meta.metadata[DASKMS_METADATA.encode()])
-        partition_meta = metadata[DASKMS_PARTITION_KEY]
+        metadata = json.loads(fragment_meta.metadata[ARROW_METADATA.encode()])
+        partition_meta = metadata.get(DASKMS_METADATA, {})[DASKMS_PARTITION_KEY]
         partition_meta = tuple(tuple((f, v)) for f, v in partition_meta)
         partitions = _partition_values(partitions, partition_meta)
         partition_schemas.add(partition_meta)
@@ -292,7 +292,7 @@ def xds_from_parquet(store, columns=None, chunks=None, **kwargs):
             }
 
             for column, field in column_iterator(exemplar_fields, columns):
-                field_metadata = field.metadata[DASKMS_METADATA.encode()]
+                field_metadata = field.metadata[ARROW_METADATA.encode()]
                 field_metadata = json.loads(field_metadata)
                 dims = tuple(field_metadata["dims"])
 
@@ -341,7 +341,7 @@ def xds_from_parquet(store, columns=None, chunks=None, **kwargs):
             data_vars[column] = (array_dims.pop(), da.concatenate(arrays))
 
         attrs = dict(partition)
-        attrs[DASKMS_PARTITION_KEY] = partition_schemas
+        attrs.setdefault(DASKMS_METADATA, {})[DASKMS_PARTITION_KEY] = partition_schemas
         datasets.append(Dataset(data_vars, attrs=attrs))
 
     return datasets

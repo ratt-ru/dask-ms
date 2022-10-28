@@ -14,7 +14,7 @@ try:
 except ImportError:
     from dask.utils import key_split
 
-from daskms.constants import DASKMS_PARTITION_KEY, DASKMS_METADATA
+from daskms.constants import DASKMS_METADATA, DASKMS_PARTITION_KEY
 from daskms.dask_ms import xds_from_ms, xds_from_table, xds_to_table
 from daskms.query import orderby_clause, where_clause
 from daskms.table_proxy import TableProxy, taql_factory
@@ -143,10 +143,10 @@ def test_ms_update(ms, group_cols, index_cols, select_cols):
 
         (write,) = xds_to_table(nds, ms, ["STATE_ID", "DATA"])
 
-        for k, _ in nds.attrs[DASKMS_PARTITION_KEY]:
+        for k, _ in nds.attrs[DASKMS_METADATA][DASKMS_PARTITION_KEY]:
             assert getattr(write, k) == getattr(nds, k)
 
-        assert ds.attrs[DASKMS_METADATA]["provenance"] == [ms]
+        # assert ds.attrs[DASKMS_METADATA]["provenance"] == [ms]
 
         writes.append(write)
 
@@ -167,10 +167,10 @@ def test_ms_update(ms, group_cols, index_cols, select_cols):
         assert_array_equal(ds.STATE_ID.data, state)
         assert_array_equal(ds.DATA.data, data)
 
-        orig_part_key = xds[i].attrs[DASKMS_PARTITION_KEY]
-        assert ds.attrs[DASKMS_PARTITION_KEY] == orig_part_key
-        assert ds.attrs[DASKMS_METADATA]["provenance"] == [ms]
-        assert len(ds.attrs[DASKMS_PARTITION_KEY]) == len(group_cols)
+        orig_part_key = xds[i].attrs[DASKMS_METADATA][DASKMS_PARTITION_KEY]
+        assert ds.attrs[DASKMS_METADATA][DASKMS_PARTITION_KEY] == orig_part_key
+        # assert ds.attrs[DASKMS_METADATA]["provenance"] == [ms]
+        assert len(ds.attrs[DASKMS_METADATA][DASKMS_PARTITION_KEY]) == len(group_cols)
 
 
 @pytest.mark.parametrize(
@@ -326,7 +326,9 @@ def test_column_promotion(ms):
     for ds in xds:
         assert "DATA" in ds.data_vars
         assert "SCAN_NUMBER" in ds.attrs
-        assert ds.attrs[DASKMS_PARTITION_KEY] == (("SCAN_NUMBER", "int32"),)
+        assert ds.attrs[DASKMS_METADATA][DASKMS_PARTITION_KEY] == (
+            ("SCAN_NUMBER", "int32"),
+        )
 
 
 def test_read_array_names(ms):

@@ -14,7 +14,7 @@ from daskms.columns import (
     dim_extents_array,
     infer_dtype,
 )
-from daskms.constants import DASKMS_PARTITION_KEY, DASKMS_METADATA
+from daskms.constants import DASKMS_METADATA, DASKMS_PARTITION_KEY, CASA_KEYWORDS
 from daskms.ordering import (
     ordering_taql,
     row_ordering,
@@ -268,9 +268,10 @@ def _dataset_variable_factory(
         )
 
         dask_array = inlined_array(dask_array)
+        array_attrs = {DASKMS_METADATA: {CASA_KEYWORDS: meta.keywords}}
 
         # Assign into variable and dimension dataset
-        dataset_vars[column] = (full_dims, dask_array)
+        dataset_vars[column] = (full_dims, dask_array, array_attrs)
 
     return dataset_vars
 
@@ -318,20 +319,6 @@ class DatasetFactory(object):
             __executor_key__=executor_key(self.canonical_name),
         )
 
-    def _metadata(self, table_proxy):
-        """Create daskms metadata"""
-        metadata = table_proxy.getdesc().result().get(DASKMS_METADATA, {})
-        provenance = metadata.setdefault("provenance", [])
-
-        try:
-            provenance.remove(self.table_path)
-        except ValueError:
-            pass
-
-        provenance.append(self.table_path)
-
-        return metadata
-
     def _table_schema(self):
         return lookup_table_schema(self.canonical_name, self.table_schema)
 
@@ -358,7 +345,12 @@ class DatasetFactory(object):
         else:
             coords = {"ROWID": rowid}
 
-        attrs = {DASKMS_METADATA: self._metadata(table_proxy), DASKMS_PARTITION_KEY: {}}
+        attrs = {
+            DASKMS_METADATA: {
+                CASA_KEYWORDS: table_proxy.getkeywords().result(),
+                DASKMS_PARTITION_KEY: (),
+            }
+        }
 
         return Dataset(variables, coords=coords, attrs=attrs)
 
@@ -415,8 +407,10 @@ class DatasetFactory(object):
                 (c, g.dtype.name) for c, g in zip(self.group_cols, group_id)
             )
             attrs = {
-                DASKMS_METADATA: self._metadata(table_proxy),
-                DASKMS_PARTITION_KEY: partitions,
+                DASKMS_METADATA: {
+                    CASA_KEYWORDS: table_proxy.getkeywords().result(),
+                    DASKMS_PARTITION_KEY: partitions,
+                }
             }
 
             # Use python types which are json serializable

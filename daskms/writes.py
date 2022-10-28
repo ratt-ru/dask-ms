@@ -566,26 +566,29 @@ def _write_datasets(
     table_name = "::".join((table_name, subtable)) if subtable else table_name
     row_orders = []
 
-    frozen_meta = set(freeze(ds.attrs.get(DASKMS_METADATA, {})) for ds in datasets)
+    # frozen_meta = set(freeze(ds.attrs.get(DASKMS_METADATA, {})) for ds in datasets)
 
-    if len(frozen_meta) == 0:
-        metadata = {}
-    elif len(frozen_meta) == 1:
-        metadata = datasets[0].attrs.get(DASKMS_METADATA, {})
-    else:
-        raise ValueError(f"{DASKMS_METADATA} is not consistent across datasets")
+    # if len(frozen_meta) == 0:
+    #     metadata = {}
+    # elif len(frozen_meta) == 1:
+    #     metadata = datasets[0].attrs.get(DASKMS_METADATA, {})
+    # else:
+    #     raise ValueError(f"{DASKMS_METADATA} is not consistent across datasets")
 
-    table_keywords = table_keywords or {}
-    table_metadata = table_keywords.get(DASKMS_METADATA, {})
-    table_keywords[DASKMS_METADATA] = {**metadata, **table_metadata}
-    provenance = table_keywords[DASKMS_METADATA].setdefault("provenance", [])
+    # import json
 
-    try:
-        provenance.remove(table)
-    except ValueError:
-        pass
+    # table_keywords = table_keywords or {}
+    # table_metadata = table_keywords.get(DASKMS_METADATA, {})
+    # table_keywords[DASKMS_METADATA] = {**metadata, **table_metadata}
+    # provenance = table_keywords[DASKMS_METADATA].setdefault("provenance", [])
+    # table_keywords[DASKMS_METADATA] = json.dumps(table_keywords[DASKMS_METADATA])
 
-    provenance.append(table)
+    # try:
+    #     provenance.remove(table)
+    # except ValueError:
+    #     pass
+
+    # provenance.append(table)
 
     # Put table and column keywords
     table_proxy.submit(
@@ -711,7 +714,7 @@ def _write_datasets(
             write_vars[column] = (full_dims, write_col)
 
         # Transfer any partition information over to the write dataset
-        partition = ds.attrs.get(DASKMS_PARTITION_KEY, False)
+        partition = ds.attrs.get(DASKMS_METADATA, {}).get(DASKMS_PARTITION_KEY, False)
 
         if not partition:
             attrs = None
@@ -748,7 +751,7 @@ def _put_keywords(table, table_keywords, column_keywords):
                 if v == DELKW:
                     table.removecolkeyword(column, k)
                 else:
-                    table.putcolkeyword(column, k, v)
+                    table.putcolkeyword(column, k, v, makesubrecord=True)
 
     return True
 
