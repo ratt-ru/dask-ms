@@ -52,7 +52,7 @@ def encode_attr(arg):
 
 def decode_attr(arg):
     if isinstance(arg, (tuple, list)):
-        return tuple(map(decode_attr, arg))
+        return type(arg)(map(decode_attr, arg))
     elif isinstance(arg, set):
         return set(map(decode_attr, arg))
     elif isinstance(arg, dict):

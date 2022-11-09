@@ -9,7 +9,7 @@ from dask.base import tokenize
 import numpy as np
 import warnings
 
-from daskms.constants import DASKMS_PARTITION_KEY, DASKMS_METADATA
+from daskms.constants import DASKMS_PARTITION_KEY
 from daskms.dataset import Dataset, Variable
 from daskms.dataset_schema import DatasetSchema, encode_type, decode_type, decode_attr
 from daskms.experimental.utils import (
@@ -322,14 +322,15 @@ def xds_to_zarr(xds, store, columns=None, rechunk=False, consolidated=True, **kw
         )
 
         # Transfer any partition information over to the write dataset
-        metadata = ds.attrs.get(DASKMS_METADATA, {})
-        partition = metadata.get(DASKMS_PARTITION_KEY, False)
+        partition = ds.attrs.get(DASKMS_PARTITION_KEY, False)
 
         if not partition:
-            attrs = ds.attrs
+            attrs = None
         else:
-            attrs = ds.attrs.copy()
-            attrs.update((k, getattr(ds, k)) for k, _ in partition)
+            attrs = {
+                DASKMS_PARTITION_KEY: partition,
+                **{k: getattr(ds, k) for k, _ in partition},
+            }
 
         write_datasets.append(Dataset(data_vars, attrs=attrs))
 

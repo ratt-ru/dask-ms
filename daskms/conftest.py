@@ -353,10 +353,3 @@ def py_minio_client(minio_client, minio_admin, minio_alias, minio_user_key):
         secret_key=minio_user_key,
         secure=MINIO_URL.scheme == "https",
     )
-
-
-@pytest.fixture
-def example_ms():
-    from daskms.example_data import example_ms as ms_factory
-
-    yield ms_factory()
