@@ -4,9 +4,9 @@ import logging
 
 import numpy as np
 
-from daskms.constants import ARROW_METADATA, DASKMS_METADATA
+from daskms.constants import DASKMS_METADATA
 from daskms.dataset_schema import DatasetSchema, ColumnSchema, unify_schemas
-from daskms.utils import Frozen, merge_dicts
+from daskms.constants import DASKMS_PARTITION_KEY
 
 from daskms.experimental.arrow.extension_types import TensorType, ComplexType
 from daskms.experimental.arrow.require_arrow import requires_arrow
@@ -28,12 +28,11 @@ class ArrowUnificationError(ValueError):
 class ArrowSchema(DatasetSchema):
     @classmethod
     def unify_column(cls, column, schema):
-        it = zip(schema.dims, schema.shape, schema.attrs)
+        it = zip(schema.dims, schema.shape)
         new_dims = []
         new_shape = []
-        new_attrs = []
 
-        for i, (dims, shape, attrs) in enumerate(it):
+        for i, (dims, shape) in enumerate(it):
             if len(dims) == 0:
                 log.warning(
                     f"Ignoring column {column} with " f"zero-length dims {schema.dims}"
@@ -49,7 +48,6 @@ class ArrowSchema(DatasetSchema):
 
             new_dims.append(dims[1:])
             new_shape.append(shape[1:])
-            new_attrs.append(attrs)
 
         typ = set(schema.type)
         dtype = set(schema.dtype)
@@ -57,22 +55,19 @@ class ArrowSchema(DatasetSchema):
         shape = set(new_shape)
 
         if len(typ) != 1:
-            raise ArrowUnificationError(f"Inconsistent column types {typ}")
+            raise ArrowUnificationError(f"Inconsistent dataset types {typ}")
 
         if len(dtype) != 1:
-            raise ArrowUnificationError(f"Inconsistent column dtypes {dtype}")
+            raise ArrowUnificationError(f"Inconsistent dataset dtypes {dtype}")
 
         if len(dims) != 1:
-            raise ArrowUnificationError(f"Inconsistent column dims {dims}")
+            raise ArrowUnificationError(f"Inconsistent dataset dims {dims}")
 
         if len(shape) != 1:
-            raise ArrowUnificationError(f"Inconsistent column shapes {shape}")
-
-        if not all(new_attrs[0] == a for a in new_attrs[1:]):
-            raise ArrowUnificationError(f"Inconsistent column attributes {new_attrs}")
+            raise ArrowUnificationError(f"Inconsistent dataset shapes {shape}")
 
         chunks = None
-        attrs = new_attrs[0]
+        attrs = {}
 
         return ColumnSchema(
             typ.pop(), dims.pop(), dtype.pop(), chunks, shape.pop(), attrs
@@ -83,12 +78,27 @@ class ArrowSchema(DatasetSchema):
         if len(attrs) == 0:
             return {}
 
-        metadata = set(map(Frozen, (a.get(DASKMS_METADATA, {}) for a in attrs)))
+        attrs = attrs.copy()
 
-        if len(metadata) != 1:
-            raise ArrowUnificationError(f"Inconsistent dataset attributes {metadata}")
+        for i, a in enumerate(attrs):
+            try:
+                partition_key = a[DASKMS_PARTITION_KEY]
+            except KeyError:
+                attrs[i] = ()
+            else:
+                attrs[i] = (DASKMS_PARTITION_KEY, partition_key)
 
-        return {DASKMS_METADATA: metadata.pop().value}
+        set_attrs = set(attrs)
+
+        if len(set_attrs) != 1:
+            raise ArrowUnificationError(
+                f"Inconsistent dataset " f"attributes {set_attrs}"
+            )
+
+        if next(iter(set_attrs)) == ():
+            return {}
+
+        return dict(set_attrs)
 
     @classmethod
     def from_datasets(cls, datasets):
@@ -99,6 +109,7 @@ class ArrowSchema(DatasetSchema):
             c: cls.unify_column(c, s) for c, s in unified_schema.data_vars.items()
         }
         coords = {c: cls.unify_column(c, s) for c, s in unified_schema.coords.items()}
+
         attrs = cls.unify_attrs(unified_schema.attrs)
 
         return ArrowSchema(data_vars, coords, attrs)
@@ -119,7 +130,7 @@ class ArrowSchema(DatasetSchema):
                 schema.dtype,
                 schema.chunks,
                 schema.shape,
-                merge_dicts(schema.attrs, ds_column.attrs),
+                {**ds_column.attrs, **schema.attrs},
             )
 
         for column, schema in self.coords.items():
@@ -134,10 +145,11 @@ class ArrowSchema(DatasetSchema):
                 schema.dtype,
                 schema.chunks,
                 schema.shape,
-                merge_dicts(schema.attrs, ds_column.attrs),
+                {**ds_column.attrs, **schema.attrs},
             )
 
-        attrs = merge_dicts(self.attrs, dataset.attrs)
+        attrs = {**dataset.attrs, **self.attrs}
+
         return ArrowSchema(data_vars, coords, attrs)
 
     @requires_arrow(pyarrow_import_error)
@@ -170,8 +182,9 @@ class ArrowSchema(DatasetSchema):
                 "coordinate": False,
                 "dims": ("row",) + tuple(var.dims),
             }
-            metadata = {ARROW_METADATA: json.dumps(metadata)}
+
+            metadata = {DASKMS_METADATA: json.dumps(metadata)}
             fields.append(pa.field(column, pa_type, metadata=metadata))
 
-        metadata = {ARROW_METADATA: json.dumps(self.attrs)}
+        metadata = {DASKMS_METADATA: json.dumps(self.attrs)}
         return pa.schema(fields, metadata=metadata)

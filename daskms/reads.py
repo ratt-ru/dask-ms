@@ -14,7 +14,7 @@ from daskms.columns import (
     dim_extents_array,
     infer_dtype,
 )
-from daskms.constants import DASKMS_METADATA, DASKMS_PARTITION_KEY, CASA_KEYWORDS
+from daskms.constants import DASKMS_PARTITION_KEY
 from daskms.ordering import (
     ordering_taql,
     row_ordering,
@@ -268,10 +268,9 @@ def _dataset_variable_factory(
         )
 
         dask_array = inlined_array(dask_array)
-        array_attrs = {DASKMS_METADATA: {CASA_KEYWORDS: meta.keywords}}
 
         # Assign into variable and dimension dataset
-        dataset_vars[column] = (full_dims, dask_array, array_attrs)
+        dataset_vars[column] = (full_dims, dask_array)
 
     return dataset_vars
 
@@ -345,12 +344,7 @@ class DatasetFactory(object):
         else:
             coords = {"ROWID": rowid}
 
-        attrs = {
-            DASKMS_METADATA: {
-                CASA_KEYWORDS: table_proxy.getkeywords().result(),
-                DASKMS_PARTITION_KEY: (),
-            }
-        }
+        attrs = {DASKMS_PARTITION_KEY: ()}
 
         return Dataset(variables, coords=coords, attrs=attrs)
 
@@ -406,12 +400,7 @@ class DatasetFactory(object):
             partitions = tuple(
                 (c, g.dtype.name) for c, g in zip(self.group_cols, group_id)
             )
-            attrs = {
-                DASKMS_METADATA: {
-                    CASA_KEYWORDS: table_proxy.getkeywords().result(),
-                    DASKMS_PARTITION_KEY: partitions,
-                }
-            }
+            attrs = {DASKMS_PARTITION_KEY: partitions}
 
             # Use python types which are json serializable
             group_id = [gid.item() for gid in group_id]

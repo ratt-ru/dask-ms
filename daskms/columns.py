@@ -97,9 +97,7 @@ class ColumnMetadataError(Exception):
     pass
 
 
-ColumnMetadata = namedtuple(
-    "ColumnMetadata", ["shape", "dims", "chunks", "dtype", "keywords"]
-)
+ColumnMetadata = namedtuple("ColumnMetadata", ["shape", "dims", "chunks", "dtype"])
 
 
 def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
@@ -124,8 +122,16 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
 
     Returns
     -------
-    column_metadata : ColumnMetadata
-        namedtuple containing Column Metadata
+    shape : tuple
+        Shape of column (excluding the row dimension).
+        For example :code:`(16, 4)`
+    dims : tuple
+        Dask dimension schema. For example :code:`("chan", "corr")`
+    dim_chunks : list of tuples
+        Dimension chunks. For example :code:`[chan_chunks, corr_chunks]`.
+    dtype : :class:`numpy.dtype`
+        Column data type (numpy)
+
 
     Raises
     ------
@@ -237,8 +243,7 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
             "dim_chunks '%s' do not agree." % (shape, dims, dim_chunks)
         )
 
-    keywords = coldesc.get("keywords", None)
-    return ColumnMetadata(shape, dims, dim_chunks, dtype, keywords)
+    return ColumnMetadata(shape, dims, dim_chunks, dtype)
 
 
 def dim_extents_array(dim, chunks):

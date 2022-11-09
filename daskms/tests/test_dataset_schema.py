@@ -49,6 +49,5 @@ def test_unified_schema(ms):
             assert s.shape == var.shape[1:]
             assert np.dtype(s.dtype) == var.dtype
             assert isinstance(var.data, s.type)
-            assert s.attrs == var.attrs
 
     schema.to_arrow_schema()
