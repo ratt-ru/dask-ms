@@ -154,6 +154,10 @@ def getter_wrapper(row_orders, *args):
         blc, trc = zip(*args[:nextent_args])
         shape = tuple(t - b + 1 for b, t in zip(blc, trc))
         result = np.empty((np.sum(row_runs[:, 1]),) + shape, dtype=dtype)
+
+        if result.size == 0:
+            return result
+
         io_fn = object_getcolslice if np.dtype == object else ndarray_getcolslice
 
         # Submit table I/O on executor
@@ -164,6 +168,10 @@ def getter_wrapper(row_orders, *args):
     # for each row is requested, so we defer to getcol
     else:
         result = np.empty((np.sum(row_runs[:, 1]),) + col_shape, dtype=dtype)
+
+        if result.size == 0:
+            return result
+
         io_fn = object_getcol if dtype == object else ndarray_getcol
 
         # Submit table I/O on executor

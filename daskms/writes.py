@@ -328,13 +328,15 @@ def _updated_table(table, datasets, columns, descriptor):
 
         # Original Data Manager Groups
         odminfo = {g["NAME"] for g in table_proxy.getdminfo().result().values()}
+        SENTINEL = object()
 
         # NOTE(JSKenyon): Add columns one at a time - this avoids issues when
         # adding multiple columns with different managers.
         for col in missing:
             _table_desc = {col: table_desc[col]}
             _dminfo = builder.dminfo(_table_desc)
-            _dminfo = {} if _dminfo["*1"]["NAME"] in odminfo else _dminfo
+            in_odminfo = _dminfo.get("*1", {}).get("NAME", SENTINEL) in odminfo
+            _dminfo = {} if in_odminfo else _dminfo
             table_proxy.addcols(_table_desc, dminfo=_dminfo).result()
 
     return table_proxy
