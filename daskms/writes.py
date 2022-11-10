@@ -335,7 +335,9 @@ def _updated_table(table, datasets, columns, descriptor):
         for col in missing:
             _table_desc = {col: table_desc[col]}
             _dminfo = builder.dminfo(_table_desc)
-            in_odminfo = _dminfo.get("*1", {}).get("NAME", SENTINEL) in odminfo
+            in_odminfo = any(
+                v.get("NAME", SENTINEL) in odminfo for v in _dminfo.values()
+            )
             _dminfo = {} if in_odminfo else _dminfo
             table_proxy.addcols(_table_desc, dminfo=_dminfo).result()
 
