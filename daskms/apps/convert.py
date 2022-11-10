@@ -56,7 +56,7 @@ def _check_output_path(output: str):
 
 
 def _check_exclude_columns(columns: str):
-    outputs = defaultdict(list)
+    outputs = defaultdict(set)
 
     for column in (c.strip() for c in columns.split(",")):
         bits = column.split("::")
@@ -72,7 +72,14 @@ def _check_exclude_columns(columns: str):
                 f"Received {column}"
             )
 
-        outputs[table].append(column)
+        outputs[table].add(column)
+
+    outputs = {
+        table: "*" if "*" in columns else columns for table, columns in outputs.items()
+    }
+
+    if outputs.get("MAIN", "") == "*":
+        raise ValueError("Excluding all columns in the MAIN table is not supported")
 
     return outputs
 
@@ -105,10 +112,11 @@ class Convert(Application):
             help="Comma-separated list of columns to exclude. "
             "For example 'CORRECTED_DATA,"
             "SPECTRAL_WINDOW::EFFECTIVE_BW' "
-            "will exclude 'CORRECTED_DATA "
+            "will exclude CORRECTED_DATA "
             "from the main table and "
             "EFFECTIVE_BW from the SPECTRAL_WINDOW "
-            "subtable",
+            "subtable. SPECTRAL_WINDOW::* will exclude "
+            "the entire SPECTRAL_WINDOW subtable",
         )
         parser.add_argument(
             "-g",
@@ -221,9 +229,9 @@ class Convert(Application):
             # Drop any ROWID columns
             datasets = [ds.drop_vars("ROWID", errors="ignore") for ds in datasets]
 
-        for exclude_column in args.exclude.get("MAIN", []):
+        if exclude_columns := args.exclude.get("MAIN", False):
             datasets = [
-                ds.drop_vars(exclude_column, errors="ignore") for ds in datasets
+                ds.drop_vars(exclude_columns, errors="ignore") for ds in datasets
             ]
 
         if isinstance(out_fmt, CasaFormat):
@@ -237,7 +245,10 @@ class Convert(Application):
 
         # Now do the subtables
         for table in list(in_fmt.subtables):
-            if table in {"SORTED_TABLE", "SOURCE"}:
+            if (
+                table in {"SORTED_TABLE", "SOURCE"}
+                or args.exclude.get(table, "") == "*"
+            ):
                 log.warning(f"Ignoring {table}")
                 continue
 
@@ -245,8 +256,6 @@ class Convert(Application):
             in_fmt = TableFormat.from_store(in_store)
             out_store = args.output.subtable_store(table)
             out_fmt = TableFormat.from_type(args.format, subtable=table)
-
-            print(f"Converting {table} {in_store} {out_store}")
 
             reader = in_fmt.reader()
             writer = out_fmt.writer()
@@ -256,9 +265,9 @@ class Convert(Application):
             else:
                 datasets = reader(in_store)
 
-            for exclude_column in args.exclude.get(table, []):
+            if exclude_columns := args.exclude.get(table, False):
                 datasets = [
-                    ds.drop_vars(exclude_column, errors="ignore") for ds in datasets
+                    ds.drop_vars(exclude_columns, errors="ignore") for ds in datasets
                 ]
 
             if isinstance(in_fmt, CasaFormat):
