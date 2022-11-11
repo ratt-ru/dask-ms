@@ -1,6 +1,8 @@
 from argparse import ArgumentParser
 import logging
 
+import pytest
+
 log = logging.getLogger(__file__)
 
 
