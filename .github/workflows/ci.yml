@@ -144,8 +144,8 @@ jobs:
       - name: Install dask-ms complete
         run: poetry install --extras "testing complete"
 
-      - name: Test dask-ms complete
-        run: poetry run py.test -s --applications -vvv daskms/
+      - name: Test dask-ms applications
+        run: poetry run py.test -s -vvv --applications daskms/
 
       # - name: Debug with tmate on failure
       #   if: ${{ failure() }}
