@@ -35,7 +35,8 @@ def pytest_configure(config):
     markexpr = [config.option.markexpr] if config.option.markexpr else []
 
     for mark in ("stress", "optional", "applications"):
-        if getattr(config.option, mark, False):
-            markexpr.append(mark)
+        test = "" if getattr(config.option, mark, False) else "not "
+        markexpr.append(f"{test}{mark}")
 
-    config.option.markexpr = " or ".join(markexpr)
+    config.option.markexpr = " and ".join(markexpr)
+    print(config.option.markexpr)
