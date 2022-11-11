@@ -56,6 +56,9 @@ def _check_output_path(output: str):
 
 
 def _check_exclude_columns(columns: str):
+    if not columns:
+        return {}
+
     outputs = defaultdict(set)
 
     for column in (c.strip() for c in columns.split(",")):

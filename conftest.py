@@ -24,12 +24,20 @@ def pytest_addoption(parser):
         default=False,
         help="Enable optional tests",
     )
+    parser.addoption(
+        "--applications",
+        action="store_true",
+        dest="applications",
+        default=False,
+        help="Enable application tests",
+    )
 
 
 def pytest_configure(config):
     # Add non-standard markers
     config.addinivalue_line("markers", "stress: long running stress tests")
     config.addinivalue_line("markers", "optional: optional tests")
+    config.addinivalue_line("markers", "applications: application tests")
 
     # Enable/disable them based on parsed config
     disable_str = []
@@ -39,6 +47,9 @@ def pytest_configure(config):
 
     if not config.option.optional:
         disable_str.append("not optional")
+
+    if not config.option.applications:
+        disable_str.append("not applications")
 
     disable_str = " and ".join(disable_str)
 
