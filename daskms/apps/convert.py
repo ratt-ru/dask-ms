@@ -67,9 +67,9 @@ def _check_exclude_columns(columns: str):
         if len(bits) == 2:
             table, column = bits
         elif len(bits) == 1:
-            table, column = "MAIN", bits
+            table, column = "MAIN", bits[0]
         else:
-            raise ValueError(
+            raise ArgumentTypeError(
                 f"Excluded columns must be of the form "
                 f"COLUMN or SUBTABLE::COLUMN. "
                 f"Received {column}"
