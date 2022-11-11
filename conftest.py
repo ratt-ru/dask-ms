@@ -1,11 +1,4 @@
 # -*- coding: utf-8 -*-
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
-from os.path import join as pjoin
-
 collect_ignore = ["setup.py"]
 
 
@@ -39,20 +32,10 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "optional: optional tests")
     config.addinivalue_line("markers", "applications: application tests")
 
-    # Enable/disable them based on parsed config
-    disable_str = []
+    markexpr = [config.option.markexpr] if config.option.markexpr else []
 
-    if not config.option.stress:
-        disable_str.append("not stress")
+    for mark in ("stress", "optional", "applications"):
+        if getattr(config.option, mark, False):
+            markexpr.append(mark)
 
-    if not config.option.optional:
-        disable_str.append("not optional")
-
-    if not config.option.applications:
-        disable_str.append("not applications")
-
-    disable_str = " and ".join(disable_str)
-
-    if disable_str != "":
-        print(disable_str)
-        setattr(config.option, "markexpr", disable_str)
+    config.option.markexpr = " or ".join(markexpr)

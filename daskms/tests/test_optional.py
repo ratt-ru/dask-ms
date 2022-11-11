@@ -181,12 +181,12 @@ def test_only_row_shape(tmp_path, column, dtype):
         assert T.getcol(column).shape == (10,)
 
         # Must be ndim == 2
-        err_str = "Vector<T>: ndim of other array > 1 ndim 1 differs from 2"
+        err_str = "Vector<T>: ndim of other array > 1 -- ndim 1 differs from 2"
         with pytest.raises(RuntimeError, match=err_str):
             T.putcol(column, np.zeros((5, 40), dtype=dtype))
 
         # shape != (20, 30)
-        err_str = "Vector<T>: ndim of other array > 1 ndim 1 differs from 3"
+        err_str = "Vector<T>: ndim of other array > 1 -- ndim 1 differs from 3"
         with pytest.raises(RuntimeError, match=err_str):
             T.putcol(column, np.zeros((5, 40, 30), dtype=dtype), startrow=0, nrow=5)
 
