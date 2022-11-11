@@ -18,8 +18,8 @@ class MSSubTableDescriptorBuilder(AbstractDescriptorBuilder):
             )
 
         self.subtable = subtable
-        self.DEFAULT_TABLE_DESC = pt.required_ms_desc(subtable)
-        self.REQUIRED_FIELDS = set(self.DEFAULT_TABLE_DESC.keys())
+        self.DEFAULT_TABLE_DESC = pt.complete_ms_desc(subtable)
+        self.REQUIRED_FIELDS = set(pt.required_ms_desc(subtable).keys())
 
     def default_descriptor(self):
         return self.DEFAULT_TABLE_DESC.copy()

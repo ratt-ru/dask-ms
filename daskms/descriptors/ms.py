@@ -30,8 +30,8 @@ class MSDescriptorBuilder(AbstractDescriptorBuilder):
 
     def __init__(self, fixed=True):
         super(AbstractDescriptorBuilder, self).__init__()
-        self.DEFAULT_MS_DESC = pt.required_ms_desc()
-        self.REQUIRED_FIELDS = set(self.DEFAULT_MS_DESC.keys())
+        self.DEFAULT_MS_DESC = pt.complete_ms_desc()
+        self.REQUIRED_FIELDS = set(pt.required_ms_desc().keys())
         self.fixed = fixed
         self.ms_dims = None
 

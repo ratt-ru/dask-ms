@@ -1,14 +1,12 @@
-import abc
 import ast
 from argparse import ArgumentTypeError
 from collections import defaultdict
-from functools import partial
 import logging
-from pathlib import Path
 
 import dask.array as da
 
 from daskms.apps.application import Application
+from daskms.apps.formats import TableFormat, CasaFormat
 from daskms.fsspec_store import DaskMSStore
 
 log = logging.getLogger(__name__)
@@ -41,236 +39,6 @@ class ChunkTransformer(ast.NodeTransformer):
         return node.n
 
 
-class TableFormat(abc.ABC):
-    @abc.abstractproperty
-    def version(self):
-        raise NotImplementedError
-
-    @abc.abstractproperty
-    def subtables(self):
-        raise NotImplementedError
-
-    @abc.abstractclassmethod
-    def reader(self):
-        raise NotImplementedError
-
-    @abc.abstractclassmethod
-    def writer(self):
-        raise NotImplementedError
-
-    @staticmethod
-    def from_store(store):
-        typ = store.type()
-
-        if typ == "casa":
-            from daskms.table_proxy import TableProxy
-            import pyrap.tables as pt
-
-            table_proxy = TableProxy(
-                pt.table, str(store.casa_path()), readonly=True, ack=False
-            )
-            keywords = table_proxy.getkeywords().result()
-
-            try:
-                version = str(keywords["MS_VERSION"])
-            except KeyError:
-                typ = "plain"
-                version = "<unspecified>"
-            else:
-                typ = "measurementset"
-
-            subtables = CasaFormat.find_subtables(keywords)
-            return CasaFormat(version, subtables, typ)
-        elif typ == "zarr":
-            subtables = ZarrFormat.find_subtables(store)
-            return ZarrFormat("0.1", subtables)
-        elif typ == "parquet":
-            subtables = ParquetFormat.find_subtables(store)
-            return ParquetFormat("0.1", subtables)
-        else:
-            raise ValueError(f"Unexpected table type {typ}")
-
-    @staticmethod
-    def from_type(typ):
-        if typ == "ms":
-            return CasaFormat("2.0", [], "measurementset")
-        if typ == "casa":
-            return CasaFormat("<unspecified>", [], "plain")
-        elif typ == "zarr":
-            return ZarrFormat("0.1", [])
-        elif typ == "parquet":
-            return ParquetFormat("0.1", [])
-        else:
-            raise ValueError(f"Unexpected table type {typ}")
-
-
-class BaseTableFormat(TableFormat):
-    def __init__(self, version):
-        self._version = version
-
-    @property
-    def version(self):
-        return self._version
-
-    def check_unused_kwargs(self, fn_name, **kwargs):
-        if kwargs:
-            raise NotImplementedError(
-                f"The following kwargs: "
-                f"{list(kwargs.keys())} "
-                f"were not consumed by "
-                f"{self.__class__.__name__}."
-                f"{fn_name}(**kw)"
-            )
-
-
-class CasaFormat(BaseTableFormat):
-    TABLE_PREFIX = "Table: "
-    TABLE_TYPES = set(["plain", "measurementset"])
-
-    def __init__(self, version, subtables, type="plain"):
-        super().__init__(version)
-
-        if type not in self.TABLE_TYPES:
-            raise ValueError(f"{type} is not in {self.TABLE_TYPES}")
-
-        self._subtables = subtables
-        self._type = type
-
-    @classmethod
-    def find_subtables(cls, keywords):
-        return [k for k, v in keywords.items() if cls.is_subtable(v)]
-
-    @classmethod
-    def is_subtable(cls, keyword):
-        if not isinstance(keyword, str):
-            return False
-
-        if not keyword.startswith(cls.TABLE_PREFIX):
-            return False
-
-        path = Path(keyword[len(cls.TABLE_PREFIX) :])
-        return path.exists() and path.is_dir() and (path / "table.dat").exists()
-
-    def is_measurement_set(self):
-        return self._type == "measurementset"
-
-    def reader(self, **kw):
-        try:
-            group_cols = kw.pop("group_columns", None)
-            index_cols = kw.pop("index_columns", None)
-            taql_where = kw.pop("taql_where", "")
-
-            if self.is_measurement_set():
-                from daskms import xds_from_ms
-
-                return partial(
-                    xds_from_ms,
-                    group_cols=group_cols,
-                    index_cols=index_cols,
-                    taql_where=taql_where,
-                )
-            else:
-                from daskms import xds_from_table
-
-                return xds_from_table
-        finally:
-            self.check_unused_kwargs("reader", **kw)
-
-    def writer(self):
-        from daskms import xds_to_table
-
-        if self.is_measurement_set():
-            return partial(xds_to_table, descriptor="ms")
-        else:
-            return xds_to_table
-
-    @property
-    def subtables(self):
-        return self._subtables
-
-    def __str__(self):
-        return "casa" if not self.is_measurement_set() else self._type
-
-
-class ZarrFormat(BaseTableFormat):
-    def __init__(self, version, subtables):
-        self._subtables = subtables
-
-    @classmethod
-    def find_subtables(cls, store):
-        paths = (p.relative_to(store.path) for p in map(Path, store.subdirectories()))
-
-        return [
-            str(p)
-            for p in paths
-            if p.stem != "MAIN" and store.exists(str(p / ".zgroup"))
-        ]
-
-    @property
-    def subtables(self):
-        return self._subtables
-
-    def reader(self, **kw):
-        for arg in Convert.CASA_INPUT_ONLY_ARGS:
-            if kw.pop(arg, False):
-                raise ValueError(f'"{arg}" is not supported for zarr inputs')
-
-        try:
-            from daskms.experimental.zarr import xds_from_zarr
-
-            return xds_from_zarr
-        finally:
-            self.check_unused_kwargs("reader", **kw)
-
-    def writer(self):
-        from daskms.experimental.zarr import xds_to_zarr
-
-        return xds_to_zarr
-
-    def __str__(self):
-        return "zarr"
-
-
-class ParquetFormat(BaseTableFormat):
-    def __init__(self, version, subtables):
-        super().__init__(version)
-        self._subtables = subtables
-
-    @classmethod
-    def find_subtables(cls, store):
-        paths = (p.relative_to(store.path) for p in map(Path, store.subdirectories()))
-
-        return [
-            str(p)
-            for p in paths
-            if p.stem != "MAIN" and store.exists(str(p / ".zgroup"))
-        ]
-
-    @property
-    def subtables(self):
-        return self._subtables
-
-    def reader(self, **kw):
-        for arg in Convert.CASA_INPUT_ONLY_ARGS:
-            if kw.pop(arg, False):
-                raise ValueError(f'"{arg}" is not supported for parquet inputs')
-
-        try:
-            from daskms.experimental.arrow.reads import xds_from_parquet
-
-            return xds_from_parquet
-        finally:
-            self.check_unused_kwargs("reader", **kw)
-
-    def writer(self):
-        from daskms.experimental.arrow.writes import xds_to_parquet
-
-        return xds_to_parquet
-
-    def __str__(self):
-        return "parquet"
-
-
 NONUNIFORM_SUBTABLES = ["SPECTRAL_WINDOW", "POLARIZATION", "FEED", "SOURCE"]
 
 
@@ -288,7 +56,10 @@ def _check_output_path(output: str):
 
 
 def _check_exclude_columns(columns: str):
-    outputs = defaultdict(list)
+    if not columns:
+        return {}
+
+    outputs = defaultdict(set)
 
     for column in (c.strip() for c in columns.split(",")):
         bits = column.split("::")
@@ -296,15 +67,22 @@ def _check_exclude_columns(columns: str):
         if len(bits) == 2:
             table, column = bits
         elif len(bits) == 1:
-            table, column = "MAIN", bits
+            table, column = "MAIN", bits[0]
         else:
-            raise ValueError(
+            raise ArgumentTypeError(
                 f"Excluded columns must be of the form "
                 f"COLUMN or SUBTABLE::COLUMN. "
                 f"Received {column}"
             )
 
-        outputs[table].append(column)
+        outputs[table].add(column)
+
+    outputs = {
+        table: "*" if "*" in columns else columns for table, columns in outputs.items()
+    }
+
+    if outputs.get("MAIN", "") == "*":
+        raise ValueError("Excluding all columns in the MAIN table is not supported")
 
     return outputs
 
@@ -314,9 +92,6 @@ def parse_chunks(chunks: str):
 
 
 class Convert(Application):
-    TABLE_KEYWORD_PREFIX = "Table: "
-    CASA_INPUT_ONLY_ARGS = ("group_columns", "index_columns", "taql_where")
-
     def __init__(self, args, log):
         self.log = log
         self.args = args
@@ -340,10 +115,11 @@ class Convert(Application):
             help="Comma-separated list of columns to exclude. "
             "For example 'CORRECTED_DATA,"
             "SPECTRAL_WINDOW::EFFECTIVE_BW' "
-            "will exclude 'CORRECTED_DATA "
+            "will exclude CORRECTED_DATA "
             "from the main table and "
             "EFFECTIVE_BW from the SPECTRAL_WINDOW "
-            "subtable",
+            "subtable. SPECTRAL_WINDOW::* will exclude "
+            "the entire SPECTRAL_WINDOW subtable",
         )
         parser.add_argument(
             "-g",
@@ -456,9 +232,9 @@ class Convert(Application):
             # Drop any ROWID columns
             datasets = [ds.drop_vars("ROWID", errors="ignore") for ds in datasets]
 
-        for exclude_column in args.exclude.get("MAIN", []):
+        if exclude_columns := args.exclude.get("MAIN", False):
             datasets = [
-                ds.drop_vars(exclude_column, errors="ignore") for ds in datasets
+                ds.drop_vars(exclude_columns, errors="ignore") for ds in datasets
             ]
 
         if isinstance(out_fmt, CasaFormat):
@@ -472,14 +248,17 @@ class Convert(Application):
 
         # Now do the subtables
         for table in list(in_fmt.subtables):
-            if table in {"SORTED_TABLE", "SOURCE"}:
+            if (
+                table in {"SORTED_TABLE", "SOURCE"}
+                or args.exclude.get(table, "") == "*"
+            ):
                 log.warning(f"Ignoring {table}")
                 continue
 
             in_store = args.input.subtable_store(table)
             in_fmt = TableFormat.from_store(in_store)
             out_store = args.output.subtable_store(table)
-            out_fmt = TableFormat.from_type(args.format)
+            out_fmt = TableFormat.from_type(args.format, subtable=table)
 
             reader = in_fmt.reader()
             writer = out_fmt.writer()
@@ -489,9 +268,9 @@ class Convert(Application):
             else:
                 datasets = reader(in_store)
 
-            for exclude_column in args.exclude.get(table, []):
+            if exclude_columns := args.exclude.get(table, False):
                 datasets = [
-                    ds.drop_vars(exclude_column, errors="ignore") for ds in datasets
+                    ds.drop_vars(exclude_columns, errors="ignore") for ds in datasets
                 ]
 
             if isinstance(in_fmt, CasaFormat):

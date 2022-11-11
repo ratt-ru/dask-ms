@@ -234,7 +234,6 @@ def test_multiprocess_create(ms, tmp_path_factory):
             assert_array_equal(v, getattr(zds, k))
 
 
-@pytest.mark.optional
 @pytest.mark.skipif(xarray is None, reason="depends on xarray")
 def test_xarray_to_zarr(ms, tmp_path_factory):
     store = tmp_path_factory.mktemp("zarr_store")
