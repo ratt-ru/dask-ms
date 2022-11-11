@@ -107,7 +107,7 @@ jobs:
       matrix:
         python-version: ["3.10"]
 
-      steps:
+    steps:
       - name: Create Cache Hash
         run: |
           export HASH=$(sha256sum <<EOT | cut -c -16
