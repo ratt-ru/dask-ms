@@ -155,7 +155,7 @@ jobs:
 
 
   deploy:
-    needs: [test, test_apss]
+    needs: [test, test_apps]
     runs-on: ubuntu-latest
     # Run on a push to a tag or master
     if: >
