@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Remove unused requirements_dev.txt (:pr:`275`)
 * Support optional CASA columns  (:pr:`270`)
 
 0.2.15 (2022-10-19)
