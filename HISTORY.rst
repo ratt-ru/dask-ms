@@ -2,7 +2,7 @@
 History
 =======
 
-X.Y.Z (YYYY-MM-DD)
+0.2.16 (2023-05-26)
 ------------------
 * Update calver versioned software such as dask and xarray to 2023 variants (:pr:`279`)
 * Remove unused requirements_dev.txt (:pr:`275`)
