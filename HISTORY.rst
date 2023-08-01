@@ -2,6 +2,10 @@
 History
 =======
 
+X.Y.Z (YYYY-MM-DD)
+------------------
+* Change setmaxcachesize to require a read lock, not a write lock (:pr:`281`)
+
 0.2.16 (2023-05-26)
 ------------------
 * Update calver versioned software such as dask and xarray to 2023 variants (:pr:`279`)
