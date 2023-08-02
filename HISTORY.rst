@@ -2,7 +2,7 @@
 History
 =======
 
-X.Y.Z (YYYY-MM-DD)
+0.2.17 (2023-08-02)
 ------------------
 * Change setmaxcachesize to require a read lock, not a write lock (:pr:`281`)
 
