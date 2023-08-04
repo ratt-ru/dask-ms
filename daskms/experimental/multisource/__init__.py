@@ -1,7 +1,7 @@
-from daskms import xds_from_storage_ms, xds_to_storage_table
+from daskms import xds_from_storage_ms
 from daskms.fsspec_store import DaskMSStore
 from daskms.utils import requires
-from daskms.experimental.zarr import xds_to_zarr, xds_from_zarr
+from daskms.experimental.zarr import xds_to_zarr
 
 from collections.abc import Iterable
 
@@ -34,7 +34,7 @@ def xds_from_merged_storage(stores, **kwargs):
     return [xarray.merge(xdss) for xdss in zip(*lxdsl)]
 
 
-def _xds_from_proxy(store, **kwargs):
+def _xds_from_fragment(store, **kwargs):
 
     xdsl = xds_from_storage_ms(store, **kwargs)
 
@@ -51,7 +51,7 @@ def _xds_from_proxy(store, **kwargs):
         if not isinstance(parent_url, DaskMSStore):
             store = DaskMSStore(parent_url)
 
-        xdsl_nested = _xds_from_proxy(store, **kwargs)
+        xdsl_nested = _xds_from_fragment(store, **kwargs)
     else:
         return [xdsl]
 
@@ -79,14 +79,69 @@ def merge_via_assign(xdsl):
     return composite_xds
 
 
-def xds_from_proxy(store, **kwargs):
+def xds_from_fragment(store, **kwargs):
+    """
+    Creates a list of xarray datasets representing the contents a composite
+    Measurement Set. The resulting list of datasets will consist of some root
+    dataset with any newer variables populated from the child fragments. It
+    defers to :func:`xds_from_storage_ms`, which should be consulted
+    for more information.
 
-    lxdsl = _xds_from_proxy(store, **kwargs)
+    Parameters
+    ----------
+    store : str or DaskMSStore
+        Store or string of the child fragment of interest.
+    columns : tuple or list, optional
+        Columns present on the resulting dataset.
+        Defaults to all if ``None``.
+    index_cols  : tuple or list, optional
+        Sequence of indexing columns.
+        Defaults to :code:`%(indices)s`
+    group_cols  : tuple or list, optional
+        Sequence of grouping columns.
+        Defaults to :code:`%(groups)s`
+    **kwargs : optional
+
+    Returns
+    -------
+    datasets : list of :class:`xarray.Dataset`
+        xarray datasets for each group
+    """
+
+    lxdsl = _xds_from_fragment(store, **kwargs)
 
     return [merge_via_assign(xdss) for xdss in zip(*lxdsl)]
 
 
-def xds_to_proxy(xds, store, parent, **kwargs):
+def xds_to_fragment(xds, store, parent, **kwargs):
+    """
+    Generates a list of Datasets representing write operations from the
+    specified arrays in :class:`xarray.Dataset`'s into a child fragment
+    dataset.
+
+    Parameters
+    ----------
+    xds : :class:`xarray.Dataset` or list of :class:`xarray.Dataset`
+        dataset(s) containing the specified columns. If a list of datasets
+        is provided, the concatenation of the columns in
+        sequential datasets will be written.
+    store : str or DaskMSStore
+        Store or string which determines the location to which the child
+        fragment will be written.
+    parent : str or DaskMSStore
+        Store or sting corresponding to the parent dataset. Can be either
+        point to either a root dataset or another child fragment.
+
+    **kwargs : optional arguments. See :func:`xds_to_table`.
+
+    Returns
+    -------
+    write_datasets : list of :class:`xarray.Dataset`
+        Datasets containing arrays representing write operations
+        into a CASA Table
+    table_proxy : :class:`daskms.TableProxy`, optional
+        The Table Proxy associated with the datasets
+    """
 
     if not isinstance(parent, DaskMSStore):
         parent = DaskMSStore(parent)
