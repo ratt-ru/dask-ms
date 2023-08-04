@@ -34,7 +34,7 @@ def xds_from_merged_storage(stores, **kwargs):
     return [xarray.merge(xdss) for xdss in zip(*lxdsl)]
 
 
-def xds_from_proxy(store, **kwargs):
+def _xds_from_proxy(store, **kwargs):
 
     xdsl = xds_from_storage_ms(store, **kwargs)
 
@@ -51,12 +51,39 @@ def xds_from_proxy(store, **kwargs):
         if not isinstance(parent_url, DaskMSStore):
             store = DaskMSStore(parent_url)
 
-        xdsl_nested = xds_from_proxy(store, **kwargs)
+        xdsl_nested = _xds_from_proxy(store, **kwargs)
     else:
         return [xdsl]
 
-    return [xdsl, *xdsl_nested]
+    return [*xdsl_nested, xdsl]
 
+
+def merge_via_assign(xdsl):
+
+    composite_xds = xdsl[0]
+
+    partition_keys = [p[0] for p in composite_xds.__daskms_partition_schema__]
+
+    for xds in xdsl[1:]:
+
+        if not all(xds.attrs[k] == composite_xds.attrs[k] for k in partition_keys):
+            raise ValueError(
+                "merge_via_assign failed due to conflicting partition keys."
+                "This usually means you are attempting to merge datasets "
+                "which were constructed with different group_cols arguments."
+            )
+
+        composite_xds = composite_xds.assign(xds.data_vars)
+        composite_xds = composite_xds.assign_attrs(xds.attrs)
+
+    return composite_xds
+
+
+def xds_from_proxy(store, **kwargs):
+
+    lxdsl = _xds_from_proxy(store, **kwargs)
+
+    return [merge_via_assign(xdss) for xdss in zip(*lxdsl)]
 
 
 def xds_to_proxy(xds, store, parent, **kwargs):
