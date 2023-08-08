@@ -65,12 +65,13 @@ def _xds_from_ms_fragment(store, **kwargs):
 
     assert (
         len(parent_urls) == 1
-    ), "Proxy has more than one parent - this is not supported."
+    ), "Fragment has more than one parent - this is not supported."
 
     parent_url = parent_urls.pop()
 
     if parent_url:
         if not isinstance(parent_url, DaskMSStore):
+            # TODO: Where, when and how should we pass storage options?
             store = DaskMSStore(parent_url)
 
         xdsl_nested = _xds_from_ms_fragment(store, **kwargs)
@@ -133,12 +134,13 @@ def _xds_from_table_fragment(store, **kwargs):
 
     assert (
         len(parent_urls) == 1
-    ), "Proxy has more than one parent - this is not supported."
+    ), "Fragment has more than one parent - this is not supported."
 
     parent_url = parent_urls.pop()
 
     if parent_url:
         if not isinstance(parent_url, DaskMSStore):
+            # TODO: Where, when and how should we pass storage options?
             store = DaskMSStore(parent_url).subtable_store(subtable)
 
         xdsl_nested = _xds_from_table_fragment(store, **kwargs)
