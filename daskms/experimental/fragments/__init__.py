@@ -4,38 +4,17 @@ from daskms.utils import requires
 from daskms.experimental.zarr import xds_to_zarr
 from daskms.fsspec_store import UnknownStoreTypeError
 
-from collections.abc import Iterable
-
 try:
-    import xarray
+    import xarray  # noqa
 except ImportError as e:
     xarray_import_error = e
 else:
     xarray_import_error = None
 
-
-@requires("pip install dask-ms[xarray] for xarray support", xarray_import_error)
-def xds_from_merged_storage(stores, **kwargs):
-    if not isinstance(stores, Iterable):
-        stores = [stores]
-
-    storage_options = kwargs.pop("storage_options", {})
-
-    lxdsl = []
-
-    for store in stores:
-        lxdsl.append(
-            xds_from_storage_ms(store, storage_options=storage_options, **kwargs)
-        )
-
-    assert len({len(xdsl) for xdsl in lxdsl}) == 1, (
-        "xds_from_merged_storage was unable to merge datasets dynamically "
-        "due to conflicting lengths on the intermediary lists of datasets."
-    )
-
-    return [xarray.merge(xdss) for xdss in zip(*lxdsl)]
+xarray_import_msg = "pip install dask-ms[xarray] for xarray support"
 
 
+@requires(xarray_import_msg, xarray_import_error)
 def consolidate(xdsl):
     composite_xds = xdsl[0]
 
@@ -55,6 +34,7 @@ def consolidate(xdsl):
     return composite_xds
 
 
+@requires(xarray_import_msg, xarray_import_error)
 def _xds_from_ms_fragment(store, **kwargs):
     xdsl = xds_from_storage_ms(store, **kwargs)
 
@@ -77,6 +57,7 @@ def _xds_from_ms_fragment(store, **kwargs):
     return [*xdsl_nested, xdsl]
 
 
+@requires(xarray_import_msg, xarray_import_error)
 def xds_from_ms_fragment(store, **kwargs):
     """
     Creates a list of xarray datasets representing the contents a composite
@@ -147,6 +128,7 @@ def _xds_from_table_fragment(store, **kwargs):
         return [*xdsl_nested]
 
 
+@requires(xarray_import_msg, xarray_import_error)
 def xds_from_table_fragment(store, **kwargs):
     """
     Creates a list of xarray datasets representing the contents a composite
@@ -185,6 +167,7 @@ def xds_from_table_fragment(store, **kwargs):
     return [consolidate(xdss) for xdss in zip(*lxdsl)]
 
 
+@requires(xarray_import_msg, xarray_import_error)
 def xds_to_table_fragment(xds, store, parent, **kwargs):
     """
     Generates a list of Datasets representing write operations from the
