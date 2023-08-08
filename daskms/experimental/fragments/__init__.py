@@ -1,4 +1,4 @@
-from daskms import xds_from_storage_ms, xds_from_storage_table
+from daskms import xds_from_storage_table
 from daskms.fsspec_store import DaskMSStore
 from daskms.utils import requires
 from daskms.experimental.zarr import xds_to_zarr
@@ -63,36 +63,12 @@ def consolidate(xdsl):
 
 
 @requires(xarray_import_msg, xarray_import_error)
-def _xds_from_ms_fragment(store, **kwargs):
-    xdsl = xds_from_storage_ms(store, **kwargs)
-
-    parent_urls = {xds.attrs.get("__dask_ms_parent_url__", None) for xds in xdsl}
-
-    assert (
-        len(parent_urls) == 1
-    ), "Fragment has more than one parent - this is not supported."
-
-    parent_url = parent_urls.pop()
-
-    if parent_url:
-        if not isinstance(parent_url, DaskMSStore):
-            # TODO: Where, when and how should we pass storage options?
-            store = DaskMSStore(parent_url)
-
-        xdsl_nested = _xds_from_ms_fragment(store, **kwargs)
-    else:
-        return [xdsl]
-
-    return [*xdsl_nested, xdsl]
-
-
-@requires(xarray_import_msg, xarray_import_error)
 def xds_from_ms_fragment(store, **kwargs):
     """
     Creates a list of xarray datasets representing the contents a composite
     Measurement Set. The resulting list of datasets will consist of some root
     dataset with any newer variables populated from the child fragments. It
-    defers to :func:`xds_from_storage_ms`, which should be consulted
+    defers to :func:`xds_from_table_fragment`, which should be consulted
     for more information.
 
     Parameters
@@ -116,7 +92,11 @@ def xds_from_ms_fragment(store, **kwargs):
         xarray datasets for each group
     """
 
-    lxdsl = _xds_from_ms_fragment(store, **kwargs)
+    # TODO: Where, when and how should we pass storage options?
+    if not isinstance(store, DaskMSStore):
+        store = DaskMSStore(store)
+
+    lxdsl = _xds_from_table_fragment(store, **kwargs)
 
     return [consolidate(xdss) for xdss in zip(*lxdsl)]
 
@@ -146,7 +126,7 @@ def _xds_from_table_fragment(store, **kwargs):
     if parent_url:
         if not isinstance(parent_url, DaskMSStore):
             # TODO: Where, when and how should we pass storage options?
-            store = DaskMSStore(parent_url).subtable_store(subtable)
+            store = DaskMSStore(parent_url).subtable_store(subtable or '')
 
         xdsl_nested = _xds_from_table_fragment(store, **kwargs)
     else:
