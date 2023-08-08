@@ -21,7 +21,7 @@ def consolidate(xdsl):
     Priority is determined by the position within the list, with elements at
     the end of the list having higher priority than those at the start. The
     primary purpose of this function is the construction of a consolidated
-    dataset from a parent and deltas (frgaments).
+    dataset from a root and deltas (fragments).
 
     Parameters
     ----------
@@ -34,12 +34,16 @@ def consolidate(xdsl):
         A single :class:`xarray.Dataset`.
     """
 
-    consolidated_xds = xdsl[0]  # First element is the
+    root_xds = xdsl[0]  # First element is the root for this operation.
 
-    partition_keys = [p[0] for p in consolidated_xds.__daskms_partition_schema__]
+    root_schema = root_xds.__daskms_partition_schema__
+
+    partition_keys = [p[0] for p in root_schema]
+
+    consolidated_xds = root_xds  # Will be replaced in the loop.
 
     for xds in xdsl[1:]:
-        if not all(xds.attrs[k] == consolidated_xds.attrs[k] for k in partition_keys):
+        if not all(xds.attrs[k] == root_xds.attrs[k] for k in partition_keys):
             raise ValueError(
                 "consolidate failed due to conflicting partition keys."
                 "This usually means you are attempting to merge datasets "
