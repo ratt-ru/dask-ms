@@ -37,21 +37,26 @@ def consolidate(xdsl):
     root_xds = xdsl[0]  # First element is the root for this operation.
 
     root_schema = root_xds.__daskms_partition_schema__
-
-    partition_keys = [p[0] for p in root_schema]
+    root_partition_keys = {p[0] for p in root_schema}
 
     consolidated_xds = root_xds  # Will be replaced in the loop.
 
     for xds in xdsl[1:]:
-        if not all(xds.attrs[k] == root_xds.attrs[k] for k in partition_keys):
+
+        xds_schema = xds.__daskms_partition_schema__
+        xds_partition_keys = {p[0] for p in xds_schema}
+
+        if root_partition_keys.symmetric_difference(xds_partition_keys):
             raise ValueError(
-                "consolidate failed due to conflicting partition keys."
-                "This usually means you are attempting to merge datasets "
-                "which were constructed with different group_cols arguments."
+                f"consolidate failed due to conflicting partition keys. "
+                f"This usually means the partition keys of the fragments "
+                f"are inconsistent with the current group_cols argument. "
+                f"Current group_cols produces {root_partition_keys} but "
+                f"the fragment has {xds_partition_keys}."
             )
 
         consolidated_xds = consolidated_xds.assign(xds.data_vars)
-        # NOTE: Assigning the fragment's attributes may be unnecessary.
+        # NOTE: Assigning the fragment's attributes may be unnecessary/bad.
         consolidated_xds = consolidated_xds.assign_attrs(xds.attrs)
 
     return consolidated_xds
