@@ -16,22 +16,41 @@ xarray_import_msg = "pip install dask-ms[xarray] for xarray support"
 
 @requires(xarray_import_msg, xarray_import_error)
 def consolidate(xdsl):
-    composite_xds = xdsl[0]
+    """
+    Consolidates a list of xarray datasets by assigning data variables.
+    Priority is determined by the position within the list, with elements at
+    the end of the list having higher priority than those at the start. The
+    primary purpose of this function is the construction of a consolidated
+    dataset from a parent and deltas (frgaments).
 
-    partition_keys = [p[0] for p in composite_xds.__daskms_partition_schema__]
+    Parameters
+    ----------
+    xdsl : tuple or list
+        Tuple or list of :class:`xarray.Dataset` objects to consolidate.
+
+    Returns
+    -------
+    consolidated_xds : :class:`xarray.Dataset`
+        A single :class:`xarray.Dataset`.
+    """
+
+    consolidated_xds = xdsl[0]  # First element is the
+
+    partition_keys = [p[0] for p in consolidated_xds.__daskms_partition_schema__]
 
     for xds in xdsl[1:]:
-        if not all(xds.attrs[k] == composite_xds.attrs[k] for k in partition_keys):
+        if not all(xds.attrs[k] == consolidated_xds.attrs[k] for k in partition_keys):
             raise ValueError(
                 "consolidate failed due to conflicting partition keys."
                 "This usually means you are attempting to merge datasets "
                 "which were constructed with different group_cols arguments."
             )
 
-        composite_xds = composite_xds.assign(xds.data_vars)
-        composite_xds = composite_xds.assign_attrs(xds.attrs)
+        consolidated_xds = consolidated_xds.assign(xds.data_vars)
+        # NOTE: Assigning the fragment's attributes may be unnecessary.
+        consolidated_xds = consolidated_xds.assign_attrs(xds.attrs)
 
-    return composite_xds
+    return consolidated_xds
 
 
 @requires(xarray_import_msg, xarray_import_error)
