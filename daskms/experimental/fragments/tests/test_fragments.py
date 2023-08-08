@@ -195,3 +195,15 @@ def test_inconsistent_partitioning(ms, tmp_path_factory, group_cols):
             index_cols=("TIME",),
             group_cols=(),
         )
+
+
+def test_mutate_parent(ms, tmp_path_factory):
+    """Raises a ValueError when parititoning would be inconsistent."""
+    reads = xds_from_storage_ms(
+        ms,
+        index_cols=("DATA_DESC_ID", "FIELD_ID", "SCAN_NUMBER"),
+        group_cols=("TIME",),
+    )
+
+    with pytest.raises(ValueError, match="store and parent arguments"):
+        xds_to_table_fragment(reads, ms, ms, columns=("DATA",))

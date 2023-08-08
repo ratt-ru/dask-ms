@@ -211,6 +211,16 @@ def xds_to_table_fragment(xds, store, parent, **kwargs):
     if not isinstance(parent, DaskMSStore):
         parent = DaskMSStore(parent)
 
+    # TODO: Where, when and how should we pass storage options?
+    if not isinstance(store, DaskMSStore):
+        store = DaskMSStore(store)
+
+    if parent == store:
+        raise ValueError(
+            "store and parent arguments identical in xds_to_table_fragment. "
+            "This is unsupported i.e. a fragment cannot be its own parent. "
+        )
+
     xds = [x.assign_attrs({"__dask_ms_parent_url__": parent.url}) for x in xds]
 
     return xds_to_zarr(xds, store, **kwargs)
