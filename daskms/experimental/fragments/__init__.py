@@ -16,7 +16,6 @@ else:
 
 @requires("pip install dask-ms[xarray] for xarray support", xarray_import_error)
 def xds_from_merged_storage(stores, **kwargs):
-
     if not isinstance(stores, Iterable):
         stores = [stores]
 
@@ -25,7 +24,9 @@ def xds_from_merged_storage(stores, **kwargs):
     lxdsl = []
 
     for store in stores:
-        lxdsl.append(xds_from_storage_ms(store, storage_options=storage_options, **kwargs))
+        lxdsl.append(
+            xds_from_storage_ms(store, storage_options=storage_options, **kwargs)
+        )
 
     assert len({len(xdsl) for xdsl in lxdsl}) == 1, (
         "xds_from_merged_storage was unable to merge datasets dynamically "
@@ -36,19 +37,17 @@ def xds_from_merged_storage(stores, **kwargs):
 
 
 def _xds_from_ms_fragment(store, **kwargs):
-
     xdsl = xds_from_storage_ms(store, **kwargs)
 
     parent_urls = {xds.attrs.get("__dask_ms_parent_url__", None) for xds in xdsl}
 
-    assert len(parent_urls) == 1, (
-        "Proxy has more than one parent - this is not supported."
-    )
+    assert (
+        len(parent_urls) == 1
+    ), "Proxy has more than one parent - this is not supported."
 
     parent_url = parent_urls.pop()
 
     if parent_url:
-
         if not isinstance(parent_url, DaskMSStore):
             store = DaskMSStore(parent_url)
 
@@ -60,13 +59,11 @@ def _xds_from_ms_fragment(store, **kwargs):
 
 
 def merge_via_assign(xdsl):
-
     composite_xds = xdsl[0]
 
     partition_keys = [p[0] for p in composite_xds.__daskms_partition_schema__]
 
     for xds in xdsl[1:]:
-
         if not all(xds.attrs[k] == composite_xds.attrs[k] for k in partition_keys):
             raise ValueError(
                 "merge_via_assign failed due to conflicting partition keys."
@@ -153,7 +150,6 @@ def xds_to_ms_fragment(xds, store, parent, **kwargs):
 
 
 def _xds_from_table_fragment(store, **kwargs):
-
     try:
         # Try to open the store. However, as we are reading from a fragment,
         # the subtable may not exist in the child.
@@ -169,14 +165,13 @@ def _xds_from_table_fragment(store, **kwargs):
 
     parent_urls = {xds.attrs.get("__dask_ms_parent_url__", None) for xds in xdsl}
 
-    assert len(parent_urls) == 1, (
-        "Proxy has more than one parent - this is not supported."
-    )
+    assert (
+        len(parent_urls) == 1
+    ), "Proxy has more than one parent - this is not supported."
 
     parent_url = parent_urls.pop()
 
     if parent_url:
-
         if not isinstance(parent_url, DaskMSStore):
             store = DaskMSStore(parent_url).subtable_store(subtable)
 
