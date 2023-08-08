@@ -36,6 +36,25 @@ def xds_from_merged_storage(stores, **kwargs):
     return [xarray.merge(xdss) for xdss in zip(*lxdsl)]
 
 
+def consolidate(xdsl):
+    composite_xds = xdsl[0]
+
+    partition_keys = [p[0] for p in composite_xds.__daskms_partition_schema__]
+
+    for xds in xdsl[1:]:
+        if not all(xds.attrs[k] == composite_xds.attrs[k] for k in partition_keys):
+            raise ValueError(
+                "consolidate failed due to conflicting partition keys."
+                "This usually means you are attempting to merge datasets "
+                "which were constructed with different group_cols arguments."
+            )
+
+        composite_xds = composite_xds.assign(xds.data_vars)
+        composite_xds = composite_xds.assign_attrs(xds.attrs)
+
+    return composite_xds
+
+
 def _xds_from_ms_fragment(store, **kwargs):
     xdsl = xds_from_storage_ms(store, **kwargs)
 
@@ -56,25 +75,6 @@ def _xds_from_ms_fragment(store, **kwargs):
         return [xdsl]
 
     return [*xdsl_nested, xdsl]
-
-
-def merge_via_assign(xdsl):
-    composite_xds = xdsl[0]
-
-    partition_keys = [p[0] for p in composite_xds.__daskms_partition_schema__]
-
-    for xds in xdsl[1:]:
-        if not all(xds.attrs[k] == composite_xds.attrs[k] for k in partition_keys):
-            raise ValueError(
-                "merge_via_assign failed due to conflicting partition keys."
-                "This usually means you are attempting to merge datasets "
-                "which were constructed with different group_cols arguments."
-            )
-
-        composite_xds = composite_xds.assign(xds.data_vars)
-        composite_xds = composite_xds.assign_attrs(xds.attrs)
-
-    return composite_xds
 
 
 def xds_from_ms_fragment(store, **kwargs):
@@ -108,45 +108,7 @@ def xds_from_ms_fragment(store, **kwargs):
 
     lxdsl = _xds_from_ms_fragment(store, **kwargs)
 
-    return [merge_via_assign(xdss) for xdss in zip(*lxdsl)]
-
-
-def xds_to_ms_fragment(xds, store, parent, **kwargs):
-    """
-    Generates a list of Datasets representing write operations from the
-    specified arrays in :class:`xarray.Dataset`'s into a child fragment
-    dataset.
-
-    Parameters
-    ----------
-    xds : :class:`xarray.Dataset` or list of :class:`xarray.Dataset`
-        dataset(s) containing the specified columns. If a list of datasets
-        is provided, the concatenation of the columns in
-        sequential datasets will be written.
-    store : str or DaskMSStore
-        Store or string which determines the location to which the child
-        fragment will be written.
-    parent : str or DaskMSStore
-        Store or sting corresponding to the parent dataset. Can be either
-        point to either a root dataset or another child fragment.
-
-    **kwargs : optional arguments. See :func:`xds_to_table`.
-
-    Returns
-    -------
-    write_datasets : list of :class:`xarray.Dataset`
-        Datasets containing arrays representing write operations
-        into a CASA Table
-    table_proxy : :class:`daskms.TableProxy`, optional
-        The Table Proxy associated with the datasets
-    """
-
-    if not isinstance(parent, DaskMSStore):
-        parent = DaskMSStore(parent)
-
-    xds = [x.assign_attrs({"__dask_ms_parent_url__": parent.url}) for x in xds]
-
-    return xds_to_zarr(xds, store, **kwargs)
+    return [consolidate(xdss) for xdss in zip(*lxdsl)]
 
 
 def _xds_from_table_fragment(store, **kwargs):
@@ -214,12 +176,13 @@ def xds_from_table_fragment(store, **kwargs):
         xarray datasets for each group
     """
 
+    # TODO: Where, when and how should we pass storage options?
     if not isinstance(store, DaskMSStore):
         store = DaskMSStore(store)
 
     lxdsl = _xds_from_table_fragment(store, **kwargs)
 
-    return [merge_via_assign(xdss) for xdss in zip(*lxdsl)]
+    return [consolidate(xdss) for xdss in zip(*lxdsl)]
 
 
 def xds_to_table_fragment(xds, store, parent, **kwargs):
@@ -252,6 +215,7 @@ def xds_to_table_fragment(xds, store, parent, **kwargs):
         The Table Proxy associated with the datasets
     """
 
+    # TODO: Where, when and how should we pass storage options?
     if not isinstance(parent, DaskMSStore):
         parent = DaskMSStore(parent)
 
