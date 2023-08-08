@@ -42,7 +42,6 @@ def consolidate(xdsl):
     consolidated_xds = root_xds  # Will be replaced in the loop.
 
     for xds in xdsl[1:]:
-
         xds_schema = xds.__daskms_partition_schema__
         xds_partition_keys = {p[0] for p in xds_schema}
 
@@ -126,7 +125,7 @@ def _xds_from_table_fragment(store, **kwargs):
     if parent_url:
         if not isinstance(parent_url, DaskMSStore):
             # TODO: Where, when and how should we pass storage options?
-            store = DaskMSStore(parent_url).subtable_store(subtable or '')
+            store = DaskMSStore(parent_url).subtable_store(subtable or "")
 
         xdsl_nested = _xds_from_table_fragment(store, **kwargs)
     else:
