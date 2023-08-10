@@ -55,8 +55,6 @@ def consolidate(xdsl):
             )
 
         consolidated_xds = consolidated_xds.assign(xds.data_vars)
-        # NOTE: Assigning the fragment's attributes may be unnecessary/bad.
-        consolidated_xds = consolidated_xds.assign_attrs(xds.attrs)
 
     return consolidated_xds
 
