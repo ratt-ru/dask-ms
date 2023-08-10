@@ -24,15 +24,20 @@ def group_cols(request):
     return request.param
 
 
+# -----------------------------MAIN_TABLE_TESTS--------------------------------
+
+
 def test_fragment_with_noop(ms, tmp_path_factory, group_cols):
     """Unchanged data_vars must remain the same when read from a fragment."""
+
     reads = xds_from_storage_ms(
         ms,
         index_cols=("TIME",),
         group_cols=group_cols,
     )
 
-    fragment_path = tmp_path_factory.mktemp("fragment0.ms")
+    tmp_dir = tmp_path_factory.mktemp("fragments")
+    fragment_path = tmp_dir / "fragment.ms"
 
     writes = xds_to_table_fragment(reads, fragment_path, ms, columns=("DATA",))
 
@@ -45,19 +50,20 @@ def test_fragment_with_noop(ms, tmp_path_factory, group_cols):
     )
 
     for rxds, frxds in zip(reads, fragment_reads):
-        for dv in rxds.data_vars.keys():
-            npt.assert_array_equal(rxds[dv].data, frxds[dv].data)
+        assert rxds.equals(frxds), "Datasets not identical."
 
 
 def test_fragment_with_update(ms, tmp_path_factory, group_cols):
     """Updated data_vars must change when read from a fragment."""
+
     reads = xds_from_storage_ms(
         ms,
         index_cols=("TIME",),
         group_cols=group_cols,
     )
 
-    fragment_path = tmp_path_factory.mktemp("fragment0.ms")
+    tmp_dir = tmp_path_factory.mktemp("fragments")
+    fragment_path = tmp_dir / "fragment.ms"
 
     updates = [
         xds.assign({"DATA": (xds.DATA.dims, da.ones_like(xds.DATA.data))})
@@ -80,13 +86,16 @@ def test_fragment_with_update(ms, tmp_path_factory, group_cols):
 
 def test_nonoverlapping_parents(ms, tmp_path_factory, group_cols):
     """All updated data_vars must change when read from a fragment."""
+
     reads = xds_from_storage_ms(
         ms,
         index_cols=("TIME",),
         group_cols=group_cols,
     )
 
-    fragment0_path = tmp_path_factory.mktemp("fragment0.ms")
+    tmp_dir = tmp_path_factory.mktemp("fragments")
+    fragment0_path = tmp_dir / "fragment0.ms"
+    fragment1_path = tmp_dir / "fragment1.ms"
 
     updates = [
         xds.assign({"DATA": (xds.DATA.dims, da.zeros_like(xds.DATA.data))})
@@ -102,8 +111,6 @@ def test_nonoverlapping_parents(ms, tmp_path_factory, group_cols):
         index_cols=("TIME",),
         group_cols=group_cols,
     )
-
-    fragment1_path = tmp_path_factory.mktemp("fragment1.ms")
 
     updates = [
         xds.assign({"UVW": (xds.UVW.dims, da.zeros_like(xds.UVW.data))})
@@ -135,7 +142,9 @@ def test_overlapping_parents(ms, tmp_path_factory, group_cols):
         group_cols=group_cols,
     )
 
-    fragment0_path = tmp_path_factory.mktemp("fragment0.ms")
+    tmp_dir = tmp_path_factory.mktemp("fragments")
+    fragment0_path = tmp_dir / "fragment0.ms"
+    fragment1_path = tmp_dir / "fragment1.ms"
 
     updates = [
         xds.assign({"DATA": (xds.DATA.dims, da.ones_like(xds.DATA.data))})
@@ -151,8 +160,6 @@ def test_overlapping_parents(ms, tmp_path_factory, group_cols):
         index_cols=("TIME",),
         group_cols=group_cols,
     )
-
-    fragment1_path = tmp_path_factory.mktemp("fragment1.ms")
 
     updates = [
         xds.assign({"DATA": (xds.DATA.dims, da.zeros_like(xds.DATA.data))})
@@ -183,7 +190,8 @@ def test_inconsistent_partitioning(ms, tmp_path_factory, group_cols):
         group_cols=group_cols,
     )
 
-    fragment_path = tmp_path_factory.mktemp("fragment0.ms")
+    tmp_dir = tmp_path_factory.mktemp("fragments")
+    fragment_path = tmp_dir / "fragment.ms"
 
     writes = xds_to_table_fragment(reads, fragment_path, ms, columns=("DATA",))
 
@@ -211,6 +219,7 @@ def test_mutate_parent(ms, tmp_path_factory):
 
 def test_missing_parent(ms, tmp_path_factory):
     """Raises a ValueError when a fragment is missing a parent."""
+
     reads = xds_from_storage_ms(
         ms,
         index_cols=("TIME",),
@@ -233,3 +242,33 @@ def test_missing_parent(ms, tmp_path_factory):
             index_cols=("TIME",),
             group_cols=("DATA_DESC_ID", "FIELD_ID", "SCAN_NUMBER"),
         )
+
+
+def test_datavar_in_parent(ms, tmp_path_factory, group_cols):
+    """Datavars not present in the fragment must be read from the parent."""
+
+    reads = xds_from_storage_ms(
+        ms,
+        index_cols=("TIME",),
+        group_cols=group_cols,
+    )
+
+    tmp_dir = tmp_path_factory.mktemp("fragments")
+    fragment_path = tmp_dir / "fragment.ms"
+
+    writes = xds_to_table_fragment(reads, fragment_path, ms, columns=("DATA",))
+
+    dask.compute(writes)
+
+    fragment_reads = xds_from_table_fragment(
+        fragment_path,
+        columns=("UVW",),  # Not in fragment.
+        index_cols=("TIME",),
+        group_cols=group_cols,
+    )
+
+    for rxds, frxds in zip(reads, fragment_reads):
+        npt.assert_array_equal(rxds.UVW.data, frxds.UVW.data)
+
+
+# ------------------------------SUBTABLE_TESTS---------------------------------
