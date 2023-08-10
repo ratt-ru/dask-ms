@@ -109,8 +109,15 @@ def _xds_from_table_fragment(store, **kwargs):
     except UnknownStoreTypeError:
         # NOTE: We don't pass kwargs - the only purpose of this read is to
         # grab the parent urls (if they exist).
-        xdsl = xds_from_storage_table(DaskMSStore(store.root))
-        required = False
+        root_store = DaskMSStore(store.root)
+        if root_store.exists():
+            xdsl = xds_from_storage_table(root_store)
+            required = False
+        else:
+            raise FileNotFoundError(
+                f"No table found at {store}. This suggests that a parent is "
+                f"missing."
+            )
 
     subtable = store.table
 

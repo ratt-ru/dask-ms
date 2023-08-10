@@ -198,12 +198,38 @@ def test_inconsistent_partitioning(ms, tmp_path_factory, group_cols):
 
 
 def test_mutate_parent(ms, tmp_path_factory):
-    """Raises a ValueError when parititoning would be inconsistent."""
+    """Raises a ValueError when a fragment would be its own parent."""
     reads = xds_from_storage_ms(
         ms,
-        index_cols=("DATA_DESC_ID", "FIELD_ID", "SCAN_NUMBER"),
-        group_cols=("TIME",),
+        index_cols=("TIME",),
+        group_cols=("DATA_DESC_ID", "FIELD_ID", "SCAN_NUMBER"),
     )
 
     with pytest.raises(ValueError, match="store and parent arguments"):
         xds_to_table_fragment(reads, ms, ms, columns=("DATA",))
+
+
+def test_missing_parent(ms, tmp_path_factory):
+    """Raises a ValueError when a fragment is missing a parent."""
+    reads = xds_from_storage_ms(
+        ms,
+        index_cols=("TIME",),
+        group_cols=("DATA_DESC_ID", "FIELD_ID", "SCAN_NUMBER"),
+    )
+
+    tmp_dir = tmp_path_factory.mktemp("fragments")
+    fragment_path = tmp_dir / "fragment.ms"
+    missing_parent = tmp_dir / "missing.ms"
+
+    writes = xds_to_table_fragment(
+        reads, fragment_path, missing_parent, columns=("DATA",)
+    )
+
+    dask.compute(writes)
+
+    with pytest.raises(FileNotFoundError, match="No table found at"):
+        xds_from_table_fragment(
+            fragment_path,
+            index_cols=("TIME",),
+            group_cols=("DATA_DESC_ID", "FIELD_ID", "SCAN_NUMBER"),
+        )
