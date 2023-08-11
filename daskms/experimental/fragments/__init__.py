@@ -62,6 +62,13 @@ def get_ancestry(store, only_required=True):
                 # TODO: Where, when and how should we pass storage options?
                 store = DaskMSStore(parent_url).subtable_store(subtable or "")
         else:
+            if store.table and not any(f.table for f in fragments):
+                # If we are attempting to open a subtable, we don't know if
+                # it exists until we have traversed the entire ancestry.
+                raise FileNotFoundError(
+                    f"{store.table} subtable was not found in parents."
+                )
+
             return fragments[::-1]  # Flip so that the root appears first.
 
 
