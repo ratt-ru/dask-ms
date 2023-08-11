@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Add experimental fragments functionality (:pr:`282`)
 * Update minio server and client versions (:pr:`287`)
 
 0.2.17 (2023-08-02)

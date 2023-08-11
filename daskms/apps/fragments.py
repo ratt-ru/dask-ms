@@ -21,7 +21,6 @@ def fragments():
     default=False,
 )
 def stat(fragment_path, prune):
-    """Path to fragment."""
 
     ancestors = get_ancestry(fragment_path, only_required=prune)
 
