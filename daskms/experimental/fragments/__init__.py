@@ -3,6 +3,7 @@ from daskms.fsspec_store import DaskMSStore
 from daskms.utils import requires
 from daskms.experimental.zarr import xds_to_zarr
 from daskms.fsspec_store import UnknownStoreTypeError
+from zarr.errors import GroupNotFoundError
 
 try:
     import xarray  # noqa
@@ -12,6 +13,63 @@ else:
     xarray_import_error = None
 
 xarray_import_msg = "pip install dask-ms[xarray] for xarray support"
+
+
+def get_ancestry(store, only_required=True):
+    """Produces a list of stores needed to reconstruct the dataset at store."""
+
+    fragments = []
+
+    if not isinstance(store, DaskMSStore):
+        # TODO: Where, when and how should we pass storage options?
+        store = DaskMSStore(store)
+
+    while True:
+        try:
+            # Try to open the store. However, as we are reading from a
+            # fragment, the subtable may not exist in the child.
+            xdsl = xds_from_storage_table(store, columns=[])
+            fragments.append(store)
+        except UnknownStoreTypeError:
+            # NOTE: We don't pass kwargs - the only purpose of this read is to
+            # grab the parent urls (if they exist).
+            root_store = DaskMSStore(store.root, columns=[])
+            if root_store.exists():
+                xdsl = xds_from_storage_table(root_store, columns=[])
+                if not only_required:
+                    fragments.append(root_store)
+            else:
+                raise FileNotFoundError(
+                    f"No table found at {store}. This suggests that a parent "
+                    f"is missing."
+                )
+        except GroupNotFoundError:
+            # We are likely dealing with a subtable fragment but the user is
+            # requesting something from the main table. This can be supported.
+            subtable_name = store.subdirectories()[0].rsplit("/")[-1]
+            subtable_store = store.subtable_store(subtable_name)
+
+            xdsl = xds_from_storage_table(subtable_store, columns=[])
+            if not only_required:
+                fragments.append(subtable_store)
+
+        subtable = store.table
+
+        parent_urls = {xds.attrs.get("__dask_ms_parent_url__", None) for xds in xdsl}
+
+        assert (
+            len(parent_urls) == 1
+        ), "Fragment has more than one parent - this is not supported."
+
+        parent_url = parent_urls.pop()
+
+        if parent_url:
+            if not isinstance(parent_url, DaskMSStore):
+                # TODO: Where, when and how should we pass storage options?
+                store = DaskMSStore(parent_url).subtable_store(subtable or "")
+        else:
+            fragments = fragments[::-1]  # Flip so that root is first.
+            return fragments
 
 
 @requires(xarray_import_msg, xarray_import_error)
@@ -89,57 +147,7 @@ def xds_from_ms_fragment(store, **kwargs):
         xarray datasets for each group
     """
 
-    # TODO: Where, when and how should we pass storage options?
-    if not isinstance(store, DaskMSStore):
-        store = DaskMSStore(store)
-
-    lxdsl = _xds_from_table_fragment(store, **kwargs)
-
-    return [consolidate(xdss) for xdss in zip(*lxdsl)]
-
-
-def _xds_from_table_fragment(store, **kwargs):
-    try:
-        # Try to open the store. However, as we are reading from a fragment,
-        # the subtable may not exist in the child.
-        xdsl = xds_from_storage_table(store, **kwargs)
-        required = True
-    except UnknownStoreTypeError:
-        # NOTE: We don't pass kwargs - the only purpose of this read is to
-        # grab the parent urls (if they exist).
-        root_store = DaskMSStore(store.root)
-        if root_store.exists():
-            xdsl = xds_from_storage_table(root_store)
-            required = False
-        else:
-            raise FileNotFoundError(
-                f"No table found at {store}. This suggests that a parent is "
-                f"missing."
-            )
-
-    subtable = store.table
-
-    parent_urls = {xds.attrs.get("__dask_ms_parent_url__", None) for xds in xdsl}
-
-    assert (
-        len(parent_urls) == 1
-    ), "Fragment has more than one parent - this is not supported."
-
-    parent_url = parent_urls.pop()
-
-    if parent_url:
-        if not isinstance(parent_url, DaskMSStore):
-            # TODO: Where, when and how should we pass storage options?
-            store = DaskMSStore(parent_url).subtable_store(subtable or "")
-
-        xdsl_nested = _xds_from_table_fragment(store, **kwargs)
-    else:
-        return [xdsl]
-
-    if required:
-        return [*xdsl_nested, xdsl]
-    else:
-        return [*xdsl_nested]
+    return xds_from_table_fragment(store, **kwargs)
 
 
 @requires(xarray_import_msg, xarray_import_error)
@@ -172,11 +180,9 @@ def xds_from_table_fragment(store, **kwargs):
         xarray datasets for each group
     """
 
-    # TODO: Where, when and how should we pass storage options?
-    if not isinstance(store, DaskMSStore):
-        store = DaskMSStore(store)
+    ancestors = get_ancestry(store)
 
-    lxdsl = _xds_from_table_fragment(store, **kwargs)
+    lxdsl = [xds_from_storage_table(s, **kwargs) for s in ancestors]
 
     return [consolidate(xdss) for xdss in zip(*lxdsl)]
 
