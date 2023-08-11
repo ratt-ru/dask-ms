@@ -24,7 +24,7 @@ def get_ancestry(store, only_required=True):
         store = DaskMSStore(store)
 
     while True:
-        root_store = DaskMSStore(store.root)
+        root_store = DaskMSStore(store.root_url)
 
         if store.exists():
             try:
