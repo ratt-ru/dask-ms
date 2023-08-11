@@ -236,7 +236,7 @@ def test_missing_parent(ms, tmp_path_factory):
 
     dask.compute(writes)
 
-    with pytest.raises(FileNotFoundError, match="No table found at"):
+    with pytest.raises(FileNotFoundError, match="No root/fragment found at"):
         xds_from_table_fragment(
             fragment_path,
             index_cols=("TIME",),

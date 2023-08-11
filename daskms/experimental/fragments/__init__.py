@@ -2,7 +2,6 @@ from daskms import xds_from_storage_table
 from daskms.fsspec_store import DaskMSStore
 from daskms.utils import requires
 from daskms.experimental.zarr import xds_to_zarr
-from daskms.fsspec_store import UnknownStoreTypeError
 from zarr.errors import GroupNotFoundError
 
 try:
@@ -25,33 +24,28 @@ def get_ancestry(store, only_required=True):
         store = DaskMSStore(store)
 
     while True:
-        try:
-            # Try to open the store. However, as we are reading from a
-            # fragment, the subtable may not exist in the child.
-            xdsl = xds_from_storage_table(store, columns=[])
-            fragments.append(store)
-        except UnknownStoreTypeError:
-            # NOTE: We don't pass kwargs - the only purpose of this read is to
-            # grab the parent urls (if they exist).
-            root_store = DaskMSStore(store.root, columns=[])
-            if root_store.exists():
-                xdsl = xds_from_storage_table(root_store, columns=[])
-                if not only_required:
-                    fragments.append(root_store)
-            else:
-                raise FileNotFoundError(
-                    f"No table found at {store}. This suggests that a parent "
-                    f"is missing."
-                )
-        except GroupNotFoundError:
-            # We are likely dealing with a subtable fragment but the user is
-            # requesting something from the main table. This can be supported.
-            subtable_name = store.subdirectories()[0].rsplit("/")[-1]
-            subtable_store = store.subtable_store(subtable_name)
+        root_store = DaskMSStore(store.root)
 
-            xdsl = xds_from_storage_table(subtable_store, columns=[])
-            if not only_required:
-                fragments.append(subtable_store)
+        if store.exists():
+            try:
+                # Store exists and can be read.
+                xdsl = xds_from_storage_table(store, columns=[])
+                fragments += [store]
+            except GroupNotFoundError:
+                # Store exists, but cannot be read. We may be dealing with
+                # a subtable only fragment. NOTE: This assumes that all
+                # subtables in a fragment have the same parent, so we don't
+                # care which subtable we read.
+                subtable_name = store.subdirectories()[0].rsplit("/")[-1]
+                subtable_store = store.subtable_store(subtable_name)
+                xdsl = xds_from_storage_table(subtable_store, columns=[])
+                fragments += [] if only_required else [subtable_store]
+        elif root_store.exists():
+            # Root store exists and can be read.
+            xdsl = xds_from_storage_table(root_store, columns=[])
+            fragments += [] if only_required else [root_store]
+        else:
+            raise FileNotFoundError(f"No root/fragment found at {store}.")
 
         subtable = store.table
 
@@ -68,8 +62,7 @@ def get_ancestry(store, only_required=True):
                 # TODO: Where, when and how should we pass storage options?
                 store = DaskMSStore(parent_url).subtable_store(subtable or "")
         else:
-            fragments = fragments[::-1]  # Flip so that root is first.
-            return fragments
+            return fragments[::-1]  # Flip so that the root appears first.
 
 
 @requires(xarray_import_msg, xarray_import_error)
