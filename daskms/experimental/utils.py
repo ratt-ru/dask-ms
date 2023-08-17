@@ -138,6 +138,7 @@ def rechunk_by_size(dataset, max_chunk_mem=2**31 - 1, unchunked_dims=None):
     rechunked_dataset : xarray.Dataset
         Dataset with appropriate chunking.
     """
+
     def _rechunk(data_array, unchunked_dims):
         dims = set(data_array.dims)
         unchunked_dims = unchunked_dims & dims
@@ -161,6 +162,9 @@ def rechunk_by_size(dataset, max_chunk_mem=2**31 - 1, unchunked_dims=None):
             )
 
         chunk_dict = {k: dim_sizes[k] for k in unchunked_dims}
+
+        if n_chunked_dim == 0:  # No chunking but still less than target size.
+            return chunk_dict
 
         ideal_chunk = int(
             np.power(max_n_ele / fixed_n_ele, 1 / (n_dim - n_unchunked_dim))
