@@ -116,3 +116,84 @@ def store_path_split(store):
         raise RuntimeError(f"len(parts) {len(parts)} not in (1, 2)")
 
     return store.parent / name, subtable
+
+
+def rechunk_by_size(dataset, max_chunk_mem=2**31 - 1, unchunked_dims=None):
+    """
+    Given an xarray.Dataset, rechunk it such that chunking is uniform and
+    consistent in all dimensions and all chunks are smaller than a specified
+    size in bytes.
+
+    Parameters
+    ----------
+    dataset : xarray.Dataset
+        A dataset containing datavars and coords.
+    max_chunk_mem : int
+        Target maximum chunk size in bytes.
+    unchunked_dims: None or set
+        A set of dimensions which should not be chunked.
+
+    Returns
+    -------
+    rechunked_dataset : xarray.Dataset
+        Dataset with appropriate chunking.
+    """
+    def _rechunk(data_array, unchunked_dims):
+        dims = set(data_array.dims)
+        unchunked_dims = unchunked_dims & dims
+        chunked_dims = dims - unchunked_dims
+
+        n_dim = len(dims)
+        n_unchunked_dim = len(unchunked_dims)
+        n_chunked_dim = n_dim - n_unchunked_dim
+
+        dim_sizes = data_array.sizes
+
+        # The maximum number of array elements in the chunk.
+        max_n_ele = max_chunk_mem // data_array.dtype.itemsize
+        # The number of elements associated with unchunkable dimensions.
+        fixed_n_ele = np.product([dim_sizes[k] for k in unchunked_dims])
+
+        if fixed_n_ele > max_n_ele:
+            raise ValueError(
+                f"Target chunk size could not be reached in rechunk_by_size. "
+                f"Unchunkable dimensions were: {unchunked_dims}."
+            )
+
+        chunk_dict = {k: dim_sizes[k] for k in unchunked_dims}
+
+        ideal_chunk = int(
+            np.power(max_n_ele / fixed_n_ele, 1 / (n_dim - n_unchunked_dim))
+        )
+
+        chunk_dict.update({k: ideal_chunk for k in chunked_dims})
+
+        new_unchunked_dims = {k for k in dims if chunk_dict[k] >= dim_sizes[k]}
+
+        if len(new_unchunked_dims) == n_dim:
+            return {k: dim_sizes[k] for k in unchunked_dims}
+        elif new_unchunked_dims != unchunked_dims:
+            return _rechunk(data_array, new_unchunked_dims)
+        else:
+            return chunk_dict
+
+    # Figure out chunking from the largest arrays to the smallest. NOTE:
+    # Using nbytes may be unreliable for object arrays.
+    dvs_and_coords = [*dataset.data_vars.values(), *dataset.coords.values()]
+    dvs_and_coords = sorted(dvs_and_coords, key=lambda arr: arr.data.nbytes)
+
+    chunk_dims = {}
+
+    for data_array in dvs_and_coords[::-1]:  # From largest to smallest.
+        chunk_update = _rechunk(data_array, unchunked_dims or set())
+
+        chunk_dims.update(
+            {
+                k: min(chunk_update[k], chunk_dims.get(k, chunk_update[k]))
+                for k in chunk_update.keys()
+            }
+        )
+
+    rechunked_dataset = dataset.chunk(chunk_dims)
+
+    return rechunked_dataset

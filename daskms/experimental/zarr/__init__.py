@@ -96,7 +96,9 @@ def create_array(ds_group, column, column_schema, schema_chunks, coordinate=Fals
             raise ValueError(
                 f"Column {column} has a chunk of "
                 f"dimension {zchunks} that will exceed "
-                f"zarr's 2GiB chunk limit"
+                f"zarr's 2GiB chunk limit. Consider calling "
+                f"daskms.experimental.utils.rechunk_by_size "
+                f"prior to writing."
             )
 
     array = ds_group.require_dataset(
