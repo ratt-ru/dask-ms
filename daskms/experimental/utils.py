@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from itertools import product
 
 import dask
 import dask.array as da
@@ -118,7 +119,12 @@ def store_path_split(store):
     return store.parent / name, subtable
 
 
-def rechunk_by_size(dataset, max_chunk_mem=2**31 - 1, unchunked_dims=None):
+def rechunk_by_size(
+    dataset,
+    max_chunk_mem=2**31 - 1,
+    unchunked_dims=None,
+    only_when_needed=False
+):
     """
     Given an xarray.Dataset, rechunk it such that chunking is uniform and
     consistent in all dimensions and all chunks are smaller than a specified
@@ -132,6 +138,8 @@ def rechunk_by_size(dataset, max_chunk_mem=2**31 - 1, unchunked_dims=None):
         Target maximum chunk size in bytes.
     unchunked_dims: None or set
         A set of dimensions which should not be chunked.
+    only_when_needed: bool
+        If set, only rechunk if existing chunks violate max_chunk_mem.
 
     Returns
     -------
@@ -184,7 +192,21 @@ def rechunk_by_size(dataset, max_chunk_mem=2**31 - 1, unchunked_dims=None):
     # Figure out chunking from the largest arrays to the smallest. NOTE:
     # Using nbytes may be unreliable for object arrays.
     dvs_and_coords = [*dataset.data_vars.values(), *dataset.coords.values()]
+    dvs_and_coords = [d for d in dvs_and_coords if isinstance(d.data, da.Array)]
     dvs_and_coords = sorted(dvs_and_coords, key=lambda arr: arr.data.nbytes)
+
+    required = False
+
+    for data_array in dvs_and_coords[::-1]:
+        iterator = product(*map(range, data_array.data.blocks.shape))
+        blocks = data_array.data.blocks
+        max_block_size = max(blocks[i].nbytes for i in iterator)
+        if max_block_size > max_chunk_mem:
+            required = True
+            break
+
+    if not required and only_when_needed:
+        return dataset.copy()
 
     chunk_dims = {}
 

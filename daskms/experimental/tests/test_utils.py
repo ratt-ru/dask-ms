@@ -98,3 +98,15 @@ def test_rechunk_impossible(dataset):
             max_chunk_mem=ZARR_MAX_CHUNK,
             unchunked_dims={"coord0", "coord1", "coord2"},
         )
+
+
+def test_rechunk_if_required(dataset):
+
+    dataset = dataset.chunk({c: 100 for c in dataset.coords.keys()})
+
+    rechunked_dataset = rechunk_by_size(dataset, only_when_needed=True)
+
+    assert rechunked_dataset.chunks == dataset.chunks, (
+        "rechunk_by_size has altered chunk sizes even though input dataset "
+        "did not require rechunking."
+    )
