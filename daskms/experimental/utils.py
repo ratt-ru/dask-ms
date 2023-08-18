@@ -119,6 +119,10 @@ def store_path_split(store):
     return store.parent / name, subtable
 
 
+def largest_chunk(arr):
+    return max(arr.blocks[i].nbytes for i in product(*map(range, arr.blocks.shape)))
+
+
 def rechunk_by_size(
     dataset,
     max_chunk_mem=2**31 - 1,
@@ -195,18 +199,12 @@ def rechunk_by_size(
     dvs_and_coords = [d for d in dvs_and_coords if isinstance(d.data, da.Array)]
     dvs_and_coords = sorted(dvs_and_coords, key=lambda arr: arr.data.nbytes)
 
-    required = False
+    if only_when_needed:
 
-    for data_array in dvs_and_coords[::-1]:
-        iterator = product(*map(range, data_array.data.blocks.shape))
-        blocks = data_array.data.blocks
-        max_block_size = max(blocks[i].nbytes for i in iterator)
-        if max_block_size > max_chunk_mem:
-            required = True
-            break
+        largest_chunks = [largest_chunk(dc.data) for dc in dvs_and_coords]
 
-    if not required and only_when_needed:
-        return dataset.copy()
+        if not any(lc > max_chunk_mem for lc in largest_chunks):
+            return dataset.copy()
 
     chunk_dims = {}
 
