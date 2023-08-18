@@ -124,10 +124,7 @@ def largest_chunk(arr):
 
 
 def rechunk_by_size(
-    dataset,
-    max_chunk_mem=2**31 - 1,
-    unchunked_dims=None,
-    only_when_needed=False
+    dataset, max_chunk_mem=2**31 - 1, unchunked_dims=None, only_when_needed=False
 ):
     """
     Given an xarray.Dataset, rechunk it such that chunking is uniform and
@@ -200,9 +197,7 @@ def rechunk_by_size(
     dvs_and_coords = sorted(dvs_and_coords, key=lambda arr: arr.data.nbytes)
 
     if only_when_needed:
-
         largest_chunks = [largest_chunk(dc.data) for dc in dvs_and_coords]
-
         if not any(lc > max_chunk_mem for lc in largest_chunks):
             return dataset.copy()
 

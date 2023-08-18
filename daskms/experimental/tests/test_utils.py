@@ -101,7 +101,6 @@ def test_rechunk_impossible(dataset):
 
 
 def test_rechunk_if_required(dataset):
-
     dataset = dataset.chunk({c: 100 for c in dataset.coords.keys()})
 
     rechunked_dataset = rechunk_by_size(dataset, only_when_needed=True)
