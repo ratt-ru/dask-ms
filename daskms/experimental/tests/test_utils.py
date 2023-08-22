@@ -1,10 +1,10 @@
 import pytest
-import xarray
 import numpy as np
 import dask.array as da
 from itertools import product, combinations
 from daskms.experimental.zarr import xds_to_zarr
 from daskms.experimental.utils import rechunk_by_size
+xarray = pytest.importorskip("xarray")
 
 ZARR_MAX_CHUNK = 2 ** (32 - 1)
 

@@ -29,7 +29,7 @@ xarray = ["xarray"]
 zarr = ["zarr"]
 s3 = ["s3fs"]
 complete = ["s3fs", "pyarrow", "xarray", "zarr"]
-testing = ["minio", "pytest", "xarray"]
+testing = ["minio", "pytest"]
 
 [tool.poetry.group.dev.dependencies]
 tbump = "^6.9.0"
