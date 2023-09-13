@@ -228,10 +228,6 @@ class Convert(Application):
 
         datasets = reader(args.input, chunks=args.chunks)
 
-        if isinstance(in_fmt, CasaFormat):
-            # Drop any ROWID columns
-            datasets = [ds.drop_vars("ROWID", errors="ignore") for ds in datasets]
-
         if exclude_columns := args.exclude.get("MAIN", False):
             datasets = [
                 ds.drop_vars(exclude_columns, errors="ignore") for ds in datasets
@@ -272,9 +268,6 @@ class Convert(Application):
                 datasets = [
                     ds.drop_vars(exclude_columns, errors="ignore") for ds in datasets
                 ]
-
-            if isinstance(in_fmt, CasaFormat):
-                datasets = [ds.drop_vars("ROWID", errors="ignore") for ds in datasets]
 
             writes.append(writer(datasets, out_store))
 

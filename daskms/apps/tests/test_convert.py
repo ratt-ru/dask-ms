@@ -49,6 +49,7 @@ def test_convert_application(tau_ms, format, tmp_path_factory):
     for ds in datasets:
         assert "MODEL_DATA" not in ds.data_vars
         assert "FLAG" in ds.data_vars
+        assert "ROWID" in ds.coords
 
     datasets = xds_from_storage_table(f"{str(OUTPUT)}::POINTING")
 
