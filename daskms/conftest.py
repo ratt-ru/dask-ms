@@ -342,6 +342,7 @@ def minio_admin(minio_client, minio_alias, minio_user_key):
     minio_admin.user_add(minio_user_key, minio_user_key)
     minio_admin.policy_set("readwrite", user=minio_user_key)
     yield minio_admin
+    minio_admin.user_remove(minio_user_key)
 
 
 @pytest.fixture
