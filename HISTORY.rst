@@ -5,7 +5,9 @@ History
 X.Y.Z (YYYY-MM-DD)
 ------------------
 * Add experimental fragments functionality (:pr:`282`)
+* Run CI weekly on Monday @ 2h30 am UTC (:pr:`288`)
 * Update minio server and client versions (:pr:`287`)
+* Retain ROWID coordinates during MS conversion (:pr:`286`)
 
 0.2.17 (2023-08-02)
 ------------------
