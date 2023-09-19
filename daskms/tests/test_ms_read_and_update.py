@@ -360,3 +360,7 @@ def test_mismatched_rowid(ms):
 
     with pytest.raises(ValueError, match="ROWID shape and/or chunking"):
         xds_to_table(xds, ms, columns=["DATA"])
+
+
+def test_request_rowid(ms):
+    xdsl = xds_from_ms(ms, columns=["TIME", "ROWID"])  # noqa

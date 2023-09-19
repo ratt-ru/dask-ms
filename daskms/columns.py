@@ -138,17 +138,22 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
     ColumnMetadataError
         Raised if inferring metadata failed.
     """
-    coldesc = table_proxy.getcoldesc(column).result()
+    try:
+        coldesc = table_proxy.getcoldesc(column).result()
+    except Exception as e:
+        raise ColumnMetadataError(
+            f"Unable to obtain column descriptor for column '{column}'"
+        ) from e
     dtype = infer_dtype(column, coldesc)
     # missing ndim implies only row dimension
     ndim = coldesc.get("ndim", "row")
 
     try:
         option = coldesc["option"]
-    except KeyError:
+    except KeyError as e:
         raise ColumnMetadataError(
-            "Column '%s' has no option " "in the column descriptor" % column
-        )
+            f"Column '{column}' has no 'option' in the column descriptor"
+        ) from e
 
     # Each row is a scalar
     # TODO(sjperkins)
@@ -156,8 +161,8 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
     # but the effort may not be worth it
     if ndim == 0:
         raise ColumnMetadataError(
-            "Scalars in column '%s' "
-            "(ndim == %d) are not currently handled" % (column, ndim)
+            f"Scalars in column '{column}' "
+            "(ndim == {ndim}) are not currently handled"
         )
     # Only row dimensions
     elif ndim == "row":
@@ -166,13 +171,13 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
     elif option & 4:
         try:
             shape = tuple(coldesc["shape"])
-        except KeyError:
+        except KeyError as e:
             raise ColumnMetadataError(
-                "'%s' column descriptor option '%d' "
+                f"'{column}' column descriptor option '{option}' "
                 "specifies a FixedShape but no 'shape' "
                 "attribute was found in the "
-                "column descriptor" % (column, option)
-            )
+                "column descriptor"
+            ) from e
     # Variably shaped...
     else:
         try:
@@ -180,9 +185,8 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
             exemplar = table_proxy.getcell(column, exemplar_row).result()
         except Exception as e:
             raise ColumnMetadataError(
-                "Unable to infer shape of "
-                "column '%s' due to:\n'%s'" % (column, str(e))
-            )
+                f"Unable to infer shape of " "column '{column}'"
+            ) from e
 
         # Try figure out the shape
         if isinstance(exemplar, np.ndarray):
