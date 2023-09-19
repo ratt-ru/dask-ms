@@ -5,6 +5,7 @@ History
 X.Y.Z (YYYY-MM-DD)
 ------------------
 * Ignore non-existent columns (:pr:`290`)
+* Add experimental fragments functionality (:pr:`282`)
 * Run CI weekly on Monday @ 2h30 am UTC (:pr:`288`)
 * Update minio server and client versions (:pr:`287`)
 * Retain ROWID coordinates during MS conversion (:pr:`286`)
