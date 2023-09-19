@@ -66,7 +66,7 @@ def test_fragment_with_update(ms, tmp_path_factory, group_cols):
     fragment_path = tmp_dir / "fragment.ms"
 
     updates = [
-        xds.assign({"DATA": (xds.DATA.dims, da.ones_like(xds.DATA.data))})
+        xds.assign(**{"DATA": (xds.DATA.dims, da.ones_like(xds.DATA.data))})
         for xds in reads
     ]
 
@@ -98,7 +98,7 @@ def test_nonoverlapping_parents(ms, tmp_path_factory, group_cols):
     fragment1_path = tmp_dir / "fragment1.ms"
 
     updates = [
-        xds.assign({"DATA": (xds.DATA.dims, da.zeros_like(xds.DATA.data))})
+        xds.assign(**{"DATA": (xds.DATA.dims, da.zeros_like(xds.DATA.data))})
         for xds in reads
     ]
 
@@ -113,7 +113,7 @@ def test_nonoverlapping_parents(ms, tmp_path_factory, group_cols):
     )
 
     updates = [
-        xds.assign({"UVW": (xds.UVW.dims, da.zeros_like(xds.UVW.data))})
+        xds.assign(**{"UVW": (xds.UVW.dims, da.zeros_like(xds.UVW.data))})
         for xds in fragment0_reads
     ]
 
@@ -147,7 +147,7 @@ def test_overlapping_parents(ms, tmp_path_factory, group_cols):
     fragment1_path = tmp_dir / "fragment1.ms"
 
     updates = [
-        xds.assign({"DATA": (xds.DATA.dims, da.ones_like(xds.DATA.data))})
+        xds.assign(**{"DATA": (xds.DATA.dims, da.ones_like(xds.DATA.data))})
         for xds in reads
     ]
 
@@ -162,7 +162,7 @@ def test_overlapping_parents(ms, tmp_path_factory, group_cols):
     )
 
     updates = [
-        xds.assign({"DATA": (xds.DATA.dims, da.zeros_like(xds.DATA.data))})
+        xds.assign(**{"DATA": (xds.DATA.dims, da.zeros_like(xds.DATA.data))})
         for xds in fragment0_reads
     ]
 
@@ -304,7 +304,7 @@ def test_subtable_fragment_with_update(spw_table, tmp_path_factory):
 
     updates = [
         xds.assign(
-            {"CHAN_FREQ": (xds.CHAN_FREQ.dims, da.ones_like(xds.CHAN_FREQ.data))}
+            **{"CHAN_FREQ": (xds.CHAN_FREQ.dims, da.ones_like(xds.CHAN_FREQ.data))}
         )
         for xds in reads
     ]
