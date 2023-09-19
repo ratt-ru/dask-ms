@@ -94,6 +94,10 @@ class DaskMSStore:
     def url(self):
         return f"{self.fs.unstrip_protocol(self.canonical_path)}"
 
+    @property
+    def root_url(self):
+        return f"{self.fs.unstrip_protocol(self.root)}"
+
     def subdirectories(self):
         return [
             d["name"]
