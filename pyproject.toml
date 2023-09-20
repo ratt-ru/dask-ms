@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dask-ms"
-version = "0.2.17"
+version = "0.2.18"
 description = "xarray Dataset from CASA Tables"
 authors = ["Simon Perkins <simon.perkins@gmail.com>"]
 license = "BSD3"
