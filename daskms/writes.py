@@ -8,6 +8,7 @@ from daskms.optimisation import cached_array, inlined_array
 from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 import pyrap.tables as pt
+from itertools import product
 
 from daskms.columns import dim_extents_array
 from daskms.constants import DASKMS_PARTITION_KEY
@@ -68,17 +69,44 @@ def multidim_str_putcol(row_runs, table_future, column, data):
         table.unlock()
 
 
-def ndarray_putcolslice(row_runs, blc, trc, table_future, column, data):
+def ndarray_putcolslice(row_runs, dim_runs, table_future, column, data):
     """Put data into the table"""
     table = table_future.result()
     putcolslice = table.putcolslice
     rr = 0
 
+    blcs = []
+    trcs = []
+
+    list_dim_runs = [dim_run.tolist() for dim_run in dim_runs]
+
+    for locs in product(*list_dim_runs):
+        blc, trc = (), ()
+
+        for start, step in locs:
+            blc += (start,)
+            trc += (start + step - 1,)  # Inclusive index.
+        blcs.append(blc)
+        trcs.append(trc)
+
+    offsets = [
+        np.cumsum([0, *[s for _, s in ldr]]).tolist() for ldr in list_dim_runs
+    ]
+    slices = [
+        [
+            slice(offset[i], offset[i + 1]) for i in range(len(offset) - 1)
+        ] for offset in offsets
+    ]
+
     table.lock(write=True)
 
     try:
         for rs, rl in row_runs:
-            putcolslice(column, data[rr : rr + rl], blc, trc, startrow=rs, nrow=rl)
+            row_slice = slice(rr, rr + rl)
+            for blc, trc, dsl in zip(blcs, trcs, product(*slices)):
+                putcolslice(
+                    column, data[(row_slice, *dsl)], blc, trc, startrow=rs, nrow=rl
+                )
             rr += rl
 
         table.flush()
@@ -204,7 +232,7 @@ def putter_wrapper(row_orders, *args):
 
     # There are other dimensions beside row
     if nextent_args > 0:
-        blc, trc = zip(*args[:nextent_args])
+        dim_runs = [dim_run for dim_run, _ in args[:nextent_args]]
         fn = (
             multidim_str_putcolslice
             if multidim_str
@@ -212,8 +240,9 @@ def putter_wrapper(row_orders, *args):
             if dict_data
             else ndarray_putcolslice
         )
+        # TODO: Signature of fn is not consistent across all three calls.
         table_proxy._ex.submit(
-            fn, row_runs, blc, trc, table_proxy._table_future, column, data
+            fn, row_runs, dim_runs, table_proxy._table_future, column, data
         ).result()
     else:
         fn = (
@@ -520,7 +549,6 @@ def cached_row_order(rowid):
         if not layer_name.startswith("row-") and not layer_name.startswith(
             "group-rows-"
         ):
-
             log.warning(
                 "Unusual ROWID layer %s. "
                 "This is probably OK but "
@@ -537,7 +565,6 @@ def cached_row_order(rowid):
             layer_names[0].startswith("group-rows-")
             and layer_names[1].startswith("rechunk-merge-")
         ):
-
             log.warning(
                 "Unusual ROWID layers %s for "
                 "the group ordering case. "
@@ -661,13 +688,24 @@ def _write_datasets(
                     f"ROWID shape and/or chunking does not match that of {column}"
                 )
 
-            if not all(len(c) == 1 for c in array.chunks[1:]):
-                # Add extent arrays
-                for d, c in zip(full_dims[1:], array.chunks[1:]):
-                    extent_array = dim_extents_array(d, c)
-                    args.append(extent_array)
-                    inlinable_arrays.append(extent_array)
-                    args.append((d,))
+            # # TODO: Reintegrate this for the case where the ids are missing!
+            # if not all(len(c) == 1 for c in array.chunks[1:]):
+            #     # Add extent arrays
+            #     for d, c in zip(full_dims[1:], array.chunks[1:]):
+            #         extent_array = dim_extents_array(d, c)
+            #         args.append(extent_array)
+            #         inlinable_arrays.append(extent_array)
+            #         args.append((d,))
+
+            for cda in variable.coords.values():
+                if cda.name == "ROWID":
+                    continue
+                dim_runs = cda.data.map_blocks(
+                    row_run_factory, sort=False, dtype=object
+                )
+                args.append(dim_runs)
+                args.append(cda.dims)
+                # inlinable_arrays.append(dim_runs)  # TODO: Unreliable.
 
             # Add other variables
             args.extend([table_proxy, None, column, None, array, full_dims])

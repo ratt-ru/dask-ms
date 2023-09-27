@@ -221,7 +221,8 @@ def _dataset_variable_factory(
     """
 
     sorted_rows, row_runs = orders
-    dataset_vars = {"ROWID": (("row",), sorted_rows)}
+    dataset_coords = {"ROWID": (("row",), sorted_rows)}
+    dataset_vars = {}
 
     for column in select_cols:
         try:
@@ -234,6 +235,18 @@ def _dataset_variable_factory(
             continue
 
         full_dims = ("row",) + meta.dims
+
+        for dim in full_dims:
+            if f"{dim.upper()}ID" not in dataset_coords:
+                dim_idx = meta.dims.index(dim)
+                dim_size = meta.shape[dim_idx]
+                dim_chunks = chunks.get(dim, -1)
+                dim_label = f"{dim.upper()}ID"
+                dataset_coords[dim_label] = (
+                    (dim,),
+                    da.arange(dim_size, dtype=np.int32, chunks=dim_chunks),
+                )
+
         args = [row_runs, ("row",)]
 
         # We only need to pass in dimension extent arrays if
@@ -280,7 +293,7 @@ def _dataset_variable_factory(
         # Assign into variable and dimension dataset
         dataset_vars[column] = (full_dims, dask_array)
 
-    return dataset_vars
+    return dataset_vars, dataset_coords
 
 
 def _col_keyword_getter(table):
@@ -335,7 +348,7 @@ class DatasetFactory(object):
 
         table_schema = self._table_schema()
         select_cols = set(self.select_cols or table_proxy.colnames().result())
-        variables = _dataset_variable_factory(
+        variables, coords = _dataset_variable_factory(
             table_proxy,
             table_schema,
             select_cols,
@@ -345,12 +358,9 @@ class DatasetFactory(object):
             short_table_name,
         )
 
-        try:
-            rowid = variables.pop("ROWID")
-        except KeyError:
+        # No coordinate case - this is an empty dict.
+        if not coords:
             coords = None
-        else:
-            coords = {"ROWID": rowid}
 
         attrs = {DASKMS_PARTITION_KEY: ()}
 
@@ -385,7 +395,7 @@ class DatasetFactory(object):
             array_suffix = f"[{gid_str}]-{short_table_name}"
 
             # Create dataset variables
-            group_var_dims = _dataset_variable_factory(
+            group_var_dims, group_var_coords = _dataset_variable_factory(
                 table_proxy,
                 table_schema,
                 select_cols,
@@ -395,13 +405,9 @@ class DatasetFactory(object):
                 array_suffix,
             )
 
-            # Extract ROWID
-            try:
-                rowid = group_var_dims.pop("ROWID")
-            except KeyError:
-                coords = None
-            else:
-                coords = {"ROWID": rowid}
+            # No coordinate case - this is an empty dict.
+            if not group_var_coords:
+                group_var_coords = None
 
             # Assign values for the dataset's grouping columns
             # as attributes
@@ -414,7 +420,9 @@ class DatasetFactory(object):
             group_id = [gid.item() for gid in group_id]
             attrs.update(zip(self.group_cols, group_id))
 
-            datasets.append(Dataset(group_var_dims, attrs=attrs, coords=coords))
+            datasets.append(
+                Dataset(group_var_dims, attrs=attrs, coords=group_var_coords)
+            )
 
         return datasets
 
