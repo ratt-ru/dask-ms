@@ -118,7 +118,7 @@ def multidim_str_putcolslice(row_runs, dim_runs, table_future, column, data):
         table.unlock()
 
 
-def multidim_dict_putvarcol(row_runs, blc, trc, table_future, column, data):
+def multidim_dict_putvarcol(row_runs, dim_runs, table_future, column, data):
     """Put data into the table"""
     if row_runs.shape[0] != 1:
         raise ValueError("Row runs unsupported for dictionary data")
@@ -169,6 +169,8 @@ def putter_wrapper(row_orders, *args):
     multidim_str = False
     dict_data = False
 
+    extent_args = args[:nextent_args]
+
     if isinstance(data, dict):
         # NOTE(sjperkins)
         # Here we're trying to reconcile the internal returned shape
@@ -178,7 +180,7 @@ def putter_wrapper(row_orders, *args):
         # output shape here.
         # Dimension slicing is also not supported as
         # putvarcol doesn't support it in any case.
-        if nextent_args > 0:
+        if any(ea[0].shape[0] > 1 for ea in extent_args):
             raise ValueError(
                 "Chunked writes for secondary dimensions "
                 "unsupported for dictionary data"
