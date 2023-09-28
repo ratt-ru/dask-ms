@@ -214,6 +214,10 @@ def putter_wrapper(row_orders, *args):
                 data = data.tolist()
 
     # There are other dimensions beside row
+    # NOTE(jskenyon): There is an irritating problem here as nextent args will
+    # now always be nonzero for multi-dimensional arrays. How do we detect
+    # when to use putcol/putcolslice? This is particuarly problematic when
+    # writing a new datasets as the putcolslice behaviour will fail.
     if nextent_args > 0:
         dim_runs = [dim_run for dim_run, _ in args[:nextent_args]]
         fn = (
@@ -223,7 +227,6 @@ def putter_wrapper(row_orders, *args):
             if dict_data
             else ndarray_putcolslice
         )
-        # TODO: Signature of fn is not consistent across all three calls.
         table_proxy._ex.submit(
             fn, row_runs, dim_runs, table_proxy._table_future, column, data
         ).result()
