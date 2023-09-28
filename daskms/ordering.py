@@ -5,6 +5,7 @@ import dask.array as da
 from dask.array.core import normalize_chunks
 from dask.highlevelgraph import HighLevelGraph
 import numpy as np
+from itertools import product
 
 from daskms.query import select_clause, groupby_clause, orderby_clause
 from daskms.optimisation import cached_array
@@ -218,3 +219,34 @@ def group_row_ordering(group_order_taql, group_cols, index_cols, chunks):
         )
 
     return ordering_arrays
+
+
+def multidim_locators(dim_runs):
+
+    blcs = []
+    trcs = []
+
+    # Convert to lists i.e. iterables we can use with itertools.
+    list_dim_runs = [dim_run.tolist() for dim_run in dim_runs]
+
+    for locs in product(*list_dim_runs):
+        blc, trc = (), ()
+
+        for start, step in locs:
+            blc += (start,)
+            trc += (start + step - 1,)  # Inclusive index.
+        blcs.append(blc)
+        trcs.append(trc)
+
+    offsets = [
+        np.cumsum([0, *[s for _, s in ldr]]).tolist() for ldr in list_dim_runs
+    ]
+    ax_slices = [
+        [
+            slice(offset[i], offset[i + 1]) for i in range(len(offset) - 1)
+        ] for offset in offsets
+    ]
+
+    slices = [sl for sl in product(*ax_slices)]
+
+    return blcs, trcs, slices

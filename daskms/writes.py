@@ -8,16 +8,14 @@ from daskms.optimisation import cached_array, inlined_array
 from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 import pyrap.tables as pt
-from itertools import product
 
-from daskms.columns import dim_extents_array
 from daskms.constants import DASKMS_PARTITION_KEY
 from daskms.dataset import Dataset
 from daskms.dataset_schema import DatasetSchema
 from daskms.descriptors.builder import AbstractDescriptorBuilder
 from daskms.descriptors.builder_factory import filename_builder_factory
 from daskms.descriptors.builder_factory import string_builder_factory
-from daskms.ordering import row_run_factory
+from daskms.ordering import row_run_factory, multidim_locators
 from daskms.table import table_exists
 from daskms.table_executor import executor_key
 from daskms.table_proxy import TableProxy, WRITELOCK
@@ -75,37 +73,16 @@ def ndarray_putcolslice(row_runs, dim_runs, table_future, column, data):
     putcolslice = table.putcolslice
     rr = 0
 
-    blcs = []
-    trcs = []
-
-    list_dim_runs = [dim_run.tolist() for dim_run in dim_runs]
-
-    for locs in product(*list_dim_runs):
-        blc, trc = (), ()
-
-        for start, step in locs:
-            blc += (start,)
-            trc += (start + step - 1,)  # Inclusive index.
-        blcs.append(blc)
-        trcs.append(trc)
-
-    offsets = [
-        np.cumsum([0, *[s for _, s in ldr]]).tolist() for ldr in list_dim_runs
-    ]
-    slices = [
-        [
-            slice(offset[i], offset[i + 1]) for i in range(len(offset) - 1)
-        ] for offset in offsets
-    ]
+    blcs, trcs, slices = multidim_locators(dim_runs)
 
     table.lock(write=True)
 
     try:
         for rs, rl in row_runs:
             row_slice = slice(rr, rr + rl)
-            for blc, trc, dsl in zip(blcs, trcs, product(*slices)):
+            for blc, trc, sl in zip(blcs, trcs, slices):
                 putcolslice(
-                    column, data[(row_slice, *dsl)], blc, trc, startrow=rs, nrow=rl
+                    column, data[(row_slice, *sl)], blc, trc, startrow=rs, nrow=rl
                 )
             rr += rl
 
