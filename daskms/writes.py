@@ -688,24 +688,20 @@ def _write_datasets(
                     f"ROWID shape and/or chunking does not match that of {column}"
                 )
 
-            # # TODO: Reintegrate this for the case where the ids are missing!
-            # if not all(len(c) == 1 for c in array.chunks[1:]):
-            #     # Add extent arrays
-            #     for d, c in zip(full_dims[1:], array.chunks[1:]):
-            #         extent_array = dim_extents_array(d, c)
-            #         args.append(extent_array)
-            #         inlinable_arrays.append(extent_array)
-            #         args.append((d,))
-
-            for cda in variable.coords.values():
-                if cda.name == "ROWID":
-                    continue
-                dim_runs = cda.data.map_blocks(
+            for dim in full_dims[1:]:
+                dim_idx = full_dims.index(dim)
+                dim_size = variable.shape[dim_idx]
+                dim_chunks = variable.chunks[dim_idx]
+                dim_label = f"{dim.upper()}ID"
+                dim_array = variable.coords.get(
+                    dim_label, da.arange(dim_size, dtype=np.int32, chunks=dim_chunks)
+                )
+                dim_runs = getattr(dim_array, 'data', dim_array).map_blocks(
                     row_run_factory, sort=False, dtype=object
                 )
                 args.append(dim_runs)
-                args.append(cda.dims)
-                # inlinable_arrays.append(dim_runs)  # TODO: Unreliable.
+                args.append((dim,))
+                # inlinable_arrays.append(dim_runs)  # TODO: Seems to break things.
 
             # Add other variables
             args.extend([table_proxy, None, column, None, array, full_dims])
