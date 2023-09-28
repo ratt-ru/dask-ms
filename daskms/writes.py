@@ -92,20 +92,24 @@ def ndarray_putcolslice(row_runs, dim_runs, table_future, column, data):
         table.unlock()
 
 
-def multidim_str_putcolslice(row_runs, blc, trc, table_future, column, data):
+def multidim_str_putcolslice(row_runs, dim_runs, table_future, column, data):
     """Put multidimensional string data into the table"""
     table = table_future.result()
-    putcol = table.putcol
+    putcol = table.putcolslice
     rr = 0
+
+    blcs, trcs, slices = multidim_locators(dim_runs)
 
     table.lock(write=True)
 
     try:
         for rs, rl in row_runs:
-            # Construct a dict with the shape and a flattened list
-            chunk = data[rr : rr + rl]
-            chunk = {"shape": chunk.shape, "array": chunk.ravel().tolist()}
-            putcol(column, chunk, blc, trc, startrow=rs, nrow=rl)
+            row_slice = slice(rr, rr + rl)
+            for blc, trc, sl in zip(blcs, trcs, slices):
+                # Construct a dict with the shape and a flattened list
+                chunk = data[(row_slice, *sl)]
+                chunk = {"shape": chunk.shape, "array": chunk.ravel().tolist()}
+                putcol(column, chunk, blc, trc, startrow=rs, nrow=rl)
             rr += rl
 
         table.flush()
