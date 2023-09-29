@@ -135,7 +135,7 @@ def multidim_dict_putvarcol(row_runs, dim_runs, table_future, column, data):
 
 
 def dict_putvarcol(row_runs, table_future, column, data):
-    return multidim_dict_putvarcol(row_runs, None, None, table_future, column, data)
+    return multidim_dict_putvarcol(row_runs, None, table_future, column, data)
 
 
 def putter_wrapper(row_orders, *args):
@@ -674,15 +674,47 @@ def _write_datasets(
                     f"ROWID shape and/or chunking does not match that of {column}"
                 )
 
+            # NOTE(JSKenyon): The following code block attempts to figure out
+            # whether a given write is possible and how to accomplish it.
+            # There are several cases to consider:
+            #   - We have ID coordinates, implying that the data was read by
+            #     dask-ms. We need to use putcol slice as we my be writing to
+            #     several on-disk locations.
+            #   - We don't have ID coordinates, implying that we are writing
+            #     something new. If the column is fixed shape, we are free
+            #     to add ID coordinates on the fly and write using putcolslice.
+            #     If the column is not fixed shape, we require that it has no
+            #     chunking in non-row dimensions and use putcol. If the data
+            #     is chunked but not fixed shape, we error out.
+            #   - We have ID coordinates, implying that we read some part of
+            #     the data from disk using dask-ms but we are also adding new
+            #     columns. This is problematic as the new columns will be
+            #     initialised with incorrect shapes.
+
+            # Get column descriptor so that we can check for fixed shapeness.
+            fixed_shape = "shape" in table_proxy.getcoldesc(column).result()
+
+            chunked = any(len(variable.chunksizes[d]) != 1 for d in full_dims[1:])
+
             for dim in full_dims[1:]:
-                dim_idx = full_dims.index(dim)
-                dim_size = variable.shape[dim_idx]
-                dim_chunks = variable.chunks[dim_idx]
+                dim_size = variable.sizes[dim]
+                dim_chunks = variable.chunksizes[dim]
                 dim_label = f"{dim.upper()}ID"
-                dim_array = variable.coords.get(
-                    dim_label, da.arange(dim_size, dtype=np.int32, chunks=dim_chunks)
-                )
-                dim_runs = getattr(dim_array, 'data', dim_array).map_blocks(
+                dim_array = variable.coords.get(dim_label)
+                if dim_array is None:
+                    if chunked and fixed_shape:  # Creation, fixed shape, putcolslice.
+                        dim_array = da.arange(
+                            dim_size, dtype=np.int32, chunks=dim_chunks
+                        )
+                    elif not chunked:  # Creation, arbitrary shape, no chunks, putcol.
+                        continue
+                    else:
+                        raise ValueError(
+                            f"User has attempted to write chunked data to "
+                            f"non-fixed shape column {column}. This is not "
+                            f"supported."
+                        )
+                dim_runs = getattr(dim_array, "data", dim_array).map_blocks(
                     row_run_factory, sort=False, dtype=object
                 )
                 args.append(dim_runs)
