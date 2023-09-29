@@ -800,7 +800,7 @@ def write_datasets(
     table_keywords=None,
     column_keywords=None,
     table_proxy=False,
-    force_shapes=None
+    force_shapes=None,
 ):
     # Promote datasets to list
     if isinstance(datasets, tuple):
