@@ -222,7 +222,6 @@ def group_row_ordering(group_order_taql, group_cols, index_cols, chunks):
 
 
 def multidim_locators(dim_runs):
-
     blcs = []
     trcs = []
 
@@ -238,13 +237,10 @@ def multidim_locators(dim_runs):
         blcs.append(blc)
         trcs.append(trc)
 
-    offsets = [
-        [0] + list(accumulate([s for _, s in ldr])) for ldr in list_dim_runs
-    ]
+    offsets = [[0] + list(accumulate([s for _, s in ldr])) for ldr in list_dim_runs]
     ax_slices = [
-        [
-            slice(offset[i], offset[i + 1]) for i in range(len(offset) - 1)
-        ] for offset in offsets
+        [slice(offset[i], offset[i + 1]) for i in range(len(offset) - 1)]
+        for offset in offsets
     ]
 
     slices = [sl for sl in product(*ax_slices)]
