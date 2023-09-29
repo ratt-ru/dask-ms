@@ -318,7 +318,7 @@ def _create_table(table_name, datasets, columns, descriptor):
         return _writable_table_proxy(str(table_path))
 
 
-def _updated_table(table, datasets, columns, descriptor):
+def _updated_table(table, datasets, columns, descriptor, force_shapes=None):
     table_proxy = _writable_table_proxy(table)
     table_columns = set(table_proxy.colnames().result())
     missing = set(columns) - table_columns
@@ -340,6 +340,10 @@ def _updated_table(table, datasets, columns, descriptor):
         variables = builder.dataset_variables(schemas)
         default_desc = builder.default_descriptor()
         table_desc = builder.descriptor(variables, default_desc)
+
+        force_shapes = force_shapes or {}
+        for col, shape in force_shapes.items():
+            table_desc[col]["shape"] = shape
 
         # Original Data Manager Groups
         odminfo = {g["NAME"] for g in table_proxy.getdminfo().result().values()}
@@ -796,6 +800,7 @@ def write_datasets(
     table_keywords=None,
     column_keywords=None,
     table_proxy=False,
+    force_shapes=None
 ):
     # Promote datasets to list
     if isinstance(datasets, tuple):
@@ -813,7 +818,7 @@ def write_datasets(
     if not table_exists(table):
         tp = _create_table(table, datasets, columns, descriptor)
     else:
-        tp = _updated_table(table, datasets, columns, descriptor)
+        tp = _updated_table(table, datasets, columns, descriptor, force_shapes)
 
     write_datasets = _write_datasets(
         table,

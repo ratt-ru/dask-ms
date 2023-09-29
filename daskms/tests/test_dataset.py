@@ -553,7 +553,9 @@ def test_write_selection_create(ms, chunks, selection):
         for ds in datasets
     ]
 
-    writes = write_datasets(ms, datasets, ["NEW_DATA"])
+    writes = write_datasets(
+        ms, datasets, ["NEW_DATA"], force_shapes={"NEW_DATA": (16, 4)}
+    )
 
     da.compute(writes)
 
