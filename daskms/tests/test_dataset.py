@@ -558,11 +558,16 @@ def test_write_selection_create(ms, chunks, selection):
     da.compute(writes)
 
     datasets = read_datasets(
-        ms, ["NEW_DATA"], ["DATA_DESC_ID", "FIELD_ID", "SCAN_NUMBER"], [], chunks=chunks
+        ms,
+        ["NEW_DATA"],
+        ["DATA_DESC_ID", "FIELD_ID", "SCAN_NUMBER"],
+        [],
+        chunks=chunks,
+        table_schema=["MS", {"NEW_DATA": {"dims": ("chan", "corr")}}],
     )
 
     for ds in datasets:
-        assert_array_equal(ds.isel(selection).DATA.data, 100)
+        assert_array_equal(ds.isel(selection).NEW_DATA.data, 100)
 
 
 def test_dataset_computes_and_values(ms):
