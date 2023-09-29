@@ -216,8 +216,10 @@ def _dataset_variable_factory(
 
     Returns
     -------
-    dict
-        A dictionary looking like :code:`{column: (arrays, dims)}`.
+    dataset_vars: dict
+        A dictionary of data varaibles looking like :code:`{column: (arrays, dims)}`.
+    dataset_coords: dict
+        A dictionary of coordiantes looking like :code:`{column: (arrays, dims)}`.
     """
 
     sorted_rows, row_runs = orders
