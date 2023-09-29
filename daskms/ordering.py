@@ -5,7 +5,7 @@ import dask.array as da
 from dask.array.core import normalize_chunks
 from dask.highlevelgraph import HighLevelGraph
 import numpy as np
-from itertools import product
+from itertools import product, accumulate
 
 from daskms.query import select_clause, groupby_clause, orderby_clause
 from daskms.optimisation import cached_array
@@ -239,7 +239,7 @@ def multidim_locators(dim_runs):
         trcs.append(trc)
 
     offsets = [
-        np.cumsum([0, *[s for _, s in ldr]]).tolist() for ldr in list_dim_runs
+        [0] + list(accumulate([s for _, s in ldr])) for ldr in list_dim_runs
     ]
     ax_slices = [
         [
