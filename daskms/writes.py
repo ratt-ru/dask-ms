@@ -710,7 +710,9 @@ def _write_datasets(
                         dim_array = da.arange(
                             dim_size, dtype=np.int32, chunks=dim_chunks
                         )
-                    elif not chunked or fixed_shape:  # Creation, arbitrary shape, no chunks, putcol.
+                    elif (
+                        not chunked or fixed_shape
+                    ):  # Creation, arbitrary shape, no chunks, putcol.
                         continue
                     else:
                         raise ValueError(

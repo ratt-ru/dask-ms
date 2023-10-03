@@ -22,6 +22,7 @@ def xds_to_table(
     table_keywords=None,
     column_keywords=None,
     table_proxy=False,
+    force_shapes=None,
 ):
     """
     Generates a list of Datasets representing a write operations from the
@@ -107,6 +108,7 @@ def xds_to_table(
         table_keywords=table_keywords,
         column_keywords=column_keywords,
         table_proxy=table_proxy,
+        force_shapes=force_shapes,
     )
 
     # Unpack table proxy if it was requested
