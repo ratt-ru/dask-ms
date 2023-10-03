@@ -9,14 +9,13 @@ from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 import pyrap.tables as pt
 
-from daskms.columns import dim_extents_array
 from daskms.constants import DASKMS_PARTITION_KEY
 from daskms.dataset import Dataset
 from daskms.dataset_schema import DatasetSchema
 from daskms.descriptors.builder import AbstractDescriptorBuilder
 from daskms.descriptors.builder_factory import filename_builder_factory
 from daskms.descriptors.builder_factory import string_builder_factory
-from daskms.ordering import row_run_factory
+from daskms.ordering import row_run_factory, multidim_locators
 from daskms.table import table_exists
 from daskms.table_executor import executor_key
 from daskms.table_proxy import TableProxy, WRITELOCK
@@ -68,17 +67,23 @@ def multidim_str_putcol(row_runs, table_future, column, data):
         table.unlock()
 
 
-def ndarray_putcolslice(row_runs, blc, trc, table_future, column, data):
+def ndarray_putcolslice(row_runs, dim_runs, table_future, column, data):
     """Put data into the table"""
     table = table_future.result()
     putcolslice = table.putcolslice
     rr = 0
 
+    blcs, trcs, slices = multidim_locators(dim_runs)
+
     table.lock(write=True)
 
     try:
         for rs, rl in row_runs:
-            putcolslice(column, data[rr : rr + rl], blc, trc, startrow=rs, nrow=rl)
+            row_slice = slice(rr, rr + rl)
+            for blc, trc, sl in zip(blcs, trcs, slices):
+                putcolslice(
+                    column, data[(row_slice, *sl)], blc, trc, startrow=rs, nrow=rl
+                )
             rr += rl
 
         table.flush()
@@ -87,20 +92,24 @@ def ndarray_putcolslice(row_runs, blc, trc, table_future, column, data):
         table.unlock()
 
 
-def multidim_str_putcolslice(row_runs, blc, trc, table_future, column, data):
+def multidim_str_putcolslice(row_runs, dim_runs, table_future, column, data):
     """Put multidimensional string data into the table"""
     table = table_future.result()
-    putcol = table.putcol
+    putcol = table.putcolslice
     rr = 0
+
+    blcs, trcs, slices = multidim_locators(dim_runs)
 
     table.lock(write=True)
 
     try:
         for rs, rl in row_runs:
-            # Construct a dict with the shape and a flattened list
-            chunk = data[rr : rr + rl]
-            chunk = {"shape": chunk.shape, "array": chunk.ravel().tolist()}
-            putcol(column, chunk, blc, trc, startrow=rs, nrow=rl)
+            row_slice = slice(rr, rr + rl)
+            for blc, trc, sl in zip(blcs, trcs, slices):
+                # Construct a dict with the shape and a flattened list
+                chunk = data[(row_slice, *sl)]
+                chunk = {"shape": chunk.shape, "array": chunk.ravel().tolist()}
+                putcol(column, chunk, blc, trc, startrow=rs, nrow=rl)
             rr += rl
 
         table.flush()
@@ -109,7 +118,7 @@ def multidim_str_putcolslice(row_runs, blc, trc, table_future, column, data):
         table.unlock()
 
 
-def multidim_dict_putvarcol(row_runs, blc, trc, table_future, column, data):
+def multidim_dict_putvarcol(row_runs, dim_runs, table_future, column, data):
     """Put data into the table"""
     if row_runs.shape[0] != 1:
         raise ValueError("Row runs unsupported for dictionary data")
@@ -126,7 +135,7 @@ def multidim_dict_putvarcol(row_runs, blc, trc, table_future, column, data):
 
 
 def dict_putvarcol(row_runs, table_future, column, data):
-    return multidim_dict_putvarcol(row_runs, None, None, table_future, column, data)
+    return multidim_dict_putvarcol(row_runs, None, table_future, column, data)
 
 
 def putter_wrapper(row_orders, *args):
@@ -160,6 +169,8 @@ def putter_wrapper(row_orders, *args):
     multidim_str = False
     dict_data = False
 
+    extent_args = args[:nextent_args]
+
     if isinstance(data, dict):
         # NOTE(sjperkins)
         # Here we're trying to reconcile the internal returned shape
@@ -169,7 +180,7 @@ def putter_wrapper(row_orders, *args):
         # output shape here.
         # Dimension slicing is also not supported as
         # putvarcol doesn't support it in any case.
-        if nextent_args > 0:
+        if any(ea[0].shape[0] > 1 for ea in extent_args):
             raise ValueError(
                 "Chunked writes for secondary dimensions "
                 "unsupported for dictionary data"
@@ -203,8 +214,12 @@ def putter_wrapper(row_orders, *args):
                 data = data.tolist()
 
     # There are other dimensions beside row
+    # NOTE(jskenyon): There is an irritating problem here as nextent args will
+    # now always be nonzero for multi-dimensional arrays. How do we detect
+    # when to use putcol/putcolslice? This is particuarly problematic when
+    # writing a new datasets as the putcolslice behaviour will fail.
     if nextent_args > 0:
-        blc, trc = zip(*args[:nextent_args])
+        dim_runs = [dim_run for dim_run, _ in args[:nextent_args]]
         fn = (
             multidim_str_putcolslice
             if multidim_str
@@ -213,7 +228,7 @@ def putter_wrapper(row_orders, *args):
             else ndarray_putcolslice
         )
         table_proxy._ex.submit(
-            fn, row_runs, blc, trc, table_proxy._table_future, column, data
+            fn, row_runs, dim_runs, table_proxy._table_future, column, data
         ).result()
     else:
         fn = (
@@ -303,7 +318,7 @@ def _create_table(table_name, datasets, columns, descriptor):
         return _writable_table_proxy(str(table_path))
 
 
-def _updated_table(table, datasets, columns, descriptor):
+def _updated_table(table, datasets, columns, descriptor, force_shapes=None):
     table_proxy = _writable_table_proxy(table)
     table_columns = set(table_proxy.colnames().result())
     missing = set(columns) - table_columns
@@ -325,6 +340,10 @@ def _updated_table(table, datasets, columns, descriptor):
         variables = builder.dataset_variables(schemas)
         default_desc = builder.default_descriptor()
         table_desc = builder.descriptor(variables, default_desc)
+
+        force_shapes = force_shapes or {}
+        for col, shape in force_shapes.items():
+            table_desc[col]["shape"] = shape
 
         # Original Data Manager Groups
         odminfo = {g["NAME"] for g in table_proxy.getdminfo().result().values()}
@@ -520,7 +539,6 @@ def cached_row_order(rowid):
         if not layer_name.startswith("row-") and not layer_name.startswith(
             "group-rows-"
         ):
-
             log.warning(
                 "Unusual ROWID layer %s. "
                 "This is probably OK but "
@@ -537,7 +555,6 @@ def cached_row_order(rowid):
             layer_names[0].startswith("group-rows-")
             and layer_names[1].startswith("rechunk-merge-")
         ):
-
             log.warning(
                 "Unusual ROWID layers %s for "
                 "the group ordering case. "
@@ -661,13 +678,54 @@ def _write_datasets(
                     f"ROWID shape and/or chunking does not match that of {column}"
                 )
 
-            if not all(len(c) == 1 for c in array.chunks[1:]):
-                # Add extent arrays
-                for d, c in zip(full_dims[1:], array.chunks[1:]):
-                    extent_array = dim_extents_array(d, c)
-                    args.append(extent_array)
-                    inlinable_arrays.append(extent_array)
-                    args.append((d,))
+            # NOTE(JSKenyon): The following code block attempts to figure out
+            # whether a given write is possible and how to accomplish it.
+            # There are several cases to consider:
+            #   - We have ID coordinates, implying that the data was read by
+            #     dask-ms. We need to use putcol slice as we my be writing to
+            #     several on-disk locations.
+            #   - We don't have ID coordinates, implying that we are writing
+            #     something new. If the column is fixed shape, we are free
+            #     to add ID coordinates on the fly and write using putcolslice.
+            #     If the column is not fixed shape, we require that it has no
+            #     chunking in non-row dimensions and use putcol. If the data
+            #     is chunked but not fixed shape, we error out.
+            #   - We have ID coordinates, implying that we read some part of
+            #     the data from disk using dask-ms but we are also adding new
+            #     columns. This is problematic as the new columns will be
+            #     initialised with incorrect shapes.
+
+            # Get column descriptor so that we can check for fixed shapeness.
+            fixed_shape = "shape" in table_proxy.getcoldesc(column).result()
+
+            chunked = any(len(variable.chunksizes[d]) != 1 for d in full_dims[1:])
+
+            for dim in full_dims[1:]:
+                dim_size = variable.sizes[dim]
+                dim_chunks = variable.chunksizes[dim]
+                dim_label = f"{dim.upper()}ID"
+                dim_array = variable.coords.get(dim_label)
+                if dim_array is None:
+                    if chunked and fixed_shape:  # Creation, fixed shape, putcolslice.
+                        dim_array = da.arange(
+                            dim_size, dtype=np.int32, chunks=dim_chunks
+                        )
+                    elif (
+                        not chunked or fixed_shape
+                    ):  # Creation, arbitrary shape, no chunks, putcol.
+                        continue
+                    else:
+                        raise ValueError(
+                            f"User has attempted to write chunked data to "
+                            f"non-fixed shape column {column}. This is not "
+                            f"supported."
+                        )
+                dim_runs = getattr(dim_array, "data", dim_array).map_blocks(
+                    row_run_factory, sort=False, dtype=object
+                )
+                args.append(dim_runs)
+                args.append((dim,))
+                # inlinable_arrays.append(dim_runs)  # TODO: Seems to break things.
 
             # Add other variables
             args.extend([table_proxy, None, column, None, array, full_dims])
@@ -744,6 +802,7 @@ def write_datasets(
     table_keywords=None,
     column_keywords=None,
     table_proxy=False,
+    force_shapes=None,
 ):
     # Promote datasets to list
     if isinstance(datasets, tuple):
@@ -761,7 +820,7 @@ def write_datasets(
     if not table_exists(table):
         tp = _create_table(table, datasets, columns, descriptor)
     else:
-        tp = _updated_table(table, datasets, columns, descriptor)
+        tp = _updated_table(table, datasets, columns, descriptor, force_shapes)
 
     write_datasets = _write_datasets(
         table,

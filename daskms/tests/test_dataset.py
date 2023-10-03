@@ -509,6 +509,69 @@ def test_write_dict_data(tmp_path, chunks, dtype):
     assert_array_almost_equal(layer[(name, 2, 0, 0)]["r2"], data["r10"])
 
 
+@pytest.mark.parametrize(
+    "chunks,selection",
+    [({"row": (-1,), "chan": (4,), "corr": (4,)}, {"chan": [3, 4, 5], "corr": [0, 3]})],
+)
+def test_write_selection_update(ms, chunks, selection):
+    datasets = read_datasets(
+        ms, ["DATA"], ["DATA_DESC_ID", "FIELD_ID", "SCAN_NUMBER"], [], chunks=chunks
+    )
+
+    datasets = [ds.isel(selection) for ds in datasets]
+
+    datasets = [
+        ds.assign({"DATA": (ds.DATA.dims, 100 * da.ones_like(ds.DATA.data))})
+        for ds in datasets
+    ]
+
+    writes = write_datasets(ms, datasets, ["DATA"])
+
+    da.compute(writes)
+
+    datasets = read_datasets(
+        ms, ["DATA"], ["DATA_DESC_ID", "FIELD_ID", "SCAN_NUMBER"], [], chunks=chunks
+    )
+
+    for ds in datasets:
+        assert_array_equal(ds.isel(selection).DATA.data, 100)
+
+
+@pytest.mark.parametrize(
+    "chunks,selection",
+    [({"row": (-1,), "chan": (4,), "corr": (4,)}, {"chan": [3, 4, 5], "corr": [0, 3]})],
+)
+def test_write_selection_create(ms, chunks, selection):
+    datasets = read_datasets(
+        ms, ["DATA"], ["DATA_DESC_ID", "FIELD_ID", "SCAN_NUMBER"], [], chunks=chunks
+    )
+
+    datasets = [ds.isel(selection) for ds in datasets]
+
+    datasets = [
+        ds.assign({"NEW_DATA": (ds.DATA.dims, 100 * da.ones_like(ds.DATA.data))})
+        for ds in datasets
+    ]
+
+    writes = write_datasets(
+        ms, datasets, ["NEW_DATA"], force_shapes={"NEW_DATA": (16, 4)}
+    )
+
+    da.compute(writes)
+
+    datasets = read_datasets(
+        ms,
+        ["NEW_DATA"],
+        ["DATA_DESC_ID", "FIELD_ID", "SCAN_NUMBER"],
+        [],
+        chunks=chunks,
+        table_schema=["MS", {"NEW_DATA": {"dims": ("chan", "corr")}}],
+    )
+
+    for ds in datasets:
+        assert_array_equal(ds.isel(selection).NEW_DATA.data, 100)
+
+
 def test_dataset_computes_and_values(ms):
     datasets = read_datasets(ms, [], [], [])
     assert len(datasets) == 1
