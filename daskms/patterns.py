@@ -1,5 +1,6 @@
 """Keep this file in sync with the codex-africanus version"""
 
+import importlib
 import inspect
 from inspect import getattr_static
 from threading import Lock
@@ -386,3 +387,8 @@ class LazyProxyMultiton(LazyProxy, metaclass=Multiton):
 
     See :class:`LazyProxy` and :class:`Multiton` for further details
     """
+
+
+def lazy_import(name):
+    """Lazily import module `name`"""
+    return LazyProxy(importlib.import_module, name)

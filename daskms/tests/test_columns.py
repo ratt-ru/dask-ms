@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
-import pyrap.tables as pt
 import pytest
 
 from daskms.columns import (
@@ -11,8 +10,11 @@ from daskms.columns import (
     _PY_TO_TABLE,
     column_metadata,
 )
+from daskms.patterns import lazy_import
 from daskms.table_proxy import TableProxy
 from daskms.utils import assert_liveness
+
+ct = lazy_import("casacore.tables")
 
 
 @pytest.mark.parametrize("casa_type, numpy_type", list(_TABLE_TO_PY.items()))
@@ -52,7 +54,7 @@ def test_missing_valuetype():
     ],
 )
 def test_column_metadata(ms, column, shape, chunks, table_schema, dtype):
-    table_proxy = TableProxy(pt.table, ms, readonly=True, ack=False)
+    table_proxy = TableProxy(ct.table, ms, readonly=True, ack=False)
     assert_liveness(1, 1)
 
     try:

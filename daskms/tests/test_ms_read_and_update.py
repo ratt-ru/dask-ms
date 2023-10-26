@@ -6,7 +6,6 @@ import dask
 import dask.array as da
 import numpy as np
 from numpy.testing import assert_array_equal
-import pyrap.tables as pt
 import pytest
 
 try:
@@ -16,6 +15,7 @@ except ImportError:
 
 from daskms.constants import DASKMS_PARTITION_KEY
 from daskms.dask_ms import xds_from_ms, xds_from_table, xds_to_table
+from daskms.patterns import lazy_import
 from daskms.query import orderby_clause, where_clause
 from daskms.table_proxy import TableProxy, taql_factory
 from daskms.utils import (
@@ -25,6 +25,7 @@ from daskms.utils import (
     table_path_split,
 )
 
+ct = lazy_import("casacore.tables")
 
 PY_37_GTE = sys.version_info[:2] >= (3, 7)
 
@@ -63,7 +64,7 @@ def test_ms_read(ms, group_cols, index_cols, select_cols):
     order = orderby_clause(index_cols)
     np_column_data = []
 
-    with TableProxy(pt.table, ms, lockoptions="auto", ack=False) as T:
+    with TableProxy(ct.table, ms, lockoptions="auto", ack=False) as T:
         for ds in xds:
             assert "ROWID" in ds.coords
             group_col_values = [ds.attrs[a] for a in group_cols]
@@ -104,7 +105,7 @@ def test_ms_read(ms, group_cols, index_cols, select_cols):
 @pytest.mark.parametrize("select_cols", [["DATA", "STATE_ID"]])
 def test_ms_update(ms, group_cols, index_cols, select_cols):
     # Zero everything to be sure
-    with TableProxy(pt.table, ms, readonly=False, lockoptions="auto", ack=False) as T:
+    with TableProxy(ct.table, ms, readonly=False, lockoptions="auto", ack=False) as T:
         nrows = T.nrows().result()
         T.putcol("STATE_ID", np.full(nrows, 0, dtype=np.int32)).result()
         data = np.zeros_like(T.getcol("DATA").result())
@@ -176,7 +177,7 @@ def test_ms_update(ms, group_cols, index_cols, select_cols):
     ids=index_cols_str,
 )
 def test_row_query(ms, index_cols):
-    T = TableProxy(pt.table, ms, readonly=True, lockoptions="auto", ack=False)
+    T = TableProxy(ct.table, ms, readonly=True, lockoptions="auto", ack=False)
 
     # Get the expected row ordering by lexically
     # sorting the indexing columns

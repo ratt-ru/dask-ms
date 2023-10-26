@@ -2,6 +2,8 @@ import abc
 from functools import partial
 from pathlib import Path
 
+from daskms.patterns import lazy_import
+
 CASA_INPUT_ONLY_ARGS = ("group_columns", "index_columns", "taql_where")
 
 
@@ -28,9 +30,9 @@ class TableFormat(abc.ABC):
 
         if typ == "casa":
             from daskms.table_proxy import TableProxy
-            import pyrap.tables as pt
+            import casacore.tables as ct
 
-            table_proxy = TableProxy(pt.table, store.root, readonly=True, ack=False)
+            table_proxy = TableProxy(ct.table, store.root, readonly=True, ack=False)
             keywords = table_proxy.getkeywords().result()
             subtables = CasaFormat.find_subtables(keywords)
 

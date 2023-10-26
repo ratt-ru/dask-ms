@@ -6,9 +6,11 @@ from threading import Lock
 import weakref
 
 from dask.base import normalize_token
-import pyrap.tables as pt
+from daskms.patterns import lazy_import
 from daskms.table_executor import Executor, STANDARD_EXECUTOR
 from daskms.utils import arg_hasher
+
+ct = lazy_import("casacore.tables")
 
 log = logging.getLogger(__name__)
 
@@ -57,7 +59,7 @@ _proxied_methods = [
 
 
 _PROXY_DOCSTRING = """
-Proxies calls to :func:`~pyrap.tables.table.%s`
+Proxies calls to :func:`~casacore.tables.table.%s`
 via a :class:`~concurrent.futures.ThreadPoolExecutor`
 
 Returns
@@ -69,7 +71,7 @@ future : :class:`concurrent.futures.Future`
 
 def proxied_method_factory(method, locktype):
     """
-    Proxy pyrap.tables.table.method calls.
+    Proxy casacore.tables.table.method calls.
 
     Creates a private implementation function which performs
     the call locked according to to ``locktype``.
@@ -176,7 +178,7 @@ class MismatchedLocks(Exception):
 
 
 def taql_factory(query, style="Python", tables=(), readonly=True):
-    """Calls pt.taql, converting TableProxy's in tables to pyrap tables"""
+    """Calls ct.taql, converting TableProxy's in tables to casacore.tables"""
     tables = [t._table_future.result() for t in tables]
 
     if isinstance(readonly, (tuple, list)):
@@ -190,7 +192,7 @@ def taql_factory(query, style="Python", tables=(), readonly=True):
         t.lock(write=ro is False)
 
     try:
-        return pt.taql(query, style=style, tables=tables)
+        return ct.taql(query, style=style, tables=tables)
     finally:
         for t in tables:
             t.unlock()
@@ -291,7 +293,7 @@ def _table_future_finaliser(ex, table_future, args, kwargs):
 
 class TableProxy(object, metaclass=TableProxyMetaClass):
     """
-    Proxies calls to a :class:`pyrap.tables.table` object via
+    Proxies calls to a :class:`casacore.tables.table` object via
     a :class:`concurrent.futures.ThreadPoolExecutor`.
     """
 

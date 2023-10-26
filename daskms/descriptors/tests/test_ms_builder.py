@@ -3,11 +3,13 @@
 import dask.array as da
 import numpy as np
 from numpy.testing import assert_array_equal
-import pyrap.tables as pt
 import pytest
 
 from daskms.dataset import Variable
 from daskms.descriptors.ms import MSDescriptorBuilder
+from daskms.patterns import lazy_import
+
+ct = lazy_import("casacore.tables")
 
 
 @pytest.fixture(
@@ -70,11 +72,11 @@ def test_ms_builder(tmp_path, variables, fixed):
     dminfo = builder.dminfo(tab_desc)
 
     # These columns must always be present on an MS
-    required_cols = {k for k in pt.required_ms_desc().keys() if not k.startswith("_")}
+    required_cols = {k for k in ct.required_ms_desc().keys() if not k.startswith("_")}
 
     filename = str(tmp_path / "test_plugin.ms")
 
-    with pt.table(filename, tab_desc, dminfo=dminfo, ack=False, nrow=10) as T:
+    with ct.table(filename, tab_desc, dminfo=dminfo, ack=False, nrow=10) as T:
         # We got required + the extra columns we asked for
 
         assert set(T.colnames()) == set.union(var_names, required_cols)

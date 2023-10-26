@@ -12,17 +12,20 @@ from dask.highlevelgraph import HighLevelGraph
 import dask.array as da
 import numpy as np
 from numpy.testing import assert_array_equal
-import pyrap.tables as pt
 import pytest
 
+from daskms.patterns import lazy_import
 from daskms.table_proxy import TableProxy, taql_factory
 from daskms.utils import assert_liveness
 
 
+ct = lazy_import("casacore.tables")
+
+
 def test_table_proxy(ms):
     """Base table proxy test"""
-    tp = TableProxy(pt.table, ms, ack=False, readonly=False)
-    tq = TableProxy(pt.taql, f"SELECT UNIQUE ANTENNA1 FROM '{ms}'")
+    tp = TableProxy(ct.table, ms, ack=False, readonly=False)
+    tq = TableProxy(ct.taql, f"SELECT UNIQUE ANTENNA1 FROM '{ms}'")
 
     assert_liveness(2, 1)
 
@@ -39,7 +42,7 @@ def test_table_proxy(ms):
 
 def test_table_proxy_pickling(ms):
     """Test table pickling"""
-    proxy = TableProxy(pt.table, ms, ack=False, readonly=False)
+    proxy = TableProxy(ct.table, ms, ack=False, readonly=False)
     proxy2 = pickle.loads(pickle.dumps(proxy))
 
     assert_liveness(1, 1)
@@ -55,7 +58,7 @@ def test_table_proxy_pickling(ms):
 
 def test_taql_proxy_pickling(ms):
     """Test taql pickling"""
-    proxy = TableProxy(pt.taql, f"SELECT UNIQUE ANTENNA1 FROM '{ms}'")
+    proxy = TableProxy(ct.taql, f"SELECT UNIQUE ANTENNA1 FROM '{ms}'")
     proxy2 = pickle.loads(pickle.dumps(proxy))
 
     assert_liveness(1, 1)
@@ -70,7 +73,7 @@ def test_taql_proxy_pickling(ms):
 @pytest.mark.parametrize("reverse", [True, False])
 def test_embedding_table_proxy_in_taql(ms, reverse):
     """Test using a TableProxy to create a TAQL TableProxy"""
-    proxy = TableProxy(pt.table, ms, ack=False, readonly=True)
+    proxy = TableProxy(ct.table, ms, ack=False, readonly=True)
     query = "SELECT UNIQUE ANTENNA1 FROM $1"
     taql_proxy = TableProxy(taql_factory, query, tables=[proxy])
     assert_array_equal(taql_proxy.getcol("ANTENNA1").result(), [0, 1, 2])
@@ -103,7 +106,7 @@ def test_proxy_dask_embedding(ms):
     """
 
     def _ant1_factory(ms):
-        proxy = TableProxy(pt.table, ms, ack=False, readonly=False)
+        proxy = TableProxy(ct.table, ms, ack=False, readonly=False)
         nrows = proxy.nrows().result()
 
         name = "ant1"
@@ -130,7 +133,7 @@ def test_proxy_dask_embedding(ms):
 
     a1 = ant1.compute()
 
-    with pt.table(ms, readonly=False, ack=False) as T:
+    with ct.table(ms, readonly=False, ack=False) as T:
         assert_array_equal(a1, T.getcol("ANTENNA1"))
 
     # Delete the graph
@@ -165,8 +168,8 @@ def test_proxy_dask_embedding(ms):
 )
 def test_taql_factory(ms, ant_table, readonly):
     """Test that we can do a somewhat complicated taql query"""
-    ms_proxy = TableProxy(pt.table, ms, ack=False, readonly=True)
-    ant_proxy = TableProxy(pt.table, ant_table, ack=False, readonly=True)
+    ms_proxy = TableProxy(ct.table, ms, ack=False, readonly=True)
+    ant_proxy = TableProxy(ct.table, ant_table, ack=False, readonly=True)
     query = "SELECT [SELECT NAME FROM $2][ANTENNA1] AS NAME FROM $1 "
     taql_proxy = TableProxy(
         taql_factory, query, tables=[ms_proxy, ant_proxy], readonly=readonly
@@ -216,7 +219,7 @@ def test_proxy_finalization(tmpdir_factory, epochs, iterations):
 
                 tab_fut = pool.submit(
                     TableProxy,
-                    pt.tablefromascii,
+                    ct.tablefromascii,
                     str(path),
                     str(ascii_desc),
                     ack=False,

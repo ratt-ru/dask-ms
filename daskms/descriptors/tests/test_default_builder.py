@@ -5,7 +5,6 @@ import os
 import dask.array as da
 import numpy as np
 from numpy.testing import assert_array_equal
-import pyrap.tables as pt
 import pytest
 
 from daskms.dataset import Variable
@@ -13,6 +12,9 @@ from daskms.descriptors.builder import (
     DefaultDescriptorBuilder,
     variable_column_descriptor,
 )
+from daskms.patterns import lazy_import
+
+ct = lazy_import("casacore.tables")
 
 
 @pytest.mark.parametrize(
@@ -38,7 +40,7 @@ def test_default_plugin(tmp_path, chunks):
     tab_desc = builder.descriptor(variables, default_desc)
     dminfo = builder.dminfo(tab_desc)
 
-    with pt.table(filename, tab_desc, dminfo=dminfo, ack=False) as T:
+    with ct.table(filename, tab_desc, dminfo=dminfo, ack=False) as T:
         T.addrows(10)
         assert set(variables.keys()) == set(T.colnames())
 
@@ -72,9 +74,9 @@ def test_variable_column_descriptor(chunks, dtype, tmp_path):
 
     # Create a new table with the column metadata
     fn = os.path.join(str(tmp_path), "test.ms")
-    tabdesc = pt.maketabdesc(column_meta)
+    tabdesc = ct.maketabdesc(column_meta)
 
-    with pt.table(fn, tabdesc, readonly=False, ack=False) as T:
+    with ct.table(fn, tabdesc, readonly=False, ack=False) as T:
         # Add rows
         T.addrows(shapes["row"])
 

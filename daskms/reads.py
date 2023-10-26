@@ -3,10 +3,10 @@
 import logging
 from pathlib import Path
 
+
 import dask
 import dask.array as da
 import numpy as np
-import pyrap.tables as pt
 
 from daskms.columns import (
     column_metadata,
@@ -15,6 +15,7 @@ from daskms.columns import (
     infer_dtype,
 )
 from daskms.constants import DASKMS_PARTITION_KEY
+from daskms.patterns import lazy_import
 from daskms.ordering import (
     ordering_taql,
     row_ordering,
@@ -30,6 +31,8 @@ from daskms.table_schemas import lookup_table_schema
 from daskms.utils import table_path_split
 
 _DEFAULT_ROW_CHUNKS = 10000
+
+ct = lazy_import("casacore.tables")
 
 log = logging.getLogger(__name__)
 
@@ -318,7 +321,7 @@ class DatasetFactory(object):
 
     def _table_proxy_factory(self):
         return TableProxy(
-            pt.table,
+            ct.table,
             self.table_path,
             ack=False,
             readonly=True,

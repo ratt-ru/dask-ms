@@ -2,8 +2,11 @@
 
 from tempfile import mkdtemp
 
+from daskms.patterns import lazy_import
+
 import numpy as np
-import pyrap.tables as pt
+
+ct = lazy_import("casacore.tables")
 
 
 def _ms_factory_impl(ms_name):
@@ -36,23 +39,23 @@ def _ms_factory_impl(ms_name):
     spw_chans = [16, 32]
     ddids = ([0, 0, 4], [1, 1, 6])
 
-    with pt.default_ms(ms_name, desc) as ms:
+    with ct.default_ms(ms_name, desc) as ms:
         # Populate ANTENNA table
-        with pt.table(ant_name, **kw) as A:
+        with ct.table(ant_name, **kw) as A:
             A.addrows(na)
             A.putcol("POSITION", rs.random_sample((na, 3)) * 10000)
             A.putcol("OFFSET", rs.random_sample((na, 3)))
             A.putcol("NAME", ["ANT-%d" % i for i in range(na)])
 
         # Populate POLARIZATION table
-        with pt.table(pol_name, **kw) as P:
+        with ct.table(pol_name, **kw) as P:
             for r, corr_type in enumerate(corr_types):
                 P.addrows(1)
                 P.putcol("NUM_CORR", np.array(len(corr_type))[None], startrow=r, nrow=1)
                 P.putcol("CORR_TYPE", np.array(corr_type)[None, :], startrow=r, nrow=1)
 
         # Populate SPECTRAL_WINDOW table
-        with pt.table(spw_name, **kw) as SPW:
+        with ct.table(spw_name, **kw) as SPW:
             freq_start = 0.856e9
             freq_end = 2 * 0.856e9
 
@@ -71,7 +74,7 @@ def _ms_factory_impl(ms_name):
                 )
 
         # Populate FIELD table
-        with pt.table(field_name, **kw) as F:
+        with ct.table(field_name, **kw) as F:
             fields = (["3C147", np.deg2rad([0, 60])], ["3C147", np.deg2rad([30, 45])])
 
             npoly = 1
@@ -86,7 +89,7 @@ def _ms_factory_impl(ms_name):
                     F.putcol(c, phase_dir[None, None, :], startrow=r, nrow=1)
 
         # Populate DATA_DESCRIPTION table
-        with pt.table(ddid_name, **kw) as D:
+        with ct.table(ddid_name, **kw) as D:
             for r, (spw_id, pol_id, _) in enumerate(ddids):
                 D.addrows(1)
                 D.putcol(
