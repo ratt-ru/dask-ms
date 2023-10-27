@@ -5,6 +5,8 @@ History
 X.Y.Z (YYYY-MM-DD)
 ------------------
 * Lazily load casacore tables module (:pr:`294`)
+* Deprecate Python 3.8 support (:pr:`296`)
+* Temporarily add Pandas as an arrow extra dependency (:pr:`296`)
 
 0.2.18 (2023-09-20)
 ------------------
