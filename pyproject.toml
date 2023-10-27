@@ -9,7 +9,6 @@ packages = [{include = "daskms"}]
 
 [tool.poetry.dependencies]
 python = "^3.9, < 3.13"
-arcae = {version = "^0.2.1", optional = true}
 appdirs = "^1.4.4"
 dask = {extras = ["array"], version = "^2023.1.0"}
 donfig = "^0.7.0"
@@ -27,7 +26,6 @@ dask-ms = "daskms.apps.entrypoint:main"
 fragments = "daskms.apps.fragments:main"
 
 [tool.poetry.extras]
-v030 = ["arcae", "xarray"]
 arrow = ["pandas", "pyarrow"]
 xarray = ["xarray"]
 zarr = ["zarr"]
