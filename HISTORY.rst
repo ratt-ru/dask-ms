@@ -2,6 +2,10 @@
 History
 =======
 
+X.Y.Z (YYYY-MM-DD)
+------------------
+* Lazily load casacore tables module (:pr:`294`)
+
 0.2.18 (2023-09-20)
 ------------------
 * Ignore non-existent columns (:pr:`290`)
