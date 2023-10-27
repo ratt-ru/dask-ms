@@ -7,7 +7,7 @@ on:
     - cron: '30 2 * * 1' # Every Monday @ 2h30am UTC
 
 env:
-  POETRY_VERSION: 1.2.1
+  POETRY_VERSION: 1.6.1
   MINIO_SERVER_DOWNLOAD_URL: https://dl.min.io/server/minio/release/linux-amd64/archive/minio_20230907020502.0.0_amd64.deb
   MINIO_CLIENT_DOWNLOAD_URL: https://dl.min.io/client/mc/release/linux-amd64/archive/mcli_20230907224855.0.0_amd64.deb
 
@@ -30,7 +30,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8", "3.9", "3.10"]
+        python-version: ["3.9", "3.10", "3.11"]
 
     steps:
       - name: Create Cache Hash
@@ -85,6 +85,9 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 1
+
+      - name: Setup a virtual environment appropriate to the python version
+        run: poetry env use python${{ matrix.python-version }}
 
       - name: Install dask-ms base
         run: poetry install --extras "testing arrow zarr"
