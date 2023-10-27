@@ -14,7 +14,7 @@ xarray Datasets from CASA Tables
 
 Constructs xarray_ ``Datasets`` from CASA Tables via python-casacore_.
 The ``Variables`` contained in the ``Dataset`` are dask_ arrays backed by
-deferred calls to :code:`pyrap.tables.table.getcol`.
+deferred calls to :code:`casacore.tables.table.getcol`.
 
 Supports writing ``Variables`` back to the respective column in the Table.
 

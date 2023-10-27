@@ -4,10 +4,8 @@ import logging
 
 import dask
 import dask.array as da
-from daskms.optimisation import cached_array, inlined_array
 from dask.highlevelgraph import HighLevelGraph
 import numpy as np
-import pyrap.tables as pt
 
 from daskms.columns import dim_extents_array
 from daskms.constants import DASKMS_PARTITION_KEY
@@ -16,12 +14,16 @@ from daskms.dataset_schema import DatasetSchema
 from daskms.descriptors.builder import AbstractDescriptorBuilder
 from daskms.descriptors.builder_factory import filename_builder_factory
 from daskms.descriptors.builder_factory import string_builder_factory
+from daskms.patterns import lazy_import
+from daskms.optimisation import cached_array, inlined_array
 from daskms.ordering import row_run_factory
 from daskms.table import table_exists
 from daskms.table_executor import executor_key
 from daskms.table_proxy import TableProxy, WRITELOCK
 from daskms.utils import table_path_split
 
+
+ct = lazy_import("casacore.tables")
 
 log = logging.getLogger(__name__)
 
@@ -241,7 +243,7 @@ def descriptor_builder(table, descriptor):
 
 def _writable_table_proxy(table_name):
     return TableProxy(
-        pt.table,
+        ct.table,
         table_name,
         ack=False,
         readonly=False,
@@ -265,7 +267,7 @@ def _create_table(table_name, datasets, columns, descriptor):
         table_path = str(table_path)
 
         # Create the MS
-        with pt.default_ms(table_path, tabdesc=table_desc, dminfo=dminfo):
+        with ct.default_ms(table_path, tabdesc=table_desc, dminfo=dminfo):
             pass
 
         return _writable_table_proxy(table_path)
@@ -280,12 +282,12 @@ def _create_table(table_name, datasets, columns, descriptor):
 
         # Create the subtable
         if isinstance(builder, MSSubTableDescriptorBuilder):
-            with pt.default_ms_subtable(
+            with ct.default_ms_subtable(
                 subtable, subtable_path, tabdesc=table_desc, dminfo=dminfo
             ):
                 pass
         else:
-            with pt.table(subtable_path, table_desc, dminfo=dminfo, ack=False):
+            with ct.table(subtable_path, table_desc, dminfo=dminfo, ack=False):
                 pass
 
         # Add subtable to the main table
@@ -297,7 +299,7 @@ def _create_table(table_name, datasets, columns, descriptor):
         return _writable_table_proxy(subtable_path)
     else:
         # Create the table
-        with pt.table(str(table_path), table_desc, dminfo=dminfo, ack=False):
+        with ct.table(str(table_path), table_desc, dminfo=dminfo, ack=False):
             pass
 
         return _writable_table_proxy(str(table_path))

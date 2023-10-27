@@ -20,7 +20,7 @@ Numpy arrays via the `python-casacore
 
 .. testcode::
 
-    import pyrap.tables as pt
+    import casacore.tables as pt
     from daskms.example_data import example_ms
 
     ms_filename = example_ms()

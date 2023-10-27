@@ -2,7 +2,6 @@
 import logging
 
 import numpy as np
-import pyrap.tables as pt
 
 from daskms.columns import infer_dtype
 from daskms.descriptors.builder import (
@@ -10,6 +9,9 @@ from daskms.descriptors.builder import (
     AbstractDescriptorBuilder,
 )
 from daskms.dataset import data_var_dims, DimensionInferenceError
+from daskms.patterns import lazy_import
+
+ct = lazy_import("casacore.tables")
 
 
 log = logging.getLogger(__name__)
@@ -30,8 +32,8 @@ class MSDescriptorBuilder(AbstractDescriptorBuilder):
 
     def __init__(self, fixed=True):
         super(AbstractDescriptorBuilder, self).__init__()
-        self.DEFAULT_MS_DESC = pt.complete_ms_desc()
-        self.REQUIRED_FIELDS = set(pt.required_ms_desc().keys())
+        self.DEFAULT_MS_DESC = ct.complete_ms_desc()
+        self.REQUIRED_FIELDS = set(ct.required_ms_desc().keys())
         self.fixed = fixed
         self.ms_dims = None
 

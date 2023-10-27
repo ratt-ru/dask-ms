@@ -10,11 +10,11 @@ from dask.array.core import normalize_chunks
 from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 from numpy.testing import assert_array_equal, assert_array_almost_equal
-import pyrap.tables as pt
 import pytest
 
 from daskms import xds_from_ms
 from daskms.dataset import Dataset, Variable
+from daskms.patterns import lazy_import
 from daskms.reads import read_datasets
 from daskms.writes import write_datasets
 from daskms.utils import (
@@ -23,6 +23,8 @@ from daskms.utils import (
     index_cols_str,
     assert_liveness,
 )
+
+ct = lazy_import("casacore.tables")
 
 try:
     import xarray as xr
@@ -119,7 +121,7 @@ def test_dataset_updates(ms, select_cols, group_cols, index_cols, shapes, chunks
     """Test dataset writes"""
 
     # Get original STATE_ID and DATA
-    with pt.table(ms, ack=False, readonly=True, lockoptions="auto") as T:
+    with ct.table(ms, ack=False, readonly=True, lockoptions="auto") as T:
         original_state_id = T.getcol("STATE_ID")
         original_data = T.getcol("DATA")
 
@@ -162,7 +164,7 @@ def test_dataset_updates(ms, select_cols, group_cols, index_cols, shapes, chunks
         assert_liveness(0, 0)
     finally:
         # Restore original STATE_ID
-        with pt.table(ms, ack=False, readonly=False, lockoptions="auto") as T:
+        with ct.table(ms, ack=False, readonly=False, lockoptions="auto") as T:
             state_id = T.getcol("STATE_ID")
             data = T.getcol("DATA")
             T.putcol("STATE_ID", original_state_id)
@@ -323,7 +325,7 @@ def test_dataset_add_column(ms, dtype):
     del datasets, ds, writes, nds
     assert_liveness(0, 0)
 
-    with pt.table(ms, readonly=False, ack=False, lockoptions="auto") as T:
+    with ct.table(ms, readonly=False, ack=False, lockoptions="auto") as T:
         bf = T.getcol("BITFLAG")
         assert T.getcoldesc("BITFLAG")["keywords"] == col_kw["BITFLAG"]
         assert bf.dtype == dtype
@@ -347,7 +349,7 @@ def test_dataset_add_string_column(ms):
     del datasets, ds, writes, nds
     assert_liveness(0, 0)
 
-    with pt.table(ms, readonly=False, ack=False, lockoptions="auto") as T:
+    with ct.table(ms, readonly=False, ack=False, lockoptions="auto") as T:
         assert name_list == T.getcol("NAMES")
 
 
@@ -423,13 +425,13 @@ def test_dataset_create_table(tmp_path, dataset_chunks, dtype):
     dask.compute(writes, subt_writes)
 
     # Check written data
-    with pt.table(table_name, readonly=True, lockoptions="auto", ack=False) as T:
+    with ct.table(table_name, readonly=True, lockoptions="auto", ack=False) as T:
         assert row_sum == T.nrows()
         assert_array_equal(T.getcol("DATA"), np.concatenate(datas))
         assert_array_equal(T.getcol("NAMES"), names)
 
     # Sub-table correctly linked and populated
-    with pt.table(
+    with ct.table(
         table_name + "::SPW", readonly=True, lockoptions="auto", ack=False
     ) as T:
         assert T.nrows() == 1

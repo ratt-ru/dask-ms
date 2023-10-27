@@ -1,13 +1,15 @@
 # -*- coding: utf-8 -*-
 
 import dask
-import pyrap.tables as pt
 import pytest
 
 from daskms.example_data import example_ms
 from daskms.table_proxy import TableProxy
 from daskms import xds_to_table, xds_from_ms
 from daskms.dataset import Dataset
+from daskms.patterns import lazy_import
+
+ct = lazy_import("casacore.tables")
 
 
 @pytest.fixture(scope="module")
@@ -23,7 +25,7 @@ def keyword_ms():
 @pytest.mark.parametrize("table_proxy", [True, False])
 def test_read_keywords(keyword_ms, table_kw, column_kw, table_proxy):
     # Create an example MS
-    with pt.table(keyword_ms, ack=False, readonly=True) as T:
+    with ct.table(keyword_ms, ack=False, readonly=True) as T:
         desc = T._getdesc(actual=True)
 
     ret = xds_from_ms(
@@ -69,7 +71,7 @@ def test_write_keywords(ms):
     assert isinstance(writes, Dataset)
     dask.compute(writes)
 
-    with pt.table(ms, ack=False, readonly=True) as T:
+    with ct.table(ms, ack=False, readonly=True) as T:
         assert T.getkeywords()["bob"] == "qux"
 
     # Add to column keywords
@@ -80,7 +82,7 @@ def test_write_keywords(ms):
     assert all(isinstance(w, Dataset) for w in writes)
     dask.compute(writes)
 
-    with pt.table(ms, ack=False, readonly=True) as T:
+    with ct.table(ms, ack=False, readonly=True) as T:
         assert T.getcolkeywords("STATE_ID")["bob"] == "qux"
 
     # Remove from column and table keywords
@@ -97,7 +99,7 @@ def test_write_keywords(ms):
     assert all(isinstance(w, Dataset) for w in writes)
     dask.compute(writes)
 
-    with pt.table(ms, ack=False, readonly=True) as T:
+    with ct.table(ms, ack=False, readonly=True) as T:
         assert "bob" not in T.getkeywords()
         assert "bob" not in T.getcolkeywords("STATE_ID")
 

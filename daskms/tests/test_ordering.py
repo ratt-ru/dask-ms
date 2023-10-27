@@ -3,9 +3,9 @@
 import dask
 import dask.array as da
 from numpy.testing import assert_array_equal
-import pyrap.tables as pt
 import pytest
 
+from daskms.patterns import lazy_import
 from daskms.table_proxy import TableProxy
 from daskms.ordering import (
     ordering_taql,
@@ -16,8 +16,11 @@ from daskms.ordering import (
 from daskms.utils import group_cols_str, index_cols_str, assert_liveness
 
 
+ct = lazy_import("casacore.tables")
+
+
 def table_proxy(ms):
-    return TableProxy(pt.table, ms, ack=False, lockoptions="user", readonly=True)
+    return TableProxy(ct.table, ms, ack=False, lockoptions="user", readonly=True)
 
 
 @pytest.mark.parametrize(

@@ -9,11 +9,9 @@ from urllib.parse import urlparse
 from uuid import uuid4
 
 import numpy as np
-import pyrap.tables as pt
 import pytest
 
 from daskms.testing import mark_in_pytest
-
 
 # content of conftest.py
 def pytest_configure(config):
@@ -35,6 +33,7 @@ def xms_always_gc():
 
 @pytest.fixture(scope="session")
 def big_ms(tmp_path_factory, request):
+    ct = pytest.importorskip("casacore.tables")
     msdir = tmp_path_factory.mktemp("big_ms_dir", numbered=False)
     fn = os.path.join(str(msdir), "big.ms")
     row = request.param
@@ -60,7 +59,7 @@ def big_ms(tmp_path_factory, request):
     data = rs.random_sample(data_shape) + rs.random_sample(data_shape) * 1j
 
     # Create the table
-    with pt.taql(create_table_query) as ms:
+    with ct.taql(create_table_query) as ms:
         ant1, ant2 = (a.astype(np.int32) for a in np.triu_indices(ant, 1))
         bl = ant1.shape[0]
         ant1 = np.repeat(ant1, (row + bl - 1) // bl)
@@ -88,6 +87,7 @@ def big_ms(tmp_path_factory, request):
 
 @pytest.fixture
 def ms(tmp_path_factory):
+    ct = pytest.importorskip("casacore.tables")
     msdir = tmp_path_factory.mktemp("msdir", numbered=True)
     fn = os.path.join(str(msdir), "test.ms")
 
@@ -124,7 +124,7 @@ def ms(tmp_path_factory):
     uvw = rs.random_sample((len(state), 3)).astype(np.float64)
 
     # Create the table
-    with pt.taql(create_table_query) as ms:
+    with ct.taql(create_table_query) as ms:
         ms.putcol("FIELD_ID", field)
         ms.putcol("DATA_DESC_ID", ddid)
         ms.putcol("ANTENNA1", ant1)
@@ -155,6 +155,7 @@ def spw_chan_freqs():
 @pytest.fixture
 def spw_table(tmp_path_factory, spw_chan_freqs):
     """Simulate a SPECTRAL_WINDOW table with two spectral windows"""
+    ct = pytest.importorskip("casacore.tables")
     spw_dir = tmp_path_factory.mktemp("spw_dir", numbered=True)
     fn = os.path.join(str(spw_dir), "SPECTRAL_WINDOW")
 
@@ -168,7 +169,7 @@ def spw_table(tmp_path_factory, spw_chan_freqs):
         len(spw_chan_freqs),
     )
 
-    with pt.taql(create_table_query) as spw:
+    with ct.taql(create_table_query) as spw:
         spw.putvarcol(
             "NUM_CHAN", {"r%d" % i: s.shape[0] for i, s in enumerate(spw_chan_freqs)}
         )
@@ -210,6 +211,7 @@ def wsrt_antenna_positions():
 
 @pytest.fixture
 def ant_table(tmp_path_factory, wsrt_antenna_positions):
+    ct = pytest.importorskip("casacore.tables")
     ant_dir = tmp_path_factory.mktemp("ant_dir", numbered=True)
     fn = os.path.join(str(ant_dir), "ANTENNA")
 
@@ -225,7 +227,7 @@ def ant_table(tmp_path_factory, wsrt_antenna_positions):
 
     names = ["ANTENNA-%d" % i for i in range(wsrt_antenna_positions.shape[0])]
 
-    with pt.taql(create_table_query) as ant:
+    with ct.taql(create_table_query) as ant:
         ant.putcol("POSITION", wsrt_antenna_positions)
         ant.putcol("NAME", names)
 

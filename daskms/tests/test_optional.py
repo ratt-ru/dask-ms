@@ -14,10 +14,12 @@ from pprint import pprint  # noqa
 
 import numpy as np
 from numpy.testing import assert_array_equal
-import pyrap.tables as pt
 import pytest
 
 from daskms.columns import infer_casa_type
+from daskms.patterns import lazy_import
+
+ct = lazy_import("casacore.tables")
 
 
 @pytest.mark.optional
@@ -44,10 +46,10 @@ def test_variable_column_dimensions(tmp_path, column, dtype):
         "name": column,
     }
 
-    table_desc = pt.maketabdesc([desc])
+    table_desc = ct.maketabdesc([desc])
     fn = os.path.join(str(tmp_path), "test.table")
 
-    with pt.table(fn, table_desc, nrow=10, ack=False) as T:
+    with ct.table(fn, table_desc, nrow=10, ack=False) as T:
         # Put 10 rows into the table
         T.putcol(column, np.zeros((10, 20, 30), dtype=dtype))
         assert T.getcol(column).shape == (10, 20, 30)
@@ -87,10 +89,10 @@ def test_variable_column_shapes(tmp_path, column, dtype):
         "name": column,
     }
 
-    table_desc = pt.maketabdesc([desc])
+    table_desc = ct.maketabdesc([desc])
     fn = os.path.join(str(tmp_path), "test.table")
 
-    with pt.table(fn, table_desc, nrow=10, ack=False) as T:
+    with ct.table(fn, table_desc, nrow=10, ack=False) as T:
         # Put 10 rows into the table
         T.putcol(column, np.zeros((10, 20, 30), dtype=dtype))
         assert T.getcol(column).shape == (10, 20, 30)
@@ -132,10 +134,10 @@ def test_fixed_column_shapes(tmp_path, column, dtype):
         "name": column,
     }
 
-    table_desc = pt.maketabdesc([desc])
+    table_desc = ct.maketabdesc([desc])
     fn = os.path.join(str(tmp_path), "test.table")
 
-    with pt.table(fn, table_desc, nrow=10, ack=False) as T:
+    with ct.table(fn, table_desc, nrow=10, ack=False) as T:
         # Put 10 rows into the table
         T.putcol(column, np.zeros((10, 20, 30), dtype=dtype))
         assert T.getcol(column).shape == (10, 20, 30)
@@ -172,10 +174,10 @@ def test_only_row_shape(tmp_path, column, dtype):
         "name": column,
     }
 
-    table_desc = pt.maketabdesc([desc])
+    table_desc = ct.maketabdesc([desc])
     fn = os.path.join(str(tmp_path), "test.table")
 
-    with pt.table(fn, table_desc, nrow=10, ack=False) as T:
+    with ct.table(fn, table_desc, nrow=10, ack=False) as T:
         # Put 10 rows into the table
         T.putcol(column, np.zeros(10, dtype=dtype))
         assert T.getcol(column).shape == (10,)
@@ -214,10 +216,10 @@ def test_scalar_ndim(tmp_path, column, dtype):
         "name": column,
     }
 
-    table_desc = pt.maketabdesc([desc])
+    table_desc = ct.maketabdesc([desc])
     fn = os.path.join(str(tmp_path), "test.table")
 
-    with pt.table(fn, table_desc, nrow=10, ack=False) as T:
+    with ct.table(fn, table_desc, nrow=10, ack=False) as T:
         for r in range(10):
             T.putcell(column, r, r)
 
@@ -250,7 +252,7 @@ def test_tiledstman(tmp_path, column, row, shape, dtype):
         "name": column,
     }
 
-    table_desc = pt.maketabdesc([desc])
+    table_desc = ct.maketabdesc([desc])
 
     tile_shape = tuple(reversed(shape)) + (row,)
 
@@ -265,7 +267,7 @@ def test_tiledstman(tmp_path, column, row, shape, dtype):
 
     fn = os.path.join(str(tmp_path), "test.table")
 
-    with pt.table(fn, table_desc, dminfo=dminfo, nrow=10, ack=False) as T:
+    with ct.table(fn, table_desc, dminfo=dminfo, nrow=10, ack=False) as T:
         dmg = T.getdminfo()["*1"]
         assert dmg["NAME"] == "BAZ-GROUP"
         assert_array_equal(dmg["SPEC"]["DEFAULTTILESHAPE"], tile_shape)
@@ -299,7 +301,7 @@ def test_tiledstman_addcols(tmp_path, column, row, shape, dtype):
         "name": column,
     }
 
-    table_desc = pt.maketabdesc([desc])
+    table_desc = ct.maketabdesc([desc])
 
     tile_shape = tuple(reversed(shape)) + (row,)
 
@@ -314,7 +316,7 @@ def test_tiledstman_addcols(tmp_path, column, row, shape, dtype):
 
     fn = os.path.join(str(tmp_path), "test.table")
 
-    with pt.table(fn, table_desc, dminfo=dminfo, nrow=10, ack=False) as T:
+    with ct.table(fn, table_desc, dminfo=dminfo, nrow=10, ack=False) as T:
         # Add a new FRED column
         desc = {
             "FRED": {

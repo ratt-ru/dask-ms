@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 
-import pyrap.tables as pt
-
 from daskms.descriptors.builder import (
     register_descriptor_builder,
     AbstractDescriptorBuilder,
 )
+from daskms.patterns import lazy_import
 from daskms.table_schemas import SUBTABLES
+
+ct = lazy_import("casacore.tables")
 
 
 @register_descriptor_builder("mssubtable")
@@ -18,8 +19,8 @@ class MSSubTableDescriptorBuilder(AbstractDescriptorBuilder):
             )
 
         self.subtable = subtable
-        self.DEFAULT_TABLE_DESC = pt.complete_ms_desc(subtable)
-        self.REQUIRED_FIELDS = set(pt.required_ms_desc(subtable).keys())
+        self.DEFAULT_TABLE_DESC = ct.complete_ms_desc(subtable)
+        self.REQUIRED_FIELDS = set(ct.required_ms_desc(subtable).keys())
 
     def default_descriptor(self):
         return self.DEFAULT_TABLE_DESC.copy()

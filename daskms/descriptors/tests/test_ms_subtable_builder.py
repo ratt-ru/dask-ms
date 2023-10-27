@@ -2,12 +2,14 @@
 
 import dask.array as da
 import numpy as np
-import pyrap.tables as pt
 import pytest
 
 from daskms.dataset import Variable
 from daskms.descriptors.ms_subtable import MSSubTableDescriptorBuilder
+from daskms.patterns import lazy_import
 from daskms.table_schemas import SUBTABLES
+
+ct = lazy_import("casacore.tables")
 
 
 @pytest.mark.parametrize("table", SUBTABLES)
@@ -23,12 +25,12 @@ def test_ms_subtable_builder(tmp_path, table):
 
     # These columns must always be present on an MS
     required_cols = {
-        k for k in pt.required_ms_desc(table).keys() if not k.startswith("_")
+        k for k in ct.required_ms_desc(table).keys() if not k.startswith("_")
     }
 
     filename = str(tmp_path / (f"{table}.table"))
 
-    with pt.table(filename, tab_desc, dminfo=dminfo, ack=False) as T:
+    with ct.table(filename, tab_desc, dminfo=dminfo, ack=False) as T:
         T.addrows(10)
 
         # We got required + the extra columns we asked for

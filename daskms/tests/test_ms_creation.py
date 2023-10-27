@@ -6,10 +6,12 @@ import dask
 import dask.array as da
 import numpy as np
 from numpy.testing import assert_array_equal
-import pyrap.tables as pt
 import pytest
 
 from daskms import xds_to_table, xds_from_ms, Dataset
+from daskms.patterns import lazy_import
+
+ct = lazy_import("casacore.tables")
 
 
 @pytest.mark.parametrize(
@@ -183,31 +185,31 @@ def test_ms_create(tmp_path, chunks, num_chans, corr_types, sources):
     )
 
     # Check ANTENNA table correctly created
-    with pt.table(ant_table_name, ack=False) as A:
+    with ct.table(ant_table_name, ack=False) as A:
         assert_array_equal(A.getcol("NAME"), names)
         assert_array_equal(A.getcol("POSITION"), position)
         assert_array_equal(A.getcol("OFFSET"), offset)
 
-        required_desc = pt.required_ms_desc("ANTENNA")
+        required_desc = ct.required_ms_desc("ANTENNA")
         required_columns = set(k for k in required_desc.keys() if not k.startswith("_"))
 
         assert set(A.colnames()) == set(required_columns)
 
     # Check POLARIZATION table correctly created
-    with pt.table(pol_table_name, ack=False) as P:
+    with ct.table(pol_table_name, ack=False) as P:
         for r, corr_type in enumerate(corr_types):
             assert_array_equal(P.getcol("CORR_TYPE", startrow=r, nrow=1), [corr_type])
             assert_array_equal(
                 P.getcol("NUM_CORR", startrow=r, nrow=1), [len(corr_type)]
             )
 
-        required_desc = pt.required_ms_desc("POLARIZATION")
+        required_desc = ct.required_ms_desc("POLARIZATION")
         required_columns = set(k for k in required_desc.keys() if not k.startswith("_"))
 
         assert set(P.colnames()) == set(required_columns)
 
     # Check SPECTRAL_WINDOW table correctly created
-    with pt.table(spw_table_name, ack=False) as S:
+    with ct.table(spw_table_name, ack=False) as S:
         for r, num_chan in enumerate(num_chans):
             assert_array_equal(S.getcol("NUM_CHAN", startrow=r, nrow=1)[0], num_chan)
             assert_array_equal(
@@ -219,23 +221,23 @@ def test_ms_create(tmp_path, chunks, num_chans, corr_types, sources):
                 np.full(num_chan, 0.856e9 / num_chan),
             )
 
-        required_desc = pt.required_ms_desc("SPECTRAL_WINDOW")
+        required_desc = ct.required_ms_desc("SPECTRAL_WINDOW")
         required_columns = set(k for k in required_desc.keys() if not k.startswith("_"))
 
         assert set(S.colnames()) == set(required_columns)
 
     # We should get a cartesian product out
-    with pt.table(ddid_table_name, ack=False) as D:
+    with ct.table(ddid_table_name, ack=False) as D:
         spw_id, pol_id = zip(*product(range(len(num_chans)), range(len(corr_types))))
         assert_array_equal(pol_id, D.getcol("POLARIZATION_ID"))
         assert_array_equal(spw_id, D.getcol("SPECTRAL_WINDOW_ID"))
 
-        required_desc = pt.required_ms_desc("DATA_DESCRIPTION")
+        required_desc = ct.required_ms_desc("DATA_DESCRIPTION")
         required_columns = set(k for k in required_desc.keys() if not k.startswith("_"))
 
         assert set(D.colnames()) == set(required_columns)
 
-    with pt.table(src_table_name, ack=False) as S:
+    with ct.table(src_table_name, ack=False) as S:
         for r, (name, direction, rest_freq) in enumerate(sources):
             assert_array_equal(S.getcol("NAME", startrow=r, nrow=1)[0], [name])
             assert_array_equal(
@@ -243,7 +245,7 @@ def test_ms_create(tmp_path, chunks, num_chans, corr_types, sources):
             )
             assert_array_equal(S.getcol("DIRECTION", startrow=r, nrow=1), [direction])
 
-    with pt.table(ms_table_name, ack=False) as T:
+    with ct.table(ms_table_name, ack=False) as T:
         # DATA_DESC_ID's are all the same shape
         assert_array_equal(T.getcol("DATA_DESC_ID"), da.concatenate(all_data_desc_id))
 
@@ -253,7 +255,7 @@ def test_ms_create(tmp_path, chunks, num_chans, corr_types, sources):
             ms_data = T.getcol("DATA", startrow=ddid * row, nrow=row)
             assert_array_equal(ms_data, data)
 
-        required_desc = pt.required_ms_desc()
+        required_desc = ct.required_ms_desc()
         required_columns = set(k for k in required_desc.keys() if not k.startswith("_"))
 
         # Check we have the required columns
@@ -323,7 +325,7 @@ def test_ms_create_and_update(tmp_path, chunks):
     dask.compute(writes)
 
     # Rows have been added and additional data is present
-    with pt.table(filename, ack=False, readonly=True) as T:
+    with ct.table(filename, ack=False, readonly=True) as T:
         first_data_desc_id = da.full(
             row, ms_datasets[0].DATA_DESC_ID, chunks=chunks["row"]
         )
