@@ -8,7 +8,7 @@ readme = "README.rst"
 packages = [{include = "daskms"}]
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.9, < 3.13"
 appdirs = "^1.4.4"
 dask = {extras = ["array"], version = "^2023.1.0"}
 donfig = "^0.7.0"
