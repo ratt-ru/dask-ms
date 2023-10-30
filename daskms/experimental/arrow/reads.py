@@ -165,7 +165,6 @@ def partition_chunking(partition, fragment_rows, chunks):
     it = zip(chunk_intervals, chunk_intervals[1:])
 
     for c, (lower, upper) in enumerate(it):
-
         si = np.searchsorted(intervals, lower, side="right") - 1
         ei = np.searchsorted(intervals, upper, side="left")
 
@@ -191,7 +190,6 @@ def partition_chunking(partition, fragment_rows, chunks):
 
 
 def fragment_reader(fragments, ranges, column, shape, dtype):
-
     if len(fragments) > 1:  # Reading over multiple row_groups.
         arr = np.empty(shape, dtype=dtype)
         offset = 0
@@ -277,7 +275,6 @@ def xds_from_parquet(store, columns=None, chunks=None, **kwargs):
         partition_chunks = partition_chunking(p, fragment_rows, chunks)
 
         for pieces in partition_chunks.values():
-
             chunk_fragments = [fragments[i] for i, _ in pieces]
             chunk_ranges = [r for _, r in pieces]
             chunk_metas = [f.metadata for f in chunk_fragments]

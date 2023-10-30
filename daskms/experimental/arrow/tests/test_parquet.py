@@ -166,7 +166,6 @@ def test_xds_to_parquet_local(ms, tmp_path_factory, spw_table, ant_table):
 def test_xds_to_parquet_s3(
     ms, spw_table, ant_table, py_minio_client, minio_user_key, minio_url, s3_bucket_name
 ):
-
     py_minio_client.make_bucket(s3_bucket_name)
 
     store = DaskMSStore(
@@ -189,7 +188,6 @@ def test_xds_to_parquet_s3(
 
 @pytest.fixture(params=[1, 2, 3, 4])
 def parquet_ms(ms, tmp_path_factory, request):
-
     parquet_store = tmp_path_factory.mktemp("parquet") / "test.parquet"
 
     # Chunk in row so we can probe chunk behaviour on reads.
@@ -204,7 +202,6 @@ def parquet_ms(ms, tmp_path_factory, request):
 
 @pytest.mark.parametrize("rc", [1, 2, 3, 4])
 def test_xds_from_parquet_chunks(ms, parquet_ms, rc):
-
     xdsl = xds_from_parquet(parquet_ms, chunks={"row": rc})
 
     chunks = chain.from_iterable([xds.chunks["row"] for xds in xdsl])

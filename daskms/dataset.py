@@ -491,7 +491,7 @@ else:
             data_vars = OrderedDict()
             rev_results = list(results[::-1])
 
-            for (dask_collection, k, v) in info:
+            for dask_collection, k, v in info:
                 if dask_collection:
                     fn, args = v
                     r = rev_results.pop()

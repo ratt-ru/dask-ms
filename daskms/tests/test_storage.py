@@ -12,7 +12,6 @@ except ImportError:
 
 @pytest.mark.skipif(xarray is None, reason="Need xarray to check equality.")
 def test_storage_ms(ms):
-
     oxdsl = xds_from_ms(ms)
 
     writes = xds_to_storage_table(oxdsl, ms)
@@ -28,7 +27,6 @@ def test_storage_ms(ms):
 
 @pytest.mark.skipif(xarray is None, reason="Need xarray to check equality.")
 def test_storage_zarr(ms, tmp_path_factory):
-
     zarr_store = tmp_path_factory.mktemp("zarr") / "test.zarr"
 
     oxdsl = xds_from_ms(ms)
@@ -52,7 +50,6 @@ def test_storage_zarr(ms, tmp_path_factory):
 
 @pytest.mark.skipif(xarray is None, reason="Need xarray to check equality.")
 def test_storage_parquet(ms, tmp_path_factory):
-
     parquet_store = tmp_path_factory.mktemp("parquet") / "test.parquet"
 
     oxdsl = xds_from_ms(ms)

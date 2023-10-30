@@ -60,7 +60,6 @@ class ParquetFragment:
         return (ParquetFragment, (self.store, self.key, self.schema, self.dataset_id))
 
     def write(self, chunk, *data):
-
         table_path = (
             self.key if self.store.table else self.store.join(["MAIN", self.key])
         )
