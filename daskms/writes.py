@@ -522,7 +522,6 @@ def cached_row_order(rowid):
         if not layer_name.startswith("row-") and not layer_name.startswith(
             "group-rows-"
         ):
-
             log.warning(
                 "Unusual ROWID layer %s. "
                 "This is probably OK but "
@@ -539,7 +538,6 @@ def cached_row_order(rowid):
             layer_names[0].startswith("group-rows-")
             and layer_names[1].startswith("rechunk-merge-")
         ):
-
             log.warning(
                 "Unusual ROWID layers %s for "
                 "the group ordering case. "

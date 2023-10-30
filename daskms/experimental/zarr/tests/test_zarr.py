@@ -113,7 +113,6 @@ def test_metadata_consolidation(ms, ant_table, tmp_path_factory, consolidated):
 
 
 def zarr_tester(ms, spw_table, ant_table, zarr_store, spw_store, ant_store):
-
     ms_datasets = xds_from_ms(ms)
     spw_datasets = xds_from_table(spw_table, group_cols="__row__")
     ant_datasets = xds_from_table(ant_table)
@@ -292,7 +291,6 @@ def test_fasteners(ms, tmp_path_factory):
 
 
 def test_basic_roundtrip(tmp_path):
-
     path = tmp_path / "test.zarr"
 
     # We need >10 datasets to be sure roundtripping is consistent.

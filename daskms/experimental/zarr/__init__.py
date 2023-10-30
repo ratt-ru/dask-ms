@@ -150,7 +150,6 @@ def prepare_zarr_group(dataset_id, dataset, store, rechunk=False):
 
 
 def get_group_chunks(group):
-
     group_chunks = {}
 
     for array in group.values():

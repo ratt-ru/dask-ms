@@ -37,6 +37,9 @@ testing = ["minio", "pytest"]
 tbump = "^6.9.0"
 pre-commit = "^2.20.0"
 black = "^22.8.0"
+ipython = "^8.16.1"
+ipdb = "^0.13.13"
+ruff = "^0.1.3"
 
 [tool.poetry.group.docs.dependencies]
 furo = "^2022.9.15"
@@ -44,6 +47,23 @@ Sphinx = "^5.1.1"
 numpydoc = "^1.4.0"
 Pygments = "^2.13.0"
 sphinx-copybutton = "^0.5.0"
+
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+select = [
+    # flake8-builtins
+    "A",
+    # flake8-bugbear
+    "B",
+    # isort
+    "I001",
+    "I002",
+    # tidy imports
+    "TID"
+]
 
 [build-system]
 requires = ["setuptools", "poetry-core"]
