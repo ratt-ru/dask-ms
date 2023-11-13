@@ -173,7 +173,7 @@ def test_xds_to_parquet_s3(
         key=minio_user_key,
         secret=minio_user_key,
         client_kwargs={
-            "endpoint_url": minio_url.geturl(),
+            "endpoint_url": minio_url,
             "region_name": "af-cpt",
         },
     )

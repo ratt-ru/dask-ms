@@ -235,7 +235,9 @@ def ant_table(tmp_path_factory, wsrt_antenna_positions):
     yield fn
 
 
-MINIO_URL = urlparse("http://127.0.0.1:9000")
+MINIO_ADMIN = "admin"
+MINIO_PASSWORD = "password"
+MINIO_URL = "http://127.0.0.1:9000"
 
 
 @pytest.fixture(scope="function")
@@ -278,11 +280,21 @@ def minio_server(tmp_path_factory):
         pytest.skip('Unable to find "minio" server binary')
 
     data_dir = tmp_path_factory.mktemp("data")
-    args = [str(server_path), "server", str(data_dir), f"--address={MINIO_URL.netloc}"]
+    args = [
+        str(server_path),
+        "server",
+        str(data_dir),
+        f"--address={urlparse(MINIO_URL).netloc}",
+    ]
+    env = {
+        "MINIO_ROOT_USER": MINIO_ADMIN,
+        "MINIO_ROOT_PASSWORD": MINIO_PASSWORD,
+        **os.environ,
+    }
 
     # Start the server process and read a line from stdout so that we know
     # it's started
-    server_process = Popen(args, shell=False, stdout=PIPE, stderr=PIPE)
+    server_process = Popen(args, env=env, shell=False, stdout=PIPE, stderr=PIPE)
 
     try:
         while line := server_process.stdout.readline():
@@ -305,42 +317,19 @@ def minio_alias():
 
 
 @pytest.fixture
-def minio_client(minio_server, minio_alias):
-    client_path = find_executable("mc")
-
-    if not client_path:
-        pytest.skip('Unable to find "mc" binary')
-
-    # Set the server alias on the client
-    args = [
-        str(client_path),
-        "alias",
-        "set",
-        minio_alias,
-        MINIO_URL.geturl(),
-        "minioadmin",
-        "minioadmin",
-    ]
-
-    ctx = multiprocessing.get_context("spawn")  # noqa
-    with Popen(args, shell=False, stdout=PIPE, stderr=PIPE) as client_process:
-        retcode = client_process.wait()
-
-        if retcode != 0:
-            raise ValueError(f"mc set alias failed with return code {retcode}")
-
-    yield client_path
-
-
-@pytest.fixture
 def minio_user_key():
     return "abcdef1234567890"
 
 
 @pytest.fixture
-def minio_admin(minio_client, minio_alias, minio_user_key):
+def minio_admin(minio_server, minio_alias, minio_user_key):
     minio = pytest.importorskip("minio")
-    minio_admin = minio.MinioAdmin(minio_alias, binary_path=str(minio_client))
+    credentials = pytest.importorskip("minio.credentials")
+    minio_admin = minio.MinioAdmin(
+        urlparse(MINIO_URL).netloc,
+        credentials.StaticProvider(MINIO_ADMIN, MINIO_PASSWORD),
+        secure=False,
+    )
     # Add a user and give it readwrite access
     minio_admin.user_add(minio_user_key, minio_user_key)
     minio_admin.policy_set("readwrite", user=minio_user_key)
@@ -349,11 +338,12 @@ def minio_admin(minio_client, minio_alias, minio_user_key):
 
 
 @pytest.fixture
-def py_minio_client(minio_client, minio_admin, minio_alias, minio_user_key):
+def py_minio_client(minio_admin, minio_alias, minio_user_key):
     minio = pytest.importorskip("minio")
+    parsed_url = urlparse(MINIO_URL)
     yield minio.Minio(
-        MINIO_URL.netloc,
+        parsed_url.netloc,
         access_key=minio_user_key,
         secret_key=minio_user_key,
-        secure=MINIO_URL.scheme == "https",
+        secure=False,
     )
