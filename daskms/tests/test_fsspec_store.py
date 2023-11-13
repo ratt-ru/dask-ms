@@ -95,6 +95,7 @@ def test_store_subtable_access(tmp_path_factory):
     assert (table_dir / "foo.txt").exists()
 
 
+@pytest.mark.skipif(s3fs is None, reason="s3fs not installed")
 def test_minio_server(
     tmp_path,
     py_minio_client,
@@ -109,7 +110,6 @@ def test_minio_server(
     py_minio_client.make_bucket(s3_bucket_name)
     py_minio_client.fput_object(s3_bucket_name, "stuff.txt", str(stuff))
 
-    s3fs = pytest.importorskip("s3fs")
     s3 = s3fs.S3FileSystem(
         key=minio_user_key,
         secret=minio_user_key,
