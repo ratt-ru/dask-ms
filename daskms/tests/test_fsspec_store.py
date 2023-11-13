@@ -98,8 +98,6 @@ def test_store_subtable_access(tmp_path_factory):
 def test_minio_server(
     tmp_path,
     py_minio_client,
-    minio_admin,
-    minio_alias,
     minio_user_key,
     minio_url,
     s3_bucket_name,
@@ -126,8 +124,6 @@ def test_minio_server(
 def test_storage_options_from_config(
     tmp_path,
     py_minio_client,
-    minio_admin,
-    minio_alias,
     minio_user_key,
     minio_url,
     s3_bucket_name,

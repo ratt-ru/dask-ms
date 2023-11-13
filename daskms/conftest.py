@@ -312,17 +312,12 @@ def minio_server(tmp_path_factory):
 
 
 @pytest.fixture
-def minio_alias():
-    return "testcloud"
-
-
-@pytest.fixture
 def minio_user_key():
     return "abcdef1234567890"
 
 
 @pytest.fixture
-def minio_admin(minio_server, minio_alias, minio_user_key):
+def minio_admin(minio_server, minio_user_key):
     minio = pytest.importorskip("minio")
     credentials = pytest.importorskip("minio.credentials")
     minio_admin = minio.MinioAdmin(
@@ -338,7 +333,7 @@ def minio_admin(minio_server, minio_alias, minio_user_key):
 
 
 @pytest.fixture
-def py_minio_client(minio_admin, minio_alias, minio_user_key):
+def py_minio_client(minio_admin, minio_user_key):
     minio = pytest.importorskip("minio")
     parsed_url = urlparse(MINIO_URL)
     yield minio.Minio(
