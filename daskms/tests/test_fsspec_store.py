@@ -95,11 +95,10 @@ def test_store_subtable_access(tmp_path_factory):
     assert (table_dir / "foo.txt").exists()
 
 
+@pytest.mark.skipif(s3fs is None, reason="s3fs not installed")
 def test_minio_server(
     tmp_path,
     py_minio_client,
-    minio_admin,
-    minio_alias,
     minio_user_key,
     minio_url,
     s3_bucket_name,
@@ -111,11 +110,10 @@ def test_minio_server(
     py_minio_client.make_bucket(s3_bucket_name)
     py_minio_client.fput_object(s3_bucket_name, "stuff.txt", str(stuff))
 
-    s3fs = pytest.importorskip("s3fs")
     s3 = s3fs.S3FileSystem(
         key=minio_user_key,
         secret=minio_user_key,
-        client_kwargs={"endpoint_url": minio_url.geturl(), "region_name": "af-cpt"},
+        client_kwargs={"endpoint_url": minio_url, "region_name": "af-cpt"},
     )
 
     with s3.open(f"{s3_bucket_name}/stuff.txt", "rb") as f:
@@ -126,8 +124,6 @@ def test_minio_server(
 def test_storage_options_from_config(
     tmp_path,
     py_minio_client,
-    minio_admin,
-    minio_alias,
     minio_user_key,
     minio_url,
     s3_bucket_name,
@@ -148,7 +144,7 @@ def test_storage_options_from_config(
         "key": minio_user_key,
         "secret": minio_user_key,
         "client_kwargs": {
-            "endpoint_url": minio_url.geturl(),
+            "endpoint_url": minio_url,
             "region_name": "af-south-1",
             "verify": False,
         },

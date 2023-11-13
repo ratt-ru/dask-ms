@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Use new minio.MinioAdmin client in test suite and update minio server version (:pr:`298`)
 * Replace black with ruff in pre-commit hooks (:pr:`297`)
 * Lazily load casacore tables module (:pr:`294`)
 * Deprecate Python 3.8 support (:pr:`296`)

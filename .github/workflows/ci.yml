@@ -8,8 +8,7 @@ on:
 
 env:
   POETRY_VERSION: 1.6.1
-  MINIO_SERVER_DOWNLOAD_URL: https://dl.min.io/server/minio/release/linux-amd64/archive/minio_20230907020502.0.0_amd64.deb
-  MINIO_CLIENT_DOWNLOAD_URL: https://dl.min.io/client/mc/release/linux-amd64/archive/mcli_20230907224855.0.0_amd64.deb
+  MINIO_SERVER_DOWNLOAD_URL: https://dl.min.io/server/minio/release/linux-amd64/archive/minio_20231111081441.0.0_amd64.deb
 
 jobs:
   check_skip:
@@ -38,7 +37,6 @@ jobs:
           export HASH=$(sha256sum <<EOT | cut -c -16
           ${{ env.POETRY_VERSION }}
           ${{ env.MINIO_SERVER_DOWNLOAD_URL }}
-          ${{ env.MINIO_CLIENT_DOWNLOAD_URL }}
           EOT
           )
           echo "INSTALL_CACHE_HASH=$HASH" >> $GITHUB_ENV
@@ -63,23 +61,18 @@ jobs:
       - name: Test poetry run
         run: poetry --version
 
-      - name: Install Minio Server and Client
+      - name: Install Minio Server
         if: steps.cache-installs.outputs.cache-hit != 'true'
         run: |
           cd /tmp
           wget -q -c ${{ env.MINIO_SERVER_DOWNLOAD_URL }} -O minio.deb
-          wget -q -c ${{ env.MINIO_CLIENT_DOWNLOAD_URL }} -O mcli.deb
           dpkg-deb --extract minio.deb /tmp/minio
-          dpkg-deb --extract mcli.deb /tmp/mcli
           mkdir -p "${HOME}/.local/bin"
           echo "${HOME}/.local/bin" >> $GITHUB_PATH
           install /tmp/minio/usr/local/bin/minio "${HOME}/.local/bin/minio"
-          install /tmp/mcli/usr/local/bin/mcli "${HOME}/.local/bin/mc"
 
       - name: Test minio run
-        run: |
-          minio --help
-          mc --help
+        run: minio --help
 
       - name: Checkout source
         uses: actions/checkout@v2
