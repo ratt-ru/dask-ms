@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Upgrade to pyarrow 14.0.1 (:pr:`299`)
 * Use new minio.MinioAdmin client in test suite and update minio server version (:pr:`298`)
 * Replace black with ruff in pre-commit hooks (:pr:`297`)
 * Lazily load casacore tables module (:pr:`294`)
