@@ -2,7 +2,7 @@
 History
 =======
 
-X.Y.Z (YYYY-MM-DD)
+0.2.19 (2023-11-13)
 ------------------
 * Upgrade to pyarrow 14.0.1 (:pr:`299`)
 * Use new minio.MinioAdmin client in test suite and update minio server version (:pr:`298`)
