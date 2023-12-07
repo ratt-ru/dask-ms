@@ -162,7 +162,7 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
     if ndim == 0:
         raise ColumnMetadataError(
             f"Scalars in column '{column}' "
-            "(ndim == {ndim}) are not currently handled"
+            f"(ndim == {ndim}) are not currently handled"
         )
     # Only row dimensions
     elif ndim == "row":
@@ -174,9 +174,9 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
         except KeyError as e:
             raise ColumnMetadataError(
                 f"'{column}' column descriptor option '{option}' "
-                "specifies a FixedShape but no 'shape' "
-                "attribute was found in the "
-                "column descriptor"
+                f"specifies a FixedShape but no 'shape' "
+                f"attribute was found in the "
+                f"column descriptor"
             ) from e
     # Variably shaped...
     else:
@@ -185,7 +185,7 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
             exemplar = table_proxy.getcell(column, exemplar_row).result()
         except Exception as e:
             raise ColumnMetadataError(
-                f"Unable to infer shape of " "column '{column}'"
+                f"Unable to infer shape of column '{column}'"
             ) from e
 
         # Try figure out the shape
@@ -202,7 +202,7 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
             shape = (len(exemplar),)
             assert dtype == object
         else:
-            raise ColumnMetadataError(f"Unhandled exemplar type " f"'{type(exemplar)}'")
+            raise ColumnMetadataError(f"Unhandled exemplar type '{type(exemplar)}'")
 
         # NOTE(sjperkins)
         # -1 implies each row can be any shape whatsoever
