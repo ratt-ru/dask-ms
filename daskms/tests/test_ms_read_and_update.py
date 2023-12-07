@@ -275,7 +275,7 @@ def _proc_map_fn(args):
         write = xds_to_table(xds[i], ms, ["STATE_ID"])
         dask.compute(write)
     except Exception as e:
-        print(str(e))
+        raise e
 
     return True
 
