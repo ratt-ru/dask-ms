@@ -5,6 +5,7 @@ History
 X.Y.Z (YYYY-MM-DD)
 ------------------
 * Re-enable exceptions in multiprocessing test case (:pr:`302`)
+* Fix auto-formatted f-strings (:pr:`301`)
 
 0.2.19 (2023-11-13)
 ------------------
