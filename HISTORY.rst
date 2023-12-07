@@ -2,6 +2,10 @@
 History
 =======
 
+X.Y.Z (YYYY-MM-DD)
+------------------
+* Fix auto-formatted f-strings (:pr:`301`)
+
 0.2.19 (2023-11-13)
 ------------------
 * Upgrade to pyarrow 14.0.1 (:pr:`299`)
