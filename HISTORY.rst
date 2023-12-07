@@ -2,6 +2,10 @@
 History
 =======
 
+X.Y.Z (YYYY-MM-DD)
+------------------
+* Re-enable exceptions in multiprocessing test case (:pr:`302`)
+
 0.2.19 (2023-11-13)
 ------------------
 * Upgrade to pyarrow 14.0.1 (:pr:`299`)
