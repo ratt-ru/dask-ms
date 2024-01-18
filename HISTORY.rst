@@ -2,8 +2,10 @@
 History
 =======
 
-X.Y.Z (YYYY-MM-DD)
+0.2.20 (2024-01-18)
 ------------------
+* Support casacore 3.3.1 and above (:pr:`306`)
+* Reinstate Python 3.8 LTS support (:pr:`306`)
 * Update readthedocs python version to 3.9 and poetry to 1.7.1 (:pr:`303`)
 * Re-enable exceptions in multiprocessing test case (:pr:`302`)
 * Fix auto-formatted f-strings (:pr:`301`)
