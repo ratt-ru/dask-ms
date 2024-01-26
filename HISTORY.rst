@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Update pre-commit to actions/python@v5.0.0 (:pr:`308`)
 * Update readthedocs python version to 3.9 and poetry to 1.7.1 (:pr:`303`)
 * Re-enable exceptions in multiprocessing test case (:pr:`302`)
 * Fix auto-formatted f-strings (:pr:`301`)

@@ -162,10 +162,10 @@ jobs:
        github.event.ref == 'refs/heads/master')
 
     steps:
-      - name: Set up Python 3.8
-        uses: actions/setup-python@v4
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
         with:
-          python-version: 3.8
+          python-version: 3.11
 
       - name: Install Poetry
         uses: abatilo/actions-poetry@v2
