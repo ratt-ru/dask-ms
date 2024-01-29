@@ -146,7 +146,6 @@ def test_storage_options_from_config(
         "client_kwargs": {
             "endpoint_url": minio_url,
             "region_name": "af-south-1",
-            "verify": False,
         },
     }
 
