@@ -118,8 +118,7 @@ def zarr_tester(ms, spw_table, ant_table, zarr_store, spw_store, ant_store):
     ant_datasets = xds_from_table(ant_table)
 
     for i, ds in enumerate(ms_datasets):
-        dims = ds.dims
-        row, chan, corr = (dims[d] for d in ("row", "chan", "corr"))
+        row, chan, corr = (ds.sizes[d] for d in ("row", "chan", "corr"))
 
         ms_datasets[i] = ds.assign_coords(
             **{

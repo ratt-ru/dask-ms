@@ -88,7 +88,7 @@ def test_dataset(ms, select_cols, group_cols, index_cols, shapes, chunks):
         assert chunks["chan"] == echunks["chan"]
         assert chunks["corr"] == echunks["corr"]
 
-        dims = dict(ds.dims)
+        dims = dict(ds.sizes)
         dims.pop("row")  # row changes
         assert dims == {"chan": shapes["chan"], "corr": shapes["corr"]}
 
@@ -233,7 +233,7 @@ def test_dataset_assign(ms):
     nds = ds.assign(ANTENNA3=(("row",), ds.ANTENNA1.data + 3))
     assert_array_equal(ds.ANTENNA1.data + 3, nds.ANTENNA3.data)
 
-    dims = ds.dims
+    dims = ds.sizes
     chunks = ds.chunks
 
     if have_xarray:
@@ -335,7 +335,7 @@ def test_dataset_add_string_column(ms):
     datasets = read_datasets(ms, [], [], [])
     assert len(datasets) == 1
     ds = datasets[0]
-    dims = ds.dims
+    dims = ds.sizes
 
     name_list = ["BOB"] * dims["row"]
     names = np.asarray(name_list, dtype=object)
@@ -588,7 +588,7 @@ def test_dataset_numpy(ms):
     assert len(datasets) == 1
     ds = datasets[0]
 
-    row, chan, corr = (ds.dims[d] for d in ("row", "chan", "corr"))
+    row, chan, corr = (ds.sizes[d] for d in ("row", "chan", "corr"))
 
     cdata = np.random.random((row, chan, corr)).astype(np.complex64)
     row_coord = np.arange(row)

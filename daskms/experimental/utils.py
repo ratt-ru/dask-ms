@@ -162,7 +162,7 @@ def rechunk_by_size(
         # The maximum number of array elements in the chunk.
         max_n_ele = max_chunk_mem // data_array.dtype.itemsize
         # The number of elements associated with unchunkable dimensions.
-        fixed_n_ele = np.product([dim_sizes[k] for k in unchunked_dims])
+        fixed_n_ele = np.prod([dim_sizes[k] for k in unchunked_dims])
 
         if fixed_n_ele > max_n_ele:
             raise ValueError(

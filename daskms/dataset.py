@@ -26,7 +26,7 @@ class ChunkInferenceError(ValueError):
     pass
 
 
-def data_var_dims(data_vars):
+def data_var_sizes(data_vars):
     """Returns a {dim: size} dictionary constructed from `data_vars`"""
     dims = {}
 
@@ -279,9 +279,12 @@ else:
         @property
         def dims(self):
             """A :code:`{dim: size}` dictionary"""
-            return data_var_dims(self._data_vars)
+            return set(self._data_vars.keys())
 
-        sizes = dims
+        @property
+        def sizes(self):
+            """A :code:`{dim: size}` dictionary"""
+            return data_var_sizes(self._data_vars)
 
         @property
         def chunks(self):
