@@ -2,7 +2,7 @@
 History
 =======
 
-X.Y.Z (YYYY-MM-DD)
+0.2.20 (2024-01-30)
 ------------------
 * Update calver dependencies to use inequality, rather than caret dependency specifiers (:pr:`307`)
 * Update pre-commit to actions/python@v5.0.0 (:pr:`308`)
