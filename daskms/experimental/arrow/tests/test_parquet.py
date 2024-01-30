@@ -1,3 +1,4 @@
+from contextlib import nullcontext
 import random
 from itertools import chain
 
@@ -86,7 +87,10 @@ def test_partition_chunks(row_chunks, user_chunks):
         (2, (3, 4)),
     ]
 
-    partition_chunks = partition_chunking(0, row_chunks, [user_chunks])
+    ctx = pytest.warns(UserWarning) if "chan" in user_chunks else nullcontext()
+
+    with ctx:
+        partition_chunks = partition_chunking(0, row_chunks, [user_chunks])
 
     obtained = chain.from_iterable([c for c in partition_chunks.values()])
 
