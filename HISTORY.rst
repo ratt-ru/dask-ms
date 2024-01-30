@@ -2,6 +2,10 @@
 History
 =======
 
+X.Y.Z (YYYY-MM-DD)
+------------------
+* Address warnings (:pr:`309`)
+
 0.2.20 (2024-01-30)
 ------------------
 * Update calver dependencies to use inequality, rather than caret dependency specifiers (:pr:`307`)
