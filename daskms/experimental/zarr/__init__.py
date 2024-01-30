@@ -1,6 +1,7 @@
 from functools import reduce
 from operator import mul
 from pathlib import Path
+import warnings
 
 import dask
 import dask.array as da
@@ -175,7 +176,8 @@ def maybe_rechunk(dataset, group, rechunk=False):
 
         if dask_chunks and (dask_chunks != disk_chunks):
             if rechunk:
-                dataset = dataset.assign({name: data.chunk(disk_chunks)})
+                disk_chunks = dict(zip(data.dims, disk_chunks))
+                dataset = dataset.assign({name: data.chunk(chunks=disk_chunks)})
             else:
                 raise ValueError(
                     f"On disk (zarr) chunks: {disk_chunks} - don't match in "
@@ -230,21 +232,23 @@ def _gen_writes(variables, chunks, factory, indirect_dims=False):
 
         token_name = f"write~{name}-" f"{tokenize(var_data, name, factory, *ext_args)}"
 
-        write = da.blockwise(
-            zarr_setter,
-            var.dims,
-            var_data,
-            var.dims,
-            name,
-            None,
-            factory,
-            None,
-            *ext_args,
-            adjust_chunks={d: 1 for d in var.dims},
-            concatenate=False,
-            name=token_name,
-            meta=np.empty((1,) * len(var.dims), bool),
-        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=da.PerformanceWarning)
+            write = da.blockwise(
+                zarr_setter,
+                var.dims,
+                var_data,
+                var.dims,
+                name,
+                None,
+                factory,
+                None,
+                *ext_args,
+                adjust_chunks={d: 1 for d in var.dims},
+                concatenate=False,
+                name=token_name,
+                meta=np.empty((1,) * len(var.dims), bool),
+            )
         write = inlined_array(write, ext_args[::2])
 
         # Alter the dimension names to preserve laziness on coordinates.
@@ -450,16 +454,18 @@ def xds_from_zarr(store, columns=None, chunks=None, consolidated=True, **kwargs)
             ext_args = extent_args(dims, array_chunks)
             token_name = f"read~{name}-{tokenize(zarray, *ext_args)}"
 
-            read = da.blockwise(
-                zarr_getter,
-                dims,
-                zarray,
-                None,
-                *ext_args,
-                concatenate=False,
-                name=token_name,
-                meta=np.empty((0,) * zarray.ndim, zarray.dtype),
-            )
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", category=da.PerformanceWarning)
+                read = da.blockwise(
+                    zarr_getter,
+                    dims,
+                    zarray,
+                    None,
+                    *ext_args,
+                    concatenate=False,
+                    name=token_name,
+                    meta=np.empty((0,) * zarray.ndim, zarray.dtype),
+                )
 
             read = inlined_array(read, ext_args[::2])
             var = Variable(dims, read, attrs)

@@ -2,7 +2,7 @@
 
 import logging
 from pathlib import Path
-
+import warnings
 
 import dask
 import dask.array as da
@@ -269,14 +269,17 @@ def _dataset_variable_factory(
         name = "~".join(("read", column, array_suffix)) + "-" + token
 
         # Construct the array
-        dask_array = da.blockwise(
-            getter_wrapper,
-            full_dims,
-            *args,
-            name=name,
-            new_axes=new_axes,
-            dtype=meta.dtype,
-        )
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=da.PerformanceWarning)
+            dask_array = da.blockwise(
+                getter_wrapper,
+                full_dims,
+                *args,
+                name=name,
+                new_axes=new_axes,
+                dtype=meta.dtype,
+            )
 
         dask_array = inlined_array(dask_array)
 
