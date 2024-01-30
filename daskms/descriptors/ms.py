@@ -8,7 +8,7 @@ from daskms.descriptors.builder import (
     register_descriptor_builder,
     AbstractDescriptorBuilder,
 )
-from daskms.dataset import data_var_dims, DimensionInferenceError
+from daskms.dataset import data_var_sizes, DimensionInferenceError
 from daskms.patterns import lazy_import
 
 ct = lazy_import("casacore.tables")
@@ -153,7 +153,7 @@ class MSDescriptorBuilder(AbstractDescriptorBuilder):
 
         # Now try find consistent dimension sizes across all variables
         try:
-            dim_sizes = data_var_dims(expanded_vars)
+            dim_sizes = data_var_sizes(expanded_vars)
         except DimensionInferenceError:
             log.warning(
                 "Unable to determine fixed column shapes as "

@@ -11,7 +11,7 @@ def test_dataset_schema(ms):
     assert len(datasets) == 1
     ds = datasets[0]
 
-    row, chan, corr = (ds.dims[d] for d in ("row", "chan", "corr"))
+    row, chan, corr = (ds.sizes[d] for d in ("row", "chan", "corr"))
     cdata = np.random.random((row, chan, corr)).astype(np.complex64)
 
     ds = ds.assign(**{"CORRECTED_DATA": (("row", "chan", "corr"), cdata)})

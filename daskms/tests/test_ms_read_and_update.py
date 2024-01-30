@@ -126,7 +126,7 @@ def test_ms_update(ms, group_cols, index_cols, select_cols):
 
     # Write out STATE_ID and DATA
     for i, ds in enumerate(xds):
-        dims = ds.dims
+        dims = ds.sizes
         chunks = ds.chunks
         state = da.arange(i, i + dims["row"], chunks=chunks["row"])
         state = state.astype(np.int32)
@@ -356,7 +356,7 @@ def test_mismatched_rowid(ms):
     # NOTE: Remove this line to make this test pass.
     xds = xdsl[0]
     xds = xds.assign_coords(
-        **{"ROWID": (("row",), da.arange(xds.dims["row"], chunks=2))}
+        **{"ROWID": (("row",), da.arange(xds.sizes["row"], chunks=2))}
     )
 
     with pytest.raises(ValueError, match="ROWID shape and/or chunking"):
