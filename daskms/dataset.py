@@ -278,8 +278,8 @@ else:
 
         @property
         def dims(self):
-            """A :code:`{dim: size}` dictionary"""
-            return set(self._data_vars.keys())
+            """A tuple of dimensions"""
+            return tuple(sorted(set(data_var_sizes(self._data_vars).keys())))
 
         @property
         def sizes(self):
