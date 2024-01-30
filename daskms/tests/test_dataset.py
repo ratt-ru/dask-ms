@@ -3,6 +3,7 @@
 from itertools import product
 import os
 import uuid
+import warnings
 
 import dask
 import dask.array as da
@@ -305,7 +306,9 @@ def test_dataset_add_column(ms, dtype):
     ds = datasets[0]
 
     # Create the dask array
-    bitflag = da.zeros_like(ds.DATA.data, dtype=dtype)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", np.exceptions.ComplexWarning)
+        bitflag = da.zeros_like(ds.DATA.data, dtype=dtype)
     # Assign keyword attribute
     col_kw = {
         "BITFLAG": {
