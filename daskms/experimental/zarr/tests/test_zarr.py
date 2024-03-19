@@ -429,5 +429,6 @@ def test_xarray_reading_daskms_written_dataset(ms, tmp_path_factory):
     path = store / "test.zarr"
     dask.compute(xds_to_zarr(datasets, path, consolidated=True))
 
-    ds = xarray.open_zarr(path / "MAIN" / "MAIN_0")
-    assert ds == datasets[0]
+    for i, mem_ds in enumerate(datasets):
+        ds = xarray.open_zarr(path / "MAIN" / f"MAIN_{i}")
+        assert ds == mem_ds
