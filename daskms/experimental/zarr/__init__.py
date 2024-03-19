@@ -10,6 +10,8 @@ from dask.base import tokenize
 import numpy as np
 import warnings
 
+ARRAY_DIMENSION = "_ARRAY_DIMENSIONS"
+
 from daskms.constants import DASKMS_PARTITION_KEY
 from daskms.dataset import Dataset, Variable
 from daskms.dataset_schema import DatasetSchema, encode_type, decode_type, decode_attr
@@ -110,6 +112,8 @@ def create_array(ds_group, column, column_schema, schema_chunks, coordinate=Fals
         object_codec=codec,
         exact=True,
     )
+
+    array.attrs[ARRAY_DIMENSION] = column_schema.dims
 
     array.attrs[DASKMS_ATTR_KEY] = {
         **column_schema.attrs,

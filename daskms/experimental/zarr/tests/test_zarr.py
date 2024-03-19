@@ -235,6 +235,7 @@ def test_multiprocess_create(ms, tmp_path_factory):
 @pytest.mark.skipif(xarray is None, reason="depends on xarray")
 def test_xarray_to_zarr(ms, tmp_path_factory):
     store = tmp_path_factory.mktemp("zarr_store")
+
     datasets = xds_from_ms(ms)
 
     for i, ds in enumerate(datasets):
@@ -407,3 +408,26 @@ def test_xds_from_zarr_assert_on_empty_store(tmp_path_factory, ms):
 
     with pytest.raises(UnknownStoreTypeError, match="Unable to infer table type"):
         xds_from_zarr(path)
+
+
+@pytest.mark.skipif(xarray is None, reason="depends on xarray")
+def test_xarray_reading_daskms_written_dataset(ms, tmp_path_factory):
+    store = tmp_path_factory.mktemp("zarr_store")
+
+    datasets = xds_from_ms(ms)
+
+    for i, ds in enumerate(datasets):
+        chunks = ds.chunks
+        row = sum(chunks["row"])
+        chan = sum(chunks["chan"])
+        corr = sum(chunks["corr"])
+
+        datasets[i] = ds.assign_coords(
+            row=np.arange(row), chan=np.arange(chan), corr=np.arange(corr)
+        )
+
+    path = store / "test.zarr"
+    dask.compute(xds_to_zarr(datasets, path, consolidated=True))
+
+    ds = xarray.open_zarr(path / "MAIN" / "MAIN_0")
+    assert ds == datasets[0]
