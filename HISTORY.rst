@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Use JSON codec for writing zarr strings (:pr:`310`)
 * Address warnings (:pr:`309`)
 
 0.2.20 (2024-01-30)

@@ -68,7 +68,7 @@ def zarr_chunks(column, dims, chunks):
 def create_array(ds_group, column, column_schema, schema_chunks, coordinate=False):
     import numcodecs
 
-    codec = numcodecs.Pickle() if column_schema.dtype == object else None
+    codec = numcodecs.JSON() if column_schema.dtype == object else None
 
     if column_schema.chunks is None:
         try:
