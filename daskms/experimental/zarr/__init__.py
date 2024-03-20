@@ -343,9 +343,9 @@ def xds_to_zarr(xds, store, columns=None, rechunk=False, consolidated=True, **kw
             }
 
         if consolidated:
-            table_path = store.table if store.table else "MAIN"
+            table_name = store.table if store.table else "MAIN"
             sep = store.fs.sep
-            store_path = f"{store.root}{sep}{table_path}{sep}{table_path}_{di}"
+            store_path = f"{store.root}{sep}{table_name}{sep}{table_name}_{di}"
             store_map = store.fs.get_mapper(store_path)
             zc.consolidate_metadata(store_map)
 
