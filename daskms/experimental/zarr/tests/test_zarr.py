@@ -11,7 +11,7 @@ import pytest
 from daskms import xds_from_ms, xds_from_table, xds_from_storage_ms
 from daskms.constants import DASKMS_PARTITION_KEY
 from daskms.dataset import Dataset
-from daskms.experimental.zarr import xds_from_zarr, xds_to_zarr
+from daskms.experimental.zarr import xds_from_zarr, xds_to_zarr, DASKMS_ATTR_KEY
 from daskms.fsspec_store import DaskMSStore, UnknownStoreTypeError
 
 try:
@@ -429,6 +429,38 @@ def test_xarray_reading_daskms_written_dataset(ms, tmp_path_factory):
     path = store / "test.zarr"
     dask.compute(xds_to_zarr(datasets, path, consolidated=True))
 
+    extra = tmp_path_factory.mktemp("extra")
+    datasets[0].to_zarr(extra)
+
     for i, mem_ds in enumerate(datasets):
         ds = xarray.open_zarr(path / "MAIN" / f"MAIN_{i}")
-        assert ds.equals(mem_ds)
+
+        for k in (set(ds.data_vars) | set(mem_ds.data_vars)) - {"ROWID"}:
+            assert_array_equal(ds.data_vars[k], mem_ds.data_vars[k])
+
+        for k in (set(ds.coords) | set(mem_ds.coords)) - {"ROWID"}:
+            assert_array_equal(ds.coords[k], mem_ds.coords[k])
+
+        # capitalised ROWID breaks the lowercase
+        # xarray coordinate naming convention
+        # so xarray treats it as a data variable
+        assert_array_equal(ds.data_vars["ROWID"], mem_ds.coords["ROWID"])
+
+        attr_keys = (set(mem_ds.attrs) | set(ds.attrs)) - {
+            DASKMS_PARTITION_KEY,
+            DASKMS_ATTR_KEY,
+        }
+
+        for k in attr_keys:
+            assert ds.attrs[k] == mem_ds.attrs[k]
+
+        # DASKMS_ATTR_KEY is added by dask-ms when writing
+        # so xarray reads it in
+        assert DASKMS_ATTR_KEY in ds.attrs
+        assert DASKMS_ATTR_KEY not in mem_ds.attrs
+
+        # xarray converts tuples to list when json encoding
+        assert (
+            tuple(map(tuple, ds.attrs[DASKMS_PARTITION_KEY]))
+            == mem_ds.attrs[DASKMS_PARTITION_KEY]
+        )
