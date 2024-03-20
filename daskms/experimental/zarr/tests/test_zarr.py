@@ -11,7 +11,7 @@ import pytest
 from daskms import xds_from_ms, xds_from_table, xds_from_storage_ms
 from daskms.constants import DASKMS_PARTITION_KEY
 from daskms.dataset import Dataset
-from daskms.experimental.zarr import xds_from_zarr, xds_to_zarr
+from daskms.experimental.zarr import xds_from_zarr, xds_to_zarr, DASKMS_ATTR_KEY
 from daskms.fsspec_store import DaskMSStore, UnknownStoreTypeError
 
 try:
@@ -75,11 +75,11 @@ def test_xds_to_zarr_coords(tmp_path_factory):
 
 @pytest.mark.parametrize("consolidated", [True, False])
 def test_metadata_consolidation(ms, ant_table, tmp_path_factory, consolidated):
-    zarr_dir = tmp_path_factory.mktemp("zarr_store") / "test.zarr"
-    ant_dir = zarr_dir.parent / f"{zarr_dir.name}::ANTENNA"
+    zarr_path = tmp_path_factory.mktemp("zarr_store") / "test.zarr"
+    ant_path = zarr_path.parent / f"{zarr_path.name}::ANTENNA"
 
-    main_store = DaskMSStore(zarr_dir)
-    ant_store = DaskMSStore(ant_dir)
+    main_store = DaskMSStore(zarr_path)
+    ant_store = DaskMSStore(ant_path)
 
     ms_datasets = xds_from_ms(ms)
     ant_datasets = xds_from_table(ant_table)
@@ -95,14 +95,14 @@ def test_metadata_consolidation(ms, ant_table, tmp_path_factory, consolidated):
     writes.extend(xds_to_zarr(ant_datasets, ant_store, consolidated=consolidated))
     dask.compute(writes)
 
-    assert main_store.exists("MAIN/.zmetadata") is consolidated
-    assert ant_store.exists(".zmetadata") is consolidated
+    assert main_store.exists("MAIN/MAIN_0/.zmetadata") is consolidated
+    assert ant_store.exists("ANTENNA_0/.zmetadata") is consolidated
 
     if consolidated:
-        with main_store.open("MAIN/.zmetadata") as f:
+        with main_store.open("MAIN/MAIN_0/.zmetadata") as f:
             assert "test-meta".encode("utf8") in f.read()
 
-        with ant_store.open(".zmetadata") as f:
+        with ant_store.open("ANTENNA_0/.zmetadata") as f:
             assert "test-meta".encode("utf8") in f.read()
 
     for ds in xds_from_zarr(main_store, consolidated=consolidated):
@@ -429,6 +429,38 @@ def test_xarray_reading_daskms_written_dataset(ms, tmp_path_factory):
     path = store / "test.zarr"
     dask.compute(xds_to_zarr(datasets, path, consolidated=True))
 
+    extra = tmp_path_factory.mktemp("extra")
+    datasets[0].to_zarr(extra)
+
     for i, mem_ds in enumerate(datasets):
         ds = xarray.open_zarr(path / "MAIN" / f"MAIN_{i}")
-        assert ds == mem_ds
+
+        for k in (set(ds.data_vars) | set(mem_ds.data_vars)) - {"ROWID"}:
+            assert_array_equal(ds.data_vars[k], mem_ds.data_vars[k])
+
+        for k in (set(ds.coords) | set(mem_ds.coords)) - {"ROWID"}:
+            assert_array_equal(ds.coords[k], mem_ds.coords[k])
+
+        # capitalised ROWID breaks the lowercase
+        # xarray coordinate naming convention
+        # so xarray treats it as a data variable
+        assert_array_equal(ds.data_vars["ROWID"], mem_ds.coords["ROWID"])
+
+        attr_keys = (set(mem_ds.attrs) | set(ds.attrs)) - {
+            DASKMS_PARTITION_KEY,
+            DASKMS_ATTR_KEY,
+        }
+
+        for k in attr_keys:
+            assert ds.attrs[k] == mem_ds.attrs[k]
+
+        # DASKMS_ATTR_KEY is added by dask-ms when writing
+        # so xarray reads it in
+        assert DASKMS_ATTR_KEY in ds.attrs
+        assert DASKMS_ATTR_KEY not in mem_ds.attrs
+
+        # xarray converts tuples to list when json encoding
+        assert (
+            tuple(map(tuple, ds.attrs[DASKMS_PARTITION_KEY]))
+            == mem_ds.attrs[DASKMS_PARTITION_KEY]
+        )
