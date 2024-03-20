@@ -109,6 +109,7 @@ def create_array(ds_group, column, column_schema, schema_chunks, coordinate=Fals
         column,
         column_schema.shape,
         chunks=zchunks,
+        fill_value=None,
         dtype=column_schema.dtype,
         object_codec=codec,
         exact=True,
