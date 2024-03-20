@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Only test Github Action Push events on master (:pr:`313`)
 * Set ``_ARRAY_DIMENSIONS`` attribute on Data Variables (:pr:`311`)
 * Use JSON codec for writing zarr strings (:pr:`310`)
 * Address warnings (:pr:`309`)

@@ -2,9 +2,13 @@ name: Ubuntu CI
 
 on:
   push:
+    branches:
+    - master
+    tags:
+    - "*"
   pull_request:
   schedule:
-    - cron: '30 2 * * 1' # Every Monday @ 2h30am UTC
+    - cron: '30 2 * * 1,4' # Every Monday and Thursday @ 2h30am UTC
 
 env:
   POETRY_VERSION: 1.6.1
