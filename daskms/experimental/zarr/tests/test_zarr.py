@@ -431,4 +431,4 @@ def test_xarray_reading_daskms_written_dataset(ms, tmp_path_factory):
 
     for i, mem_ds in enumerate(datasets):
         ds = xarray.open_zarr(path / "MAIN" / f"MAIN_{i}")
-        assert ds == mem_ds
+        assert ds.equals(mem_ds)
