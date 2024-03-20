@@ -75,11 +75,11 @@ def test_xds_to_zarr_coords(tmp_path_factory):
 
 @pytest.mark.parametrize("consolidated", [True, False])
 def test_metadata_consolidation(ms, ant_table, tmp_path_factory, consolidated):
-    zarr_dir = tmp_path_factory.mktemp("zarr_store") / "test.zarr"
-    ant_dir = zarr_dir.parent / f"{zarr_dir.name}::ANTENNA"
+    zarr_path = tmp_path_factory.mktemp("zarr_store") / "test.zarr"
+    ant_path = zarr_path.parent / f"{zarr_path.name}::ANTENNA"
 
-    main_store = DaskMSStore(zarr_dir)
-    ant_store = DaskMSStore(ant_dir)
+    main_store = DaskMSStore(zarr_path)
+    ant_store = DaskMSStore(ant_path)
 
     ms_datasets = xds_from_ms(ms)
     ant_datasets = xds_from_table(ant_table)
@@ -95,14 +95,14 @@ def test_metadata_consolidation(ms, ant_table, tmp_path_factory, consolidated):
     writes.extend(xds_to_zarr(ant_datasets, ant_store, consolidated=consolidated))
     dask.compute(writes)
 
-    assert main_store.exists("MAIN/.zmetadata") is consolidated
-    assert ant_store.exists(".zmetadata") is consolidated
+    assert main_store.exists("MAIN/MAIN_0/.zmetadata") is consolidated
+    assert ant_store.exists("ANTENNA_0/.zmetadata") is consolidated
 
     if consolidated:
-        with main_store.open("MAIN/.zmetadata") as f:
+        with main_store.open("MAIN/MAIN_0/.zmetadata") as f:
             assert "test-meta".encode("utf8") in f.read()
 
-        with ant_store.open(".zmetadata") as f:
+        with ant_store.open("ANTENNA_0/.zmetadata") as f:
             assert "test-meta".encode("utf8") in f.read()
 
     for ds in xds_from_zarr(main_store, consolidated=consolidated):

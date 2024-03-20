@@ -1,6 +1,7 @@
 from functools import reduce
 from operator import mul
 from pathlib import Path
+import os.path
 import warnings
 
 import dask
@@ -341,13 +342,14 @@ def xds_to_zarr(xds, store, columns=None, rechunk=False, consolidated=True, **kw
                 **{k: getattr(ds, k) for k, _ in partition},
             }
 
-        write_datasets.append(Dataset(data_vars, attrs=attrs))
+        if consolidated:
+            table_path = store.table if store.table else "MAIN"
+            sep = store.fs.sep
+            store_path = f"{store.root}{sep}{table_path}{sep}{table_path}_{di}"
+            store_map = store.fs.get_mapper(store_path)
+            zc.consolidate_metadata(store_map)
 
-    if consolidated:
-        table_path = store.table if store.table else "MAIN"
-        store_path = f"{store.root}{store.fs.sep}{table_path}"
-        store_map = store.fs.get_mapper(store_path)
-        zc.consolidate_metadata(store_map)
+        write_datasets.append(Dataset(data_vars, attrs=attrs))
 
     return write_datasets
 
@@ -420,16 +422,32 @@ def xds_from_zarr(store, columns=None, chunks=None, consolidated=True, **kwargs)
 
     datasets = []
     numpy_vars = []
-    table_path = store.table if store.table else "MAIN"
+    table_name = store.table if store.table else "MAIN"
 
-    store_map = store.fs.get_mapper(f"{store.root}{store.fs.sep}{table_path}")
+    store_path = f"{store.root}{store.fs.sep}{table_name}"
+    store_map = store.fs.get_mapper(store_path)
 
-    try:
-        table_group = zarr.open_consolidated(store_map, mode="r")
-    except KeyError:
-        table_group = zarr.open_group(store_map, mode="r")
+    partition_ids = []
 
-    for g, (_, group) in enumerate(sorted(table_group.groups(), key=group_sortkey)):
+    for entry in store_map.fs.listdir(f"{store_map.root}"):
+        if entry["type"] == "directory":
+            _, dir_name = os.path.split(entry["name"])
+            if dir_name.startswith(table_name):
+                _, i = dir_name.split("_")
+                partition_ids.append(int(i))
+
+    for g in sorted(partition_ids):
+        group_path = f"{store_path}{store.fs.sep}{table_name}_{g}"
+        group_map = store.fs.get_mapper(group_path)
+
+        if consolidated:
+            try:
+                group = zarr.open_consolidated(group_map, mode="r")
+            except KeyError:
+                group = zarr.open_group(group_map, mode="r")
+        else:
+            group = zarr.open_group(group_map, mode="r")
+
         group_attrs = decode_attr(dict(group.attrs))
         dask_ms_attrs = group_attrs.pop(DASKMS_ATTR_KEY)
         natural_chunks = dask_ms_attrs["chunks"]
