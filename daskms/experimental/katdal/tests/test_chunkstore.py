@@ -58,7 +58,7 @@ class FakeDataset(MinimalDataSet):
         store = NpyFileChunkStore(str(path))
         shape = (len(timestamps), spw.num_chans, len(corr_products))
         # data, chunk_info = put_fake_dataset(store, "cb1", shape)
-        data, chunk_info = put_fake_dataset(
+        self._test_data, chunk_info = put_fake_dataset(
             store,
             "cb1",
             shape,
@@ -133,7 +133,7 @@ def dataset(request, tmp_path_factory):
     )
 
 
-@pytest.mark.parametrize("include_auto_corrs", [False])
+@pytest.mark.parametrize("include_auto_corrs", [True])
 @pytest.mark.parametrize("row_dim", [True, False])
 @pytest.mark.parametrize("out_store", ["output.zarr"])
 def test_chunkstore(tmp_path_factory, dataset, include_auto_corrs, row_dim, out_store):
