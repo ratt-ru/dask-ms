@@ -32,7 +32,7 @@ katdal = ["katdal", "xarray", "zarr"]
 xarray = ["xarray"]
 zarr = ["zarr"]
 s3 = ["s3fs"]
-complete = ["s3fs", "pandas", "pyarrow", "xarray", "zarr"]
+complete = ["s3fs", "pandas", "pyarrow", "xarray", "zarr", "katdal"]
 testing = ["minio", "pytest"]
 
 [tool.poetry.group.dev.dependencies]
