@@ -1,6 +1,16 @@
 from functools import partial
 
+import pytest
+
+pytest.importorskip("dask.array")
+pytest.importorskip("xarray")
+pytest.importorskip("katdal")
+
+import dask
 import dask.array as da
+import numba
+import numpy as np
+import xarray
 
 from daskms.experimental.zarr import xds_to_zarr
 
@@ -13,10 +23,6 @@ from katdal.test.test_vis_flags_weights import put_fake_dataset
 from katdal.test.test_dataset import MinimalDataSet
 from katpoint import Antenna, Target, Timestamp
 
-import numba
-import numpy as np
-import pytest
-import xarray
 
 from daskms.experimental.katdal.meerkat_antennas import MEERKAT_ANTENNA_DESCRIPTIONS
 from daskms.experimental.katdal.transpose import transpose
@@ -119,11 +125,11 @@ def dataset(request, tmp_path_factory):
     timestamps = 1234667890.0 + 8.0 * np.arange(20)
 
     spw = SpectralWindow(
-        centre_freq=1284e6, channel_width=0, num_chans=4096, sideband=1, bandwidth=856e6
+        centre_freq=1284e6, channel_width=0, num_chans=16, sideband=1, bandwidth=856e6
     )
 
     return FakeDataset(
-        path, targets, timestamps, antennas=MEERKAT_ANTENNA_DESCRIPTIONS[:16], spw=spw
+        path, targets, timestamps, antennas=MEERKAT_ANTENNA_DESCRIPTIONS[:4], spw=spw
     )
 
 
@@ -131,6 +137,10 @@ def dataset(request, tmp_path_factory):
 @pytest.mark.parametrize("row_dim", [True, False])
 @pytest.mark.parametrize("out_store", ["output.zarr"])
 def test_chunkstore(tmp_path_factory, dataset, include_auto_corrs, row_dim, out_store):
+    # Example using an actual mvf4 dataset, make sure to replace the token with a real one
+    # url = "https://archive-gw-1.kat.ac.za/1711249692/1711249692_sdp_l0.full.rdb?token=abcdef1234567890"
+    # import katdal
+    # dataset = katdal.open(url, applycal="l1")
     cp_info = corrprod_index(dataset, ["HH", "HV", "VH", "VV"], include_auto_corrs)
     all_antennas = dataset.ants
 
@@ -237,16 +247,27 @@ def test_chunkstore(tmp_path_factory, dataset, include_auto_corrs, row_dim, out_
 
     xds = xarray.concat(xds, dim=primary_dims[0])
 
-    import dask
-    import shutil
-
-    # out_store = tmp_path_factory.mktemp(out_store)
+    ant_xds = [
+        xarray.Dataset(
+            {
+                "NAME": (("row",), np.asarray([a.name for a in all_antennas])),
+                "OFFSET": (
+                    ("row", "xyz"),
+                    np.asarray(np.zeros((len(all_antennas), 3))),
+                ),
+                "POSITION": (
+                    ("row", "xyz"),
+                    np.asarray([a.position_ecef for a in all_antennas]),
+                ),
+            }
+        )
+    ]
 
     print(xds)
 
-    shutil.rmtree(out_store, ignore_errors=True)
-    dask.compute(xds_to_zarr(xds, out_store))
+    #
+    # shutil.rmtree(out_store, ignore_errors=True)
+    out_store = tmp_path_factory.mktemp("output") / out_store
 
-    # auto_corrs = 0 if include_auto_corrs else 1
-    # ant1, ant2 = np.triu_indices(len(dataset.ants), auto_corrs)
-    # ant1, ant2 = (a.astype(np.int32) for a in (ant1, ant2))
+    dask.compute(xds_to_zarr(xds, out_store))
+    dask.compute(xds_to_zarr(ant_xds, f"{out_store}::ANTENNA"))

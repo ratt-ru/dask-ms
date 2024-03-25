@@ -29,7 +29,7 @@ def nb_transpose(in_data, cp_index, data_type, row):
         raise TypingError(f"data_type {data_type} is not a literal_value") from e
     else:
         if not isinstance(data_type, str):
-            raise TypeError("data_type {data_type} is not a string")
+            raise TypeError(f"data_type {data_type} is not a string: {type(data_type)}")
 
     try:
         row_dim = row.literal_value
@@ -37,7 +37,7 @@ def nb_transpose(in_data, cp_index, data_type, row):
         raise TypingError(f"row {row} is not a literal_value") from e
     else:
         if not isinstance(row_dim, bool):
-            raise TypingError("row_dim")
+            raise TypingError(f"row_dim {row_dim} is not a boolean {type(row_dim)}")
 
     if data_type == "flags":
         get_value = lambda v: v != 0
