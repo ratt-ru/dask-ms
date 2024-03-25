@@ -259,10 +259,14 @@ def test_chunkstore(tmp_path_factory, dataset, include_auto_corrs, row_dim, out_
                     ("row", "xyz"),
                     np.asarray([a.position_ecef for a in all_antennas]),
                 ),
+                "DISH_DIAMETER": (
+                    ("row",),
+                    np.asarray([a.diameter for a in all_antennas]),
+                ),
             }
         )
     ]
-
+    print(ant_xds)
     print(xds)
 
     # Reintroduce the shutil.rmtree and remote the tmp_path_factory
