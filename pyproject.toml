@@ -20,6 +20,7 @@ s3fs = {version = ">= 2023.1.0", optional=true}
 minio = {version = "^7.2.0", optional = true}
 pytest = {version = "^7.1.3", optional=true}
 pandas = {version = "^2.1.2", optional = true}
+katdal = {version = "^0.22", optional = true}
 
 [tool.poetry.scripts]
 dask-ms = "daskms.apps.entrypoint:main"
@@ -27,6 +28,7 @@ fragments = "daskms.apps.fragments:main"
 
 [tool.poetry.extras]
 arrow = ["pandas", "pyarrow"]
+katdal = ["katdal", "xarray", "zarr"]
 xarray = ["xarray"]
 zarr = ["zarr"]
 s3 = ["s3fs"]

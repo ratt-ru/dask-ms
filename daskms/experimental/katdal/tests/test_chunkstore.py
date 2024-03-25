@@ -1,0 +1,252 @@
+from functools import partial
+
+import dask.array as da
+
+from daskms.experimental.zarr import xds_to_zarr
+
+from katdal.chunkstore_npy import NpyFileChunkStore
+from katdal.dataset import Subarray
+from katdal.lazy_indexer import DaskLazyIndexer
+from katdal.spectral_window import SpectralWindow
+from katdal.vis_flags_weights import ChunkStoreVisFlagsWeights
+from katdal.test.test_vis_flags_weights import put_fake_dataset
+from katdal.test.test_dataset import MinimalDataSet
+from katpoint import Antenna, Target, Timestamp
+
+import numba
+import numpy as np
+import pytest
+import xarray
+
+from daskms.experimental.katdal.meerkat_antennas import MEERKAT_ANTENNA_DESCRIPTIONS
+from daskms.experimental.katdal.transpose import transpose
+from daskms.experimental.katdal.corr_products import corrprod_index
+from daskms.experimental.katdal.uvw import uvw_coords
+
+SPW = SpectralWindow(
+    centre_freq=1284e6, channel_width=0, num_chans=16, sideband=1, bandwidth=856e6
+)
+
+
+class FakeDataset(MinimalDataSet):
+    def __init__(
+        self,
+        path,
+        targets,
+        timestamps,
+        antennas=MEERKAT_ANTENNA_DESCRIPTIONS,
+        spw=SPW,
+    ):
+        antennas = list(map(Antenna, antennas))
+        corr_products = [
+            (a1.name + c1, a2.name + c2)
+            for i, a1 in enumerate(antennas)
+            for a2 in antennas[i:]
+            for c1 in ("h", "v")
+            for c2 in ("h", "v")
+        ]
+
+        subarray = Subarray(antennas, corr_products)
+        assert len(subarray.ants) > 0
+
+        store = NpyFileChunkStore(str(path))
+        shape = (len(timestamps), spw.num_chans, len(corr_products))
+        # data, chunk_info = put_fake_dataset(store, "cb1", shape)
+        data, chunk_info = put_fake_dataset(
+            store,
+            "cb1",
+            shape,
+            chunk_overrides={
+                "correlator_data": (1, spw.num_chans, len(corr_products)),
+                "flags": (1, spw.num_chans, len(corr_products)),
+                "weights": (1, spw.num_chans, len(corr_products)),
+            },
+        )
+        self._vfw = ChunkStoreVisFlagsWeights(store, chunk_info)
+        self._vis = None
+        self._weights = None
+        self._flags = None
+        super().__init__(targets, timestamps, subarray, spw)
+
+    def _set_keep(
+        self,
+        time_keep=None,
+        freq_keep=None,
+        corrprod_keep=None,
+        weights_keep=None,
+        flags_keep=None,
+    ):
+        super()._set_keep(time_keep, freq_keep, corrprod_keep, weights_keep, flags_keep)
+        stage1 = (time_keep, freq_keep, corrprod_keep)
+        self._vis = DaskLazyIndexer(self._vfw.vis, stage1)
+        self._weights = DaskLazyIndexer(self._vfw.weights, stage1)
+        self._flags = DaskLazyIndexer(self._vfw.flags, stage1)
+
+    @property
+    def vis(self):
+        if self._vis is None:
+            raise ValueError("Selection has not yet been performed")
+        return self._vis
+
+    @property
+    def flags(self):
+        if self._flags is None:
+            raise ValueError("Selection has not yet been performed")
+        return self._flags
+
+    @property
+    def weights(self):
+        if self._weights is None:
+            raise ValueError("Selection has not yet been performed")
+
+        return self._weights
+
+
+@pytest.fixture(scope="session")
+def dataset(request, tmp_path_factory):
+    path = tmp_path_factory.mktemp("chunks")
+    targets = [
+        # It would have been nice to have radec = 19:39, -63:42 but then
+        # selection by description string does not work because the catalogue's
+        # description string pads it out to radec = 19:39:00.00, -63:42:00.0.
+        # (XXX Maybe fix Target comparison in katpoint to support this?)
+        Target("J1939-6342 | PKS1934-638, radec bpcal, 19:39:25.03, -63:42:45.6"),
+        Target("J1939-6342, radec gaincal, 19:39:25.03, -63:42:45.6"),
+        Target("J0408-6545 | PKS 0408-65, radec bpcal, 4:08:20.38, -65:45:09.1"),
+        Target("J1346-6024 | Cen B, radec, 13:46:49.04, -60:24:29.4"),
+    ]
+    # Ensure that len(timestamps) is an integer multiple of len(targets)
+    timestamps = 1234667890.0 + 8.0 * np.arange(20)
+
+    spw = SpectralWindow(
+        centre_freq=1284e6, channel_width=0, num_chans=4096, sideband=1, bandwidth=856e6
+    )
+
+    return FakeDataset(
+        path, targets, timestamps, antennas=MEERKAT_ANTENNA_DESCRIPTIONS[:16], spw=spw
+    )
+
+
+@pytest.mark.parametrize("include_auto_corrs", [False])
+@pytest.mark.parametrize("row_dim", [True, False])
+@pytest.mark.parametrize("out_store", ["output.zarr"])
+def test_chunkstore(tmp_path_factory, dataset, include_auto_corrs, row_dim, out_store):
+    cp_info = corrprod_index(dataset, ["HH", "HV", "VH", "VV"], include_auto_corrs)
+    all_antennas = dataset.ants
+
+    xds = []
+
+    for scan_index, scan_state, target in dataset.scans():
+        # Extract numpy and dask products
+        time_utc = dataset.timestamps
+        t_chunks, chan_chunks, cp_chunks = dataset.vis.dataset.chunks
+
+        # Modified Julian Date in Seconds
+        time_mjds = np.asarray(
+            [t.to_mjd() * 24 * 60 * 60 for t in map(Timestamp, time_utc)]
+        )
+
+        # Create a dask chunking transform
+        rechunk = partial(da.rechunk, chunks=(t_chunks, chan_chunks, cp_chunks))
+
+        # Transpose from (time, chan, corrprod) to (time, bl, chan, corr)
+        cpi = cp_info.cp_index
+        flag_transpose = partial(
+            transpose,
+            cp_index=cpi,
+            data_type=numba.literally("flags"),
+            row=row_dim,
+        )
+        weight_transpose = partial(
+            transpose,
+            cp_index=cpi,
+            data_type=numba.literally("weights"),
+            row=row_dim,
+        )
+        vis_transpose = partial(
+            transpose, cp_index=cpi, data_type=numba.literally("vis"), row=row_dim
+        )
+
+        flags = DaskLazyIndexer(dataset.flags, (), (rechunk, flag_transpose))
+        weights = DaskLazyIndexer(dataset.weights, (), (rechunk, weight_transpose))
+        vis = DaskLazyIndexer(dataset.vis, (), transforms=(vis_transpose,))
+
+        time = da.from_array(time_mjds[:, None], chunks=(t_chunks, 1))
+        ant1 = da.from_array(cp_info.ant1_index[None, :], chunks=(1, cpi.shape[0]))
+        ant2 = da.from_array(cp_info.ant2_index[None, :], chunks=(1, cpi.shape[0]))
+
+        uvw = uvw_coords(
+            target,
+            da.from_array(time_utc, chunks=t_chunks),
+            all_antennas,
+            cp_info,
+            row=row_dim,
+        )
+
+        time, ant1, ant2 = da.broadcast_arrays(time, ant1, ant2)
+
+        if row_dim:
+            primary_dims = ("row",)
+            time = time.ravel().rechunk({0: vis.dataset.chunks[0]})
+            ant1 = ant1.ravel().rechunk({0: vis.dataset.chunks[0]})
+            ant2 = ant2.ravel().rechunk({0: vis.dataset.chunks[0]})
+        else:
+            primary_dims = ("time", "baseline")
+
+        xds.append(
+            xarray.Dataset(
+                {
+                    # Primary indexing columns
+                    "TIME": (primary_dims, time),
+                    "ANTENNA1": (primary_dims, ant1),
+                    "ANTENNA2": (primary_dims, ant2),
+                    "FEED1": (primary_dims, da.zeros_like(ant1)),
+                    "FEED2": (primary_dims, da.zeros_like(ant1)),
+                    # TODO(sjperkins)
+                    # Fill these in with real values
+                    "DATA_DESC_ID": (primary_dims, da.zeros_like(ant1)),
+                    "FIELD_ID": (primary_dims, da.zeros_like(ant1)),
+                    "STATE_ID": (primary_dims, da.zeros_like(ant1)),
+                    "ARRAY_ID": (primary_dims, da.zeros_like(ant1)),
+                    "OBSERVATION_ID": (primary_dims, da.zeros_like(ant1)),
+                    "PROCESSOR_ID": (primary_dims, da.ones_like(ant1)),
+                    "SCAN_NUMBER": (primary_dims, da.full_like(ant1, scan_index)),
+                    "TIME_CENTROID": (primary_dims, time),
+                    "INTERVAL": (primary_dims, da.full_like(time, dataset.dump_period)),
+                    "EXPOSURE": (primary_dims, da.full_like(time, dataset.dump_period)),
+                    "UVW": (primary_dims + ("uvw",), uvw),
+                    "DATA": (primary_dims + ("chan", "corr"), vis.dataset),
+                    "FLAG": (primary_dims + ("chan", "corr"), flags.dataset),
+                    "WEIGHT_SPECTRUM": (
+                        primary_dims + ("chan", "corr"),
+                        weights.dataset,
+                    ),
+                    # Estimated RMS noise per frequency channel
+                    # note this column is used when computing calibration weights
+                    # in CASA - WEIGHT_SPECTRUM may be modified based on the
+                    # values in this column. See
+                    # https://casadocs.readthedocs.io/en/stable/notebooks/data_weights.html
+                    # for further details
+                    "SIGMA_SPECTRUM": (
+                        primary_dims + ("chan", "corr"),
+                        weights.dataset**-0.5,
+                    ),
+                }
+            )
+        )
+
+    xds = xarray.concat(xds, dim=primary_dims[0])
+
+    import dask
+    import shutil
+
+    # out_store = tmp_path_factory.mktemp(out_store)
+
+    print(xds)
+
+    shutil.rmtree(out_store, ignore_errors=True)
+    dask.compute(xds_to_zarr(xds, out_store))
+
+    # auto_corrs = 0 if include_auto_corrs else 1
+    # ant1, ant2 = np.triu_indices(len(dataset.ants), auto_corrs)
+    # ant1, ant2 = (a.astype(np.int32) for a in (ant1, ant2))
