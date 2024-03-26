@@ -108,7 +108,14 @@ class FakeDataset(MinimalDataSet):
         return self._weights
 
 
-@pytest.fixture(scope="session")
+NTIME = 20
+NCHAN = 16
+NANT = 4
+DUMP_RATE = 8.0
+DEFAULT_PARAM = {"ntime": NTIME, "nchan": NCHAN, "nant": NANT, "dump_rate": DUMP_RATE}
+
+
+@pytest.fixture(scope="session", params=[DEFAULT_PARAM])
 def dataset(request, tmp_path_factory):
     path = tmp_path_factory.mktemp("chunks")
     targets = [
@@ -121,18 +128,32 @@ def dataset(request, tmp_path_factory):
         Target("J0408-6545 | PKS 0408-65, radec bpcal, 4:08:20.38, -65:45:09.1"),
         Target("J1346-6024 | Cen B, radec, 13:46:49.04, -60:24:29.4"),
     ]
+    ntime = request.param.get("ntime", NTIME)
+    nchan = request.param.get("nchan", NCHAN)
+    nant = request.param.get("nant", NANT)
+    dump_rate = request.param.get("dump_rate", DUMP_RATE)
+
     # Ensure that len(timestamps) is an integer multiple of len(targets)
-    timestamps = 1234667890.0 + 8.0 * np.arange(20)
+    timestamps = 1234667890.0 + dump_rate * np.arange(ntime)
+
+    assert divmod(ntime, len(targets))[-1] == 0
 
     spw = SpectralWindow(
-        centre_freq=1284e6, channel_width=0, num_chans=16, sideband=1, bandwidth=856e6
+        centre_freq=1284e6,
+        channel_width=0,
+        num_chans=nchan,
+        sideband=1,
+        bandwidth=856e6,
     )
 
     return FakeDataset(
-        path, targets, timestamps, antennas=MEERKAT_ANTENNA_DESCRIPTIONS[:4], spw=spw
+        path, targets, timestamps, antennas=MEERKAT_ANTENNA_DESCRIPTIONS[:nant], spw=spw
     )
 
 
+@pytest.mark.parametrize(
+    "dataset", [{"ntime": 20, "nchan": 16, "nant": 4}], indirect=True
+)
 @pytest.mark.parametrize("include_auto_corrs", [True])
 @pytest.mark.parametrize("row_dim", [True, False])
 @pytest.mark.parametrize("out_store", ["output.zarr"])
