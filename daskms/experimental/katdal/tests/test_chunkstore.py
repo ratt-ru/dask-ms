@@ -342,12 +342,13 @@ def test_chunkstore(tmp_path_factory, dataset, include_auto_corrs, row_dim, out_
     # This must hold for test_tranpose to work
     assert_array_equal(cp_info.cp_index.ravel(), np.arange(nbl * ncorr))
 
-    def test_transpose(a):
+    def assert_transposed_equal(a, e):
         """Simple transpose of katdal (time, chan, corrprod) to
         (time, bl, chan, corr)."""
-        o = a.reshape(ntime, nchan, nbl, ncorr).transpose(0, 2, 1, 3)
-        return o.reshape(-1, nchan, ncorr) if row_dim else o
+        t = a.reshape(ntime, nchan, nbl, ncorr).transpose(0, 2, 1, 3)
+        t = t.reshape(-1, nchan, ncorr) if row_dim else t
+        return assert_array_equal(t, e)
 
-    assert_array_equal(test_transpose(test_data), read_xds.DATA.values)
-    assert_array_equal(test_transpose(test_weights), read_xds.WEIGHT_SPECTRUM.values)
-    assert_array_equal(test_transpose(test_flags), read_xds.FLAG.values)
+    assert_transposed_equal(test_data, read_xds.DATA.values)
+    assert_transposed_equal(test_weights, read_xds.WEIGHT_SPECTRUM.values)
+    assert_transposed_equal(test_flags, read_xds.FLAG.values)
