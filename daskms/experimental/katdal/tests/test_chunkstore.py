@@ -20,124 +20,19 @@ from katpoint import Timestamp
 from daskms.experimental.katdal.transpose import transpose
 from daskms.experimental.katdal.corr_products import corrprod_index
 from daskms.experimental.katdal.uvw import uvw_coords
+from daskms.experimental.katdal.msv2_proxy import MSv2DatasetProxy
 
 
 @pytest.mark.parametrize(
     "dataset", [{"ntime": 20, "nchan": 16, "nant": 4}], indirect=True
 )
-@pytest.mark.parametrize("include_auto_corrs", [True])
+@pytest.mark.parametrize("auto_corrs", [True])
 @pytest.mark.parametrize("row_dim", [True, False])
 @pytest.mark.parametrize("out_store", ["output.zarr"])
-def test_chunkstore(tmp_path_factory, dataset, include_auto_corrs, row_dim, out_store):
-    # Example using an actual mvf4 dataset, make sure to replace the token with a real one
-    # url = "https://archive-gw-1.kat.ac.za/1711249692/1711249692_sdp_l0.full.rdb?token=abcdef1234567890"
-    # import katdal
-    # dataset = katdal.open(url, applycal="l1")
-    cp_info = corrprod_index(dataset, ["HH", "HV", "VH", "VV"], include_auto_corrs)
-    all_antennas = dataset.ants
-
-    xds = []
-
-    for scan_index, scan_state, target in dataset.scans():
-        # Extract numpy and dask products
-        time_utc = dataset.timestamps
-        t_chunks, chan_chunks, cp_chunks = dataset.vis.dataset.chunks
-
-        # Modified Julian Date in Seconds
-        time_mjds = np.asarray(
-            [t.to_mjd() * 24 * 60 * 60 for t in map(Timestamp, time_utc)]
-        )
-
-        # Create a dask chunking transform
-        rechunk = partial(da.rechunk, chunks=(t_chunks, chan_chunks, cp_chunks))
-
-        # Transpose from (time, chan, corrprod) to (time, bl, chan, corr)
-        cpi = cp_info.cp_index
-        flag_transpose = partial(
-            transpose,
-            cp_index=cpi,
-            data_type=numba.literally("flags"),
-            row=row_dim,
-        )
-        weight_transpose = partial(
-            transpose,
-            cp_index=cpi,
-            data_type=numba.literally("weights"),
-            row=row_dim,
-        )
-        vis_transpose = partial(
-            transpose, cp_index=cpi, data_type=numba.literally("vis"), row=row_dim
-        )
-
-        flags = DaskLazyIndexer(dataset.flags, (), (rechunk, flag_transpose))
-        weights = DaskLazyIndexer(dataset.weights, (), (rechunk, weight_transpose))
-        vis = DaskLazyIndexer(dataset.vis, (), transforms=(vis_transpose,))
-
-        time = da.from_array(time_mjds[:, None], chunks=(t_chunks, 1))
-        ant1 = da.from_array(cp_info.ant1_index[None, :], chunks=(1, cpi.shape[0]))
-        ant2 = da.from_array(cp_info.ant2_index[None, :], chunks=(1, cpi.shape[0]))
-
-        uvw = uvw_coords(
-            target,
-            da.from_array(time_utc, chunks=t_chunks),
-            all_antennas,
-            cp_info,
-            row=row_dim,
-        )
-
-        time, ant1, ant2 = da.broadcast_arrays(time, ant1, ant2)
-
-        if row_dim:
-            primary_dims = ("row",)
-            time = time.ravel().rechunk({0: vis.dataset.chunks[0]})
-            ant1 = ant1.ravel().rechunk({0: vis.dataset.chunks[0]})
-            ant2 = ant2.ravel().rechunk({0: vis.dataset.chunks[0]})
-        else:
-            primary_dims = ("time", "baseline")
-
-        xds.append(
-            xarray.Dataset(
-                {
-                    # Primary indexing columns
-                    "TIME": (primary_dims, time),
-                    "ANTENNA1": (primary_dims, ant1),
-                    "ANTENNA2": (primary_dims, ant2),
-                    "FEED1": (primary_dims, da.zeros_like(ant1)),
-                    "FEED2": (primary_dims, da.zeros_like(ant1)),
-                    # TODO(sjperkins)
-                    # Fill these in with real values
-                    "DATA_DESC_ID": (primary_dims, da.zeros_like(ant1)),
-                    "FIELD_ID": (primary_dims, da.zeros_like(ant1)),
-                    "STATE_ID": (primary_dims, da.zeros_like(ant1)),
-                    "ARRAY_ID": (primary_dims, da.zeros_like(ant1)),
-                    "OBSERVATION_ID": (primary_dims, da.zeros_like(ant1)),
-                    "PROCESSOR_ID": (primary_dims, da.ones_like(ant1)),
-                    "SCAN_NUMBER": (primary_dims, da.full_like(ant1, scan_index)),
-                    "TIME_CENTROID": (primary_dims, time),
-                    "INTERVAL": (primary_dims, da.full_like(time, dataset.dump_period)),
-                    "EXPOSURE": (primary_dims, da.full_like(time, dataset.dump_period)),
-                    "UVW": (primary_dims + ("uvw",), uvw),
-                    "DATA": (primary_dims + ("chan", "corr"), vis.dataset),
-                    "FLAG": (primary_dims + ("chan", "corr"), flags.dataset),
-                    "WEIGHT_SPECTRUM": (
-                        primary_dims + ("chan", "corr"),
-                        weights.dataset,
-                    ),
-                    # Estimated RMS noise per frequency channel
-                    # note this column is used when computing calibration weights
-                    # in CASA - WEIGHT_SPECTRUM may be modified based on the
-                    # values in this column. See
-                    # https://casadocs.readthedocs.io/en/stable/notebooks/data_weights.html
-                    # for further details
-                    "SIGMA_SPECTRUM": (
-                        primary_dims + ("chan", "corr"),
-                        weights.dataset**-0.5,
-                    ),
-                }
-            )
-        )
-
-    xds = xarray.concat(xds, dim=primary_dims[0])
+def test_chunkstore(tmp_path_factory, dataset, auto_corrs, row_dim, out_store):
+    proxy = MSv2DatasetProxy(dataset, auto_corrs, row_dim)
+    all_antennas = proxy.ants
+    xds = list(proxy.scans())
 
     ant_xds = [
         xarray.Dataset(
@@ -209,11 +104,11 @@ def test_chunkstore(tmp_path_factory, dataset, include_auto_corrs, row_dim, out_
     # Clamp test data to [0, 1]
     test_flags = np.where(dataset._test_data["flags"] != 0, 1, 0)
     ntime, nchan, _ = test_data.shape
-    (nbl,) = cp_info.ant1_index.shape
+    (nbl,) = proxy.cp_info.ant1_index.shape
     ncorr = read_xds.sizes["corr"]
 
     # This must hold for test_tranpose to work
-    assert_array_equal(cp_info.cp_index.ravel(), np.arange(nbl * ncorr))
+    assert_array_equal(proxy.cp_info.cp_index.ravel(), np.arange(nbl * ncorr))
 
     def assert_transposed_equal(a, e):
         """Simple transpose of katdal (time, chan, corrprod) to

@@ -1,14 +1,15 @@
 import dask.array as da
+import numpy as np
 
-import numba
+from numba import njit, literally
 from numba.extending import overload, SentryLiteralArgs, register_jitable
 from numba.core.errors import TypingError
-import numpy as np
+
 
 JIT_OPTIONS = {"nogil": True, "cache": True}
 
 
-@numba.njit(**JIT_OPTIONS)
+@njit(**JIT_OPTIONS)
 def transpose_core(in_data, cp_index, data_type, row):
     return transpose_impl(in_data, cp_index, data_type, row)
 
@@ -101,7 +102,7 @@ def transpose(data, cp_index, data_type, row=False):
         ("time", "chan", "corrprod"),
         cp_index,
         None,
-        numba.literally(data_type),
+        literally(data_type),
         None,
         row,
         None,

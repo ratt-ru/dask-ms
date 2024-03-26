@@ -192,7 +192,7 @@ def requires(*args):
         def decorator(fn):
             lines = [
                 f"Optional extras required by "
-                f"{funcname(fn)} are missing due to "
+                f"{fn.__name__} are missing due to "
                 f"the following ImportErrors:"
             ]
 

@@ -1,5 +1,9 @@
-import numpy as np
 import pytest
+
+katdal = pytest.importorskip("katdal")
+katpoint = pytest.importorskip("katpoint")
+
+import numpy as np
 
 from katdal.lazy_indexer import DaskLazyIndexer
 from katdal.chunkstore_npy import NpyFileChunkStore
