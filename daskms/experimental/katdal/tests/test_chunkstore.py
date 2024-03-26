@@ -324,3 +324,30 @@ def test_chunkstore(tmp_path_factory, dataset, include_auto_corrs, row_dim, out_
 
     dask.compute(xds_to_zarr(xds, out_store))
     dask.compute(xds_to_zarr(ant_xds, f"{out_store}::ANTENNA"))
+
+    # Compare visibilities, weights and flags
+    (read_xds,) = dask.compute(xds_from_zarr(out_store))
+    (read_xds,) = read_xds
+
+    test_data = dataset._test_data["correlator_data"]
+    # Defer to ChunkStoreVisWeights application of weight scaling
+    test_weights = dataset._vfw.weights
+    assert test_weights.shape == test_data.shape
+    # Clamp test data to [0, 1]
+    test_flags = np.where(dataset._test_data["flags"] != 0, 1, 0)
+    ntime, nchan, _ = test_data.shape
+    (nbl,) = cp_info.ant1_index.shape
+    ncorr = read_xds.sizes["corr"]
+
+    # This must hold for test_tranpose to work
+    assert_array_equal(cp_info.cp_index.ravel(), np.arange(nbl * ncorr))
+
+    def test_transpose(a):
+        """Simple transpose of katdal (time, chan, corrprod) to
+        (time, bl, chan, corr)."""
+        o = a.reshape(ntime, nchan, nbl, ncorr).transpose(0, 2, 1, 3)
+        return o.reshape(-1, nchan, ncorr) if row_dim else o
+
+    assert_array_equal(test_transpose(test_data), read_xds.DATA.values)
+    assert_array_equal(test_transpose(test_weights), read_xds.WEIGHT_SPECTRUM.values)
+    assert_array_equal(test_transpose(test_flags), read_xds.FLAG.values)
