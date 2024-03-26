@@ -1,25 +1,13 @@
-from functools import partial
-
 import pytest
 
-dask = pytest.importorskip("dask")
-da = pytest.importorskip("dask.array")
 xarray = pytest.importorskip("xarray")
 katdal = pytest.importorskip("katdal")
-katpoint = pytest.importorskip("katpoint")
 
-import numba
+import dask
 import numpy as np
 from numpy.testing import assert_array_equal
 
 from daskms.experimental.zarr import xds_from_zarr, xds_to_zarr
-
-from katdal.lazy_indexer import DaskLazyIndexer
-from katpoint import Timestamp
-
-from daskms.experimental.katdal.transpose import transpose
-from daskms.experimental.katdal.corr_products import corrprod_index
-from daskms.experimental.katdal.uvw import uvw_coords
 from daskms.experimental.katdal.msv2_proxy import MSv2DatasetProxy
 
 

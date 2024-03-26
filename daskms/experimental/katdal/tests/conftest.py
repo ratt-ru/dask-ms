@@ -1,7 +1,6 @@
 import pytest
 
 katdal = pytest.importorskip("katdal")
-katpoint = pytest.importorskip("katpoint")
 
 import numpy as np
 

@@ -3,24 +3,11 @@ from functools import partial
 import dask.array as da
 import numpy as np
 
-from daskms.utils import requires
-
-try:
-    from katdal.dataset import DataSet
-    from katdal.lazy_indexer import DaskLazyIndexer
-    from katpoint import Timestamp
-    import numba
-except ImportError as e:
-    kat_import_error = e
-else:
-    kat_import_error = None
-
-try:
-    import xarray
-except ImportError as e:
-    xarray_import_error = e
-else:
-    xarray_import_error = None
+from katdal.dataset import DataSet
+from katdal.lazy_indexer import DaskLazyIndexer
+from katpoint import Timestamp
+import numba
+import xarray
 
 from daskms.experimental.katdal.corr_products import corrprod_index
 from daskms.experimental.katdal.transpose import transpose
@@ -59,7 +46,6 @@ class MSv2DataProxyMetaclass(type):
         return type.__new__(cls, name, bases, dct)
 
 
-@requires("pip install dask-ms[katdal, xarray]", kat_import_error, xarray_import_error)
 class MSv2DatasetProxy(metaclass=MSv2DataProxyMetaclass):
     """Proxies a katdal dataset to present an MSv2 view over archive data"""
 
