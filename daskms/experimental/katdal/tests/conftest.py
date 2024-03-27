@@ -7,6 +7,7 @@ NTIME = 20
 NCHAN = 16
 NANT = 4
 DUMP_RATE = 8.0
+
 DEFAULT_PARAM = {"ntime": NTIME, "nchan": NCHAN, "nant": NANT, "dump_rate": DUMP_RATE}
 
 
@@ -18,8 +19,7 @@ def dataset(request, tmp_path_factory):
     SpectralWindow = pytest.importorskip("katdal.spectral_window").SpectralWindow
     Target = pytest.importorskip("katpoint").Target
 
-    path = tmp_path_factory.mktemp("chunks")
-    targets = [
+    DEFAULT_TARGETS = [
         # It would have been nice to have radec = 19:39, -63:42 but then
         # selection by description string does not work because the catalogue's
         # description string pads it out to radec = 19:39:00.00, -63:42:00.0.
@@ -29,6 +29,7 @@ def dataset(request, tmp_path_factory):
         Target("J0408-6545 | PKS 0408-65, radec bpcal, 4:08:20.38, -65:45:09.1"),
         Target("J1346-6024 | Cen B, radec, 13:46:49.04, -60:24:29.4"),
     ]
+    targets = request.param.get("targets", DEFAULT_TARGETS)
     ntime = request.param.get("ntime", NTIME)
     nchan = request.param.get("nchan", NCHAN)
     nant = request.param.get("nant", NANT)
@@ -36,7 +37,8 @@ def dataset(request, tmp_path_factory):
 
     # Ensure that len(timestamps) is an integer multiple of len(targets)
     timestamps = 1234667890.0 + dump_rate * np.arange(ntime)
-    assert divmod(ntime, len(targets))[-1] == 0
+    assert ntime > len(targets)
+    assert ntime % len(targets) == 0
 
     spw = SpectralWindow(
         centre_freq=1284e6,
@@ -47,5 +49,9 @@ def dataset(request, tmp_path_factory):
     )
 
     return MockDataset(
-        path, targets, timestamps, antennas=MEERKAT_ANTENNA_DESCRIPTIONS[:nant], spw=spw
+        tmp_path_factory.mktemp("chunks"),
+        targets,
+        timestamps,
+        antennas=MEERKAT_ANTENNA_DESCRIPTIONS[:nant],
+        spw=spw,
     )
