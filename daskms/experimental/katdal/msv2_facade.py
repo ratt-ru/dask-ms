@@ -43,7 +43,7 @@ class XarrayMSV2Facade:
     def cp_info(self):
         return self._cp_info
 
-    def _main_xarray_factory(self, state_id, scan_index, scan_state, target):
+    def _main_xarray_factory(self, field_id, state_id, scan_index, scan_state, target):
         # Extract numpy and dask products
         dataset = self._dataset
         cp_info = self._cp_info
@@ -110,10 +110,11 @@ class XarrayMSV2Facade:
             "ANTENNA2": (primary_dims, ant2),
             "FEED1": (primary_dims, da.zeros_like(ant1)),
             "FEED2": (primary_dims, da.zeros_like(ant1)),
-            # TODO(sjperkins)
-            # Fill these in with real values
+            # katdal datasets only have one spectral window
+            # and one polarisation. Thus, there
+            # is only one DATA_DESC_ID and it is zero
             "DATA_DESC_ID": (primary_dims, da.zeros_like(ant1)),
-            "FIELD_ID": (primary_dims, da.zeros_like(ant1)),
+            "FIELD_ID": (primary_dims, da.full_like(ant1, field_id)),
             "STATE_ID": (primary_dims, da.full_like(ant1, state_id)),
             "ARRAY_ID": (primary_dims, da.zeros_like(ant1)),
             "OBSERVATION_ID": (primary_dims, da.zeros_like(ant1)),
@@ -291,7 +292,7 @@ class XarrayMSV2Facade:
                 {
                     "NAME": ("row", np.array([target.name], object)),
                     "CODE": ("row", np.array(["T"], object)),
-                    "SOURCE_ID": ("row", np.array([s], dtype=np.int32)),
+                    "SOURCE_ID": ("row", np.array([field_id], dtype=np.int32)),
                     "NUM_POLY": ("row", np.zeros(1, dtype=np.int32)),
                     "TIME": ("row", np.array([time])),
                     "DELAY_DIR": (
@@ -309,19 +310,19 @@ class XarrayMSV2Facade:
                     "FLAG_ROW": ("row", np.zeros(1, dtype=np.int32)),
                 }
             )
-            for s, (time, target, radec) in enumerate(field_data)
+            for field_id, time, target, radec in field_data.values()
         ]
 
         return xarray.concat(fields, dim="row")
 
     def _source_xarray_factory(self, field_data):
-        times, targets, radecs = zip(*field_data)
+        field_ids, times, targets, radecs = zip(*(field_data.values()))
         times = np.array(times, dtype=np.float64)
-        nfields = len(times)
+        nfields = len(field_ids)
         return xarray.Dataset(
             {
                 "NAME": ("row", np.array([t.name for t in targets], dtype=object)),
-                "SOURCE_ID": ("row", np.arange(nfields, dtype=np.int32)),
+                "SOURCE_ID": ("row", np.array(field_ids, dtype=np.int32)),
                 "PROPER_MOTION": (
                     ("row", "radec-per-sec"),
                     np.zeros((nfields, 2), dtype=np.float32),
@@ -384,13 +385,24 @@ class XarrayMSV2Facade:
         """
         main_xds = []
         field_data = []
+        field_data = {}
         state_modes = {"UNKNOWN": 0}
+        UNKNOWN_STATE_ID = next(iter(state_modes.values()))
 
         # Generate MAIN table xarray partition datasets
         for scan_index, scan_state, target in self._dataset.scans():
-            # Create per-scan field and source data
-            time_origin = Timestamp(self._dataset.timestamps[0])
-            field_data.append((to_mjds(time_origin), target, target.radec(time_origin)))
+            # Retrieve existing field data, or create
+            try:
+                field_id, _, _, _ = field_data[target.name]
+            except KeyError:
+                field_id = len(field_data)
+                time_origin = Timestamp(self._dataset.timestamps[0])
+                field_data[target.name] = (
+                    field_id,
+                    to_mjds(time_origin),
+                    target,
+                    target.radec(time_origin),
+                )
 
             # Create or retrieve the state_id associated
             # with the tags of the current source
@@ -399,10 +411,12 @@ class XarrayMSV2Facade:
             )
             if state_tag and state_tag not in state_modes:
                 state_modes[state_tag] = len(state_modes)
-            state_id = state_modes.get(state_tag, state_modes["UNKNOWN"])
+            state_id = state_modes.get(state_tag, UNKNOWN_STATE_ID)
 
             main_xds.append(
-                self._main_xarray_factory(state_id, scan_index, scan_state, target)
+                self._main_xarray_factory(
+                    field_id, state_id, scan_index, scan_state, target
+                )
             )
 
         # Generate subtable xarray datasets
