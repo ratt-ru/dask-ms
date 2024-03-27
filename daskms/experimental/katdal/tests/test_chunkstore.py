@@ -22,6 +22,8 @@ def test_chunkstore(tmp_path_factory, dataset, auto_corrs, row_dim, out_store):
     xds = list(proxy.scans())
     sub_xds = proxy.subtables()
 
+    from pprint import pprint
+
     pprint(xds)
     pprint(sub_xds)
 
