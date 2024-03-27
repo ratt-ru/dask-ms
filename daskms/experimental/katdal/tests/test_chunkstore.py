@@ -19,7 +19,6 @@ from daskms.experimental.katdal.msv2_proxy import MSv2DatasetProxy
 @pytest.mark.parametrize("out_store", ["output.zarr"])
 def test_chunkstore(tmp_path_factory, dataset, auto_corrs, row_dim, out_store):
     proxy = MSv2DatasetProxy(dataset, auto_corrs, row_dim)
-    all_antennas = proxy.ants
     xds = list(proxy.scans())
     sub_xds = proxy.subtables()
 
