@@ -386,8 +386,8 @@ class XarrayMSV2Facade:
         main_xds = []
         field_data = []
         field_data = {}
-        state_modes = {"UNKNOWN": 0}
-        UNKNOWN_STATE_ID = next(iter(state_modes.values()))
+        UNKNOWN_STATE_ID = 0
+        state_modes = {"UNKNOWN": UNKNOWN_STATE_ID}
 
         # Generate MAIN table xarray partition datasets
         for scan_index, scan_state, target in self._dataset.scans():
