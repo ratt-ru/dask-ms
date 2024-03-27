@@ -8,7 +8,7 @@ import numpy as np
 from numpy.testing import assert_array_equal
 
 from daskms.experimental.zarr import xds_from_zarr, xds_to_zarr
-from daskms.experimental.katdal.msv2_proxy import MSv2DatasetProxy
+from daskms.experimental.katdal.msv2_proxy import KatdalToXarrayMSv2Adapter
 
 
 @pytest.mark.parametrize(
@@ -18,10 +18,8 @@ from daskms.experimental.katdal.msv2_proxy import MSv2DatasetProxy
 @pytest.mark.parametrize("row_dim", [True, False])
 @pytest.mark.parametrize("out_store", ["output.zarr"])
 def test_chunkstore(tmp_path_factory, dataset, auto_corrs, row_dim, out_store):
-    proxy = MSv2DatasetProxy(dataset, auto_corrs, row_dim)
-    xds = list(proxy.scans())
-    sub_xds = proxy.subtables()
-
+    adapter = KatdalToXarrayMSv2Adapter(dataset, auto_corrs, row_dim)
+    xds, sub_xds = adapter.generate()
     from pprint import pprint
 
     pprint(xds)
@@ -40,7 +38,7 @@ def test_chunkstore(tmp_path_factory, dataset, auto_corrs, row_dim, out_store):
 
     # Compare visibilities, weights and flags
     (read_xds,) = dask.compute(xds_from_zarr(out_store))
-    (read_xds,) = read_xds
+    read_xds = xarray.concat(read_xds, dim="row" if row_dim else "time")
 
     test_data = dataset._test_data["correlator_data"]
     # Defer to ChunkStoreVisWeights application of weight scaling
@@ -49,11 +47,11 @@ def test_chunkstore(tmp_path_factory, dataset, auto_corrs, row_dim, out_store):
     # Clamp test data to [0, 1]
     test_flags = np.where(dataset._test_data["flags"] != 0, 1, 0)
     ntime, nchan, _ = test_data.shape
-    (nbl,) = proxy.cp_info.ant1_index.shape
+    (nbl,) = adapter.cp_info.ant1_index.shape
     ncorr = read_xds.sizes["corr"]
 
     # This must hold for test_tranpose to work
-    assert_array_equal(proxy.cp_info.cp_index.ravel(), np.arange(nbl * ncorr))
+    assert_array_equal(adapter.cp_info.cp_index.ravel(), np.arange(nbl * ncorr))
 
     def assert_transposed_equal(a, e):
         """Simple transpose of katdal (time, chan, corrprod) to

@@ -14,39 +14,7 @@ from daskms.experimental.katdal.transpose import transpose
 from daskms.experimental.katdal.uvw import uvw_coords
 
 
-PROXIED_PROPERTIES = [
-    "ants",
-    "size",
-    "shape",
-    "catalogue",
-    "scan_indices",
-    "target_indices" "name",
-    "experiment_id",
-    "observer",
-    "description",
-    "version",
-]
-
-
-def property_factory(name: str):
-    def impl(self):
-        return getattr(self._dataset, name)
-
-    impl.__name__ = name
-    impl.__doc__ = f"Proxies :attr:`katdal.Dataset.{name}"
-
-    return property(impl)
-
-
-class MSv2DataProxyMetaclass(type):
-    def __new__(cls, name, bases, dct):
-        for p in PROXIED_PROPERTIES:
-            dct[p] = property_factory(p)
-
-        return type.__new__(cls, name, bases, dct)
-
-
-class MSv2DatasetProxy(metaclass=MSv2DataProxyMetaclass):
+class KatdalToXarrayMSv2Adapter:
     """Proxies a katdal dataset to present an MSv2 view over archive data"""
 
     def __init__(
@@ -57,20 +25,12 @@ class MSv2DatasetProxy(metaclass=MSv2DataProxyMetaclass):
         self._auto_corrs = auto_corrs
         self._row_view = row_view
         self._pols_to_use = ["HH", "HV", "VH", "VV"]
-        self.select(reset="")
-        self._antennas = dataset.ants.copy()
+        self._dataset.select(reset="")
+        self._cp_info = corrprod_index(dataset, self._pols_to_use, auto_corrs)
 
     @property
     def cp_info(self):
         return self._cp_info
-
-    def select(self, **kwargs):
-        """Proxies :meth:`katdal.select`"""
-        result = self._dataset.select(**kwargs)
-        self._cp_info = corrprod_index(
-            self._dataset, self._pols_to_use, self._auto_corrs
-        )
-        return result
 
     def _main_xarray_factory(self, scan_index, scan_state, target):
         # Extract numpy and dask products
@@ -119,7 +79,7 @@ class MSv2DatasetProxy(metaclass=MSv2DataProxyMetaclass):
         uvw = uvw_coords(
             target,
             da.from_array(time_utc, chunks=t_chunks),
-            self._antennas,
+            dataset.ants,
             cp_info,
             row=self._row_view,
         )
@@ -173,13 +133,6 @@ class MSv2DatasetProxy(metaclass=MSv2DataProxyMetaclass):
         }
 
         return xarray.Dataset(data_vars)
-
-    def scans(self):
-        """Proxies :meth:`katdal.scans`"""
-        xds = [
-            self._main_xarray_factory(*scan_data) for scan_data in self._dataset.scans()
-        ]
-        yield xarray.concat(xds, dim="row" if self._row_view else "time")
 
     def _antenna_xarray_factory(self):
         antennas = self._dataset.ants
@@ -270,9 +223,9 @@ class MSv2DatasetProxy(metaclass=MSv2DataProxyMetaclass):
     def _ddid_xarray_factory(self):
         return xarray.Dataset(
             {
-                "SPECTRAL_WINDOW_ID": np.zeros(1, dtype=np.int32),
-                "POLARIZATION_ID": np.zeros(1, dtype=np.int32),
-                "FLAG_ROW": np.zeros(1, dtype=np.int32),
+                "SPECTRAL_WINDOW_ID": ("row", np.zeros(1, dtype=np.int32)),
+                "POLARIZATION_ID": ("row", np.zeros(1, dtype=np.int32)),
+                "FLAG_ROW": ("row", np.zeros(1, dtype=np.int32)),
             }
         )
 
@@ -323,13 +276,76 @@ class MSv2DatasetProxy(metaclass=MSv2DataProxyMetaclass):
             }
         )
 
-    def subtables(self):
-        self.select(reset="")
+    def _field_xarray_factory(self, field_data):
+        fields = [
+            xarray.Dataset(
+                {
+                    "NAME": ("row", np.array([target.name], object)),
+                    "CODE": ("row", np.array(["T"], object)),
+                    "SOURCE_ID": ("row", np.array([s], dtype=np.int32)),
+                    "NUM_POLY": ("row", np.zeros(1, dtype=np.int32)),
+                    "TIME": ("row", np.array([time])),
+                    "DELAY_DIR": (
+                        ("row", "field-poly", "field-dir"),
+                        np.array([[radec]], dtype=np.float64),
+                    ),
+                    "PHASE_DIR": (
+                        ("row", "field-poly", "field-dir"),
+                        np.array([[radec]], dtype=np.float64),
+                    ),
+                    "REFERENCE_DIR": (
+                        ("row", "field-poly", "field-dir"),
+                        np.array([[radec]], dtype=np.float64),
+                    ),
+                    "FLAG_ROW": ("row", np.zeros(1, dtype=np.int32)),
+                }
+            )
+            for s, (time, target, radec) in enumerate(field_data)
+        ]
 
-        return {
+        return xarray.concat(fields, dim="row")
+
+    def _source_xarray_factory(self, field_data):
+        times, targets, radecs = zip(*field_data)
+        times = np.array(times, dtype=np.float64)
+        nfields = len(times)
+        return xarray.Dataset(
+            {
+                "NAME": ("row", np.array([t.name for t in targets], dtype=object)),
+                "SOURCE_ID": ("row", np.arange(nfields, dtype=np.int32)),
+                "PROPER_MOTION": (
+                    ("row", "radec-per-sec"),
+                    np.zeros((nfields, 2), dtype=np.float32),
+                ),
+                "CALIBRATION_GROUP": ("row", np.full(nfields, -1, dtype=np.int32)),
+                "DIRECTION": (("row", "radec"), np.array(radecs)),
+                "TIME": ("row", times),
+                "NUM_LINES": ("row", np.ones(nfields, dtype=np.int32)),
+                "REST_FREQUENCY": (
+                    ("row", "lines"),
+                    np.zeros((nfields, 1), dtype=np.float64),
+                ),
+            }
+        )
+
+    def generate(self):
+        main_xds = []
+        field_data = []
+
+        for scan_index, scan_state, target in self._dataset.scans():
+            main_xds.append(self._main_xarray_factory(scan_index, scan_state, target))
+            time_origin = Timestamp(self._dataset.timestamps[0])
+            time_mjds = time_origin.to_mjd() * 24 * 60 * 60
+            field_data.append((time_mjds, target, target.radec(time_origin)))
+
+        subtables = {
             "ANTENNA": self._antenna_xarray_factory(),
             "DATA_DESCRIPTION": self._ddid_xarray_factory(),
             "SPECTRAL_WINDOW": self._spw_xarray_factory(),
             "POLARIZATION": self._pol_xarray_factory(),
             "FEED": self._feed_xarray_factory(),
+            "FIELD": self._field_xarray_factory(field_data),
+            "SOURCE": self._source_xarray_factory(field_data),
         }
+
+        return main_xds, subtables
