@@ -178,15 +178,15 @@ class XarrayMSV2Facade:
                     "RESOLUTION": (("row", "chan"), spw.channel_freqs[np.newaxis, :]),
                     "CHAN_WIDTH": (
                         ("row", "chan"),
-                        np.full_like(spw.channel_freqs, spw.channel_width)[
-                            np.newaxis, :
-                        ],
+                        np.full_like(
+                            spw.channel_freqs[np.newaxis, :], spw.channel_width
+                        ),
                     ),
                     "EFFECTIVE_BW": (
                         ("row", "chan"),
-                        np.full_like(spw.channel_freqs, spw.channel_width)[
-                            np.newaxis, :
-                        ],
+                        np.full_like(
+                            spw.channel_freqs[np.newaxis, :], spw.channel_width
+                        ),
                     ),
                     "MEAS_FREQ_REF": ("row", np.array([5], dtype=np.int32)),
                     "REF_FREQUENCY": ("row", [ref_freq(spw.channel_freqs)]),
