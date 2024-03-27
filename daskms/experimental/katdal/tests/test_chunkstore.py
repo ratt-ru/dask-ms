@@ -21,65 +21,21 @@ def test_chunkstore(tmp_path_factory, dataset, auto_corrs, row_dim, out_store):
     proxy = MSv2DatasetProxy(dataset, auto_corrs, row_dim)
     all_antennas = proxy.ants
     xds = list(proxy.scans())
+    sub_xds = proxy.subtables()
 
-    ant_xds = [
-        xarray.Dataset(
-            {
-                "NAME": (("row",), np.asarray([a.name for a in all_antennas])),
-                "OFFSET": (
-                    ("row", "xyz"),
-                    np.asarray(np.zeros((len(all_antennas), 3))),
-                ),
-                "POSITION": (
-                    ("row", "xyz"),
-                    np.asarray([a.position_ecef for a in all_antennas]),
-                ),
-                "DISH_DIAMETER": (
-                    ("row",),
-                    np.asarray([a.diameter for a in all_antennas]),
-                ),
-                # "FLAG_ROW": (("row","xyz"),
-                #             np.zeros([a.flags for a in all_antennas],np.uint8)
-                # )
-            }
-        )
-    ]
-
-    spw = dataset.spectral_windows[dataset.spw]
-
-    spw_xds = [
-        xarray.Dataset(
-            {
-                "CHAN_FREQ": (("row", "chan"), dataset.channel_freqs[np.newaxis, :]),
-                "CHAN_WIDTH": (
-                    ("row", "chan"),
-                    np.full_like(dataset.channel_freqs, dataset.channel_width)[
-                        np.newaxis, :
-                    ],
-                ),
-                "EFFECTIVE_BW": (
-                    ("row", "chan"),
-                    np.full_like(dataset.channel_freqs, dataset.channel_width)[
-                        np.newaxis, :
-                    ],
-                ),
-                "FLAG_ROW": (("row",), np.zeros(1, dtype=np.int32)),
-                "NUM_CHAN": (("row",), np.array([spw.num_chans], dtype=np.int32)),
-            }
-        )
-    ]
-
-    print(spw_xds)
-    print(ant_xds)
-    print(xds)
+    pprint(xds)
+    pprint(sub_xds)
 
     # Reintroduce the shutil.rmtree and remote the tmp_path_factory
     # to test in the local directory
     # shutil.rmtree(out_store, ignore_errors=True)
     out_store = tmp_path_factory.mktemp("output") / out_store
 
-    dask.compute(xds_to_zarr(xds, out_store))
-    dask.compute(xds_to_zarr(ant_xds, f"{out_store}::ANTENNA"))
+    writes = [
+        xds_to_zarr(xds, out_store),
+        *(xds_to_zarr(ds, f"{out_store}::{k}") for k, ds in sub_xds.items()),
+    ]
+    dask.compute(writes)
 
     # Compare visibilities, weights and flags
     (read_xds,) = dask.compute(xds_from_zarr(out_store))
