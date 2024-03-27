@@ -14,8 +14,8 @@ from daskms.experimental.katdal.transpose import transpose
 from daskms.experimental.katdal.uvw import uvw_coords
 
 
-class KatdalToXarrayMSv2Adapter:
-    """Proxies a katdal dataset to present an MSv2 view over archive data"""
+class XarrayMSV2Facade:
+    """Provides a simplified xarray Dataset view over a katdal dataset"""
 
     def __init__(
         self, dataset: DataSet, auto_corrs: bool = True, row_view: bool = True
@@ -328,7 +328,17 @@ class KatdalToXarrayMSv2Adapter:
             }
         )
 
-    def generate(self):
+    def xarray_datasets(self):
+        """
+
+        Returns
+        -------
+        main_xds: list of :code:`xarray.Dataset`
+            A list of xarray datasets corresponding to Measurement Set 2
+            partitions
+        subtable_xds: dict of :code:`xarray.Dataset`
+            A dictionary of datasets keyed on subtable names
+        """
         main_xds = []
         field_data = []
 

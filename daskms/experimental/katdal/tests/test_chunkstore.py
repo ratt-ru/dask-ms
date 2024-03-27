@@ -8,7 +8,7 @@ import numpy as np
 from numpy.testing import assert_array_equal
 
 from daskms.experimental.zarr import xds_from_zarr, xds_to_zarr
-from daskms.experimental.katdal.msv2_proxy import KatdalToXarrayMSv2Adapter
+from daskms.experimental.katdal.msv2_facade import XarrayMSV2Facade
 
 
 @pytest.mark.parametrize(
@@ -18,8 +18,8 @@ from daskms.experimental.katdal.msv2_proxy import KatdalToXarrayMSv2Adapter
 @pytest.mark.parametrize("row_dim", [True, False])
 @pytest.mark.parametrize("out_store", ["output.zarr"])
 def test_chunkstore(tmp_path_factory, dataset, auto_corrs, row_dim, out_store):
-    adapter = KatdalToXarrayMSv2Adapter(dataset, auto_corrs, row_dim)
-    xds, sub_xds = adapter.generate()
+    facade = XarrayMSV2Facade(dataset, auto_corrs, row_dim)
+    xds, sub_xds = facade.xarray_datasets()
     from pprint import pprint
 
     pprint(xds)
@@ -47,11 +47,11 @@ def test_chunkstore(tmp_path_factory, dataset, auto_corrs, row_dim, out_store):
     # Clamp test data to [0, 1]
     test_flags = np.where(dataset._test_data["flags"] != 0, 1, 0)
     ntime, nchan, _ = test_data.shape
-    (nbl,) = adapter.cp_info.ant1_index.shape
+    (nbl,) = facade.cp_info.ant1_index.shape
     ncorr = read_xds.sizes["corr"]
 
     # This must hold for test_tranpose to work
-    assert_array_equal(adapter.cp_info.cp_index.ravel(), np.arange(nbl * ncorr))
+    assert_array_equal(facade.cp_info.cp_index.ravel(), np.arange(nbl * ncorr))
 
     def assert_transposed_equal(a, e):
         """Simple transpose of katdal (time, chan, corrprod) to
