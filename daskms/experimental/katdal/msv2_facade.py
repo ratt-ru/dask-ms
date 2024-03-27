@@ -9,6 +9,7 @@ from katpoint import Timestamp
 import numba
 import xarray
 
+from daskms.constants import DASKMS_PARTITION_KEY
 from daskms.experimental.katdal.corr_products import corrprod_index
 from daskms.experimental.katdal.transpose import transpose
 from daskms.experimental.katdal.uvw import uvw_coords
@@ -18,6 +19,18 @@ TAG_TO_INTENT = {
     "bpcal": "CALIBRATE_BANDPASS,CALIBRATE_FLUX",
     "target": "TARGET",
 }
+
+
+# Partitioning columns
+GROUP_COLS = ["FIELD_ID", "DATA_DESC_ID", "SCAN_NUMBER"]
+
+# No partitioning, applies to many subtables
+EMPTY_PARTITION_SCHEMA = {DASKMS_PARTITION_KEY: ()}
+
+# katdal datasets only have one spectral window
+# and one polarisation. Thus, there
+# is only one DATA_DESC_ID and it is zero
+DATA_DESC_ID = 0
 
 
 def to_mjds(timestamp: Timestamp):
@@ -110,10 +123,7 @@ class XarrayMSV2Facade:
             "ANTENNA2": (primary_dims, ant2),
             "FEED1": (primary_dims, da.zeros_like(ant1)),
             "FEED2": (primary_dims, da.zeros_like(ant1)),
-            # katdal datasets only have one spectral window
-            # and one polarisation. Thus, there
-            # is only one DATA_DESC_ID and it is zero
-            "DATA_DESC_ID": (primary_dims, da.zeros_like(ant1)),
+            "DATA_DESC_ID": (primary_dims, da.full_like(ant1, DATA_DESC_ID)),
             "FIELD_ID": (primary_dims, da.full_like(ant1, field_id)),
             "STATE_ID": (primary_dims, da.full_like(ant1, state_id)),
             "ARRAY_ID": (primary_dims, da.zeros_like(ant1)),
@@ -142,7 +152,18 @@ class XarrayMSV2Facade:
             ),
         }
 
-        return xarray.Dataset(data_vars)
+        attrs = {
+            DASKMS_PARTITION_KEY: tuple(
+                (c, data_vars[c][-1].dtype.name) for c in GROUP_COLS
+            ),
+            "FIELD_ID": field_id,
+            "DATA_DESC_ID": DATA_DESC_ID,
+            "SCAN_NUMBER": scan_index,
+        }
+
+        assert (set(GROUP_COLS) & set(attrs)) == set(GROUP_COLS)
+
+        return xarray.Dataset(data_vars, attrs=attrs)
 
     def _antenna_xarray_factory(self):
         antennas = self._dataset.ants
@@ -430,6 +451,14 @@ class XarrayMSV2Facade:
             "SOURCE": self._source_xarray_factory(field_data),
             "OBSERVATION": self._observation_xarray_factory(),
             "STATE": self._state_xarray_factory(state_modes),
+        }
+
+        # Assign empty partition schemas to subtables
+        subtables = {
+            n: dss.assign_attrs(EMPTY_PARTITION_SCHEMA)
+            if isinstance(dss, xarray.Dataset)
+            else [ds.assign_attrs(EMPTY_PARTITION_SCHEMA) for ds in dss]
+            for n, dss in subtables.items()
         }
 
         return main_xds, subtables
