@@ -20,11 +20,11 @@ class XarrayMSV2Facade:
     def __init__(
         self, dataset: DataSet, auto_corrs: bool = True, row_view: bool = True
     ):
-        # Reset the dataset selection
         self._dataset = dataset
         self._auto_corrs = auto_corrs
         self._row_view = row_view
         self._pols_to_use = ["HH", "HV", "VH", "VV"]
+        # Reset the dataset selection
         self._dataset.select(reset="")
         self._cp_info = corrprod_index(dataset, self._pols_to_use, auto_corrs)
 
