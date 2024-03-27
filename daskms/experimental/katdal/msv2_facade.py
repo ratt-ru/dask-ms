@@ -13,6 +13,17 @@ from daskms.experimental.katdal.corr_products import corrprod_index
 from daskms.experimental.katdal.transpose import transpose
 from daskms.experimental.katdal.uvw import uvw_coords
 
+TAG_TO_INTENT = {
+    "gaincal": "CALIBRATE_PHASE,CALIBRATE_AMPLI",
+    "bpcal": "CALIBRATE_BANDPASS,CALIBRATE_FLUX",
+    "target": "TARGET",
+}
+
+
+def to_mjds(timestamp: Timestamp):
+    """Converts a katpoint Timestamp to Modified Julian Date Seconds"""
+    return timestamp.to_mjd() * 24 * 60 * 60
+
 
 class XarrayMSV2Facade:
     """Provides a simplified xarray Dataset view over a katdal dataset"""
@@ -32,7 +43,7 @@ class XarrayMSV2Facade:
     def cp_info(self):
         return self._cp_info
 
-    def _main_xarray_factory(self, scan_index, scan_state, target):
+    def _main_xarray_factory(self, state_id, scan_index, scan_state, target):
         # Extract numpy and dask products
         dataset = self._dataset
         cp_info = self._cp_info
@@ -40,9 +51,7 @@ class XarrayMSV2Facade:
         t_chunks, chan_chunks, cp_chunks = dataset.vis.dataset.chunks
 
         # Modified Julian Date in Seconds
-        time_mjds = np.asarray(
-            [t.to_mjd() * 24 * 60 * 60 for t in map(Timestamp, time_utc)]
-        )
+        time_mjds = np.asarray([to_mjds(t) for t in map(Timestamp, time_utc)])
 
         # Create a dask chunking transform
         rechunk = partial(da.rechunk, chunks=(t_chunks, chan_chunks, cp_chunks))
@@ -105,7 +114,7 @@ class XarrayMSV2Facade:
             # Fill these in with real values
             "DATA_DESC_ID": (primary_dims, da.zeros_like(ant1)),
             "FIELD_ID": (primary_dims, da.zeros_like(ant1)),
-            "STATE_ID": (primary_dims, da.zeros_like(ant1)),
+            "STATE_ID": (primary_dims, da.full_like(ant1, state_id)),
             "ARRAY_ID": (primary_dims, da.zeros_like(ant1)),
             "OBSERVATION_ID": (primary_dims, da.zeros_like(ant1)),
             "PROCESSOR_ID": (primary_dims, da.ones_like(ant1)),
@@ -328,8 +337,42 @@ class XarrayMSV2Facade:
             }
         )
 
+    def _state_xarray_factory(self, state_modes):
+        state_ids, modes = zip(*sorted((i, m) for m, i in state_modes.items()))
+        nstates = len(state_ids)
+        return xarray.Dataset(
+            {
+                "SIG": np.ones(nstates, dtype=np.uint8),
+                "REF": np.zeros(nstates, dtype=np.uint8),
+                "CAL": np.zeros(nstates, dtype=np.float64),
+                "LOAD": np.zeros(nstates, dtype=np.float64),
+                "SUB_SCAN": np.zeros(nstates, dtype=np.int32),
+                "OBS_MODE": np.array(modes, dtype=object),
+                "FLAG_ROW": np.zeros(nstates, dtype=np.int32),
+            }
+        )
+
+    def _observation_xarray_factory(self):
+        ds = self._dataset
+        start, end = [to_mjds(t) for t in [ds.start_time, ds.end_time]]
+        return xarray.Dataset(
+            {
+                "OBSERVER": ("row", np.array([ds.observer], dtype=object)),
+                "PROJECT": ("row", np.array([ds.experiment_id], dtype=object)),
+                "LOG": (("row", "extra"), np.array([["unavailable"]], dtype=object)),
+                "SCHEDULE": (
+                    ("row", "extra"),
+                    np.array([["unavailable"]], dtype=object),
+                ),
+                "SCHEDULE_TYPE": ("row", np.array(["unknown"], dtype=object)),
+                "TELESCOPE": ("row", np.array(["MeerKAT"], dtype=object)),
+                "TIME_RANGE": (("row", "extent"), np.array([[start, end]])),
+                "FLAG_ROW": ("row", np.zeros(1, np.uint8)),
+            }
+        )
+
     def xarray_datasets(self):
-        """
+        """Generates partitions of the main MSv2 table, as well as the subtables.
 
         Returns
         -------
@@ -341,13 +384,28 @@ class XarrayMSV2Facade:
         """
         main_xds = []
         field_data = []
+        state_modes = {"UNKNOWN": 0}
 
+        # Generate MAIN table xarray partition datasets
         for scan_index, scan_state, target in self._dataset.scans():
-            main_xds.append(self._main_xarray_factory(scan_index, scan_state, target))
+            # Create per-scan field and source data
             time_origin = Timestamp(self._dataset.timestamps[0])
-            time_mjds = time_origin.to_mjd() * 24 * 60 * 60
-            field_data.append((time_mjds, target, target.radec(time_origin)))
+            field_data.append((to_mjds(time_origin), target, target.radec(time_origin)))
 
+            # Create or retrieve the state_id associated
+            # with the tags of the current source
+            state_tag = ",".join(
+                TAG_TO_INTENT[tag] for tag in target.tags if tag in TAG_TO_INTENT
+            )
+            if state_tag and state_tag not in state_modes:
+                state_modes[state_tag] = len(state_modes)
+            state_id = state_modes.get(state_tag, state_modes["UNKNOWN"])
+
+            main_xds.append(
+                self._main_xarray_factory(state_id, scan_index, scan_state, target)
+            )
+
+        # Generate subtable xarray datasets
         subtables = {
             "ANTENNA": self._antenna_xarray_factory(),
             "DATA_DESCRIPTION": self._ddid_xarray_factory(),
@@ -356,6 +414,8 @@ class XarrayMSV2Facade:
             "FEED": self._feed_xarray_factory(),
             "FIELD": self._field_xarray_factory(field_data),
             "SOURCE": self._source_xarray_factory(field_data),
+            "OBSERVATION": self._observation_xarray_factory(),
+            "STATE": self._state_xarray_factory(state_modes),
         }
 
         return main_xds, subtables
