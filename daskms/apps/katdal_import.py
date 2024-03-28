@@ -1,5 +1,7 @@
 import click
 
+from daskms.utils import parse_chunks_dict
+
 
 @click.group()
 @click.pass_context
@@ -58,10 +60,16 @@ class PolarisationListType(click.ParamType):
     "'K,B,G'. Use 'default' for L1 + L2 and 'all' for "
     "all available products.",
 )
-def _import(ctx, rdb_url, no_auto, pols_to_use, applycal, output_store):
+@click.option(
+    "--chunks",
+    callback=lambda c, p, v: parse_chunks_dict(v),
+    default="{time: 10}",
+    help="Chunking values to apply to each dimension",
+)
+def _import(ctx, rdb_url, output_store, no_auto, pols_to_use, applycal, chunks):
     """Export an observation in the SARAO archive to zarr formation
 
     RDB_URL is the SARAO archive link"""
     from daskms.experimental.katdal import katdal_import
 
-    katdal_import(rdb_url, output_store, no_auto, applycal)
+    katdal_import(rdb_url, output_store, no_auto, applycal, chunks)

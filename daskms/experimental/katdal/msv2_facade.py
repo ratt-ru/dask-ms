@@ -58,10 +58,22 @@ def to_mjds(timestamp: Timestamp):
     return timestamp.to_mjd() * 24 * 60 * 60
 
 
+DEFAULT_TIME_CHUNKS = 100
+DEFAULT_CHAN_CHUNKS = 4096
+DEFAULT_CHUNKS = {"time": DEFAULT_TIME_CHUNKS, "chan": DEFAULT_CHAN_CHUNKS}
+
+
 class XarrayMSV2Facade:
     """Provides a simplified xarray Dataset view over a katdal dataset"""
 
-    def __init__(self, dataset: DataSet, no_auto: bool = True, row_view: bool = True):
+    def __init__(
+        self,
+        dataset: DataSet,
+        no_auto: bool = True,
+        row_view: bool = True,
+        chunks: dict = None,
+    ):
+        self._chunks = chunks or DEFAULT_CHUNKS
         self._dataset = dataset
         self._no_auto = no_auto
         self._row_view = row_view
@@ -80,6 +92,10 @@ class XarrayMSV2Facade:
         cp_info = self._cp_info
         time_utc = dataset.timestamps
         t_chunks, chan_chunks, cp_chunks = dataset.vis.dataset.chunks
+
+        # Override time and channel chunking
+        t_chunks = self._chunks.get("time", t_chunks)
+        chan_chunks = self._chunks.get("chan", chan_chunks)
 
         # Modified Julian Date in Seconds
         time_mjds = np.asarray([to_mjds(t) for t in map(Timestamp, time_utc)])
@@ -110,7 +126,14 @@ class XarrayMSV2Facade:
 
         flags = DaskLazyIndexer(dataset.flags, (), (rechunk, flag_transpose))
         weights = DaskLazyIndexer(dataset.weights, (), (rechunk, weight_transpose))
-        vis = DaskLazyIndexer(dataset.vis, (), transforms=(vis_transpose,))
+        vis = DaskLazyIndexer(
+            dataset.vis,
+            (),
+            transforms=(
+                rechunk,
+                vis_transpose,
+            ),
+        )
 
         time = da.from_array(time_mjds[:, None], chunks=(t_chunks, 1))
         ant1 = da.from_array(cp_info.ant1_index[None, :], chunks=(1, cpi.shape[0]))

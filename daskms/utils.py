@@ -1,16 +1,12 @@
 # -*- coding: utf-8 -*-
 
 from collections import OrderedDict
-import importlib.util
 import logging
 from pathlib import PurePath, Path
 import re
-import sys
 import time
 import inspect
 import warnings
-
-from dask.utils import funcname
 
 # The numpy module may disappear during interpreter shutdown
 # so explicitly import ndarray
@@ -19,6 +15,28 @@ from numpy import ndarray
 from daskms.testing import in_pytest
 
 log = logging.getLogger(__name__)
+
+
+def parse_chunks_dict(chunks_str):
+    chunks_str = chunks_str.strip()
+    e = ValueError(
+        f"{chunks_str} is not of the form {{dim_1: size_1, ..., dim_n, size_n}}"
+    )
+    if not (chunks_str.startswith("{") and chunks_str.endswith("}")):
+        raise e
+
+    chunks = {}
+
+    for kvmap in chunks_str[1:-1].split(","):
+        try:
+            k, v = (p.strip() for p in kvmap.split(":"))
+            v = int(v)
+        except (IndexError, ValueError):
+            raise e
+        else:
+            chunks[k] = v
+
+    return chunks
 
 
 def natural_order(key):

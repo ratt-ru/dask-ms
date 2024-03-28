@@ -1,9 +1,13 @@
+import logging
 import os
 import urllib
 
 import dask
 
+from daskms.fsspec_store import DaskMSStore
 from daskms.utils import requires
+
+log = logging.getLogger(__file__)
 
 try:
     import katdal
@@ -31,7 +35,7 @@ def default_output_name(url):
 
 
 @requires("pip install dask-ms[katdal]", import_error)
-def katdal_import(url: str, out_store: str, no_auto: bool, applycal: str):
+def katdal_import(url: str, out_store: str, no_auto: bool, applycal: str, chunks: dict):
     if isinstance(url, str):
         dataset = katdal.open(url, appycal=applycal)
     elif isinstance(url, DataSet):
@@ -39,11 +43,16 @@ def katdal_import(url: str, out_store: str, no_auto: bool, applycal: str):
     else:
         raise TypeError(f"{url} must be a string or a katdal DataSet")
 
-    facade = XarrayMSV2Facade(dataset, no_auto=no_auto)
+    facade = XarrayMSV2Facade(dataset, no_auto=no_auto, chunks=chunks)
     main_xds, subtable_xds = facade.xarray_datasets()
 
     if not out_store:
         out_store = default_output_name(url)
+
+    out_store = DaskMSStore(out_store)
+    if out_store.exists():
+        log.warn("Removing previously existing %s", out_store)
+        out_store.rm("", recursive=True)
 
     writes = [
         xds_to_zarr(main_xds, out_store),
