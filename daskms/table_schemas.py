@@ -100,7 +100,7 @@ SPECTRAL_WINDOW_SCHEMA = {
 SOURCE_SCHEMA = {
     "DIRECTION": {"dims": ("radec",)},
     "POSITION": {"dims": ("position",)},
-    "PROPER_MOTION": {"dims": ("radec_per_sec",)},
+    "PROPER_MOTION": {"dims": ("radec-per-sec",)},
     "REST_FREQUENCY": {"dims": ("lines",)},
     "SYSVEL": {"dims": ("lines",)},
     "TRANSITION": {"dims": ("lines",)},
