@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Define dask-ms command line applications with click (:pr:`317`)
 * Make poetry dev and docs groups optional (:pr:`316`)
 * Only test Github Action Push events on master (:pr:`313`)
 * Move consolidated metadata into partition subdirectories (:pr:`312`)
