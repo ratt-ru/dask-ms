@@ -61,16 +61,14 @@ def to_mjds(timestamp: Timestamp):
 class XarrayMSV2Facade:
     """Provides a simplified xarray Dataset view over a katdal dataset"""
 
-    def __init__(
-        self, dataset: DataSet, auto_corrs: bool = True, row_view: bool = True
-    ):
+    def __init__(self, dataset: DataSet, no_auto: bool = True, row_view: bool = True):
         self._dataset = dataset
-        self._auto_corrs = auto_corrs
+        self._no_auto = no_auto
         self._row_view = row_view
         self._pols_to_use = ["HH", "HV", "VH", "VV"]
         # Reset the dataset selection
         self._dataset.select(reset="")
-        self._cp_info = corrprod_index(dataset, self._pols_to_use, auto_corrs)
+        self._cp_info = corrprod_index(dataset, self._pols_to_use, not no_auto)
 
     @property
     def cp_info(self):

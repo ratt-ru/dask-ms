@@ -3,9 +3,10 @@ import logging
 import click
 
 from daskms.apps.convert import convert
+from daskms.apps.katdal_import import katdal
 
 
-@click.group()
+@click.group(name="dask-ms")
 @click.pass_context
 @click.option("--debug/--no-debug", default=False)
 def main(ctx, debug):
@@ -15,3 +16,4 @@ def main(ctx, debug):
 
 
 main.add_command(convert)
+main.add_command(katdal)

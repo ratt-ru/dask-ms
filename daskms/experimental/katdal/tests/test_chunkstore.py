@@ -18,7 +18,7 @@ from daskms.experimental.katdal.msv2_facade import XarrayMSV2Facade
 @pytest.mark.parametrize("row_dim", [True, False])
 @pytest.mark.parametrize("out_store", ["output.zarr"])
 def test_chunkstore(tmp_path_factory, dataset, auto_corrs, row_dim, out_store):
-    facade = XarrayMSV2Facade(dataset, auto_corrs, row_dim)
+    facade = XarrayMSV2Facade(dataset, not auto_corrs, row_dim)
     xds, sub_xds = facade.xarray_datasets()
 
     # Reintroduce the shutil.rmtree and remote the tmp_path_factory
