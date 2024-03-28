@@ -236,8 +236,7 @@ def xds_from_parquet(store, columns=None, chunks=None, **kwargs):
     else:
         raise TypeError("chunks must be None or dict or list of dict")
 
-    table_path = "" if store.table else "MAIN"
-
+    table_path = Path("" if store.table else "MAIN")
     fragments = list(map(Path, store.rglob("*.parquet")))
     ds_cfg = defaultdict(list)
 
@@ -246,7 +245,10 @@ def xds_from_parquet(store, columns=None, chunks=None, **kwargs):
     partition_schemas = set()
 
     for fragment in fragments:
-        *partitions, _ = fragment.relative_to(Path(table_path)).parts
+        if not fragment.is_relative_to(table_path):
+            continue
+
+        *partitions, _ = fragment.relative_to(table_path).parts
         fragment = ParquetFileProxy(store, str(fragment))
         fragment_meta = fragment.metadata
         metadata = json.loads(fragment_meta.metadata[DASKMS_METADATA.encode()])
