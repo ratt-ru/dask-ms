@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import ast
 from collections import OrderedDict
 import logging
 from pathlib import PurePath, Path
@@ -17,26 +18,35 @@ from daskms.testing import in_pytest
 log = logging.getLogger(__name__)
 
 
+class ChunkTransformer(ast.NodeTransformer):
+    def visit_Module(self, node):
+        if len(node.body) != 1 or not isinstance(node.body[0], ast.Expr):
+            raise ValueError("Module must contain a single expression")
+
+        expr = node.body[0]
+
+        if not isinstance(expr.value, ast.Dict):
+            raise ValueError("Expression must contain a dictionary")
+
+        return self.visit(expr).value
+
+    def visit_Dict(self, node):
+        keys = [self.visit(k) for k in node.keys]
+        values = [self.visit(v) for v in node.values]
+        return {k: v for k, v in zip(keys, values)}
+
+    def visit_Name(self, node):
+        return node.id
+
+    def visit_Tuple(self, node):
+        return tuple(self.visit(v) for v in node.elts)
+
+    def visit_Constant(self, node):
+        return node.n
+
+
 def parse_chunks_dict(chunks_str):
-    chunks_str = chunks_str.strip()
-    e = ValueError(
-        f"{chunks_str} is not of the form {{dim_1: size_1, ..., dim_n, size_n}}"
-    )
-    if not (chunks_str.startswith("{") and chunks_str.endswith("}")):
-        raise e
-
-    chunks = {}
-
-    for kvmap in chunks_str[1:-1].split(","):
-        try:
-            k, v = (p.strip() for p in kvmap.split(":"))
-            v = int(v)
-        except (IndexError, ValueError):
-            raise e
-        else:
-            chunks[k] = v
-
-    return chunks
+    return ChunkTransformer().visit(ast.parse(chunks_str))
 
 
 def natural_order(key):
