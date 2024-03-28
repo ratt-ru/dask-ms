@@ -10,9 +10,9 @@ log = logging.getLogger(__file__)
 
 
 @pytest.mark.applications
-@pytest.mark.parametrize("format", ["ms", "zarr", "parquet"])
+@pytest.mark.parametrize("format", ["zarr"])
 def test_convert_application(tau_ms, format, tmp_path_factory):
-    OUTPUT = tmp_path_factory.mktemp(f"convert_{format}") / "output.{format}"
+    OUTPUT = tmp_path_factory.mktemp(f"convert_{format}") / f"output.{format}"
 
     exclude_columns = [
         "ASDM_ANTENNA::*",
@@ -34,7 +34,7 @@ def test_convert_application(tau_ms, format, tmp_path_factory):
         "-o",
         str(OUTPUT),
         "--format",
-        "zarr",
+        format,
         "--force",
     ]
 
