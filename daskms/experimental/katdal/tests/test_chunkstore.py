@@ -20,10 +20,6 @@ from daskms.experimental.katdal.msv2_facade import XarrayMSV2Facade
 def test_chunkstore(tmp_path_factory, dataset, auto_corrs, row_dim, out_store):
     facade = XarrayMSV2Facade(dataset, auto_corrs, row_dim)
     xds, sub_xds = facade.xarray_datasets()
-    from pprint import pprint
-
-    pprint(xds)
-    pprint(sub_xds)
 
     # Reintroduce the shutil.rmtree and remote the tmp_path_factory
     # to test in the local directory
