@@ -434,7 +434,7 @@ def xds_from_zarr(store, columns=None, chunks=None, consolidated=True, **kwargs)
         if entry["type"] == "directory":
             _, dir_name = os.path.split(entry["name"])
             if dir_name.startswith(table_name):
-                _, i = dir_name.split("_")
+                _, i = dir_name[len(table_name) :].split("_")
                 partition_ids.append(int(i))
 
     for g in sorted(partition_ids):
