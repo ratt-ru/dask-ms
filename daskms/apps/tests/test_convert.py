@@ -1,7 +1,8 @@
-from argparse import ArgumentParser
 import logging
 
-from daskms.apps.convert import Convert
+from click.testing import CliRunner
+from daskms.apps.entrypoint import main
+
 from daskms import xds_from_storage_ms, xds_from_storage_table
 
 import pytest
@@ -38,11 +39,9 @@ def test_convert_application(tau_ms, format, tmp_path_factory):
         "--force",
     ]
 
-    p = ArgumentParser()
-    Convert.setup_parser(p)
-    args = p.parse_args(args)
-    app = Convert(args, log)
-    app.execute()
+    runner = CliRunner()
+    result = runner.invoke(main, ["convert"] + args)
+    assert result.exit_code == 0
 
     datasets = xds_from_storage_ms(OUTPUT)
 
