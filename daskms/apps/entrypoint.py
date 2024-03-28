@@ -9,7 +9,7 @@ from daskms.apps.convert import convert
 @click.pass_context
 @click.option("--debug/--no-debug", default=False)
 def main(ctx, debug):
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(format="%(levelname)s - %(message)s", level=logging.INFO)
     ctx.ensure_object(dict)
     ctx.obj["DEBUG"] = debug
 
