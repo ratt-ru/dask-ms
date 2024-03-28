@@ -23,13 +23,15 @@ def test_convert_application(tau_ms, format, tmp_path_factory):
         "ASDM_SOURCE::*",
         "ASDM_STATION::*",
         "POINTING::OVER_THE_TOP",
+        "SPECTRAL_WINDOW::ASSOC_SPW_ID",
+        "SPECTRAL_WINDOW::ASSOC_NATURE",
         "MODEL_DATA",
     ]
 
     args = [
         str(tau_ms),
-        # "-g",
-        # "FIELD_ID,DATA_DESC_ID,SCAN_NUMBER",
+        "-g",
+        "FIELD_ID,DATA_DESC_ID,SCAN_NUMBER",
         "-x",
         ",".join(exclude_columns),
         "-o",
@@ -43,15 +45,17 @@ def test_convert_application(tau_ms, format, tmp_path_factory):
     result = runner.invoke(main, ["convert"] + args)
     assert result.exit_code == 0
 
-    datasets = xds_from_storage_ms(OUTPUT)
-
-    for ds in datasets:
+    for ds in xds_from_storage_ms(OUTPUT):
         assert "MODEL_DATA" not in ds.data_vars
         assert "FLAG" in ds.data_vars
         assert "ROWID" in ds.coords
 
-    datasets = xds_from_storage_table(f"{str(OUTPUT)}::POINTING")
-
-    for ds in datasets:
+    for ds in xds_from_storage_table(f"{OUTPUT}::POINTING"):
         assert "OVER_THE_TOP" not in ds.data_vars
         assert "NAME" in ds.data_vars
+
+    for ds in xds_from_storage_table(f"{OUTPUT}::SPECTRAL_WINDOW"):
+        assert "CHAN_FREQ" in ds.data_vars
+        assert "CHAN_WIDTH" in ds.data_vars
+        assert "ASSOC_SPW_ID" not in ds.data_vars
+        assert "ASSOC_NATURE" not in ds.data_vars
