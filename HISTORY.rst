@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Make poetry dev and docs groups optional (:pr:`316`)
 * Only test Github Action Push events on master (:pr:`313`)
 * Move consolidated metadata into partition subdirectories (:pr:`312`)
 * Set ``_ARRAY_DIMENSIONS`` attribute on Data Variables (:pr:`311`)
