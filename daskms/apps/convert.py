@@ -1,4 +1,3 @@
-import ast
 from argparse import ArgumentTypeError
 from collections import defaultdict
 import logging
@@ -8,35 +7,9 @@ import dask.array as da
 
 from daskms.apps.formats import TableFormat, CasaFormat
 from daskms.fsspec_store import DaskMSStore
+from daskms.utils import parse_chunks_dict
 
 log = logging.getLogger(__name__)
-
-
-class ChunkTransformer(ast.NodeTransformer):
-    def visit_Module(self, node):
-        if len(node.body) != 1 or not isinstance(node.body[0], ast.Expr):
-            raise ValueError("Module must contain a single expression")
-
-        expr = node.body[0]
-
-        if not isinstance(expr.value, ast.Dict):
-            raise ValueError("Expression must contain a dictionary")
-
-        return self.visit(expr).value
-
-    def visit_Dict(self, node):
-        keys = [self.visit(k) for k in node.keys]
-        values = [self.visit(v) for v in node.values]
-        return {k: v for k, v in zip(keys, values)}
-
-    def visit_Name(self, node):
-        return node.id
-
-    def visit_Tuple(self, node):
-        return tuple(self.visit(v) for v in node.elts)
-
-    def visit_Constant(self, node):
-        return node.n
 
 
 NONUNIFORM_SUBTABLES = ["SPECTRAL_WINDOW", "POLARIZATION", "FEED", "SOURCE"]
@@ -88,7 +61,7 @@ def _check_exclude_columns(ctx, param, value):
 
 
 def parse_chunks(ctx, param, value):
-    return ChunkTransformer().visit(ast.parse(value))
+    return parse_chunks_dict(value)
 
 
 def col_converter(ctx, param, value):

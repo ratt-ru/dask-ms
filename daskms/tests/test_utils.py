@@ -7,12 +7,25 @@ import platform
 import pytest
 
 from daskms.utils import (
+    parse_chunks_dict,
     promote_columns,
     natural_order,
     table_path_split,
     requires,
     filter_kwargs,
 )
+
+
+def test_parse_chunks_dict():
+    assert parse_chunks_dict("{row: 1000}") == {"row": 1000}
+    assert parse_chunks_dict("{row: 1000, chan: 64}") == {"row": 1000, "chan": 64}
+    assert parse_chunks_dict("{row: (10, 10), chan: (4, 4)}") == {
+        "row": (10, 10),
+        "chan": (4, 4),
+    }
+
+    with pytest.raises(SyntaxError):
+        parse_chunks_dict("row:1000}")
 
 
 def test_natural_order():
