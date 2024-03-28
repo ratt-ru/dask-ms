@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Add chunk specification to ``dask-ms katdal import`` (:pr:`318`)
 * Add a ``dask-ms katdal import`` application for exporting SARAO archive data directly to zarr (:pr:`315`)
 * Define dask-ms command line applications with click (:pr:`317`)
 * Make poetry dev and docs groups optional (:pr:`316`)
