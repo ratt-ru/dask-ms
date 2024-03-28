@@ -259,7 +259,6 @@ class Convert:
         )
         writer = out_fmt.writer()
 
-        breakpoint()
         datasets = reader(self.input, chunks=self.chunks)
 
         if exclude_columns := self.exclude.get("MAIN", False):
