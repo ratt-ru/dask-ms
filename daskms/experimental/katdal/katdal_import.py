@@ -2,11 +2,19 @@ import os
 import urllib
 
 import dask
-import katdal
-from katdal.dataset import DataSet
 
-from daskms.experimental.katdal.msv2_facade import XarrayMSV2Facade
-from daskms.experimental.zarr import xds_to_zarr
+from daskms.utils import requires
+
+try:
+    import katdal
+    from katdal.dataset import DataSet
+
+    from daskms.experimental.katdal.msv2_facade import XarrayMSV2Facade
+    from daskms.experimental.zarr import xds_to_zarr
+except ImportError as e:
+    import_error = e
+else:
+    import_error = None
 
 
 def default_output_name(url):
@@ -22,6 +30,7 @@ def default_output_name(url):
     return f"{dataset_basename}.zarr"
 
 
+@requires("pip install dask-ms[katdal]", import_error)
 def katdal_import(url: str, out_store: str, no_auto: bool, applycal: str):
     if isinstance(url, str):
         dataset = katdal.open(url, appycal=applycal)
