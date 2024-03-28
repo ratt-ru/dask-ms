@@ -4,7 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
-* Add a ``dask-ms katdal import`` application (:pr:`315`)
+* Add a ``dask-ms katdal import`` application for exporting SARAO archive data directly to zarr (:pr:`315`)
 * Define dask-ms command line applications with click (:pr:`317`)
 * Make poetry dev and docs groups optional (:pr:`316`)
 * Only test Github Action Push events on master (:pr:`313`)
