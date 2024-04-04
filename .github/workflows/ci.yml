@@ -52,7 +52,7 @@ jobs:
 
       - name: Cache Installations
         id: cache-installs
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.local
           key: install-${{ env.INSTALL_CACHE_HASH }}-2
@@ -127,7 +127,7 @@ jobs:
 
       - name: Cache Installations
         id: cache-installs
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.local
           key: install-${{ env.INSTALL_CACHE_HASH }}-0
