@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Change `dask-ms katdal import` to `dask-ms import katdal` (:pr:`325`)
 * Configure dependabot (:pr:`319`)
 * Add chunk specification to ``dask-ms katdal import`` (:pr:`318`)
 * Add a ``dask-ms katdal import`` application for exporting SARAO archive data directly to zarr (:pr:`315`)
