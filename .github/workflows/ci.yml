@@ -79,7 +79,7 @@ jobs:
         run: minio --help
 
       - name: Checkout source
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
@@ -141,7 +141,7 @@ jobs:
         run: poetry --version
 
       - name: Checkout source
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
@@ -177,7 +177,7 @@ jobs:
           poetry-version: ${{ env.POETRY_VERSION }}
 
       - name: Checkout source
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
