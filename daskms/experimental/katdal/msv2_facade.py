@@ -19,6 +19,7 @@
 ################################################################################
 
 from functools import partial
+from operator import getitem
 
 import dask.array as da
 import numpy as np
@@ -126,14 +127,7 @@ class XarrayMSV2Facade:
 
         flags = DaskLazyIndexer(dataset.flags, (), (rechunk, flag_transpose))
         weights = DaskLazyIndexer(dataset.weights, (), (rechunk, weight_transpose))
-        vis = DaskLazyIndexer(
-            dataset.vis,
-            (),
-            transforms=(
-                rechunk,
-                vis_transpose,
-            ),
-        )
+        vis = DaskLazyIndexer(dataset.vis, (), (rechunk, vis_transpose))
 
         time = da.from_array(time_mjds[:, None], chunks=(t_chunks, 1))
         ant1 = da.from_array(cp_info.ant1_index[None, :], chunks=(1, cpi.shape[0]))
@@ -147,7 +141,32 @@ class XarrayMSV2Facade:
             row=self._row_view,
         )
 
-        time, ant1, ant2 = da.broadcast_arrays(time, ant1, ant2)
+        # Better graph than da.broadcast_arrays
+        bcast = da.blockwise(
+            np.broadcast_arrays,
+            ("time", "bl"),
+            time,
+            ("time", "bl"),
+            ant1,
+            ("time", "bl"),
+            ant2,
+            ("time", "bl"),
+            align_arrays=False,
+            adjust_chunks={"time": time.chunks[0], "bl": ant1.chunks[1]},
+            meta=np.empty((0,) * 2, dtype=np.int32),
+        )
+
+        time = da.blockwise(
+            getitem, ("time", "bl"), bcast, ("time", "bl"), 0, None, dtype=time.dtype
+        )
+
+        ant1 = da.blockwise(
+            getitem, ("time", "bl"), bcast, ("time", "bl"), 1, None, dtype=ant1.dtype
+        )
+
+        ant2 = da.blockwise(
+            getitem, ("time", "bl"), bcast, ("time", "bl"), 2, None, dtype=ant2.dtype
+        )
 
         if self._row_view:
             primary_dims = ("row",)
