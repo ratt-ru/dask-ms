@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Optimise `broadcast_arrays` in katdal import (:pr:`326`)
 * Change `dask-ms katdal import` to `dask-ms import katdal` (:pr:`325`)
 * Configure dependabot (:pr:`319`)
 * Add chunk specification to ``dask-ms katdal import`` (:pr:`318`)
