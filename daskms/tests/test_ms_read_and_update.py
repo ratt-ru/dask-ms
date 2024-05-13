@@ -379,7 +379,7 @@ def test_postprocess_ms(ms):
     # Write some non-standard columns back to the MS
     for i, ds in enumerate(xdsl):
         xdsl[i] = ds.assign(
-            {
+            **{
                 "BITFLAG": _array(ds, ("row", "chan", "corr")),
                 "HAS_CORRS": _array(ds, ("row", "corr")),
                 "HAS_CHANS": _array(ds, ("row", "chan")),
