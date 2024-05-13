@@ -328,7 +328,12 @@ def xds_from_ms(ms, columns=None, index_cols=None, group_cols=None, **kwargs):
     kwargs.setdefault("table_schema", "MS")
 
     return xds_from_table(
-        ms, columns=columns, index_cols=index_cols, group_cols=group_cols, **kwargs
+        ms,
+        columns=columns,
+        index_cols=index_cols,
+        group_cols=group_cols,
+        context="ms",
+        **kwargs,
     )
 
 

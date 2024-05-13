@@ -318,6 +318,7 @@ class DatasetFactory(object):
         self.table_keywords = kwargs.pop("table_keywords", False)
         self.column_keywords = kwargs.pop("column_keywords", False)
         self.table_proxy = kwargs.pop("table_proxy", False)
+        self.context = kwargs.pop("context", None)
 
         if len(kwargs) > 0:
             raise ValueError(f"Unhandled kwargs: {kwargs}")
@@ -359,8 +360,10 @@ class DatasetFactory(object):
             coords = {"ROWID": rowid}
 
         attrs = {DASKMS_PARTITION_KEY: ()}
-
-        return Dataset(variables, coords=coords, attrs=attrs)
+        dataset = Dataset(variables, coords=coords, attrs=attrs)
+        return self.postprocess_dataset(
+            dataset, table_proxy, exemplar_row, orders, self.chunks[0], short_table_name
+        )
 
     def _group_datasets(self, table_proxy, groups, exemplar_rows, orders):
         _, t, s = table_path_split(self.canonical_name)
@@ -420,9 +423,58 @@ class DatasetFactory(object):
             group_id = [gid.item() for gid in group_id]
             attrs.update(zip(self.group_cols, group_id))
 
-            datasets.append(Dataset(group_var_dims, attrs=attrs, coords=coords))
+            dataset = Dataset(group_var_dims, attrs=attrs, coords=coords)
+            dataset = self.postprocess_dataset(
+                dataset, table_proxy, exemplar_row, order, group_chunks, array_suffix
+            )
+            datasets.append(dataset)
 
         return datasets
+
+    def postprocess_dataset(
+        self, dataset, table_proxy, exemplar_row, order, chunks, array_suffix
+    ):
+        if not self.context or self.context != "ms":
+            return dataset
+
+        # Fixup any non-standard columns
+        # with dimensions like chan and corr
+        try:
+            chan = dataset.sizes["chan"]
+            corr = dataset.sizes["corr"]
+        except KeyError:
+            return dataset
+
+        schema_updates = {}
+
+        for name, var in dataset.data_vars.items():
+            new_dims = list(var.dims[1:])
+
+            for dim, dim_name in enumerate(var.dims[1:]):
+                if dim_name.startswith(f"{name}-"):
+                    if dataset.sizes[dim_name] == chan:
+                        new_dims[dim] = "chan"
+                    elif dataset.sizes[dim_name] == corr:
+                        new_dims[dim] = "corr"
+
+            new_dims = tuple(new_dims)
+            if var.dims[1:] != new_dims:
+                schema_updates[name] = {"dims": new_dims}
+
+        if not schema_updates:
+            return dataset
+
+        return dataset.assign(
+            **_dataset_variable_factory(
+                table_proxy,
+                schema_updates,
+                list(schema_updates.keys()),
+                exemplar_row,
+                order,
+                chunks,
+                array_suffix,
+            )
+        )
 
     def datasets(self):
         table_proxy = self._table_proxy_factory()
