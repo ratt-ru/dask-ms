@@ -4,7 +4,8 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
-* Identify channel and correlation-like dimensions in non-standard MS columns (:pr:``)
+* Improve table schema handling (:pr:`329`)
+* Identify channel and correlation-like dimensions in non-standard MS columns (:pr:`329`)
 * DaskMSStore depends on ``fsspec >= 2022.7.0`` (:pr:`328`)
 * Optimise `broadcast_arrays` in katdal import (:pr:`326`)
 * Change `dask-ms katdal import` to `dask-ms import katdal` (:pr:`325`)
