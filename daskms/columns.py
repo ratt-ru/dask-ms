@@ -222,11 +222,23 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
                 "match shape of exemplar=%s" % (ndim, shape)
             )
 
-    # Extract dimension schema
+    # Get the column schema, or create a default
     try:
-        dims = table_schema[column]["dims"]
+        column_schema = table_schema[column]
     except KeyError:
-        dims = tuple("%s-%d" % (column, i) for i in range(1, len(shape) + 1))
+        column_schema = {
+            "dims": tuple("%s-%d" % (column, i) for i in range(1, len(shape) + 1))
+        }
+
+    try:
+        dims = column_schema["dims"]
+    except KeyError:
+        raise ColumnMetadataError(
+            f"Column schema {column_schema} does not contain required 'dims' attribute"
+        )
+
+    if not isinstance(dims, tuple) or not all(isinstance(d, str) for d in dims):
+        raise ColumnMetadataError(f"Dimensions {dims} is not a tuple of strings")
 
     dim_chunks = []
 
