@@ -272,6 +272,11 @@ def test_dataset_table_schemas(ms):
     table_schema = ["MS", {"DATA": {"dims": data_dims}}]
     datasets = read_datasets(ms, [], [], [], table_schema=table_schema)
     assert datasets[0].data_vars["DATA"].dims == ("row",) + data_dims
+    assert datasets[0].data_vars["UVW"].dims == ("row", "uvw")
+
+    datasets = read_datasets(ms, [], [], [], table_schema={"DATA": {"dims": data_dims}})
+    assert datasets[0].data_vars["DATA"].dims == ("row",) + data_dims
+    assert datasets[0].data_vars["UVW"].dims == ("row", "uvw")
 
 
 @pytest.mark.parametrize(
