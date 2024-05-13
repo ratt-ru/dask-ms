@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+from copy import deepcopy
+
 try:
     from collections.abc import Mapping
 except ImportError:
@@ -158,19 +160,20 @@ def lookup_table_schema(table_name, lookup_str):
         A dictionary of the form
         :code:`{column: {'dims': (...)}}`.
     """
+    table_type = infer_table_type(table_name)
+
+    # Infer a base schema from the inferred table, if available
+    try:
+        table_schema = deepcopy(_ALL_SCHEMAS[table_type])
+    except KeyError:
+        table_schema = {}
+
     if lookup_str is None:
-        table_type = infer_table_type(table_name)
-
-        try:
-            return _ALL_SCHEMAS[table_type]
-        except KeyError:
-            raise ValueError(f"No schema registered " f"for table type '{table_type}'")
-
-    if not isinstance(lookup_str, (tuple, list)):
+        lookup_str = []
+    elif not isinstance(lookup_str, (tuple, list)):
         lookup_str = [lookup_str]
 
-    table_schema = {}
-
+    # Add extra schema information to the table
     for ls in lookup_str:
         if isinstance(ls, Mapping):
             table_schema.update(ls)

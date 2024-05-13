@@ -365,3 +365,38 @@ def test_mismatched_rowid(ms):
 
 def test_request_rowid(ms):
     xdsl = xds_from_ms(ms, columns=["TIME", "ROWID"])  # noqa
+
+
+def test_postprocess_ms(ms):
+    """Test that postprocessing of MS variables identifies chan/corr like data"""
+    xdsl = xds_from_ms(ms)
+
+    def _array(ds, dims):
+        shape = tuple(ds.sizes[d] for d in dims)
+        chunks = tuple(ds.chunks[d] for d in dims)
+        return (dims, da.random.random(size=shape, chunks=chunks))
+
+    # Write some non-standard columns back to the MS
+    for i, ds in enumerate(xdsl):
+        xdsl[i] = ds.assign(
+            **{
+                "BITFLAG": _array(ds, ("row", "chan", "corr")),
+                "HAS_CORRS": _array(ds, ("row", "corr")),
+                "HAS_CHANS": _array(ds, ("row", "chan")),
+            }
+        )
+
+    dask.compute(xds_to_table(xdsl, ms))
+
+    for ds in xds_from_ms(ms, chunks={"row": 1, "chan": 1, "corr": 1}):
+        assert ds.BITFLAG.dims == ("row", "chan", "corr")
+
+        assert ds.HAS_CORRS.dims == ("row", "corr")
+        assert ds.HAS_CHANS.dims == ("row", "chan")
+
+        assert dict(ds.chunks) == {
+            "uvw": (3,),
+            "row": (1,) * ds.sizes["row"],
+            "chan": (1,) * ds.sizes["chan"],
+            "corr": (1,) * ds.sizes["corr"],
+        }
