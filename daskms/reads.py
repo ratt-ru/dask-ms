@@ -450,12 +450,17 @@ class DatasetFactory(object):
         for name, var in dataset.data_vars.items():
             new_dims = list(var.dims[1:])
 
+            unassigned = {"chan", "corr"}
+
             for dim, dim_name in enumerate(var.dims[1:]):
-                if dim_name.startswith(f"{name}-"):
-                    if dataset.sizes[dim_name] == chan:
+                # An automicatically assigned dimension name
+                if dim_name == f"{name}-{dim + 1}":
+                    if dataset.sizes[dim_name] == chan and "chan" in unassigned:
                         new_dims[dim] = "chan"
-                    elif dataset.sizes[dim_name] == corr:
+                        unassigned.discard("chan")
+                    elif dataset.sizes[dim_name] == corr and "corr" in unassigned:
                         new_dims[dim] = "corr"
+                        unassigned.discard("corr")
 
             new_dims = tuple(new_dims)
             if var.dims[1:] != new_dims:
