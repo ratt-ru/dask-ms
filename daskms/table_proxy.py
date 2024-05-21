@@ -164,6 +164,7 @@ class TableProxyMetaClass(type):
                 return _table_cache[key]
             except KeyError:
                 instance = type.__call__(cls, *args, **kwargs)
+                instance._hashvalue = key
                 _table_cache[key] = instance
                 return instance
 
@@ -362,6 +363,9 @@ class TableProxy(object, metaclass=TableProxyMetaClass):
     @property
     def executor_key(self):
         return self._ex_key
+
+    def __hash__(self):
+        return self._hashvalue
 
     def __reduce__(self):
         """Defer to _map_create_proxy to support kwarg pickling"""
