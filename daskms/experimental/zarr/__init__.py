@@ -2,6 +2,7 @@ from functools import reduce
 from operator import mul
 from pathlib import Path
 import os.path
+from uuid import uuid4
 import warnings
 
 import dask
@@ -216,7 +217,7 @@ def zarr_setter(data, name, group, *extents):
     return np.full((1,) * len(extents), True)
 
 
-def _gen_writes(variables, chunks, factory, indirect_dims=False):
+def _gen_writes(variables, chunks, factory, epoch, indirect_dims=False):
     for name, var in variables.items():
         if isinstance(var.data, da.Array):
             ext_args = extent_args(var.dims, var.chunks)
@@ -236,7 +237,9 @@ def _gen_writes(variables, chunks, factory, indirect_dims=False):
         if var_data.nbytes == 0:
             continue
 
-        token_name = f"write~{name}-" f"{tokenize(var_data, name, factory, *ext_args)}"
+        token_name = (
+            f"write~{name}-" f"{tokenize(var_data, name, factory, epoch, *ext_args)}"
+        )
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=da.PerformanceWarning)
@@ -264,7 +267,9 @@ def _gen_writes(variables, chunks, factory, indirect_dims=False):
 
 
 @requires("pip install dask-ms[zarr] for zarr support", zarr_import_error)
-def xds_to_zarr(xds, store, columns=None, rechunk=False, consolidated=True, **kwargs):
+def xds_to_zarr(
+    xds, store, columns=None, rechunk=False, consolidated=True, epoch=None, **kwargs
+):
     """
     Stores a dataset of list of datasets defined by `xds` in
     file location `store`.
@@ -284,6 +289,9 @@ def xds_to_zarr(xds, store, columns=None, rechunk=False, consolidated=True, **kw
         consistent with existing on-disk zarr arrays while writing to disk.
     consolidated : bool
         Controls whether metadata is consolidated
+    epoch : str or None
+        Uniquely identifies this instance of the returned dataset.
+        Should usually be set to None.
     **kwargs : optional
 
     Returns
@@ -306,6 +314,7 @@ def xds_to_zarr(xds, store, columns=None, rechunk=False, consolidated=True, **kw
             UserWarning,
         )
 
+    epoch = epoch or uuid4().hex[:16]
     columns = promote_columns(columns)
 
     if isinstance(xds, Dataset):
@@ -326,10 +335,10 @@ def xds_to_zarr(xds, store, columns=None, rechunk=False, consolidated=True, **kw
 
         ds, group = prepare_zarr_group(di, ds, store, rechunk=rechunk)
 
-        data_vars = dict(_gen_writes(ds.data_vars, ds.chunks, group))
+        data_vars = dict(_gen_writes(ds.data_vars, ds.chunks, group, epoch))
         # Include coords in the write dataset so they're reified
         data_vars.update(
-            dict(_gen_writes(ds.coords, ds.chunks, group, indirect_dims=True))
+            dict(_gen_writes(ds.coords, ds.chunks, group, epoch, indirect_dims=True))
         )
 
         # Transfer any partition information over to the write dataset
@@ -368,7 +377,9 @@ def group_sortkey(element):
 
 
 @requires("pip install dask-ms[zarr] for zarr support", zarr_import_error)
-def xds_from_zarr(store, columns=None, chunks=None, consolidated=True, **kwargs):
+def xds_from_zarr(
+    store, columns=None, chunks=None, consolidated=True, epoch=None, **kwargs
+):
     """
     Reads the zarr data store in `store` and returns list of
     Dataset's containing the data.
@@ -384,6 +395,9 @@ def xds_from_zarr(store, columns=None, chunks=None, consolidated=True, **kwargs)
         chunking schema for each dataset
     consolidated : bool
         If True, attempt to read consolidated metadata
+    epoch : str or None
+        Uniquely identifies this instance of the returned dataset.
+        Should usually be set to None.
     **kwargs: optional
 
     Returns
@@ -409,6 +423,7 @@ def xds_from_zarr(store, columns=None, chunks=None, consolidated=True, **kwargs)
             UserWarning,
         )
 
+    epoch = epoch or uuid4().hex[:16]
     columns = promote_columns(columns)
 
     if chunks is None:
@@ -475,7 +490,7 @@ def xds_from_zarr(store, columns=None, chunks=None, consolidated=True, **kwargs)
 
             array_chunks = da.core.normalize_chunks(array_chunks, zarray.shape)
             ext_args = extent_args(dims, array_chunks)
-            token_name = f"read~{name}-{tokenize(zarray, *ext_args)}"
+            token_name = f"read~{name}-{tokenize(zarray, epoch, *ext_args)}"
 
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", category=da.PerformanceWarning)
