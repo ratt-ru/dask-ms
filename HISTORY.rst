@@ -4,6 +4,8 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Add an epoch argument to xds_{from,to}_zarr to uniquely identify
+  datasets in a distributed context (:pr:`330`)
 * Improve table schema handling (:pr:`329`)
 * Identify channel and correlation-like dimensions in non-standard MS columns (:pr:`329`)
 * DaskMSStore depends on ``fsspec >= 2022.7.0`` (:pr:`328`)
