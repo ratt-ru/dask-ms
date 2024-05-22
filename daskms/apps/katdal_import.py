@@ -67,7 +67,7 @@ class PolarisationListType(click.ParamType):
     help="Chunking values to apply to each dimension " "for e.g. {time: 20, chan: 64}",
 )
 def katdal(ctx, rdb_url, output_store, no_auto, pols_to_use, applycal, chunks):
-    """Export an observation in the SARAO archive to zarr formation
+    """Export an observation from the SARAO archive to zarr format
 
     RDB_URL is the SARAO archive link"""
     from daskms.experimental.katdal import katdal_import

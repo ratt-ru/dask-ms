@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Fix katdal import typos (:pr:`331`)
 * Add an epoch argument to xds_{from,to}_zarr to uniquely identify
   datasets in a distributed context (:pr:`330`)
 * Improve table schema handling (:pr:`329`)
