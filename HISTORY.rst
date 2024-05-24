@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Bump donfig dependency to 0.8.0 due to install error with pip (:pr:332)
 * Fix katdal import typos (:pr:`331`)
 * Add an epoch argument to xds_{from,to}_zarr to uniquely identify
   datasets in a distributed context (:pr:`330`)
