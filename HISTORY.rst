@@ -2,7 +2,7 @@
 History
 =======
 
-X.Y.Z (YYYY-MM-DD)
+0.2.21 (2021-06-18)
 ------------------
 * Restrict NumPy to < 2.0.0 (:pr:`333`)
 * Bump donfig dependency to 0.8.0 due to install error with pip (:pr:`332`)
