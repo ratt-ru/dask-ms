@@ -2,7 +2,11 @@
 History
 =======
 
-0.2.21 (2021-06-18)
+X.Y.Z (YYYY-MM-DD)
+------------------
+* Fix date typo in HISTORY.rst (:pr:`336`)
+
+0.2.21 (2024-06-18)
 ------------------
 * Restrict NumPy to < 2.0.0 (:pr:`333`)
 * Bump donfig dependency to 0.8.0 due to install error with pip (:pr:`332`)
