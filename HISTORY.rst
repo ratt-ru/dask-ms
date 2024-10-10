@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Fix date typo in HISTORY.rst (:pr:`336`)
 
 0.2.21 (2024-06-18)
 ------------------
