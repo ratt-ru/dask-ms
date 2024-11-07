@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Deprecate Python 3.9 support (:pr:`338`)
 * Update minio server version (:pr:`338`)
 * Remove complicated push setup in github action workflow (:pr:`338`)
 * Fix date typo in HISTORY.rst (:pr:`336`)
