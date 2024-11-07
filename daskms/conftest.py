@@ -297,8 +297,8 @@ def minio_server(tmp_path_factory):
     server_process = Popen(args, env=env, shell=False, stdout=PIPE, stderr=PIPE)
 
     try:
-        while line := server_process.stdout.readline():
-            if "Documentation: ".encode("utf-8") in line:
+        while line := server_process.stderr.readline():
+            if "Docs: ".encode("utf-8") in line:
                 break
 
         retcode = server_process.poll()

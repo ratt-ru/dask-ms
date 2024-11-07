@@ -2,17 +2,13 @@ name: Ubuntu CI
 
 on:
   push:
-    branches:
-    - master
-    tags:
-    - "*"
   pull_request:
   schedule:
     - cron: '30 2 * * 1,4' # Every Monday and Thursday @ 2h30am UTC
 
 env:
-  POETRY_VERSION: 1.6.1
-  MINIO_SERVER_DOWNLOAD_URL: https://dl.min.io/server/minio/release/linux-amd64/archive/minio_20231111081441.0.0_amd64.deb
+  POETRY_VERSION: 1.8.3
+  MINIO_SERVER_DOWNLOAD_URL: https://dl.min.io/server/minio/release/linux-amd64/archive/minio_20241029160148.0.0_amd64.deb
 
 jobs:
   check_skip:
@@ -33,7 +29,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11"]
+        python-version: ["3.10", "3.11", "3.12"]
 
     steps:
       - name: Create Cache Hash
