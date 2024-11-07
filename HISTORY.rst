@@ -2,6 +2,10 @@
 History
 =======
 
+X.Y.Z (YYYY-MM-DD)
+------------------
+* Update readthedocs version (:pr:`339`)
+
 0.2.22 (2024-11-07)
 ------------------
 * Pin minimum version of katdal to 0.23 (:pr:`337`)
