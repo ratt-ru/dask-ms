@@ -2,7 +2,7 @@
 History
 =======
 
-X.Y.Z (YYYY-MM-DD)
+0.2.22 (2024-11-07)
 ------------------
 * Pin minimum version of katdal to 0.23 (:pr:`337`)
 * Pin minimum version of python-casacore to 3.6.1 (:pr:`337`)
