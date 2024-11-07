@@ -4,6 +4,8 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Update minio server version (:pr:`338`)
+* Remove complicated push setup in github action workflow (:pr:`338`)
 * Fix date typo in HISTORY.rst (:pr:`336`)
 
 0.2.21 (2024-06-18)
