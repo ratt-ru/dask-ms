@@ -4,6 +4,9 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Pin minimum version of katdal to 0.23 (:pr:`337`)
+* Pin minimum version of python-casacore to 3.6.1 (:pr:`337`)
+* Pin minimum version of NumPy to 2.0.0 (:pr:`337`)
 * Deprecate Python 3.9 support (:pr:`338`)
 * Update minio server version (:pr:`338`)
 * Remove complicated push setup in github action workflow (:pr:`338`)
