@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Use github action to install poetry (:pr:`340`)
 * Update readthedocs version (:pr:`339`)
 
 0.2.22 (2024-11-07)
