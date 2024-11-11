@@ -2,7 +2,7 @@
 History
 =======
 
-X.Y.Z (YYYY-MM-DD)
+0.2.23 (2024-11-11)
 ------------------
 * Restrict dask < 2024.11.0 (:pr:`341`)
 * Use github action to install poetry (:pr:`340`)
