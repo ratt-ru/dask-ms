@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Restrict dask < 2024.11.0 (:pr:`341`)
 * Use github action to install poetry (:pr:`340`)
 * Update readthedocs version (:pr:`339`)
 
