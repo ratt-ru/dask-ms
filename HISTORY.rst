@@ -2,6 +2,10 @@
 History
 =======
 
+X.Y.Z (YYYY-MM-DD)
+------------------
+* Implement a cacheout-based multiton, implementing a TTL (:pr:`344`)
+
 0.2.23 (2024-11-11)
 ------------------
 * Restrict dask < 2024.11.0 (:pr:`341`)
