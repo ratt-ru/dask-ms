@@ -5,7 +5,7 @@ import uuid
 from weakref import WeakValueDictionary, WeakKeyDictionary
 
 import dask.array as da
-from dask.core import flatten, _execute_task
+from dask.core import flatten, execute_graph
 from dask.highlevelgraph import HighLevelGraph
 from dask.optimization import cull, inline
 
@@ -63,7 +63,7 @@ def cache_entry(cache, key, *task):
         try:
             return cache.cache[key]
         except KeyError:
-            cache.cache[key] = value = _execute_task(task, {})
+            cache.cache[key] = value = execute_graph(task, {})
             return value
 
 

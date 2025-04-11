@@ -154,3 +154,61 @@ def test_multiton_serialisation(clear_table_multiton_cache):
     assert m1 == m2
     assert m1 is not m2
     assert m1.instance == m2.instance
+
+
+def test_multiton_table_proxy():
+    class BaseTableProxy(metaclass=MultitonMetaclass):
+        pass
+
+    class ExecutorProxy(metaclass=MultitonMetaclass):
+        pass
+
+    class TableProxy(BaseTableProxy):
+        __slots__ = ("pool",)
+
+        def __post_init__(self):
+            self.pool = ExecutorProxy(ThreadPoolExecutor, max_workers=1)
+
+        def _read_locked_impl(self, table, fn, args, kw):
+            table.lock(write=False)
+            try:
+                return getattr(table, fn)(*args, **kw)
+            finally:
+                table.unlock()
+
+        def _write_locked_impl(self, table, fn, args, kw):
+            table.lock(write=True)
+            try:
+                return getattr(table, fn)(*args, **kw)
+            finally:
+                table.unlock()
+
+        def nrows(self) -> int:
+            return self.pool.instance.submit(self.instance.nrows).result()
+
+        def getcol(self, column: str):
+            return self.pool.instance.submit(self.instance.getcol, column).result()
+
+    class ExecutorProxy(metaclass=MultitonMetaclass):
+        pass
+
+    import casacore.tables as ct
+    from concurrent.futures import ThreadPoolExecutor
+
+    ms = "/home/simon/data/WSRT_polar.MS_p0"
+
+    table_proxy = TableProxy(ct.table, ms, readonly=True)
+    print(table_proxy.nrows())
+    print(table_proxy.getcol("TIME"))
+
+    # def table_factory(factory, *args, **kw):
+
+    # class TableProxy:
+    #     def __init__(self, factory, *args, **kw):
+    #         self.proxy = MultitonMetaclass(factory, *args, **kw)
+    #         self.pool = MultitonMetaclass(ThreadPoolExecutor, 1)
+
+    #     def nrow(self) -> int:
+    #         self.pool.submit(lambda: self.proxy.instance.nrow()).result()
+
+    # table_proxy = TableProxy(ct.table, ms, readonly=True)
