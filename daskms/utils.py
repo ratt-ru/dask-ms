@@ -42,7 +42,7 @@ class ChunkTransformer(ast.NodeTransformer):
         return tuple(self.visit(v) for v in node.elts)
 
     def visit_Constant(self, node):
-        return node.n
+        return node.value
 
 
 def parse_chunks_dict(chunks_str):
