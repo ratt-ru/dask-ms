@@ -20,12 +20,12 @@ class Visitor(ast.NodeTransformer):
     if sys.version_info[1] >= 8:
 
         def visit_Constant(self, node):
-            return node.n
+            return node.value
 
     else:
 
         def visit_Num(self, node):
-            return node.n
+            return node.value
 
     def visit_Expr(self, node):
         return self.visit(node.value)
