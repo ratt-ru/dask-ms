@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Support Python 3.13 (:pr:`348`, :pr:`349`)
 * Implement a cacheout-based multiton, implementing a TTL (:pr:`344`)
 
 0.2.23 (2024-11-11)
