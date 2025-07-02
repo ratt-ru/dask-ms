@@ -163,11 +163,9 @@ class MultitonMetaclass(type):
         cls._CACHE = cache_cls(**cache_params)
 
         # Define class and static methods for inclusion on the class
-        @classmethod
         def reduce_from_args(cls, factory, args, kw):
             return cls(factory, *args, **kw)
 
-        @staticmethod
         def _create_instance(obj) -> Any:
             return obj._factory(*obj._args, **obj._kw)
 
