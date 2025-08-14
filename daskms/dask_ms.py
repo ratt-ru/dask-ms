@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import logging
+from urllib.parse import urlparse
 
 from daskms.fsspec_store import DaskMSStore
 from daskms.table_proxy import TableProxy
@@ -337,7 +338,30 @@ def xds_from_ms(ms, columns=None, index_cols=None, group_cols=None, **kwargs):
     )
 
 
+def is_katdal_url(store) -> bool:
+    """Returns true if this is probably a katdal url
+
+    katdal urls are of the form
+    "(http|https)://archive-gw-1.kat.ac.za/{bid}/{bid}_sdp_l0.full.rdb?token={xyz}"
+    where bid is the capture block id.
+    """
+    pr = urlparse(str(store))
+    return (
+        "kat.ac.za" in pr.netloc
+        and pr.path.endswith("rdb")
+        and (
+            # http doesn't require auth
+            pr.scheme == "http" or (pr.scheme == "https" and "token" in pr.query)
+        )
+    )
+
+
 def xds_from_storage_table(store, **kwargs):
+    if is_katdal_url(store):
+        from daskms.experimental.katdal import xds_from_katdal
+
+        return xds_from_katdal(store, **kwargs)
+
     if not isinstance(store, DaskMSStore):
         store = DaskMSStore(store, **kwargs.pop("storage_options", {}))
 
@@ -358,6 +382,11 @@ def xds_from_storage_table(store, **kwargs):
 
 
 def xds_from_storage_ms(store, **kwargs):
+    if is_katdal_url(store):
+        from daskms.experimental.katdal import xds_from_katdal
+
+        return xds_from_katdal(store, **kwargs)
+
     if not isinstance(store, DaskMSStore):
         store = DaskMSStore(store, **kwargs.pop("storage_options", {}))
 
@@ -378,6 +407,9 @@ def xds_from_storage_ms(store, **kwargs):
 
 
 def xds_to_storage_table(xds, store, **kwargs):
+    if is_katdal_url(store):
+        raise NotImplementedError(f"Writing back to katdal archive")
+
     if not isinstance(store, DaskMSStore):
         store = DaskMSStore(store, **kwargs.pop("storage_options", {}))
 
