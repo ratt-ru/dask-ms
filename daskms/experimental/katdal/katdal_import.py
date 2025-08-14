@@ -1,8 +1,7 @@
+from __future__ import annotations
 import logging
 import os
 import urllib
-from threading import Lock
-import weakref
 
 import dask
 
