@@ -2,6 +2,7 @@ from __future__ import annotations
 import logging
 import os
 import urllib
+import warnings
 
 import dask
 
@@ -15,7 +16,7 @@ try:
     import katdal
     from katdal.dataset import DataSet
 
-    from daskms.experimental.katdal.msv2_facade import XarrayMSV2Facade
+    from daskms.experimental.katdal.msv2_facade import XArrayMSv2Facade
     from daskms.experimental.zarr import xds_to_zarr
 except ImportError as e:
     import_error = e
@@ -31,7 +32,7 @@ class FacadeMultiton(metaclass=MultitonMetaclass):
         url: str, applycal: str = "", no_auto: bool = True, chunks: dict = {}
     ):
         katdal_dataset = katdal.open(url, applycal=applycal)
-        return XarrayMSV2Facade(katdal_dataset, no_auto=no_auto)
+        return XArrayMSv2Facade(katdal_dataset, no_auto=no_auto, chunks=chunks)
 
 
 def default_output_name(url):
@@ -84,7 +85,9 @@ def katdal_import(url: str, out_store: str, no_auto: bool, applycal: str, chunks
     else:
         raise TypeError(f"{url} must be a string or a katdal DataSet")
 
-    facade = FacadeMultiton(FacadeMultiton.from_args, url, applycal, no_auto, chunks)
+    facade = FacadeMultiton(
+        FacadeMultiton.from_args, dataset, applycal, no_auto, chunks
+    )
     main_xds, subtable_xds = facade.instance.xarray_datasets()
 
     if not out_store:
@@ -92,7 +95,7 @@ def katdal_import(url: str, out_store: str, no_auto: bool, applycal: str, chunks
 
     out_store = DaskMSStore(out_store)
     if out_store.exists():
-        log.warn("Removing previously existing %s", out_store)
+        warnings.warn(f"Removing previously existing {out_store}", UserWarning)
         out_store.rm("", recursive=True)
 
     writes = [

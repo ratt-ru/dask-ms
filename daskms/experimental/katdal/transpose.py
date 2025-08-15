@@ -32,7 +32,7 @@ JIT_OPTIONS = {"nogil": True, "cache": True}
 
 @njit(**JIT_OPTIONS)
 def transpose_core(in_data, cp_index, data_type, row):
-    return transpose_impl(in_data, cp_index, data_type, row)
+    return transpose_impl(in_data, cp_index, literally(data_type), row)
 
 
 def transpose_impl(in_data, cp_index, data_type, row):
@@ -107,6 +107,7 @@ def nb_transpose(in_data, cp_index, data_type, row):
 
 def transpose(data, cp_index, data_type, row=False):
     ntime, _, _ = data.shape
+    t_chunks, _, _ = data.chunks
     nbl, ncorr = cp_index.shape
 
     if row:
@@ -123,7 +124,7 @@ def transpose(data, cp_index, data_type, row=False):
         ("time", "chan", "corrprod"),
         cp_index,
         None,
-        literally(data_type),
+        data_type,
         None,
         row,
         None,
@@ -133,6 +134,6 @@ def transpose(data, cp_index, data_type, row=False):
     )
 
     if row:
-        return output.rechunk({0: ntime * (nbl,)})
+        return output.rechunk({0: tuple(tc * nbl for tc in t_chunks)})
 
     return output

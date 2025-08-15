@@ -41,6 +41,7 @@ def _uvw(target_description, time_utc, antennas, ant1, ant2, row):
 
 def uvw_coords(target, time_utc, antennas, cp_info, row=True):
     (ntime,) = time_utc.shape
+    (t_chunks,) = time_utc.chunks
     (nbl,) = cp_info.ant1_index.shape
 
     if row:
@@ -71,6 +72,6 @@ def uvw_coords(target, time_utc, antennas, cp_info, row=True):
     )
 
     if row:
-        return out.rechunk({0: ntime * (nbl,)})
+        return out.rechunk({0: tuple(tc * nbl for tc in t_chunks)})
 
     return out

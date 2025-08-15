@@ -60,11 +60,10 @@ def to_mjds(timestamp: Timestamp):
 
 
 DEFAULT_TIME_CHUNKS = 100
-DEFAULT_CHAN_CHUNKS = 4096
-DEFAULT_CHUNKS = {"time": DEFAULT_TIME_CHUNKS, "chan": DEFAULT_CHAN_CHUNKS}
+DEFAULT_CHUNKS = {"time": DEFAULT_TIME_CHUNKS}
 
 
-class XarrayMSV2Facade:
+class XArrayMSv2Facade:
     """Provides a simplified xarray Dataset view over a katdal dataset"""
 
     def __init__(
@@ -74,7 +73,6 @@ class XarrayMSV2Facade:
         row_view: bool = True,
         chunks: dict = None,
     ):
-        self._chunks = chunks or DEFAULT_CHUNKS
         self._dataset = dataset
         self._no_auto = no_auto
         self._row_view = row_view
@@ -83,9 +81,40 @@ class XarrayMSV2Facade:
         self._dataset.select(reset="")
         self._cp_info = corrprod_index(dataset, self._pols_to_use, not no_auto)
 
+        if not self._row_view:
+            self._chunks = chunks.copy() or DEFAULT_CHUNKS.copy()
+        else:
+            # katdal's internal data shape is (time, chan, baseline*pol)
+            # If chunking reasoning is row-based it's necessary to
+            # derive a time based chunking from the row dimension
+            # We cannot exactly supply the number of rows
+            chunks = chunks.copy() or {}
+            row = chunks.pop("row", DEFAULT_TIME_CHUNKS * self.nbl)
+            # We need at least one timestamps worth of rows
+            row = max(row, self.nbl)
+            time = row // self.nbl
+            chunks["time"] = min(time, len(self._dataset.timestamps))
+            self._chunks = chunks
+
     @property
     def cp_info(self):
         return self._cp_info
+
+    @property
+    def ntime(self):
+        return len(self._dataset.timestamps)
+
+    @property
+    def na(self):
+        return len(self._dataset.ants)
+
+    @property
+    def nbl(self):
+        return self._cp_info.cp_index.shape[0]
+
+    @property
+    def npol(self):
+        return self._cp_info.cp_index.shape[1]
 
     def _main_xarray_factory(self, field_id, state_id, scan_index, scan_state, target):
         # Extract numpy and dask products
@@ -109,19 +138,19 @@ class XarrayMSV2Facade:
         flag_transpose = partial(
             transpose,
             cp_index=cpi,
-            data_type=numba.literally("flags"),
+            data_type="flags",
             row=self._row_view,
         )
         weight_transpose = partial(
             transpose,
             cp_index=cpi,
-            data_type=numba.literally("weights"),
+            data_type="weights",
             row=self._row_view,
         )
         vis_transpose = partial(
             transpose,
             cp_index=cpi,
-            data_type=numba.literally("vis"),
+            data_type="vis",
             row=self._row_view,
         )
 
@@ -170,9 +199,9 @@ class XarrayMSV2Facade:
 
         if self._row_view:
             primary_dims = ("row",)
-            time = time.ravel().rechunk({0: vis.dataset.chunks[0]})
-            ant1 = ant1.ravel().rechunk({0: vis.dataset.chunks[0]})
-            ant2 = ant2.ravel().rechunk({0: vis.dataset.chunks[0]})
+            time = time.ravel()
+            ant1 = ant1.ravel()
+            ant2 = ant2.ravel()
         else:
             primary_dims = ("time", "baseline")
 
