@@ -24,7 +24,7 @@ import numpy as np
 
 from numba import njit, literally
 from numba import types
-from numba.extending import overload, SentryLiteralArgs, register_jitable
+from numba.extending import overload, register_jitable
 from numba.core.errors import TypingError, RequireLiteralValue
 
 
