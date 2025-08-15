@@ -502,6 +502,9 @@ class XArrayMSv2Facade:
 
         # Generate MAIN table xarray partition datasets
         for scan_index, scan_state, target in self._dataset.scans():
+            if scan_state == "slew":
+                continue
+
             # Retrieve existing field data, or create
             try:
                 field_id, _, _, _ = field_data[target.name]

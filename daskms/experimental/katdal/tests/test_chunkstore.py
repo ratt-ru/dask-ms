@@ -13,7 +13,20 @@ from daskms.experimental.katdal.msv2_facade import XArrayMSv2Facade
 
 
 @pytest.mark.parametrize(
-    "katdal_dataset", [{"ntime": 20, "nchan": 16, "nant": 4}], indirect=True
+    "katdal_dataset",
+    [
+        {
+            "ntime": 20,
+            "nchan": 16,
+            "nant": 4,
+            "targets": [
+                katpoint.Target(
+                    "J1939-6342 | PKS1934-638, radec bpcal, 19:39:25.03, -63:42:45.6"
+                )
+            ],
+        }
+    ],
+    indirect=True,
 )
 @pytest.mark.parametrize("auto_corrs", [True])
 @pytest.mark.parametrize("row_dim", [True, False])
@@ -55,13 +68,15 @@ def test_katdal_import(
     def assert_transposed_equal(a, e):
         """Simple transpose of katdal (time, chan, corrprod) to
         (time, bl, chan, corr)."""
-        t = a.reshape(ntime, nchan, nbl, ncorr).transpose(0, 2, 1, 3)
+        # MinimalDataset uses 1 timestap as a slew scan
+        # which is not returned here
+        t = a.reshape(ntime - 1, nchan, nbl, ncorr).transpose(0, 2, 1, 3)
         t = t.reshape(-1, nchan, ncorr) if row_dim else t
         return assert_array_equal(t, e)
 
-    assert_transposed_equal(test_data, read_xds.DATA.values)
-    assert_transposed_equal(test_weights, read_xds.WEIGHT_SPECTRUM.values)
-    assert_transposed_equal(test_flags, read_xds.FLAG.values)
+    assert_transposed_equal(test_data[1:, ...], read_xds.DATA.values)
+    assert_transposed_equal(test_weights[1:, ...], read_xds.WEIGHT_SPECTRUM.values)
+    assert_transposed_equal(test_flags[1:, ...], read_xds.FLAG.values)
 
 
 @pytest.mark.parametrize(
@@ -102,12 +117,11 @@ def test_facade_chunking(
     row_dim = "row" in chunks
     facade = XArrayMSv2Facade(katdal_dataset, not auto_corrs, row_dim, chunks)
     xds, _ = facade.xarray_datasets()
-    assert len(xds) == 2
-    assert xds[0].sizes["row"] == facade.nbl  # First dataset is a slew and rather small
+    assert len(xds) == 1
 
     from dask.array.core import normalize_chunks
 
     for k, v in expected_chunks.items():
-        (expected_chunks[k],) = normalize_chunks(v, (xds[1].sizes[k],))
+        (expected_chunks[k],) = normalize_chunks(v, (xds[0].sizes[k],))
 
-    assert expected_chunks == xds[1].chunks, chunks
+    assert expected_chunks == xds[0].chunks, chunks
