@@ -82,13 +82,13 @@ class XArrayMSv2Facade:
         self._cp_info = corrprod_index(dataset, self._pols_to_use, not no_auto)
 
         if not self._row_view:
-            self._chunks = chunks.copy() or DEFAULT_CHUNKS.copy()
+            self._chunks = (chunks or DEFAULT_CHUNKS).copy()
         else:
             # katdal's internal data shape is (time, chan, baseline*pol)
             # If chunking reasoning is row-based it's necessary to
             # derive a time based chunking from the row dimension
             # We cannot exactly supply the number of rows
-            chunks = chunks.copy() or {}
+            chunks = (chunks or {}).copy()
             row = chunks.pop("row", DEFAULT_TIME_CHUNKS * self.nbl)
             # We need at least one timestamps worth of rows
             row = max(row, self.nbl)
