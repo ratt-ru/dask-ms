@@ -87,7 +87,8 @@ class XArrayMSv2Facade:
             # katdal's internal data shape is (time, chan, baseline*pol)
             # If chunking reasoning is row-based it's necessary to
             # derive a time based chunking from the row dimension
-            # We cannot exactly supply the number of rows
+            # We cannot always exactly supply the requested number of rows,
+            # as we always have to supply a multiple of the number of baselines
             chunks = (chunks or {}).copy()
             row = chunks.pop("row", DEFAULT_TIME_CHUNKS * self.nbl)
             # We need at least one timestamps worth of rows
