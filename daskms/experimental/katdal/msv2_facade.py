@@ -20,14 +20,12 @@
 
 from functools import partial
 from operator import getitem
-
 import dask.array as da
 import numpy as np
 
 from katdal.dataset import DataSet
 from katdal.lazy_indexer import DaskLazyIndexer
 from katpoint import Timestamp
-import numba
 import xarray
 
 from daskms.constants import DASKMS_PARTITION_KEY
@@ -60,7 +58,6 @@ def to_mjds(timestamp: Timestamp):
 
 
 DEFAULT_TIME_CHUNKS = 100
-DEFAULT_CHUNKS = {"time": DEFAULT_TIME_CHUNKS}
 
 
 class XArrayMSv2Facade:
@@ -71,7 +68,7 @@ class XArrayMSv2Facade:
         dataset: DataSet,
         no_auto: bool = True,
         row_view: bool = True,
-        chunks: dict = None,
+        chunks: dict | list[dict] | None = None,
     ):
         self._dataset = dataset
         self._no_auto = no_auto
@@ -81,21 +78,36 @@ class XArrayMSv2Facade:
         self._dataset.select(reset="")
         self._cp_info = corrprod_index(dataset, self._pols_to_use, not no_auto)
 
-        if not self._row_view:
-            self._chunks = (chunks or DEFAULT_CHUNKS).copy()
-        else:
-            # katdal's internal data shape is (time, chan, baseline*pol)
-            # If chunking reasoning is row-based it's necessary to
-            # derive a time based chunking from the row dimension
-            # We cannot always exactly supply the requested number of rows,
-            # as we always have to supply a multiple of the number of baselines
-            chunks = (chunks or {}).copy()
-            row = chunks.pop("row", DEFAULT_TIME_CHUNKS * self.nbl)
-            # We need at least one timestamps worth of rows
-            row = max(row, self.nbl)
-            time = row // self.nbl
-            chunks["time"] = min(time, len(self._dataset.timestamps))
-            self._chunks = chunks
+        if chunks is None:
+            chunks = [{"time": DEFAULT_TIME_CHUNKS}]
+        elif isinstance(chunks, dict):
+            chunks = [chunks]
+        elif not isinstance(chunks, list) and not all(
+            isinstance(c, dict) for c in chunks
+        ):
+            raise TypeError(f"{chunks} must a dictionary or list of dictionaries")
+        elif len(chunks) == 0:
+            chunks.append([{"time": DEFAULT_TIME_CHUNKS}])
+
+        xformed_chunks = []
+
+        for ds_chunks in chunks:
+            if not self._row_view:
+                xformed_chunks.append(ds_chunks)
+            else:
+                # katdal's internal data shape is (time, chan, baseline*pol)
+                # If chunking reasoning is row-based it's necessary to
+                # derive a time based chunking from the row dimension
+                # We cannot always exactly supply the requested number of rows,
+                # as we always have to supply a multiple of the number of baselines
+                row = ds_chunks.pop("row", DEFAULT_TIME_CHUNKS * self.nbl)
+                # We need at least one timestamps worth of rows
+                row = max(row, self.nbl)
+                time = row // self.nbl
+                ds_chunks["time"] = min(time, len(self._dataset.timestamps))
+                xformed_chunks.append(ds_chunks)
+
+        self._chunks = xformed_chunks
 
     @property
     def cp_info(self):
@@ -117,7 +129,9 @@ class XArrayMSv2Facade:
     def npol(self):
         return self._cp_info.cp_index.shape[1]
 
-    def _main_xarray_factory(self, field_id, state_id, scan_index, scan_state, target):
+    def _main_xarray_factory(
+        self, field_id, state_id, scan_index, scan_state, target, chunks
+    ):
         # Extract numpy and dask products
         dataset = self._dataset
         cp_info = self._cp_info
@@ -125,8 +139,8 @@ class XArrayMSv2Facade:
         t_chunks, chan_chunks, cp_chunks = dataset.vis.dataset.chunks
 
         # Override time and channel chunking
-        t_chunks = self._chunks.get("time", t_chunks)
-        chan_chunks = self._chunks.get("chan", chan_chunks)
+        t_chunks = chunks.get("time", t_chunks)
+        chan_chunks = chunks.get("chan", chan_chunks)
 
         # Modified Julian Date in Seconds
         time_mjds = np.asarray([to_mjds(t) for t in map(Timestamp, time_utc)])
@@ -501,7 +515,7 @@ class XArrayMSv2Facade:
         state_modes = {"UNKNOWN": UNKNOWN_STATE_ID}
 
         # Generate MAIN table xarray partition datasets
-        for scan_index, scan_state, target in self._dataset.scans():
+        for i, (scan_index, scan_state, target) in enumerate(self._dataset.scans()):
             if scan_state == "slew":
                 continue
 
@@ -527,9 +541,14 @@ class XArrayMSv2Facade:
                 state_modes[state_tag] = len(state_modes)
             state_id = state_modes.get(state_tag, UNKNOWN_STATE_ID)
 
+            try:
+                chunks = self._chunks[i]
+            except IndexError:
+                chunks = self._chunks[-1]
+
             main_xds.append(
                 self._main_xarray_factory(
-                    field_id, state_id, scan_index, scan_state, target
+                    field_id, state_id, scan_index, scan_state, target, chunks
                 )
             )
 

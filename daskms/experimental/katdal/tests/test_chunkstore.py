@@ -115,7 +115,7 @@ def test_facade_chunking(
 ):
     expected_chunks.update((("corr", 4), ("uvw", 3)))
     row_dim = "row" in chunks
-    facade = XArrayMSv2Facade(katdal_dataset, not auto_corrs, row_dim, chunks)
+    facade = XArrayMSv2Facade(katdal_dataset, not auto_corrs, row_dim, [chunks])
     xds, _ = facade.xarray_datasets()
     assert len(xds) == 1
 

@@ -53,7 +53,7 @@ def xds_from_katdal(
     url_or_dataset: str | Dataset,
     applycal: str = "",
     no_auto: bool = True,
-    chunks: dict = {},
+    chunks: list[dict] | dict | None = None,
 ):
     if isinstance(url_or_dataset, Dataset):
         base_url = url_or_dataset
