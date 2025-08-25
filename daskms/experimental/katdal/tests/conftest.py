@@ -12,7 +12,7 @@ DEFAULT_PARAM = {"ntime": NTIME, "nchan": NCHAN, "nant": NANT, "dump_rate": DUMP
 
 
 @pytest.fixture(scope="session", params=[DEFAULT_PARAM])
-def dataset(request, tmp_path_factory):
+def katdal_dataset(request, tmp_path_factory):
     MockDataset = pytest.importorskip(
         "daskms.experimental.katdal.mock_dataset"
     ).MockDataset
@@ -48,10 +48,12 @@ def dataset(request, tmp_path_factory):
         bandwidth=856e6,
     )
 
-    return MockDataset(
+    ds = MockDataset(
         tmp_path_factory.mktemp("chunks"),
         targets,
         timestamps,
         antennas=MEERKAT_ANTENNA_DESCRIPTIONS[:nant],
         spw=spw,
     )
+
+    return ds

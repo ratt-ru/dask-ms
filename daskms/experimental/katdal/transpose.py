@@ -23,8 +23,9 @@ import dask.array as da
 import numpy as np
 
 from numba import njit, literally
-from numba.extending import overload, SentryLiteralArgs, register_jitable
-from numba.core.errors import TypingError
+from numba import types
+from numba.extending import overload, register_jitable
+from numba.core.errors import TypingError, RequireLiteralValue
 
 
 JIT_OPTIONS = {"nogil": True, "cache": True}
@@ -32,50 +33,41 @@ JIT_OPTIONS = {"nogil": True, "cache": True}
 
 @njit(**JIT_OPTIONS)
 def transpose_core(in_data, cp_index, data_type, row):
-    return transpose_impl(in_data, cp_index, data_type, row)
+    return transpose_impl(in_data, cp_index, literally(data_type), literally(row))
 
 
-def transpose_impl(in_data, cp_index, data_type, row):
+def transpose_impl(in_data, cp_index, data_type_literal, row_literal):
     raise NotImplementedError
 
 
 @overload(transpose_impl, jit_options=JIT_OPTIONS, prefer_literal=True)
-def nb_transpose(in_data, cp_index, data_type, row):
-    SentryLiteralArgs(["data_type", "row"]).for_function(nb_transpose).bind(
-        in_data, cp_index, data_type, row
-    )
+def nb_transpose(in_data, cp_index, data_type_literal, row_literal):
+    if not isinstance(data_type_literal, types.StringLiteral):
+        raise RequireLiteralValue(
+            f"'data_type' {data_type_literal} must be a StringLiteral"
+        )
 
-    try:
-        data_type = data_type.literal_value
-    except AttributeError as e:
-        raise TypingError(f"data_type {data_type} is not a literal_value") from e
+    if not isinstance(row_literal, types.BooleanLiteral):
+        raise RequireLiteralValue(f"'row' {row_literal} must be a BooleanLiteral")
+
+    DATA_TYPE = data_type_literal.literal_value
+    ROW_DIM = row_literal.literal_value
+
+    if DATA_TYPE == "flags":
+        GET_VALUE = lambda v: v != 0
+        DEFAULT_VALUE = np.bool_(True)
+    elif DATA_TYPE == "vis":
+        GET_VALUE = lambda v: v
+        DEFAULT_VALUE = in_data.dtype(0 + 0j)
+    elif DATA_TYPE == "weights":
+        GET_VALUE = lambda v: v
+        DEFAULT_VALUE = in_data.dtype(0)
     else:
-        if not isinstance(data_type, str):
-            raise TypeError(f"data_type {data_type} is not a string: {type(data_type)}")
+        raise TypingError(f"data_type {DATA_TYPE} is not supported")
 
-    try:
-        row_dim = row.literal_value
-    except AttributeError as e:
-        raise TypingError(f"row {row} is not a literal_value") from e
-    else:
-        if not isinstance(row_dim, bool):
-            raise TypingError(f"row_dim {row_dim} is not a boolean {type(row_dim)}")
+    GET_VALUE = register_jitable(GET_VALUE)
 
-    if data_type == "flags":
-        get_value = lambda v: v != 0
-        default_value = np.bool_(True)
-    elif data_type == "vis":
-        get_value = lambda v: v
-        default_value = in_data.dtype(0 + 0j)
-    elif data_type == "weights":
-        get_value = lambda v: v
-        default_value = in_data.dtype(0)
-    else:
-        raise TypingError(f"data_type {data_type} is not supported")
-
-    get_value = register_jitable(get_value)
-
-    def impl(in_data, cp_index, data_type, row):
+    def impl(in_data, cp_index, data_type_literal, row_literal):
         n_time, n_chans, _ = in_data.shape
         n_bls, n_pol = cp_index.shape
         out_data = np.empty((n_time, n_bls, n_chans, n_pol), in_data.dtype)
@@ -91,13 +83,13 @@ def nb_transpose(in_data, cp_index, data_type, row):
                         for p in range(out_data.shape[3]):
                             idx = cp_index[b, p]
                             data = (
-                                get_value(in_data[t, c, idx])
+                                GET_VALUE(in_data[t, c, idx])
                                 if idx >= 0
-                                else default_value
+                                else DEFAULT_VALUE
                             )
                             out_data[t, b, c, p] = data
 
-        if row_dim:
+        if ROW_DIM:
             return out_data.reshape(n_time * n_bls, n_chans, n_pol)
 
         return out_data
@@ -107,6 +99,7 @@ def nb_transpose(in_data, cp_index, data_type, row):
 
 def transpose(data, cp_index, data_type, row=False):
     ntime, _, _ = data.shape
+    t_chunks, _, _ = data.chunks
     nbl, ncorr = cp_index.shape
 
     if row:
@@ -123,7 +116,7 @@ def transpose(data, cp_index, data_type, row=False):
         ("time", "chan", "corrprod"),
         cp_index,
         None,
-        literally(data_type),
+        data_type,
         None,
         row,
         None,
@@ -133,6 +126,6 @@ def transpose(data, cp_index, data_type, row=False):
     )
 
     if row:
-        return output.rechunk({0: ntime * (nbl,)})
+        return output.rechunk({0: tuple(tc * nbl for tc in t_chunks)})
 
     return output
