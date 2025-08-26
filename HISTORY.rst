@@ -4,7 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
-* Support katdal data sources in xds_from_storage_ms (:pr:`353`, :pr:`355`)
+* Support katdal data sources in xds_from_storage_ms (:pr:`353`, :pr:`355`, :pr:`356`)
 * Support Python 3.13 (:pr:`348`, :pr:`349`)
 * Implement a cacheout-based multiton, implementing a TTL (:pr:`344`)
 
