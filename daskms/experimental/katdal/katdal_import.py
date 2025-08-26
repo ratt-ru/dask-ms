@@ -54,6 +54,7 @@ def xds_from_katdal(
     applycal: str = "",
     no_auto: bool = True,
     chunks: list[dict] | dict | None = None,
+    **kwargs,
 ):
     if isinstance(url_or_dataset, DataSet):
         base_url = url_or_dataset
@@ -66,6 +67,13 @@ def xds_from_katdal(
     else:
         raise TypeError(
             f"url_or_dataset {type(url_or_dataset)} must be a str or Dataset"
+        )
+
+    if len(kwargs) > 0:
+        warnings.warn(
+            f"The following unsupported kwargs were ignored in "
+            f"xds_from_katdal: {list(kwargs.keys())}",
+            UserWarning,
         )
 
     facade = FacadeMultiton(
