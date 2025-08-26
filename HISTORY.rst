@@ -4,13 +4,13 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
-* Support katdal data sources in xds_from_storage_ms (:pr:`353`)
+* Support katdal data sources in xds_from_storage_ms (:pr:`353`, :pr:`355`)
 * Support Python 3.13 (:pr:`348`, :pr:`349`)
 * Implement a cacheout-based multiton, implementing a TTL (:pr:`344`)
 
 0.2.23 (2024-11-11)
 ------------------
-* Restrict dask < 2024.11.0 (:pr:`341`)
+* Restrict dask \< 2024.11.0 (:pr:`341`)
 * Use github action to install poetry (:pr:`340`)
 * Update readthedocs version (:pr:`339`)
 

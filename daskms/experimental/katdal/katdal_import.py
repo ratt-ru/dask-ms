@@ -50,16 +50,19 @@ def default_output_name(url):
 
 @requires("pip install dask-ms[katdal]", import_error)
 def xds_from_katdal(
-    url_or_dataset: str | Dataset,
+    url_or_dataset: str | DataSet,
     applycal: str = "",
     no_auto: bool = True,
     chunks: list[dict] | dict | None = None,
 ):
-    if isinstance(url_or_dataset, Dataset):
+    if isinstance(url_or_dataset, DataSet):
         base_url = url_or_dataset
     elif isinstance(url_or_dataset, str):
-        base_url, subtable = url_or_dataset.split("::")
-        subtable = ""
+        try:
+            base_url, subtable = url_or_dataset.split("::", 1)
+        except ValueError:
+            base_url = url_or_dataset
+            subtable = ""
     else:
         raise TypeError(
             f"url_or_dataset {type(url_or_dataset)} must be a str or Dataset"
