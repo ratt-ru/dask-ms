@@ -2,9 +2,12 @@
 History
 =======
 
-X.Y.Z (YYYY-MM-DD)
+0.2.25 (2025-09-09)
 ------------------
 * Support katdal data sources in xds_from_storage_ms (:pr:`353`, :pr:`355`, :pr:`356`)
+
+0.2.24 (2025-07-02)
+-------------------
 * Support Python 3.13 (:pr:`348`, :pr:`349`)
 * Implement a cacheout-based multiton, implementing a TTL (:pr:`344`)
 
