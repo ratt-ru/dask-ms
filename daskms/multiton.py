@@ -17,11 +17,12 @@ FIVE_MINUTES = 5 * 60.0
 
 def freeze(arg: Any) -> Any:
     """Recursively convert argument into an immutable representation"""
-    if isinstance(arg, (str, bytes)):
-        # str and bytes are sequences, return early to avoid tuplification
+    if isinstance(arg, (bytes, str, FrozenKey)):
+        # str and bytes are immutable sequences
+        # return early to avoid tuplification
+        # and freezing a FrozenKey is redundant
         return arg
-
-    if isinstance(arg, Sequence):
+    elif isinstance(arg, Sequence):
         return tuple(map(freeze, arg))
     elif isinstance(arg, Set):
         return frozenset(map(freeze, arg))
@@ -63,7 +64,7 @@ class FrozenKey(Hashable):
 def normalise_args(
     factory: Callable, args, kw
 ) -> Tuple[Tuple[Any, ...], Mapping[str, Any]]:
-    """Normalise args and kwargs into a hashable representation
+    """Move any arguments present in keywords into the arguments tuple.
 
     Args:
       factory: factory function
@@ -71,7 +72,7 @@ def normalise_args(
       kw: keyword arguments
 
     Returns:
-      tuple containing the normalised positional arguments and keyword arguments
+      tuple containing normalised positional arguments and keyword arguments
     """
     spec = inspect.getfullargspec(factory)
     args = list(args)
@@ -119,6 +120,10 @@ class MultitonMetaclass(type):
             self._factory = factory
             self._args, self._kw = normalise_args(factory, args, kw)
             self._key = FrozenKey(factory, *self._args, **self._kw)
+            self.__post_init__()
+
+        def __post_init__(self):
+            pass
 
         def __reduce__(self) -> Tuple[Callable, Tuple]:
             return (type(self).reduce_from_args, (self._factory, self._args, self._kw))
@@ -138,15 +143,18 @@ class MultitonMetaclass(type):
         def release(self) -> bool:
             return self._CACHE.delete(self) > 0
 
-        namespace["__init__"] = __init__
-        namespace["__reduce__"] = __reduce__
-        namespace["__hash__"] = __hash__
-        namespace["__eq__"] = __eq__
-        namespace["instance"] = instance
-        namespace["release"] = release
+        namespace.setdefault("__init__", __init__)
+        namespace.setdefault("__post_init__", __post_init__)
+        namespace.setdefault("__reduce__", __reduce__)
+        namespace.setdefault("__hash__", __hash__)
+        namespace.setdefault("__eq__", __eq__)
+        namespace.setdefault("instance", instance)
+        namespace.setdefault("release", release)
 
         # Configure the class to be slotted
-        namespace["__slots__"] = ("_factory", "_args", "_kw", "_key")
+        REQUIRED_SLOTS = {"_factory", "_args", "_kw", "_key"}
+        slots = set(namespace.get("__slots__", REQUIRED_SLOTS))
+        namespace["__slots__"] = tuple(sorted(slots | REQUIRED_SLOTS))
 
         # Create the class
         cls = super().__new__(meta_cls, name, bases, namespace)
