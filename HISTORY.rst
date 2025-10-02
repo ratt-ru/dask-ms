@@ -2,6 +2,10 @@
 History
 =======
 
+X.Y.Z (YYYY-MM-DD)
+------------------
+* Pass ``MinioAdmin.__init__`` arguments by kwarg (:pr:`358`)
+
 0.2.25 (2025-09-09)
 ------------------
 * Support katdal data sources in xds_from_storage_ms (:pr:`353`, :pr:`355`, :pr:`356`)
