@@ -18,7 +18,7 @@ pyarrow = {version = ">= 14.0.1", optional = true}
 zarr = {version = "^2.12.0", optional=true}
 xarray = {version = ">= 2023.01.0", optional=true}
 s3fs = {version = ">= 2023.1.0", optional=true}
-minio = {version = "^7.2.0", optional = true}
+minio = {version = "^7.2.0, <7.2.17", optional = true}
 pytest = {version = "^7.1.3", optional=true}
 pandas = {version = "^2.1.2", optional = true}
 katdal = {version = "^0.23", optional = true}
