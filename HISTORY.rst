@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Convert pyproject.toml from a poetry build to a PEP 621 structure (:pr:`359`)
 * Pass ``MinioAdmin.__init__`` arguments by kwarg (:pr:`358`)
 
 0.2.25 (2025-09-09)
