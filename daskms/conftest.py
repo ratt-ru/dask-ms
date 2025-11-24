@@ -337,7 +337,7 @@ def py_minio_client(minio_admin, minio_user_key):
     minio = pytest.importorskip("minio")
     parsed_url = urlparse(MINIO_URL)
     yield minio.Minio(
-        parsed_url.netloc,
+        endpoint=parsed_url.netloc,
         access_key=minio_user_key,
         secret_key=minio_user_key,
         secure=False,

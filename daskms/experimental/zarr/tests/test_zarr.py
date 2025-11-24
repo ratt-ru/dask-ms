@@ -185,7 +185,7 @@ def test_xds_to_zarr_local(ms, spw_table, ant_table, tmp_path_factory):
 def test_xds_to_zarr_s3(
     ms, spw_table, ant_table, py_minio_client, minio_user_key, minio_url, s3_bucket_name
 ):
-    py_minio_client.make_bucket(s3_bucket_name)
+    py_minio_client.make_bucket(bucket_name=s3_bucket_name)
 
     zarr_store = DaskMSStore(
         f"s3://{s3_bucket_name}/measurementset.MS",
