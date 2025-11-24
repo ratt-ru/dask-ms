@@ -107,7 +107,7 @@ def test_minio_server(
     stuff = tmp_path / "stuff.txt"
     stuff.write_text(payload)
 
-    py_minio_client.make_bucket(s3_bucket_name)
+    py_minio_client.make_bucket(bucket_name=s3_bucket_name)
     py_minio_client.fput_object(s3_bucket_name, "stuff.txt", str(stuff))
 
     s3 = s3fs.S3FileSystem(
@@ -130,7 +130,7 @@ def test_storage_options_from_config(
 ):
     filename = "test.txt"
     payload = "How now brown cow"
-    py_minio_client.make_bucket(s3_bucket_name)
+    py_minio_client.make_bucket(bucket_name=s3_bucket_name)
     py_minio_client.put_object(
         s3_bucket_name,
         f"subdir/{filename}",
