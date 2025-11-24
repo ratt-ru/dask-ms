@@ -2,9 +2,12 @@
 History
 =======
 
+X.Y.Z (YYYY-MM-DD)
+------------------
+* Fix further changes of args to kwargs by the minio api (:pr:`363`)
+
 0.2.26 (2025-10-10)
 -------------------
-* Fix further changes of args to kwargs by the minio api (:pr:`363`)
 * Use trusted publishing (:pr:`359`)
 * Convert pyproject.toml from a poetry build to a PEP 621 structure (:pr:`359`)
 * Pass ``MinioAdmin.__init__`` arguments by kwarg (:pr:`358`)
