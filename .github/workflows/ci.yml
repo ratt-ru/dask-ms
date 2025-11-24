@@ -69,7 +69,7 @@ jobs:
         run: minio --help
 
       - name: Checkout source
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 1
 
@@ -120,7 +120,7 @@ jobs:
           key: install-${{ env.INSTALL_CACHE_HASH }}-0
 
       - name: Checkout source
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 1
 
@@ -151,7 +151,7 @@ jobs:
           python-version: 3.11
 
       - name: Checkout source
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 1
 
