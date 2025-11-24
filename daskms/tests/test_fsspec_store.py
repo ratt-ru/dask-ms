@@ -135,7 +135,7 @@ def test_storage_options_from_config(
     py_minio_client.make_bucket(bucket_name=s3_bucket_name)
     py_minio_client.put_object(
         bucket_name=s3_bucket_name,
-        file_path=f"subdir/{filename}",
+        object_name=f"subdir/{filename}",
         data=BytesIO(payload.encode("utf-8")),
         length=len(payload),
     )
