@@ -29,9 +29,9 @@ class FacadeMultiton(metaclass=MultitonMetaclass):
 
     @staticmethod
     def from_args(
-        url: str, applycal: str = "", no_auto: bool = True, chunks: dict = {}
+        url: str, applycal: str = "", no_auto: bool = True, chunks: dict = {}, **kw
     ):
-        katdal_dataset = katdal.open(url, applycal=applycal)
+        katdal_dataset = katdal.open(url, applycal=applycal, **kw)
         return XArrayMSv2Facade(katdal_dataset, no_auto=no_auto, chunks=chunks)
 
 
@@ -69,15 +69,8 @@ def xds_from_katdal(
             f"url_or_dataset {type(url_or_dataset)} must be a str or Dataset"
         )
 
-    if len(kwargs) > 0:
-        warnings.warn(
-            f"The following unsupported kwargs were ignored in "
-            f"xds_from_katdal: {list(kwargs.keys())}",
-            UserWarning,
-        )
-
     facade = FacadeMultiton(
-        FacadeMultiton.from_args, base_url, applycal, no_auto, chunks
+        FacadeMultiton.from_args, base_url, applycal, no_auto, chunks, **kwargs
     )
     main_xds, subtable_xds = facade.instance.xarray_datasets()
 
