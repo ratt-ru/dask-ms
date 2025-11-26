@@ -2,8 +2,8 @@
 History
 =======
 
-X.Y.Z (YYYY-MM-DD)
-------------------
+0.2.27 (2025-11-26)
+-------------------
 * Propagate ``xds_from_katdal`` kwargs to ``katdal.open`` (:pr:`364`)
 * Fix further changes of args to kwargs by the minio api (:pr:`363`)
 
@@ -14,7 +14,7 @@ X.Y.Z (YYYY-MM-DD)
 * Pass ``MinioAdmin.__init__`` arguments by kwarg (:pr:`358`)
 
 0.2.25 (2025-09-09)
-------------------
+-------------------
 * Support katdal data sources in xds_from_storage_ms (:pr:`353`, :pr:`355`, :pr:`356`)
 
 0.2.24 (2025-07-02)
@@ -23,13 +23,13 @@ X.Y.Z (YYYY-MM-DD)
 * Implement a cacheout-based multiton, implementing a TTL (:pr:`344`)
 
 0.2.23 (2024-11-11)
-------------------
+-------------------
 * Restrict dask \< 2024.11.0 (:pr:`341`)
 * Use github action to install poetry (:pr:`340`)
 * Update readthedocs version (:pr:`339`)
 
 0.2.22 (2024-11-07)
-------------------
+-------------------
 * Pin minimum version of katdal to 0.23 (:pr:`337`)
 * Pin minimum version of python-casacore to 3.6.1 (:pr:`337`)
 * Pin minimum version of NumPy to 2.0.0 (:pr:`337`)
@@ -39,7 +39,7 @@ X.Y.Z (YYYY-MM-DD)
 * Fix date typo in HISTORY.rst (:pr:`336`)
 
 0.2.21 (2024-06-18)
-------------------
+-------------------
 * Restrict NumPy to < 2.0.0 (:pr:`333`)
 * Bump donfig dependency to 0.8.0 due to install error with pip (:pr:`332`)
 * Fix katdal import typos (:pr:`331`)
@@ -62,7 +62,7 @@ X.Y.Z (YYYY-MM-DD)
 * Address warnings (:pr:`309`)
 
 0.2.20 (2024-01-30)
-------------------
+-------------------
 * Update calver dependencies to use inequality, rather than caret dependency specifiers (:pr:`307`)
 * Update pre-commit to actions/python@v5.0.0 (:pr:`308`)
 * Update readthedocs python version to 3.9 and poetry to 1.7.1 (:pr:`303`)
@@ -79,7 +79,7 @@ X.Y.Z (YYYY-MM-DD)
 * Temporarily add Pandas as an arrow extra dependency (:pr:`296`)
 
 0.2.18 (2023-09-20)
-------------------
+-------------------
 * Ignore non-existent columns (:pr:`290`)
 * Add experimental fragments functionality (:pr:`282`, :pr:`291`)
 * Add rechunk by size utility funtion (:pr:`284`)
@@ -88,11 +88,11 @@ X.Y.Z (YYYY-MM-DD)
 * Retain ROWID coordinates during MS conversion (:pr:`286`)
 
 0.2.17 (2023-08-02)
-------------------
+-------------------
 * Change setmaxcachesize to require a read lock, not a write lock (:pr:`281`)
 
 0.2.16 (2023-05-26)
-------------------
+-------------------
 * Update calver versioned software such as dask and xarray to 2023 variants (:pr:`279`)
 * Remove unused requirements_dev.txt (:pr:`275`)
 * Support optional CASA columns  (:pr:`270`)
