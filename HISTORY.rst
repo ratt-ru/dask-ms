@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Propagate ``xds_from_katdal`` kwargs to ``katdal.open`` (:pr:`364`)
 * Fix further changes of args to kwargs by the minio api (:pr:`363`)
 
 0.2.26 (2025-10-10)
