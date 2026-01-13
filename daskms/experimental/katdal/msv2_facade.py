@@ -486,7 +486,7 @@ class XArrayMSv2Facade:
                     np.array([["unavailable"]], dtype=object),
                 ),
                 "SCHEDULE_TYPE": ("row", np.array(["unknown"], dtype=object)),
-                "TELESCOPE": ("row", np.array(["MeerKAT"], dtype=object)),
+                "TELESCOPE_NAME": ("row", np.array(["MeerKAT"], dtype=object)),
                 "TIME_RANGE": (("row", "extent"), np.array([[start, end]])),
                 "FLAG_ROW": ("row", np.zeros(1, np.uint8)),
             }
