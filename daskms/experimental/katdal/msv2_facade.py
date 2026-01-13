@@ -254,9 +254,7 @@ class XArrayMSv2Facade:
         }
 
         attrs = {
-            DASKMS_PARTITION_KEY: tuple(
-                (c, data_vars[c][-1].dtype.name) for c in GROUP_COLS
-            ),
+            DASKMS_PARTITION_KEY: tuple((c, "int32") for c in GROUP_COLS),
             "FIELD_ID": field_id,
             "DATA_DESC_ID": DATA_DESC_ID,
             "SCAN_NUMBER": scan_index,
