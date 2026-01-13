@@ -2,6 +2,13 @@
 History
 =======
 
+0.2.28 (2026-01-13)
+-------------------
+* Remove ``DATA_DESC_ID``, ``FIELD_ID`` and ``SCAN_NUMBER`` arrays that
+  were shadowing xarray dataset attributes (:pr:`366`)
+* Add ``WEIGHT`` and ``SIGMA`` columns to katdal xarray datasets (:pr:`366`)
+* Convert many of the subtables to lists of xarray datasets (:pr:`366`)
+
 0.2.27 (2025-11-26)
 -------------------
 * Propagate ``xds_from_katdal`` kwargs to ``katdal.open`` (:pr:`364`)
