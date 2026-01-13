@@ -241,7 +241,10 @@ class XArrayMSv2Facade:
                 primary_dims + ("chan", "corr"),
                 weights.dataset,
             ),
-            "WEIGHT": (primary_dims + ("corr",), da.mean(weights.dataset, axis=1)),
+            "WEIGHT": (
+                primary_dims + ("corr",),
+                da.mean(weights.dataset, axis=len(primary_dims)),
+            ),
             # Estimated RMS noise per frequency channel
             # note this column is used when computing calibration weights
             # in CASA - WEIGHT_SPECTRUM may be modified based on the
@@ -254,7 +257,7 @@ class XArrayMSv2Facade:
             ),
             "SIGMA": (
                 primary_dims + ("corr",),
-                da.mean(weights.dataset**-0.5, axis=1),
+                da.mean(weights.dataset**-0.5, axis=len(primary_dims)),
             ),
         }
 
