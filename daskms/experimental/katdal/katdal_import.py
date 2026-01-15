@@ -6,7 +6,7 @@ import warnings
 
 import dask
 
-from daskms.experimental.katdal.msv2_facade import GROUP_COLS
+from daskms.experimental.katdal.constants import GROUP_COLS
 from daskms.fsspec_store import DaskMSStore
 from daskms.utils import requires, promote_columns
 from daskms.multiton import MultitonMetaclass
