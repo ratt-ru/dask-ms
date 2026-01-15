@@ -30,27 +30,15 @@ from katpoint import Timestamp
 import xarray
 
 from daskms.constants import DASKMS_PARTITION_KEY
+from daskms.experimental.katdal.constants import (
+    GROUP_COLS,
+    DATA_DESC_ID,
+    TAG_TO_INTENT,
+    EMPTY_PARTITION_SCHEMA,
+)
 from daskms.experimental.katdal.corr_products import corrprod_index
 from daskms.experimental.katdal.transpose import transpose
 from daskms.experimental.katdal.uvw import uvw_coords
-
-TAG_TO_INTENT = {
-    "gaincal": "CALIBRATE_PHASE,CALIBRATE_AMPLI",
-    "bpcal": "CALIBRATE_BANDPASS,CALIBRATE_FLUX",
-    "target": "TARGET",
-}
-
-
-# Partitioning columns
-GROUP_COLS = ["FIELD_ID", "DATA_DESC_ID", "SCAN_NUMBER"]
-
-# No partitioning, applies to many subtables
-EMPTY_PARTITION_SCHEMA = {DASKMS_PARTITION_KEY: ()}
-
-# katdal datasets only have one spectral window
-# and one polarisation. Thus, there
-# is only one DATA_DESC_ID and it is zero
-DATA_DESC_ID = 0
 
 
 def to_mjds(timestamp: Timestamp):
@@ -274,10 +262,13 @@ class XArrayMSv2Facade:
         return xarray.Dataset(data_vars, attrs=attrs)
 
     def _apply_subtable_grouping(self, datasets, group_cols, subtable):
+        # Assign empty partition schemas to subtables
         if group_cols == "__row__":
-            return datasets
+            return [ds.assign_attrs(EMPTY_PARTITION_SCHEMA) for ds in datasets]
         elif len(group_cols) == 0:
-            return [xarray.concat(datasets, dim="row")]
+            return [
+                xarray.concat(datasets, dim="row").assign_attrs(EMPTY_PARTITION_SCHEMA)
+            ]
         else:
             raise ValueError(
                 f"group_cols {group_cols} not supported "
@@ -642,14 +633,6 @@ class XArrayMSv2Facade:
         subtables = {
             subtable: factory(**{"group_cols": []} | s_kw.get(subtable, {}))
             for subtable, factory in subtable_factory_map.items()
-        }
-
-        # Assign empty partition schemas to subtables
-        subtables = {
-            n: dss.assign_attrs(EMPTY_PARTITION_SCHEMA)
-            if isinstance(dss, xarray.Dataset)
-            else [ds.assign_attrs(EMPTY_PARTITION_SCHEMA) for ds in dss]
-            for n, dss in subtables.items()
         }
 
         return main_xds, subtables
