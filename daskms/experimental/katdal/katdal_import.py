@@ -29,11 +29,9 @@ class FacadeMultiton(metaclass=MultitonMetaclass):
     """Apply some caching to facades"""
 
     @staticmethod
-    def from_args(
-        url: str, applycal: str = "", no_auto: bool = True, chunks: dict = {}, **kw
-    ):
+    def from_args(url: str, applycal: str = "", no_auto: bool = True, **kw):
         katdal_dataset = katdal.open(url, applycal=applycal, **kw)
-        return XArrayMSv2Facade(katdal_dataset, no_auto=no_auto, chunks=chunks)
+        return XArrayMSv2Facade(katdal_dataset, no_auto=no_auto)
 
 
 def default_output_name(url):
