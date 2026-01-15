@@ -86,9 +86,11 @@ def xds_from_katdal(
 
     if subtable:
         main_kw = {}
-        subtable_kw = {
-            subtable: {"chunks": chunks, "group_cols": promote_columns(group_cols, [])}
-        }
+
+        if chunks:
+            raise NotImplementedError(f"chunking {subtable} subtable")
+
+        subtable_kw = {subtable: {"group_cols": promote_columns(group_cols, [])}}
     else:
         main_kw = {
             "chunks": chunks,
