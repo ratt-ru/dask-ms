@@ -263,7 +263,7 @@ class XArrayMSv2Facade:
 
     def _apply_subtable_grouping(self, datasets, group_cols, subtable):
         # Assign empty partition schemas to subtables
-        if group_cols == "__row__":
+        if group_cols == ["__row__"]:
             return [ds.assign_attrs(EMPTY_PARTITION_SCHEMA) for ds in datasets]
         elif len(group_cols) == 0:
             return [

@@ -151,7 +151,7 @@ def test_facade_subtable_group_cols(katdal_dataset, auto_corrs, row_dim):
     assert len(datasets := subtables["ANTENNA"]) == 1 and datasets[0].sizes["row"] == 4
 
     _, subtables = facade.xarray_datasets(
-        subtable_kw={"ANTENNA": {"group_cols": "__row__"}}
+        subtable_kw={"ANTENNA": {"group_cols": ["__row__"]}}
     )
     assert len(subtables["ANTENNA"]) == 4 and all(
         ds.sizes["row"] == 1 for ds in subtables["ANTENNA"]
