@@ -2,7 +2,7 @@
 History
 =======
 
-0.2.29 (2026-01-16)
+0.2.29 (2026-01-19)
 -------------------
 * Increase support and consistency for column grouping in ``xds_from_katdal`` (:pr:`367`)
 
