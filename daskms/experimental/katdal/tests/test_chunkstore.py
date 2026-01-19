@@ -115,8 +115,8 @@ def test_facade_chunking(
 ):
     expected_chunks.update((("corr", 4), ("uvw", 3)))
     row_dim = "row" in chunks
-    facade = XArrayMSv2Facade(katdal_dataset, not auto_corrs, row_dim, [chunks])
-    xds, _ = facade.xarray_datasets()
+    facade = XArrayMSv2Facade(katdal_dataset, not auto_corrs, row_dim)
+    xds, _ = facade.xarray_datasets(chunks=[chunks])
     assert len(xds) == 1
 
     from dask.array.core import normalize_chunks
@@ -125,3 +125,34 @@ def test_facade_chunking(
         (expected_chunks[k],) = normalize_chunks(v, (xds[0].sizes[k],))
 
     assert expected_chunks == xds[0].chunks, chunks
+
+
+@pytest.mark.parametrize(
+    "katdal_dataset",
+    [
+        {
+            "ntime": 20,
+            "nchan": 16,
+            "nant": 4,
+            "targets": [
+                katpoint.Target(
+                    "J1939-6342 | PKS1934-638, radec bpcal, 19:39:25.03, -63:42:45.6"
+                )
+            ],
+        }
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize("auto_corrs", [True])
+@pytest.mark.parametrize("row_dim", [True])
+def test_facade_subtable_group_cols(katdal_dataset, auto_corrs, row_dim):
+    facade = XArrayMSv2Facade(katdal_dataset, not auto_corrs, row_dim)
+    _, subtables = facade.xarray_datasets(subtable_kw={"ANTENNA": {"group_cols": []}})
+    assert len(datasets := subtables["ANTENNA"]) == 1 and datasets[0].sizes["row"] == 4
+
+    _, subtables = facade.xarray_datasets(
+        subtable_kw={"ANTENNA": {"group_cols": ["__row__"]}}
+    )
+    assert len(subtables["ANTENNA"]) == 4 and all(
+        ds.sizes["row"] == 1 for ds in subtables["ANTENNA"]
+    )

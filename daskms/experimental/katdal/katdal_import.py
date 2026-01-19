@@ -6,8 +6,9 @@ import warnings
 
 import dask
 
+from daskms.experimental.katdal.constants import GROUP_COLS
 from daskms.fsspec_store import DaskMSStore
-from daskms.utils import requires
+from daskms.utils import requires, promote_columns
 from daskms.multiton import MultitonMetaclass
 
 log = logging.getLogger(__file__)
@@ -28,11 +29,9 @@ class FacadeMultiton(metaclass=MultitonMetaclass):
     """Apply some caching to facades"""
 
     @staticmethod
-    def from_args(
-        url: str, applycal: str = "", no_auto: bool = True, chunks: dict = {}, **kw
-    ):
+    def from_args(url: str, applycal: str = "", no_auto: bool = True, **kw):
         katdal_dataset = katdal.open(url, applycal=applycal, **kw)
-        return XArrayMSv2Facade(katdal_dataset, no_auto=no_auto, chunks=chunks)
+        return XArrayMSv2Facade(katdal_dataset, no_auto=no_auto)
 
 
 def default_output_name(url):
@@ -53,6 +52,7 @@ def xds_from_katdal(
     url_or_dataset: str | DataSet,
     applycal: str = "",
     no_auto: bool = True,
+    group_cols: list | None = None,
     chunks: list[dict] | dict | None = None,
     **kwargs,
 ):
@@ -69,10 +69,41 @@ def xds_from_katdal(
             f"url_or_dataset {type(url_or_dataset)} must be a str or Dataset"
         )
 
+    # Ignore these arguments
+    for ignored_argument in ["columns", "index_cols", "table_schema", "taql_where"]:
+        if (arg := kwargs.pop(ignored_argument, None)) is not None:
+            warnings.warn(
+                f"{ignored_argument} {arg} argument to xds_from_katdal ignored",
+                UserWarning,
+            )
+
+    # This changes the return signature -- fail
+    for failed_argument in ["table_keywords", "column_keywords", "table_proxy"]:
+        if (arg := kwargs.pop(failed_argument, None)) is not None:
+            raise NotImplementedError(
+                f"{failed_argument} {arg} argument to xds_from_katdal is not supported"
+            )
+
+    if subtable:
+        main_kw = {}
+
+        if chunks:
+            raise NotImplementedError(f"chunking {subtable} subtable")
+
+        subtable_kw = {subtable: {"group_cols": promote_columns(group_cols, [])}}
+    else:
+        main_kw = {
+            "chunks": chunks,
+            "group_cols": promote_columns(group_cols, GROUP_COLS),
+        }
+        subtable_kw = {}
+
     facade = FacadeMultiton(
-        FacadeMultiton.from_args, base_url, applycal, no_auto, chunks, **kwargs
+        FacadeMultiton.from_args, base_url, applycal, no_auto, **kwargs
     )
-    main_xds, subtable_xds = facade.instance.xarray_datasets()
+    main_xds, subtable_xds = facade.instance.xarray_datasets(
+        subtable_kw=subtable_kw, **main_kw
+    )
 
     if subtable:
         return subtable_xds[subtable]
@@ -89,10 +120,8 @@ def katdal_import(url: str, out_store: str, no_auto: bool, applycal: str, chunks
     else:
         raise TypeError(f"{url} must be a string or a katdal DataSet")
 
-    facade = FacadeMultiton(
-        FacadeMultiton.from_args, dataset, applycal, no_auto, chunks
-    )
-    main_xds, subtable_xds = facade.instance.xarray_datasets()
+    facade = FacadeMultiton(FacadeMultiton.from_args, dataset, applycal, no_auto)
+    main_xds, subtable_xds = facade.instance.xarray_datasets(chunks=chunks)
 
     if not out_store:
         out_store = default_output_name(url)
