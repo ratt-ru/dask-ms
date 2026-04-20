@@ -165,9 +165,11 @@ def assert_liveness(table_proxies, executors, collect=True):
     """
     from daskms.table_proxy import _table_cache
     from daskms.table_executor import _executor_cache
+    from daskms.multiton import clear_multiton_caches
     import gc
 
     if collect:
+        clear_multiton_caches()
         gc.collect()
 
     if table_proxies is not None and len(_table_cache) != table_proxies:

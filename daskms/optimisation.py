@@ -1,157 +1,90 @@
 # -*- coding: utf-8 -*-
 
-from threading import Lock
-import uuid
-from weakref import WeakValueDictionary, WeakKeyDictionary
+from itertools import product
 
 import dask.array as da
-from dask.core import flatten, _execute_task
+from dask.base import tokenize
+from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
+from dask.local import get_sync
 from dask.optimization import cull, inline
 
-
-_key_cache = WeakValueDictionary()
-_key_cache_lock = Lock()
+from daskms.multiton import MultitonMetaclass
 
 
-class KeyMetaClass(type):
-    """
-    Ensures that Key identities are the same,
-    given the same constructor arguments
-    """
+class _ArrayRef:
+    """Wraps a dask Array with a stable identity token. Equality and hash
+    are keyed solely on the token so that the array itself is opaque to
+    the :class:`MultitonMetaclass` :class:`FrozenKey` machinery."""
 
-    def __call__(cls, key):
-        try:
-            return _key_cache[key]
-        except KeyError:
-            pass
+    __slots__ = ("array", "token")
 
-        with _key_cache_lock:
-            try:
-                return _key_cache[key]
-            except KeyError:
-                _key_cache[key] = instance = type.__call__(cls, key)
-                return instance
-
-
-class Key(metaclass=KeyMetaClass):
-    """
-    Suitable for storing a tuple
-    (or other dask key type) in a WeakKeyDictionary.
-    Uniques of key identity guaranteed by KeyMetaClass
-    """
-
-    __slots__ = ("key", "__weakref__")
-
-    def __init__(self, key):
-        self.key = key
+    def __init__(self, array, token):
+        self.array = array
+        self.token = token
 
     def __hash__(self):
-        return hash(self.key)
+        return hash(self.token)
 
-    def __repr__(self):
-        return f"Key{self.key}"
-
-    def __reduce__(self):
-        return (Key, (self.key,))
-
-    __str__ = __repr__
-
-
-def cache_entry(cache, key, *task):
-    with cache.lock:
-        try:
-            return cache.cache[key]
-        except KeyError:
-            cache.cache[key] = value = _execute_task(task, {})
-            return value
-
-
-_array_cache_cache = WeakValueDictionary()
-_array_cache_lock = Lock()
-
-
-class ArrayCacheMetaClass(type):
-    """
-    Ensures that Array Cache identities are the same,
-    given the same constructor arguments
-    """
-
-    def __call__(cls, token):
-        key = (cls, token)
-
-        try:
-            return _array_cache_cache[key]
-        except KeyError:
-            pass
-
-        with _array_cache_lock:
-            try:
-                return _array_cache_cache[key]
-            except KeyError:
-                instance = type.__call__(cls, token)
-                _array_cache_cache[key] = instance
-                return instance
-
-
-class ArrayCache(metaclass=ArrayCacheMetaClass):
-    """
-    Thread-safe array data cache. token makes this picklable.
-
-    Cached on a WeakKeyDictionary with ``Key`` objects.
-    """
-
-    def __init__(self, token):
-        self.token = token
-        self.cache = WeakKeyDictionary()
-        self.lock = Lock()
+    def __eq__(self, other):
+        if not isinstance(other, _ArrayRef):
+            return NotImplemented
+        return self.token == other.token
 
     def __reduce__(self):
-        return (ArrayCache, (self.token,))
+        return (type(self), (self.array, self.token))
 
-    def __repr__(self):
-        return f"ArrayCache[{self.token}]"
+
+def _materialise(ref):
+    graph = dict(ref.array.__dask_graph__())
+    keys = list(flatten(ref.array.__dask_keys__()))
+    values = get_sync(graph, keys)
+    return {key[1:]: val for key, val in zip(keys, values)}
+
+
+class _CachedArray(metaclass=MultitonMetaclass):
+    """Multiton holding the per-block results of a materialised dask Array,
+    keyed on ``(_materialise, _ArrayRef.token)``."""
+
+
+def _read_cached_block(holder, block_idx):
+    return holder.instance[block_idx]
 
 
 def cached_array(array, token=None):
     """
-    Return a new array that functionally has the same values as array,
-    but flattens the underlying graph and introduces a cache lookup
-    when the individual array chunks are accessed.
+    Return a new array that functionally has the same values as ``array``.
 
-    Useful for caching data that can fit in-memory for the duration
-    of the graph's execution.
+    On first block access within a process, the entire input array is
+    materialised (using the synchronous scheduler) and each block's
+    computed value is stored in a process-local cache keyed on ``token``.
+    Subsequent block accesses fetch pre-computed blocks from that cache.
+
+    Cache entries are released once no dask graph references the cached
+    array any longer. Call sites that pass the same ``token`` share a
+    single cached result.
 
     Parameters
     ----------
     array : :class:`dask.array.Array`
         dask array to cache.
     token : optional, str
-        A unique token for identifying the internal cache.
-        If None, it will be automatically generated.
+        Identity token for the cached result. If ``None``, derived from
+        ``dask.base.tokenize(array)``.
     """
-    dsk = dict(array.__dask_graph__())
-    keys = set(flatten(array.__dask_keys__()))
-
     if token is None:
-        token = uuid.uuid4().hex
+        token = tokenize(array)
 
-    # Inline + cull everything except the current array
-    inline_keys = set(dsk.keys() - keys)
-    dsk2 = inline(dsk, inline_keys, inline_constants=True)
-    dsk3, _ = cull(dsk2, keys)
+    holder = _CachedArray(_materialise, _ArrayRef(array, token))
+    name = f"cached-array-{token}"
 
-    # Create a cache used to store array values
-    cache = ArrayCache(token)
+    dsk = {
+        (name, *idx): (_read_cached_block, holder, idx)
+        for idx in product(*(range(len(c)) for c in array.chunks))
+    }
 
-    assert len(dsk3) == len(keys)
-
-    for k in keys:
-        dsk3[k] = (cache_entry, cache, Key(k), *dsk3.pop(k))
-
-    graph = HighLevelGraph.from_collections(array.name, dsk3, [])
-
-    return da.Array(graph, array.name, array.chunks, array.dtype)
+    graph = HighLevelGraph.from_collections(name, dsk, [])
+    return da.Array(graph, name, chunks=array.chunks, dtype=array.dtype)
 
 
 def inlined_array(a, inline_arrays=None):
