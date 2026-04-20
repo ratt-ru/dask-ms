@@ -4,6 +4,7 @@ from functools import partial
 import inspect
 from collections.abc import Callable
 from typing import ClassVar, Hashable, Mapping, Sequence, Set, Type, Any, Dict, Tuple
+from weakref import WeakSet
 
 from cacheout import Cache
 from numpy import ndarray
@@ -13,6 +14,22 @@ FactoryFunctionT = Callable[..., Any]
 
 
 FIVE_MINUTES = 5 * 60.0
+
+
+_multiton_classes: "WeakSet[type]" = WeakSet()
+
+
+def clear_multiton_caches() -> None:
+    """Clear the ``_CACHE`` of every :class:`MultitonMetaclass`-derived class.
+
+    Multiton caches hold values strongly for their TTL, which is the intended
+    lifecycle but can keep objects alive past points at which test-level
+    liveness assertions expect them to be collected. Callers that need those
+    assertions to reflect "nothing outside the multitons" should call this
+    before ``gc.collect()``.
+    """
+    for cls in list(_multiton_classes):
+        cls._CACHE.clear()
 
 
 def freeze(arg: Any) -> Any:
@@ -161,6 +178,7 @@ class MultitonMetaclass(type):
         cache_params.setdefault("on_delete", on_delete)
 
         cls._CACHE = cache_cls(**cache_params)
+        _multiton_classes.add(cls)
 
         # Define class and static methods for inclusion on the class
         def reduce_from_args(cls, factory, args, kw):

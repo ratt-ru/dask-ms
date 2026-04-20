@@ -11,6 +11,7 @@ from uuid import uuid4
 import numpy as np
 import pytest
 
+from daskms.multiton import clear_multiton_caches
 from daskms.testing import mark_in_pytest
 
 
@@ -25,10 +26,17 @@ def pytest_unconfigure(config):
 
 @pytest.fixture(autouse=True)
 def xms_always_gc():
-    """Force garbage collection after each test"""
+    """Release multiton caches and force garbage collection after each test.
+
+    Multitons hold cached instances for their TTL, which can keep
+    TableProxy/Executor objects alive longer than a test expects. Clearing
+    before ``gc.collect`` restores the pre-multiton semantics that the
+    liveness assertions and executor-count tests rely on.
+    """
     try:
         yield
     finally:
+        clear_multiton_caches()
         gc.collect()
 
 
