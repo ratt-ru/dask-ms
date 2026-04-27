@@ -4,24 +4,26 @@ import logging
 
 import dask
 import dask.array as da
-from dask.highlevelgraph import HighLevelGraph
 import numpy as np
+from dask.highlevelgraph import HighLevelGraph
 
+from daskms.array_api_utils import is_array_api_obj, to_device_cpu
 from daskms.columns import dim_extents_array
 from daskms.constants import DASKMS_PARTITION_KEY
 from daskms.dataset import Dataset
 from daskms.dataset_schema import DatasetSchema
 from daskms.descriptors.builder import AbstractDescriptorBuilder
-from daskms.descriptors.builder_factory import filename_builder_factory
-from daskms.descriptors.builder_factory import string_builder_factory
-from daskms.patterns import lazy_import
+from daskms.descriptors.builder_factory import (
+    filename_builder_factory,
+    string_builder_factory,
+)
 from daskms.optimisation import cached_array, inlined_array
 from daskms.ordering import row_run_factory
+from daskms.patterns import lazy_import
 from daskms.table import table_exists
 from daskms.table_executor import executor_key
-from daskms.table_proxy import TableProxy, WRITELOCK
+from daskms.table_proxy import WRITELOCK, TableProxy
 from daskms.utils import table_path_split
-
 
 ct = lazy_import("casacore.tables")
 
@@ -185,7 +187,8 @@ def putter_wrapper(row_orders, *args):
                 "r%d" % (i + 1): data["r%d" % (s + 1)] for i, s in enumerate(resort)
             }
 
-    elif isinstance(data, np.ndarray):
+    elif is_array_api_obj(data):
+        data = np.asarray(to_device_cpu(data))
         # Infer output shape
         out_shape = (1,) * len(data.shape)
 
@@ -404,7 +407,7 @@ def add_row_orders(data, table_proxy, prev=None):
     None
         Indicate that row resorting should not occur by default
     """
-    if isinstance(data, np.ndarray):
+    if is_array_api_obj(data):
         rows = data.shape[0]
     elif isinstance(data, dict):
         rows = len(data)

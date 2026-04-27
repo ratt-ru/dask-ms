@@ -209,3 +209,147 @@ Keywords can be added to the target table and columns:
     >>> xds_to_table(datasets, "test.ms", [],
                      table_keywords={"foo":"bar"},
                      column_keywords={"DATA": {"foo": "bar"}})
+
+
+.. _array-api-writes:
+
+Writing Arrays from Array API Compatible Libraries
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+dask-ms supports writing arrays from libraries that implement the
+`Python Array API standard (2021.12+) <https://data-apis.org/array-api/latest/>`_,
+including JAX, CuPy, and PyTorch.  Arrays are converted to NumPy inside
+each write task, so no changes to the :func:`~daskms.xds_to_table` call
+are needed.  GPU arrays are transferred to CPU automatically, one chunk
+at a time, avoiding a full device-to-host copy at graph-construction time.
+
+The only practical difference between libraries is **how you wrap the
+source array in a dask array**:
+
+- **JAX and CuPy** expose NumPy-compatible dtype objects, so
+  :func:`dask.array.from_array` works without any extra arguments.
+- **PyTorch** uses its own dtype objects (``torch.complex64``, etc.)
+  which are not recognised by NumPy at graph-construction time, so
+  :func:`dask.array.from_delayed` with an explicit ``dtype`` is required.
+
+JAX
+^^^
+
+:func:`dask.array.from_array` works directly with ``jax.Array`` objects.
+Each chunk will be a ``jax.Array``; dask-ms converts it to NumPy inside
+the write task.
+
+.. code-block:: python
+
+    import dask
+    import dask.array as da
+    import jax.numpy as jnp
+    from daskms import xds_from_ms, xds_to_table
+
+    ms = "path/to/data.ms"
+    ds = xds_from_ms(ms, columns=["DATA"], group_cols=[],
+                     chunks={"row": 100})[0]
+    dims, chunks = ds.sizes, ds.chunks
+
+    jax_data = jnp.zeros(
+        (dims["row"], dims["chan"], dims["corr"]), dtype=jnp.complex64
+    )
+    da_data = da.from_array(
+        jax_data, chunks=(chunks["row"], dims["chan"], dims["corr"])
+    )
+    new_ds = ds.assign(DATA=(("row", "chan", "corr"), da_data))
+    dask.compute(xds_to_table(new_ds, ms, ["DATA"]))
+
+This pattern also applies when ``jax.Array`` objects are produced
+per-chunk, for example from a :func:`dask.array.map_blocks` call over a
+JAX-jitted function:
+
+.. code-block:: python
+
+    import jax
+
+    @jax.jit
+    def predict(uvw_chunk):
+        ...  # returns a jax.Array of shape (row, chan, corr)
+
+    da_data = da.map_blocks(
+        predict, ds.UVW.data,
+        dtype="complex64",
+        new_axis=[1, 2],
+        chunks=(chunks["row"], dims["chan"], dims["corr"]),
+    )
+
+CuPy
+^^^^
+
+CuPy arrays live on the GPU.  :func:`dask.array.from_array` introspects
+the dtype correctly, and dask-ms transfers each chunk to CPU inside the
+write task via ``cupy.ndarray.get()``.
+
+.. code-block:: python
+
+    import dask
+    import dask.array as da
+    import cupy as cp
+    from daskms import xds_from_ms, xds_to_table
+
+    ms = "path/to/data.ms"
+    ds = xds_from_ms(ms, columns=["DATA"], group_cols=[],
+                     chunks={"row": 100})[0]
+    dims, chunks = ds.sizes, ds.chunks
+
+    cupy_data = cp.zeros(
+        (dims["row"], dims["chan"], dims["corr"]), dtype=cp.complex64
+    )
+    da_data = da.from_array(
+        cupy_data, chunks=(chunks["row"], dims["chan"], dims["corr"])
+    )
+    new_ds = ds.assign(DATA=(("row", "chan", "corr"), da_data))
+    dask.compute(xds_to_table(new_ds, ms, ["DATA"]))
+
+PyTorch
+^^^^^^^
+
+PyTorch tensor dtype objects (``torch.complex64``, etc.) are not
+NumPy-compatible, so :func:`dask.array.from_array` cannot introspect the
+dtype at graph-construction time.  Use :func:`dask.array.from_delayed`
+with an explicit NumPy ``dtype`` string instead, building one delayed
+chunk per row-chunk:
+
+.. code-block:: python
+
+    import dask
+    import dask.array as da
+    import torch
+    from daskms import xds_from_ms, xds_to_table
+
+    ms = "path/to/data.ms"
+    ds = xds_from_ms(ms, columns=["DATA"], group_cols=[],
+                     chunks={"row": 100})[0]
+    dims, chunks = ds.sizes, ds.chunks
+
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    torch_data = torch.zeros(
+        dims["row"], dims["chan"], dims["corr"],
+        dtype=torch.complex64, device=device,
+    )
+
+    parts, row = [], 0
+    for rc in chunks["row"]:
+        chunk = torch_data[row: row + rc]
+        parts.append(
+            da.from_delayed(
+                dask.delayed(chunk),
+                shape=(rc, dims["chan"], dims["corr"]),
+                dtype="complex64",  # NumPy dtype — no torch dependency here
+            )
+        )
+        row += rc
+    da_data = da.concatenate(parts, axis=0)
+
+    new_ds = ds.assign(DATA=(("row", "chan", "corr"), da_data))
+    dask.compute(xds_to_table(new_ds, ms, ["DATA"]))
+
+For CUDA tensors, the device-to-host transfer (``tensor.to("cpu")``) is
+performed inside each write task.  For CPU tensors no copy is made at the
+dask layer.
