@@ -2,7 +2,7 @@
 History
 =======
 
-0.2.31 (unreleased)
+0.2.31 (2026-05-11)
 -------------------
 * Fix writes for arrays from array API compatible libraries (JAX, CuPy,
   PyTorch, etc.) using ``is_array_api_obj()`` for detection and
