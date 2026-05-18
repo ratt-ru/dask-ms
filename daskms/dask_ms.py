@@ -342,10 +342,17 @@ def is_katdal_url(store) -> bool:
     """Returns true if this is probably a katdal url
 
     katdal urls are of the form
-    "(http|https)://archive-gw-1.kat.ac.za/{bid}/{bid}_sdp_l0.full.rdb?token={xyz}"
+    "(http|https)://archive-gw-1.kat.ac.za/{bid}/{bid}_sdp_l0.full.rdb?token={xyz}::{subtable}"
     where bid is the capture block id.
     """
-    pr = urlparse(str(store))
+    url = str(store)
+
+    try:
+        base_url, _ = url.split("::", 1)
+    except ValueError:
+        base_url = url
+
+    pr = urlparse(base_url)
     return (
         "kat.ac.za" in pr.netloc
         and pr.path.endswith("rdb")

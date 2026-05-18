@@ -8,6 +8,7 @@ import dask
 import numpy as np
 from numpy.testing import assert_array_equal
 
+from daskms.dask_ms import is_katdal_url
 from daskms.experimental.zarr import xds_from_zarr, xds_to_zarr
 from daskms.experimental.katdal.msv2_facade import XArrayMSv2Facade
 
@@ -156,3 +157,16 @@ def test_facade_subtable_group_cols(katdal_dataset, auto_corrs, row_dim):
     assert len(subtables["ANTENNA"]) == 4 and all(
         ds.sizes["row"] == 1 for ds in subtables["ANTENNA"]
     )
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://archive-gw-1.kat.ac.za/12345/12345_sdp_l0.full.rdb",
+        "http://archive-gw-1.kat.ac.za/12345/12345_sdp_l0.full.rdb::FIELD",
+        "https://archive-gw-1.kat.ac.za/12345/12345_sdp_l0.full.rdb?token=eyABCD",
+        "https://archive-gw-1.kat.ac.za/12345/12345_sdp_l0.full.rdb?token=eyABCD::FIELD",
+    ],
+)
+def test_is_katdal_url(url):
+    assert is_katdal_url(url)
