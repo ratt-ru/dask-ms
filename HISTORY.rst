@@ -2,6 +2,10 @@
 History
 =======
 
+X.Y.Z (YYYY-MM-DD)
+------------------
+* Fix ``is_katdal_url`` which was returning False for url's containing a subtable (:pr:`372`)
+
 0.2.31 (2026-05-11)
 -------------------
 * Fix writes for arrays from array API compatible libraries (JAX, CuPy,
