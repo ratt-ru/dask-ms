@@ -2,7 +2,7 @@
 History
 =======
 
-X.Y.Z (YYYY-MM-DD)
+0.2.32 (2026-05-18)
 ------------------
 * Fix ``is_katdal_url`` which was returning False for url's containing a subtable (:pr:`372`)
 
