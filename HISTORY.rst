@@ -2,6 +2,10 @@
 History
 =======
 
+X.Y.Z (YYYY-MM-DD)
+------------------
+* Introduce pytest != 9.1.0 version restriction (:pr:`375`)
+
 0.2.32 (2026-05-18)
 ------------------
 * Fix ``is_katdal_url`` which was returning False for url's containing a subtable (:pr:`372`)
