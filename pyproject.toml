@@ -17,6 +17,11 @@ fragments = "daskms.apps.fragments:main"
 arrow = ['pandas >=2.1.2', 'pyarrow >=14.0.1']
 katdal = [
     'katdal >=0.23',
+    # katpoint 0.10.2 (latest release) calls np.row_stack in Target.uvw_basis,
+    # which numpy 2.5.0 removed. Fixed upstream in ska-sa/katpoint 122f90d8
+    # ("Replace deprecated row_stack with vstack"), but unreleased.
+    # Drop this pin once a katpoint release containing that fix is available.
+    'numpy <2.5',
     'xarray >=2023.01.0',
     'zarr (>=2.12.0, < 3.0.0)',
     'numcodecs < 0.16.0'
@@ -30,7 +35,9 @@ complete = [
     'pyarrow >=14.0.1',
     'xarray>=2023.01.0', 'zarr (>= 2.12.0, < 3.0.0)',
     'numcodecs < 0.16.0',
-    'katdal >= 0.23']
+    'katdal >= 0.23',
+    # See the numpy pin comment in the katdal extra above.
+    'numpy <2.5']
 testing = ['minio >=7.2.0', 'pytest >=8.0.0, != 9.1.0']
 dev = [
     "pre-commit>=4.3.0",
