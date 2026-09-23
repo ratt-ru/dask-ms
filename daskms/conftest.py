@@ -41,12 +41,12 @@ def xms_clear_table_cache():
     written by one test would still be open when the next test reopens
     it.
     """
-    from daskms.casa_table import close_cached_tables
+    from daskms.casa_table import clear_table_cache
 
     try:
         yield
     finally:
-        close_cached_tables()
+        clear_table_cache()
 
 
 @pytest.fixture(scope="session")

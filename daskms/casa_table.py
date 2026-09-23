@@ -140,15 +140,30 @@ def create_table(
     return Table.from_descriptor(table, table_desc=table_desc, dminfo=dminfo, nrow=nrow)
 
 
-def close_cached_tables():
-    """Close every cached arcae table and empty the multiton cache.
+def clear_table_cache():
+    """Drop every cached table without closing it.
 
-    The multiton cache has no eviction hook, so dropping an entry closes
-    its table only once the last reference to it goes away. That is
-    normally immediate, but it is not something to rely on at interpreter
-    shutdown -- each arcae table owns isolation threads, and leaving them
-    to be joined during finalisation hangs the process. Closing them
-    explicitly first keeps teardown deterministic.
+    Tables are deliberately not closed here. A table still in use by a
+    running task is kept alive by that task's own reference and closes
+    when the last one goes away. Closing it here would tear it down
+    underneath that task, and in casacore that deadlocks rather than
+    fails: closing a table acquires a table lock of its own
+    (``TableProxy::close`` -> ``flush`` -> ``keywordSet`` ->
+    ``ColumnSet::userLock``), so the close and the in-flight write end
+    up waiting on each other.
+    """
+    with Multiton._INSTANCE_LOCK:
+        Multiton._INSTANCE_CACHE.clear()
+        Multiton._EXPIRY_HEAP.clear()
+
+
+def close_cached_tables():
+    """Close every cached arcae table, then empty the cache.
+
+    Only safe once nothing else is using the tables -- see
+    :func:`clear_table_cache`. This exists for interpreter shutdown,
+    where each arcae table owns isolation threads and leaving them to be
+    joined during finalisation hangs the process.
     """
     from arcae.lib.arrow_tables import Table
 
@@ -161,7 +176,7 @@ def close_cached_tables():
             except Exception:  # pragma: no cover - best effort
                 log.debug("Error closing %s", table, exc_info=True)
 
-    Multiton.clear_cache()
+    clear_table_cache()
 
 
 @atexit.register
