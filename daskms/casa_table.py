@@ -18,13 +18,13 @@ from __future__ import annotations
 
 import atexit
 import logging
-from typing import Any, Dict, Sequence
+from typing import Any, ClassVar, Dict, Sequence, Tuple
+from weakref import WeakSet
 
 import numpy as np
-from cacheout import LRUCache
 
 from daskms.config import config
-from daskms.multiton import MultitonMetaclass
+from daskms.multiton import FactoryFunctionT, Multiton
 
 log = logging.getLogger(__name__)
 
@@ -140,16 +140,34 @@ def create_table(
     return Table.from_descriptor(table, table_desc=table_desc, dminfo=dminfo, nrow=nrow)
 
 
-@atexit.register
-def _close_cached_tables():
-    """Close cached tables before the interpreter shuts down.
+def close_cached_tables():
+    """Close every cached arcae table and empty the multiton cache.
 
-    Each arcae table owns isolation threads. Leaving tables open until
-    interpreter shutdown hangs the process, so drop them while the
-    runtime is still healthy enough to join those threads.
+    The multiton cache has no eviction hook, so dropping an entry closes
+    its table only once the last reference to it goes away. That is
+    normally immediate, but it is not something to rely on at interpreter
+    shutdown -- each arcae table owns isolation threads, and leaving them
+    to be joined during finalisation hangs the process. Closing them
+    explicitly first keeps teardown deterministic.
     """
+    from arcae.lib.arrow_tables import Table
+
+    for entry in list(Multiton._INSTANCE_CACHE.values()):
+        table = entry[0]
+
+        if isinstance(table, Table):
+            try:
+                table.close()
+            except Exception:  # pragma: no cover - best effort
+                log.debug("Error closing %s", table, exc_info=True)
+
+    Multiton.clear_cache()
+
+
+@atexit.register
+def _close_cached_tables_at_exit():
     try:
-        CasaTable._CACHE.clear()
+        close_cached_tables()
     except Exception:  # pragma: no cover - best effort at shutdown
         log.debug("Error closing cached tables at exit", exc_info=True)
 
@@ -165,7 +183,12 @@ def ms_descriptor(subtable: str = "MAIN", complete: bool = False):
     return _ms_descriptor(subtable, complete=complete)
 
 
-class CasaTable(metaclass=MultitonMetaclass, cache_params={"cls": LRUCache}):
+def _rebuild_casa_table(cls, factory, args, kw, ttl):
+    """Reconstruct a :class:`CasaTable` (or subclass) from pickled state"""
+    return cls(factory, *args, **kw).with_ttl(ttl)
+
+
+class CasaTable(Multiton):
     """A picklable, hashable handle onto an :class:`arcae.Table`.
 
     The table itself is created lazily by the factory supplied on
@@ -173,6 +196,28 @@ class CasaTable(metaclass=MultitonMetaclass, cache_params={"cls": LRUCache}):
     a dask graph and shipped to another thread or process.  Access the
     table through :attr:`instance`.
     """
+
+    # __weakref__ is not in Multiton's __slots__, and the live-handle
+    # registry needs handles to be weakly referenceable
+    __slots__ = ("__weakref__",)
+
+    #: Registry of live handles. Entries disappear once the last reference
+    #: to a handle is dropped, which is what lets
+    #: :func:`daskms.utils.assert_liveness` reason about table lifetimes
+    #: independently of the instance cache.
+    _INSTANCES: ClassVar[WeakSet] = WeakSet()
+
+    def __init__(self, factory: FactoryFunctionT, *args: Any, **kw: Any):
+        super().__init__(factory, *args, **kw)
+        CasaTable._INSTANCES.add(self)
+
+    def __reduce__(self) -> Tuple[Any, ...]:
+        # Multiton.__reduce__ rebuilds a plain Multiton, which would drop
+        # both this class's API and its liveness registration
+        return (
+            _rebuild_casa_table,
+            (type(self), self._factory, self._args, self._kw, self._ttl),
+        )
 
     @classmethod
     def from_table(cls, table: str, ninstances: int = 1, readonly: bool = True):

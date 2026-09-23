@@ -3,8 +3,8 @@
 import gc
 import multiprocessing
 import os
-from subprocess import Popen, PIPE
 from pathlib import Path
+from subprocess import PIPE, Popen
 from urllib.parse import urlparse
 from uuid import uuid4
 
@@ -41,12 +41,12 @@ def xms_clear_table_cache():
     written by one test would still be open when the next test reopens
     it.
     """
-    from daskms.casa_table import CasaTable
+    from daskms.casa_table import close_cached_tables
 
     try:
         yield
     finally:
-        CasaTable._CACHE.clear()
+        close_cached_tables()
 
 
 @pytest.fixture(scope="session")
