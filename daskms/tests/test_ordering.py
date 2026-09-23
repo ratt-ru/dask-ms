@@ -6,7 +6,7 @@ from numpy.testing import assert_array_equal
 import pytest
 
 from daskms.patterns import lazy_import
-from daskms.table_proxy import TableProxy
+from daskms.casa_table import CasaTable
 from daskms.ordering import (
     ordering_taql,
     row_ordering,
@@ -20,7 +20,7 @@ ct = lazy_import("casacore.tables")
 
 
 def table_proxy(ms):
-    return TableProxy(ct.table, ms, ack=False, lockoptions="user", readonly=True)
+    return CasaTable.from_table(ms, readonly=True)
 
 
 @pytest.mark.parametrize(
@@ -113,7 +113,7 @@ def test_ordering_query_taql_where_strings(ms, group_cols, index_cols):
 
     taql = ordering_taql(table_proxy(ms), [])
     assert taql._args[0].replace("\t", " " * 4) == (
-        "SELECT\n" "    ROWID() as __tablerow__\n" "FROM\n" "    $1\n"
+        "SELECT\n    ROWID() as __tablerow__\nFROM\n    $1\n"
     )
 
 
@@ -128,7 +128,7 @@ def test_ordering_multiple_groups(ms, group_cols, index_cols):
     assert_liveness(2, 1)
     orders = group_row_ordering(group_taql, group_cols, index_cols, [{"row": 2}])
     assert_liveness(2, 1)
-    first_rows = group_taql.getcol("__firstrow__").result()
+    first_rows = group_taql.instance.getcol("__firstrow__")
     assert_liveness(2, 1)
 
     assert len(first_rows) == len(orders) == 6
@@ -196,7 +196,7 @@ def test_row_ordering_multiple_groups(ms, group_cols, index_cols, chunks):
     assert_liveness(2, 1)
     orders = group_row_ordering(group_taql, group_cols, index_cols, chunks)
     assert_liveness(2, 1)
-    first_rows = group_taql.getcol("__firstrow__").result()
+    first_rows = group_taql.instance.getcol("__firstrow__")
     assert_liveness(2, 1)
 
     # We get two groups out

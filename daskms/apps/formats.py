@@ -29,11 +29,10 @@ class TableFormat(abc.ABC):
         typ = store.type()
 
         if typ == "casa":
-            from daskms.table_proxy import TableProxy
-            import casacore.tables as ct
+            from daskms.casa_table import CasaTable
 
-            table_proxy = TableProxy(ct.table, store.root, readonly=True, ack=False)
-            keywords = table_proxy.getkeywords().result()
+            casa_table = CasaTable.from_table(store.root, readonly=True)
+            keywords = casa_table.instance.getkeywords()
             subtables = CasaFormat.find_subtables(keywords)
 
             try:

@@ -17,126 +17,24 @@ from daskms.descriptors.builder_factory import (
     filename_builder_factory,
     string_builder_factory,
 )
+from daskms.casa_table import (
+    CasaTable,
+    build_index,
+    create_ms,
+    create_table,
+    ninstances,
+)
 from daskms.optimisation import cached_array, inlined_array
 from daskms.ordering import row_run_factory
-from daskms.patterns import lazy_import
 from daskms.table import table_exists
-from daskms.table_executor import executor_key
-from daskms.table_proxy import WRITELOCK, TableProxy
 from daskms.utils import table_path_split
-
-ct = lazy_import("casacore.tables")
 
 log = logging.getLogger(__name__)
 
 
-def ndarray_putcol(row_runs, table_future, column, data):
-    """Put data into the table"""
-    table = table_future.result()
-    putcol = table.putcol
-    rr = 0
-
-    table.lock(write=True)
-
-    try:
-        for rs, rl in row_runs:
-            putcol(column, data[rr : rr + rl], startrow=rs, nrow=rl)
-            rr += rl
-
-        table.flush()
-
-    finally:
-        table.unlock()
-
-
-def multidim_str_putcol(row_runs, table_future, column, data):
-    """Put multidimensional string data into the table"""
-    table = table_future.result()
-    putcol = table.putcol
-
-    rr = 0
-
-    table.lock(write=True)
-
-    try:
-        for rs, rl in row_runs:
-            # Construct a dict with the shape and a flattened list
-            chunk = data[rr : rr + rl]
-            chunk = {"shape": chunk.shape, "array": chunk.ravel().tolist()}
-            putcol(column, chunk, startrow=rs, nrow=rl)
-            rr += rl
-
-        table.flush()
-
-    finally:
-        table.unlock()
-
-
-def ndarray_putcolslice(row_runs, blc, trc, table_future, column, data):
-    """Put data into the table"""
-    table = table_future.result()
-    putcolslice = table.putcolslice
-    rr = 0
-
-    table.lock(write=True)
-
-    try:
-        for rs, rl in row_runs:
-            putcolslice(column, data[rr : rr + rl], blc, trc, startrow=rs, nrow=rl)
-            rr += rl
-
-        table.flush()
-
-    finally:
-        table.unlock()
-
-
-def multidim_str_putcolslice(row_runs, blc, trc, table_future, column, data):
-    """Put multidimensional string data into the table"""
-    table = table_future.result()
-    putcol = table.putcol
-    rr = 0
-
-    table.lock(write=True)
-
-    try:
-        for rs, rl in row_runs:
-            # Construct a dict with the shape and a flattened list
-            chunk = data[rr : rr + rl]
-            chunk = {"shape": chunk.shape, "array": chunk.ravel().tolist()}
-            putcol(column, chunk, blc, trc, startrow=rs, nrow=rl)
-            rr += rl
-
-        table.flush()
-
-    finally:
-        table.unlock()
-
-
-def multidim_dict_putvarcol(row_runs, blc, trc, table_future, column, data):
-    """Put data into the table"""
-    if row_runs.shape[0] != 1:
-        raise ValueError("Row runs unsupported for dictionary data")
-
-    table = table_future.result()
-    putvarcol = table.putvarcol
-    table.lock(write=True)
-
-    try:
-        putvarcol(column, data, startrow=row_runs[0, 0], nrow=row_runs[0, 1])
-        table.flush()
-    finally:
-        table.unlock()
-
-
-def dict_putvarcol(row_runs, table_future, column, data):
-    return multidim_dict_putvarcol(row_runs, None, None, table_future, column, data)
-
-
 def putter_wrapper(row_orders, *args):
     """
-    Wrapper which should run I/O operations within
-    the table_proxy's associated executor
+    Write a chunk of ``column`` into the table.
 
     Returns
     -------
@@ -147,21 +45,13 @@ def putter_wrapper(row_orders, *args):
     # Infer number of shape arguments
     nextent_args = len(args) - 3
     # Extract other arguments
-    table_proxy, column, data = args[nextent_args:]
+    casa_table, column, data = args[nextent_args:]
 
     # Handle dask compute_meta gracefully
     if len(row_orders) == 0:
         return np.empty((0,) * nextent_args, dtype=bool)
 
     row_runs, resort = row_orders
-
-    # NOTE(sjperkins)
-    # python-casacore wants to put lists of objects, but
-    # because dask.array handles ndarrays we're passed
-    # ndarrays of python objects (strings).
-    # Without this conversion python-casacore can segfault
-    # See https://github.com/ska-sa/dask-ms/issues/42
-    multidim_str = False
     dict_data = False
 
     if isinstance(data, dict):
@@ -171,15 +61,14 @@ def putter_wrapper(row_orders, *args):
         # array metadata is plainly incorrect as a dict isn't a valid
         # numpy array representation, so we heuristically guess the
         # output shape here.
-        # Dimension slicing is also not supported as
-        # putvarcol doesn't support it in any case.
+        # Dimension slicing is not supported for variably shaped data.
         if nextent_args > 0:
             raise ValueError(
                 "Chunked writes for secondary dimensions "
                 "unsupported for dictionary data"
             )
 
-        out_shape = (1,) * max(len(v.shape) for v in data.values())
+        out_shape = (1,) * max(len(np.asarray(v).shape) for v in data.values())
         dict_data = True
 
         if resort is not None:
@@ -194,43 +83,32 @@ def putter_wrapper(row_orders, *args):
 
         if resort is not None:
             data = data[resort]
-
-        # NOTE(sjperkins)
-        # The convention here is that an object dtype implies an
-        # array of string objects
-        if data.dtype == object:
-            if data.ndim > 1:
-                # Multi-dimensional strings,
-                # we need to pass dicts through
-                multidim_str = True
-            else:
-                # We can just a list of string through
-                data = data.tolist()
-
-    # There are other dimensions beside row
-    if nextent_args > 0:
-        blc, trc = zip(*args[:nextent_args])
-        fn = (
-            multidim_str_putcolslice
-            if multidim_str
-            else multidim_dict_putvarcol
-            if dict_data
-            else ndarray_putcolslice
-        )
-        table_proxy._ex.submit(
-            fn, row_runs, blc, trc, table_proxy._table_future, column, data
-        ).result()
     else:
-        fn = (
-            multidim_str_putcol
-            if multidim_str
-            else dict_putvarcol
-            if dict_data
-            else ndarray_putcol
-        )
-        table_proxy._ex.submit(
-            fn, row_runs, table_proxy._table_future, column, data
-        ).result()
+        raise TypeError(f"data {type(data)} must be a numpy array or dict")
+
+    table = casa_table.instance
+
+    if dict_data:
+        # Variably shaped rows differ in shape from one another, so each
+        # is written individually -- arcae can only address a ragged
+        # column one row at a time
+        if row_runs.shape[0] != 1:
+            raise ValueError("Row runs unsupported for dictionary data")
+
+        startrow = int(row_runs[0, 0])
+
+        for i in range(len(data)):
+            value = np.asarray(data["r%d" % (i + 1)])
+            # Restore the leading row dimension for scalar cells
+            if value.ndim == 0:
+                value = value[None]
+            row = startrow + i
+            table.putcol(column, value, index=(slice(row, row + 1),))
+    else:
+        # args[:nextent_args] is one inclusive (blc, trc) pair per
+        # non-row dimension of the column
+        index = build_index(row_runs, args[:nextent_args])
+        table.putcol(column, data, index=index)
 
     return np.full(out_shape, True)
 
@@ -245,14 +123,7 @@ def descriptor_builder(table, descriptor):
 
 
 def _writable_table_proxy(table_name):
-    return TableProxy(
-        ct.table,
-        table_name,
-        ack=False,
-        readonly=False,
-        lockoptions="user",
-        __executor_key__=executor_key(table_name),
-    )
+    return CasaTable.from_table(table_name, ninstances=ninstances(), readonly=False)
 
 
 def _create_table(table_name, datasets, columns, descriptor):
@@ -270,8 +141,7 @@ def _create_table(table_name, datasets, columns, descriptor):
         table_path = str(table_path)
 
         # Create the MS
-        with ct.default_ms(table_path, tabdesc=table_desc, dminfo=dminfo):
-            pass
+        create_ms(table_path, table_desc=table_desc, dminfo=dminfo).close()
 
         return _writable_table_proxy(table_path)
     elif subtable:
@@ -285,32 +155,34 @@ def _create_table(table_name, datasets, columns, descriptor):
 
         # Create the subtable
         if isinstance(builder, MSSubTableDescriptorBuilder):
-            with ct.default_ms_subtable(
-                subtable, subtable_path, tabdesc=table_desc, dminfo=dminfo
-            ):
-                pass
+            # arcae links a standard subtable into its parent's keyword
+            # set as part of creating it
+            create_ms(
+                str(table_path),
+                subtable=subtable,
+                table_desc=table_desc,
+                dminfo=dminfo,
+            ).close()
         else:
-            with ct.table(subtable_path, table_desc, dminfo=dminfo, ack=False):
-                pass
+            create_table(subtable_path, table_desc=table_desc, dminfo=dminfo).close()
 
-        # Add subtable to the main table
-        table_proxy = _writable_table_proxy(str(table_path))
-        table_proxy.putkeywords({subtable: "Table: " + subtable_path}).result()
-        del table_proxy
+            # A non-standard subtable must be registered against the
+            # main table by hand
+            table_proxy = _writable_table_proxy(str(table_path))
+            table_proxy.instance.putkeywords({subtable: "Table: " + subtable_path})
+            del table_proxy
 
-        # Return TableProxy
         return _writable_table_proxy(subtable_path)
     else:
         # Create the table
-        with ct.table(str(table_path), table_desc, dminfo=dminfo, ack=False):
-            pass
+        create_table(str(table_path), table_desc=table_desc, dminfo=dminfo).close()
 
         return _writable_table_proxy(str(table_path))
 
 
 def _updated_table(table, datasets, columns, descriptor):
     table_proxy = _writable_table_proxy(table)
-    table_columns = set(table_proxy.colnames().result())
+    table_columns = set(table_proxy.instance.columns())
     missing = set(columns) - table_columns
 
     # Add missing columns to the table
@@ -332,7 +204,7 @@ def _updated_table(table, datasets, columns, descriptor):
         table_desc = builder.descriptor(variables, default_desc)
 
         # Original Data Manager Groups
-        odminfo = {g["NAME"] for g in table_proxy.getdminfo().result().values()}
+        odminfo = {g["NAME"] for g in table_proxy.instance.getdminfo().values()}
         SENTINEL = object()
 
         # NOTE(JSKenyon): Add columns one at a time - this avoids issues when
@@ -344,13 +216,13 @@ def _updated_table(table, datasets, columns, descriptor):
                 v.get("NAME", SENTINEL) in odminfo for v in _dminfo.values()
             )
             _dminfo = {} if in_odminfo else _dminfo
-            table_proxy.addcols(_table_desc, dminfo=_dminfo).result()
+            table_proxy.instance.addcols(_table_desc, _dminfo)
 
     return table_proxy
 
 
 def _add_row_wrapper(table, rows, checkrow=-1):
-    startrow = table.nrows()
+    startrow = table.nrow()
 
     if checkrow != -1 and startrow != checkrow:
         raise ValueError("Inconsistent starting row %d %d" % (startrow, checkrow))
@@ -382,7 +254,7 @@ def add_row_orders(data, table_proxy, prev=None):
         should contain the number of rows.
         If a dict, the number of rows is
         set to the length of the dict.
-    table_proxy : :class:`daskms.table_proxy.TableProxy`
+    table_proxy : :class:`daskms.casa_table.CasaTable`
         Table Proxy object
     prev : tuple or None
         Previous row run array. This argument serves two purposes:
@@ -414,15 +286,21 @@ def add_row_orders(data, table_proxy, prev=None):
     else:
         raise TypeError(f"data {type(data)} must be a numpy array or dict")
 
+    # NOTE(sjperkins)
+    # arcae serialises writes onto a single instance, but reading the row
+    # count and then adding rows is still check-then-act, so these calls
+    # are chained sequentially by add_row_order_factory rather than run
+    # concurrently.
+    #
     # This is the first link in the chain
     if prev is None:
-        return table_proxy.submit(_add_row_wrapper, WRITELOCK, rows, -1).result()
+        return _add_row_wrapper(table_proxy.instance, rows, -1)
     else:
         # There's a previous link in the chain
         prev_runs, _ = prev
         startrow = prev_runs.sum()
 
-        return table_proxy.submit(_add_row_wrapper, WRITELOCK, rows, startrow).result()
+        return _add_row_wrapper(table_proxy.instance, rows, startrow)
 
 
 def add_row_order_factory(table_proxy, datasets):
@@ -574,9 +452,7 @@ def _write_datasets(
     row_orders = []
 
     # Put table and column keywords
-    table_proxy.submit(
-        _put_keywords, WRITELOCK, table_keywords, column_keywords
-    ).result()
+    _put_keywords(table_proxy.instance, table_keywords, column_keywords)
 
     # Sort datasets on (not has "ROWID", index) such that
     # datasets with ROWID's are handled first, while
@@ -631,7 +507,7 @@ def _write_datasets(
             try:
                 variable = ds.data_vars[column]
             except KeyError:
-                log.warning("Ignoring '%s' not present " "on dataset %d" % (column, di))
+                log.warning("Ignoring '%s' not present on dataset %d" % (column, di))
                 continue
             else:
                 full_dims = variable.dims
@@ -726,7 +602,7 @@ def _put_keywords(table, table_keywords, column_keywords):
             if v == DELKW:
                 table.removekeyword(k)
             else:
-                table.putkeyword(k, v)
+                table.putkeywords({k: v})
 
     if column_keywords is not None:
         for column, keywords in column_keywords.items():
@@ -734,7 +610,7 @@ def _put_keywords(table, table_keywords, column_keywords):
                 if v == DELKW:
                     table.removecolkeyword(column, k)
                 else:
-                    table.putcolkeyword(column, k, v)
+                    table.putcolkeywords(column, {k: v})
 
     return True
 

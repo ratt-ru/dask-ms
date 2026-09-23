@@ -139,7 +139,7 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
         Raised if inferring metadata failed.
     """
     try:
-        coldesc = table_proxy.getcoldesc(column).result()
+        coldesc = table_proxy.instance.getcoldesc(column)
     except Exception as e:
         raise ColumnMetadataError(
             f"Unable to obtain column descriptor for column '{column}'"
@@ -161,8 +161,7 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
     # but the effort may not be worth it
     if ndim == 0:
         raise ColumnMetadataError(
-            f"Scalars in column '{column}' "
-            f"(ndim == {ndim}) are not currently handled"
+            f"Scalars in column '{column}' (ndim == {ndim}) are not currently handled"
         )
     # Only row dimensions
     elif ndim == "row":
@@ -181,8 +180,11 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
     # Variably shaped...
     else:
         try:
-            # Get an exemplar row and infer the shape
-            exemplar = table_proxy.getcell(column, exemplar_row).result()
+            # Get an exemplar row and infer the shape.
+            # A single-row read also works for ragged columns, which
+            # arcae cannot read across multiple rows
+            index = (slice(exemplar_row, exemplar_row + 1),)
+            exemplar = table_proxy.instance.getcol(column, index=index)[0]
         except Exception as e:
             raise ColumnMetadataError(
                 f"Unable to infer shape of column '{column}'"
@@ -277,8 +279,9 @@ def dim_extents_array(dim, chunks):
     -------
     dim_extents : :class:`dask.array.Array`
         dask array where each chunk contains a single (start, end) tuple
-        defining the start and end of the chunk. The end is inclusive
-        in the python-casacore style.
+        defining the start and end of the chunk. The end is inclusive;
+        :func:`daskms.casa_table.build_index` converts these extents into
+        the half-open slices that arcae expects.
 
         The array chunks match ``chunks`` and are inaccurate, but
         are used to define chunk sizes of final outputs.

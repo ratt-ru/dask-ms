@@ -14,8 +14,8 @@ from daskms.columns import (
     dim_extents_array,
     infer_dtype,
 )
+from daskms.casa_table import CasaTable, build_index, ninstances
 from daskms.constants import DASKMS_PARTITION_KEY
-from daskms.patterns import lazy_import
 from daskms.ordering import (
     ordering_taql,
     row_ordering,
@@ -24,126 +24,26 @@ from daskms.ordering import (
 )
 from daskms.optimisation import inlined_array
 from daskms.dataset import Dataset
-from daskms.table_executor import executor_key
 from daskms.table import table_exists
-from daskms.table_proxy import TableProxy, READLOCK
 from daskms.table_schemas import lookup_table_schema
 from daskms.utils import table_path_split
 
 _DEFAULT_ROW_CHUNKS = 10000
 
-ct = lazy_import("casacore.tables")
-
 log = logging.getLogger(__name__)
 
 
-def ndarray_getcol(row_runs, table_future, column, result, dtype):
-    """Get numpy array data"""
-    table = table_future.result()
-    getcolnp = table.getcolnp
-    rr = 0
-
-    table.lock(write=False)
-
-    try:
-        for rs, rl in row_runs:
-            getcolnp(column, result[rr : rr + rl], startrow=rs, nrow=rl)
-            rr += rl
-    finally:
-        table.unlock()
-
-    return result
-
-
-def ndarray_getcolslice(row_runs, table_future, column, result, blc, trc, dtype):
-    """Get numpy array data"""
-    table = table_future.result()
-    getcolslicenp = table.getcolslicenp
-    rr = 0
-
-    table.lock(write=False)
-
-    try:
-        for rs, rl in row_runs:
-            getcolslicenp(
-                column, result[rr : rr + rl], blc=blc, trc=trc, startrow=rs, nrow=rl
-            )
-            rr += rl
-    finally:
-        table.unlock()
-
-    return result
-
-
-def object_getcol(row_runs, table_future, column, result, dtype):
-    """Get object list data"""
-    table = table_future.result()
-    getcol = table.getcol
-    rr = 0
-
-    table.lock(write=False)
-
-    try:
-        for rs, rl in row_runs:
-            data = getcol(column, rs, rl)
-
-            # Multi-dimensional string arrays are returned as a
-            # dict with 'array' and 'shape' keys. Massage the data.
-            if isinstance(data, dict):
-                data = np.asarray(data["array"], dtype=dtype).reshape(data["shape"])
-
-            # NOTE(sjperkins)
-            # Dask wants ndarrays internally, so we asarray objects
-            # the returning list of objects.
-            # See https://github.com/ska-sa/dask-ms/issues/42
-            result[rr : rr + rl] = np.asarray(data, dtype=dtype)
-
-            rr += rl
-    finally:
-        table.unlock()
-
-    return result
-
-
-def object_getcolslice(row_runs, table_future, column, result, blc, trc, dtype):
-    """Get object list data"""
-    table = table_future.result()
-    getcolslice = table.getcolslice
-    rr = 0
-
-    table.lock(write=False)
-
-    try:
-        for rs, rl in row_runs:
-            data = getcolslice(column, blc, trc, startrow=rs, nrow=rl)
-
-            # Multi-dimensional string arrays are returned as a
-            # dict with 'array' and 'shape' keys. Massage the data.
-            if isinstance(data, dict):
-                data = np.asarray(data["array"], dtype=dtype).reshape(data["shape"])
-
-            # NOTE(sjperkins)
-            # Dask wants ndarrays internally, so we asarray objects
-            # the returning list of objects.
-            # See https://github.com/ska-sa/dask-ms/issues/42
-            result[rr : rr + rl] = np.asarray(data, dtype=dtype)
-
-            rr += rl
-    finally:
-        table.unlock()
-
-    return result
-
-
 def getter_wrapper(row_orders, *args):
-    """
-    Wrapper running I/O operations
-    within the table_proxy's associated executor
+    """Read a chunk of ``column`` out of the table.
+
+    arcae reads a whole chunk in a single call: the row runs and the
+    per-dimension chunk extents are combined into one index, and the data
+    is read directly into the output buffer.
     """
     # Infer number of shape arguments
     nextent_args = len(args) - 4
     # Extract other arguments
-    table_proxy, column, col_shape, dtype = args[nextent_args:]
+    casa_table, column, col_shape, dtype = args[nextent_args:]
 
     # Handle dask compute_meta gracefully
     if len(row_orders) == 0:
@@ -151,42 +51,33 @@ def getter_wrapper(row_orders, *args):
 
     row_runs, resort = row_orders
 
-    # In this case, we've been passed dimension extent arrays
-    # that define a slice of the column and we defer to getcolslice.
+    # args[:nextent_args] is one inclusive (blc, trc) pair per non-row
+    # dimension of the column, defining the extent of this chunk
+    extents = args[:nextent_args]
+
     if nextent_args > 0:
-        blc, trc = zip(*args[:nextent_args])
-        shape = tuple(t - b + 1 for b, t in zip(blc, trc))
-        result = np.empty((np.sum(row_runs[:, 1]),) + shape, dtype=dtype)
-
-        if result.size == 0:
-            return result
-
-        io_fn = object_getcolslice if np.dtype == object else ndarray_getcolslice
-
-        # Submit table I/O on executor
-        future = table_proxy._ex.submit(
-            io_fn, row_runs, table_proxy._table_future, column, result, blc, trc, dtype
-        )
-    # In this case, the full resolution data
-    # for each row is requested, so we defer to getcol
+        shape = tuple(trc - blc + 1 for blc, trc in extents)
+    # Otherwise the full resolution data for each row is requested
     else:
-        result = np.empty((np.sum(row_runs[:, 1]),) + col_shape, dtype=dtype)
+        shape = col_shape
 
-        if result.size == 0:
-            return result
+    result = np.empty((int(row_runs[:, 1].sum()),) + tuple(shape), dtype=dtype)
 
-        io_fn = object_getcol if dtype == object else ndarray_getcol
+    if result.size == 0:
+        return result
 
-        # Submit table I/O on executor
-        future = table_proxy._ex.submit(
-            io_fn, row_runs, table_proxy._table_future, column, result, dtype
-        )
+    index = build_index(row_runs, extents)
+    table = casa_table.instance
+
+    if dtype == object:
+        # String columns come back as object arrays, which arcae cannot
+        # write into a pre-allocated buffer
+        result[:] = table.getcol(column, index=index)
+    else:
+        table.getcol(column, index=index, result=result)
 
     # Resort result if necessary
-    if resort is not None:
-        return future.result()[resort]
-
-    return future.result()
+    return result[resort] if resort is not None else result
 
 
 def _dataset_variable_factory(
@@ -200,7 +91,7 @@ def _dataset_variable_factory(
 
     Parameters
     ----------
-    table_proxy : :class:`daskms.table_proxy.TableProxy`
+    table_proxy : :class:`daskms.casa_table.CasaTable`
         Table proxy object
     table_schema : dict
         Table schema
@@ -241,17 +132,12 @@ def _dataset_variable_factory(
 
         # We only need to pass in dimension extent arrays if
         # there is more than one chunk in any of the non-row columns.
-        # In that case, we can getcol, otherwise getcolslice is required
+        # Otherwise the whole of each row is read.
         if not all(len(c) == 1 for c in meta.chunks):
             for d, c in zip(meta.dims, meta.chunks):
                 # Create an array describing the dimension chunk extents
                 args.append(dim_extents_array(d, c))
                 args.append((d,))
-
-            # Disable getcolslice caching
-            # https://github.com/ska-sa/dask-ms/issues/92
-            # https://github.com/casacore/casacore/issues/1018
-            table_proxy.setmaxcachesize(column, 1).result()
 
             new_axes = {}
         else:
@@ -291,7 +177,7 @@ def _dataset_variable_factory(
 
 def _col_keyword_getter(table):
     """Gets column keywords for all columns in table"""
-    return {c: table.getcolkeywords(c) for c in table.colnames()}
+    return {c: table.getcolkeywords(c) for c in table.columns()}
 
 
 class DatasetFactory(object):
@@ -323,14 +209,9 @@ class DatasetFactory(object):
         if len(kwargs) > 0:
             raise ValueError(f"Unhandled kwargs: {kwargs}")
 
-    def _table_proxy_factory(self):
-        return TableProxy(
-            ct.table,
-            self.table_path,
-            ack=False,
-            readonly=True,
-            lockoptions="user",
-            __executor_key__=executor_key(self.canonical_name),
+    def _casa_table_factory(self):
+        return CasaTable.from_table(
+            self.table_path, ninstances=ninstances(), readonly=True
         )
 
     def _table_schema(self):
@@ -341,7 +222,7 @@ class DatasetFactory(object):
         short_table_name = "/".join((t, s)) if s else t
 
         table_schema = self._table_schema()
-        select_cols = set(self.select_cols or table_proxy.colnames().result())
+        select_cols = set(self.select_cols or table_proxy.instance.columns())
         variables = _dataset_variable_factory(
             table_proxy,
             table_schema,
@@ -376,7 +257,7 @@ class DatasetFactory(object):
         assert len(group_ids) == len(orders)
 
         # Select columns, excluding grouping columns
-        select_cols = set(self.select_cols or table_proxy.colnames().result())
+        select_cols = set(self.select_cols or table_proxy.instance.columns())
         select_cols -= set(self.group_cols)
 
         # Create a dataset for each group
@@ -482,7 +363,7 @@ class DatasetFactory(object):
         )
 
     def datasets(self):
-        table_proxy = self._table_proxy_factory()
+        table_proxy = self._casa_table_factory()
 
         # No grouping case
         if len(self.group_cols) == 0:
@@ -524,14 +405,14 @@ class DatasetFactory(object):
                 order_taql, self.group_cols, self.index_cols, self.chunks
             )
 
-            groups = [order_taql.getcol(g).result() for g in self.group_cols]
+            groups = [order_taql.instance.getcol(g) for g in self.group_cols]
             # Cast to actual column dtype
             group_types = [
-                infer_dtype(c, table_proxy.getcoldesc(c).result())
+                infer_dtype(c, table_proxy.instance.getcoldesc(c))
                 for c in self.group_cols
             ]
             groups = [g.astype(t) for g, t in zip(groups, group_types)]
-            exemplar_rows = order_taql.getcol("__firstrow__").result()
+            exemplar_rows = order_taql.instance.getcol("__firstrow__")
             assert len(orders) == len(exemplar_rows)
 
             datasets = self._group_datasets(table_proxy, groups, exemplar_rows, orders)
@@ -539,11 +420,10 @@ class DatasetFactory(object):
         ret = (datasets,)
 
         if self.table_keywords is True:
-            ret += (table_proxy.getkeywords().result(),)
+            ret += (table_proxy.instance.getkeywords(),)
 
         if self.column_keywords is True:
-            keywords = table_proxy.submit(_col_keyword_getter, READLOCK)
-            ret += (keywords.result(),)
+            ret += (_col_keyword_getter(table_proxy.instance),)
 
         if self.table_proxy is True:
             ret += (table_proxy,)

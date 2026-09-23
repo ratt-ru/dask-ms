@@ -19,7 +19,7 @@ from daskms.constants import DASKMS_PARTITION_KEY
 from daskms.dask_ms import xds_from_ms, xds_from_table, xds_to_table
 from daskms.patterns import lazy_import
 from daskms.query import orderby_clause, where_clause
-from daskms.table_proxy import TableProxy, taql_factory
+from daskms.casa_table import CasaTable
 from daskms.utils import (
     group_cols_str,
     index_cols_str,
@@ -70,16 +70,17 @@ def test_ms_read(ms, group_cols, index_cols, select_cols):
     order = orderby_clause(index_cols)
     np_column_data = []
 
-    with TableProxy(ct.table, ms, lockoptions="auto", ack=False) as T:
-        for ds in xds:
-            assert "ROWID" in ds.coords
-            group_col_values = [ds.attrs[a] for a in group_cols]
-            where = where_clause(group_cols, group_col_values)
-            query = f"SELECT * FROM $1 {where} {order}"
+    T = CasaTable.from_table(ms, readonly=True)
 
-            with TableProxy(taql_factory, query, tables=[T]) as Q:
-                column_data = {c: Q.getcol(c).result() for c in select_cols}
-                np_column_data.append(column_data)
+    for ds in xds:
+        assert "ROWID" in ds.coords
+        group_col_values = [ds.attrs[a] for a in group_cols]
+        where = where_clause(group_cols, group_col_values)
+        query = f"SELECT * FROM $1 {where} {order}"
+
+        Q = CasaTable.from_taql(query, (T,))
+        column_data = {c: Q.instance.getcol(c) for c in select_cols}
+        np_column_data.append(column_data)
 
     del T
 
@@ -111,12 +112,12 @@ def test_ms_read(ms, group_cols, index_cols, select_cols):
 @pytest.mark.parametrize("select_cols", [["DATA", "STATE_ID"]])
 def test_ms_update(ms, group_cols, index_cols, select_cols):
     # Zero everything to be sure
-    with TableProxy(ct.table, ms, readonly=False, lockoptions="auto", ack=False) as T:
-        nrows = T.nrows().result()
-        T.putcol("STATE_ID", np.full(nrows, 0, dtype=np.int32)).result()
-        data = np.zeros_like(T.getcol("DATA").result())
+    with CasaTable.from_table(ms, readonly=False).instance as T:
+        nrows = T.nrow()
+        T.putcol("STATE_ID", np.full(nrows, 0, dtype=np.int32))
+        data = np.zeros_like(T.getcol("DATA"))
         data_dtype = data.dtype
-        T.putcol("DATA", data).result()
+        T.putcol("DATA", data)
 
     xds = xds_from_ms(
         ms,
@@ -183,11 +184,11 @@ def test_ms_update(ms, group_cols, index_cols, select_cols):
     ids=index_cols_str,
 )
 def test_row_query(ms, index_cols):
-    T = TableProxy(ct.table, ms, readonly=True, lockoptions="auto", ack=False)
+    T = CasaTable.from_table(ms, readonly=True)
 
     # Get the expected row ordering by lexically
     # sorting the indexing columns
-    cols = [(name, T.getcol(name).result()) for name in index_cols]
+    cols = [(name, T.instance.getcol(name)) for name in index_cols]
     expected_rows = np.lexsort(tuple(c for n, c in reversed(cols)))
 
     del T

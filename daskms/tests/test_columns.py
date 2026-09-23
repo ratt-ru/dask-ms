@@ -11,7 +11,7 @@ from daskms.columns import (
     column_metadata,
 )
 from daskms.patterns import lazy_import
-from daskms.table_proxy import TableProxy
+from daskms.casa_table import CasaTable
 from daskms.utils import assert_liveness
 
 ct = lazy_import("casacore.tables")
@@ -54,7 +54,7 @@ def test_missing_valuetype():
     ],
 )
 def test_column_metadata(ms, column, shape, chunks, table_schema, dtype):
-    table_proxy = TableProxy(ct.table, ms, readonly=True, ack=False)
+    table_proxy = CasaTable.from_table(ms, readonly=True)
     assert_liveness(1, 1)
 
     try:

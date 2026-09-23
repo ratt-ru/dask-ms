@@ -6,9 +6,9 @@ from dask.array.core import normalize_chunks
 from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 
+from daskms.casa_table import CasaTable
 from daskms.query import select_clause, groupby_clause, orderby_clause
 from daskms.optimisation import cached_array
-from daskms.table_proxy import TableProxy, taql_factory
 
 
 class GroupChunkingError(Exception):
@@ -58,7 +58,8 @@ def row_run_factory(rows, sort="auto", sort_dir="read"):
 
 
 def _sorted_rows(taql_proxy, startrow, nrow):
-    return taql_proxy.getcol("__tablerow__", startrow=startrow, nrow=nrow).result()
+    index = (slice(startrow, startrow + nrow),)
+    return taql_proxy.instance.getcol("__tablerow__", index=index)
 
 
 def ordering_taql(table_proxy, index_cols, taql_where=""):
@@ -70,16 +71,11 @@ def ordering_taql(table_proxy, index_cols, taql_where=""):
 
     query = f"{select}\nFROM\n\t$1{taql_where}{orderby}"
 
-    return TableProxy(
-        taql_factory,
-        query,
-        tables=[table_proxy],
-        __executor_key__=table_proxy.executor_key,
-    )
+    return CasaTable.from_taql(query, (table_proxy,))
 
 
 def row_ordering(taql_proxy, index_cols, chunks):
-    nrows = taql_proxy.nrows().result()
+    nrows = taql_proxy.instance.nrow()
     chunks = normalize_chunks(chunks["row"], shape=(nrows,))
     token = dask.base.tokenize(taql_proxy, index_cols, chunks, nrows)
     name = "rows-" + token
@@ -101,8 +97,11 @@ def row_ordering(taql_proxy, index_cols, chunks):
 
 def _sorted_group_rows(taql_proxy, group, index_cols):
     """Returns group rows sorted according to index_cols"""
-    rows = taql_proxy.getcellslice("__tablerow__", group, (-1,), (-1,))
-    rows = rows.result()
+    # The aggregated columns are ragged -- each group holds a different
+    # number of rows -- so they must be read a single row at a time
+    table = taql_proxy.instance
+    index = (slice(group, group + 1),)
+    rows = table.getcol("__tablerow__", index=index)[0]
 
     # No sorting, return early
     if len(index_cols) == 0:
@@ -110,11 +109,11 @@ def _sorted_group_rows(taql_proxy, group, index_cols):
 
     # Sort rows according to group indexing columns
     sort_columns = [
-        taql_proxy.getcell("GROUP_" + c, group) for c in reversed(index_cols)
+        table.getcol(f"GROUP_{c}", index=index)[0] for c in reversed(index_cols)
     ]
 
     # Return sorted rows
-    return rows[np.lexsort([c.result() for c in sort_columns])]
+    return rows[np.lexsort(sort_columns)]
 
 
 def _group_ordering_arrays(
@@ -164,7 +163,7 @@ def _group_ordering_arrays(
 
 def group_ordering_taql(table_proxy, group_cols, index_cols, taql_where=""):
     if len(group_cols) == 0:
-        raise ValueError("group_ordering_taql requires " "len(group_cols) > 0")
+        raise ValueError("group_ordering_taql requires len(group_cols) > 0")
     else:
         index_group_cols = [f"GAGGR({c}) as GROUP_{c}" for c in index_cols]
         # Group Row ID's
@@ -182,18 +181,13 @@ def group_ordering_taql(table_proxy, group_cols, index_cols, taql_where=""):
 
         query = f"{select}\nFROM\n\t$1{taql_where}\n{groupby}"
 
-        return TableProxy(
-            taql_factory,
-            query,
-            tables=[table_proxy],
-            __executor_key__=table_proxy.executor_key,
-        )
+        return CasaTable.from_taql(query, (table_proxy,))
 
     raise RuntimeError("Invalid condition in group_ordering_taql")
 
 
 def group_row_ordering(group_order_taql, group_cols, index_cols, chunks):
-    nrows = group_order_taql.getcol("__tablerows__").result()
+    nrows = group_order_taql.instance.getcol("__tablerows__")
 
     ordering_arrays = []
 
@@ -209,7 +203,7 @@ def group_row_ordering(group_order_taql, group_cols, index_cols, chunks):
             # Extract row chunking scheme
             group_row_chunks = group_chunks["row"]
         except KeyError:
-            raise ValueError(f"No row chunking scheme " f"found in {group_chunks}!")
+            raise ValueError(f"No row chunking scheme found in {group_chunks}!")
 
         ordering_arrays.append(
             _group_ordering_arrays(

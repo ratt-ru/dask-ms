@@ -5,6 +5,8 @@ import inspect
 from collections.abc import Callable
 from typing import ClassVar, Hashable, Mapping, Sequence, Set, Type, Any, Dict, Tuple
 
+from weakref import WeakSet
+
 from cacheout import Cache
 from numpy import ndarray
 
@@ -20,6 +22,12 @@ def freeze(arg: Any) -> Any:
     if isinstance(arg, (str, bytes)):
         # str and bytes are sequences, return early to avoid tuplification
         return arg
+
+    # A multiton handle is represented by its own key. Retaining the
+    # handle itself would keep it alive for as long as anything derived
+    # from it stays in the instance cache
+    if isinstance(type(arg), MultitonMetaclass):
+        return arg._key
 
     if isinstance(arg, Sequence):
         return tuple(map(freeze, arg))
@@ -119,6 +127,9 @@ class MultitonMetaclass(type):
             self._factory = factory
             self._args, self._kw = normalise_args(factory, args, kw)
             self._key = FrozenKey(factory, *self._args, **self._kw)
+            # Track live handles so that their lifetime can be asserted
+            # independently of the instance cache
+            type(self)._INSTANCES.add(self)
 
         def __reduce__(self) -> Tuple[Callable, Tuple]:
             return (type(self).reduce_from_args, (self._factory, self._args, self._kw))
@@ -133,10 +144,15 @@ class MultitonMetaclass(type):
 
         @property
         def instance(self) -> Any:
-            return self._CACHE.get(self, self._create_instance)
+            # NOTE: the cache is keyed on the FrozenKey rather than on
+            # self, so that caching an instance does not keep the handle
+            # that produced it alive
+            return self._CACHE.get(
+                self._key, lambda _: self._factory(*self._args, **self._kw)
+            )
 
         def release(self) -> bool:
-            return self._CACHE.delete(self) > 0
+            return self._CACHE.delete(self._key) > 0
 
         namespace["__init__"] = __init__
         namespace["__reduce__"] = __reduce__
@@ -145,8 +161,9 @@ class MultitonMetaclass(type):
         namespace["instance"] = instance
         namespace["release"] = release
 
-        # Configure the class to be slotted
-        namespace["__slots__"] = ("_factory", "_args", "_kw", "_key")
+        # Configure the class to be slotted.
+        # __weakref__ is required for the live handle registry
+        namespace["__slots__"] = ("_factory", "_args", "_kw", "_key", "__weakref__")
 
         # Create the class
         cls = super().__new__(meta_cls, name, bases, namespace)
@@ -161,6 +178,10 @@ class MultitonMetaclass(type):
         cache_params.setdefault("on_delete", on_delete)
 
         cls._CACHE = cache_cls(**cache_params)
+
+        # Registry of live handles. Entries disappear once the last
+        # reference to a handle is dropped
+        cls._INSTANCES = WeakSet()
 
         # Define class and static methods for inclusion on the class
         def reduce_from_args(cls, factory, args, kw):
@@ -178,5 +199,6 @@ class MultitonMetaclass(type):
         cls.__annotations__["_kw"] = Mapping[str, Any]
         cls.__annotations__["_key"] = FrozenKey
         cls.__annotations__["_CACHE"] = ClassVar[cache_cls]
+        cls.__annotations__["_INSTANCES"] = ClassVar[WeakSet]
 
         return cls

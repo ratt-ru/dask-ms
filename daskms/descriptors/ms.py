@@ -8,11 +8,8 @@ from daskms.descriptors.builder import (
     register_descriptor_builder,
     AbstractDescriptorBuilder,
 )
+from daskms.casa_table import ms_descriptor
 from daskms.dataset import data_var_sizes, DimensionInferenceError
-from daskms.patterns import lazy_import
-
-ct = lazy_import("casacore.tables")
-
 
 log = logging.getLogger(__name__)
 
@@ -32,8 +29,8 @@ class MSDescriptorBuilder(AbstractDescriptorBuilder):
 
     def __init__(self, fixed=True):
         super(AbstractDescriptorBuilder, self).__init__()
-        self.DEFAULT_MS_DESC = ct.complete_ms_desc()
-        self.REQUIRED_FIELDS = set(ct.required_ms_desc().keys())
+        self.DEFAULT_MS_DESC = ms_descriptor("MAIN", complete=True)
+        self.REQUIRED_FIELDS = set(ms_descriptor("MAIN", complete=False).keys())
         self.fixed = fixed
         self.ms_dims = None
 
@@ -213,8 +210,7 @@ class MSDescriptorBuilder(AbstractDescriptorBuilder):
 
             if np.nan in shape:
                 log.warning(
-                    f"Could not fix shape for column {col_name} "
-                    f"with np.nan in shape."
+                    f"Could not fix shape for column {col_name} with np.nan in shape."
                 )
                 continue
 
