@@ -4,6 +4,9 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Replace python-casacore with arcae in the CASA backend, removing the
+  ``TableProxy``/``Executor`` pair that serialised all I/O for a table onto a
+  single thread (:pr:`384`)
 * Introduce pytest != 9.1.0 version restriction (:pr:`375`)
 
 0.2.32 (2026-05-18)
