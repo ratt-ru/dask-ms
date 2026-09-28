@@ -7,6 +7,7 @@ X.Y.Z (YYYY-MM-DD)
 * Replace python-casacore with arcae in the CASA backend, removing the
   ``TableProxy``/``Executor`` pair that serialised all I/O for a table onto a
   single thread (:pr:`384`)
+* Drop Python 3.10 (:pr:`386`)
 * Replace the minio server with moto's ``ThreadedMotoServer`` in the test
   suite (:pr:`385`)
 * Serialise reads on a shared ``pyarrow.parquet.ParquetFile``, as concurrent
