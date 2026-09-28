@@ -14,18 +14,17 @@ CASA Support for NumPy
 ~~~~~~~~~~~~~~~~~~~~~~
 
 CASA Supports reading and writing Table data into
-Numpy arrays via the `python-casacore
-<https://github.com/casacore/python-casacore>`_ library.
+Numpy arrays via the `arcae <https://github.com/ratt-ru/arcae>`_ library.
 
 
 .. testcode::
 
-    import casacore.tables as pt
+    import arcae
     from daskms.example_data import example_ms
 
     ms_filename = example_ms()
 
-    with pt.table(ms_filename) as T:
+    with arcae.table(ms_filename) as T:
         ddid = T.getcol("DATA_DESC_ID")
         print(ddid)
         print(type(ddid))

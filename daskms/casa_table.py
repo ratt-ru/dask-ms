@@ -152,9 +152,7 @@ def clear_table_cache():
     ``ColumnSet::userLock``), so the close and the in-flight write end
     up waiting on each other.
     """
-    with Multiton._INSTANCE_LOCK:
-        Multiton._INSTANCE_CACHE.clear()
-        Multiton._EXPIRY_HEAP.clear()
+    Multiton.clear_cache()
 
 
 def close_cached_tables():
@@ -167,6 +165,9 @@ def close_cached_tables():
     """
     from arcae.lib.arrow_tables import Table
 
+    # Iterate the cache rather than the live handles: a handle's instance
+    # is built on first access, so asking the handles would open tables
+    # here purely to close them again.
     for entry in list(Multiton._INSTANCE_CACHE.values()):
         table = entry[0]
 
@@ -176,7 +177,7 @@ def close_cached_tables():
             except Exception:  # pragma: no cover - best effort
                 log.debug("Error closing %s", table, exc_info=True)
 
-    clear_table_cache()
+    Multiton.clear_cache(Table)
 
 
 @atexit.register

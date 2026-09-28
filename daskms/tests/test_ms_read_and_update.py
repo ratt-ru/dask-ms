@@ -17,7 +17,6 @@ except ImportError:
 from daskms.array_api_utils import _issubclass_fast
 from daskms.constants import DASKMS_PARTITION_KEY
 from daskms.dask_ms import xds_from_ms, xds_from_table, xds_to_table
-from daskms.patterns import lazy_import
 from daskms.query import orderby_clause, where_clause
 from daskms.casa_table import CasaTable
 from daskms.utils import (
@@ -27,7 +26,6 @@ from daskms.utils import (
     table_path_split,
 )
 
-ct = lazy_import("casacore.tables")
 
 PY_37_GTE = sys.version_info[:2] >= (3, 7)
 

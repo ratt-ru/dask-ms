@@ -5,7 +5,6 @@ import dask.array as da
 from numpy.testing import assert_array_equal
 import pytest
 
-from daskms.patterns import lazy_import
 from daskms.casa_table import CasaTable
 from daskms.ordering import (
     ordering_taql,
@@ -14,9 +13,6 @@ from daskms.ordering import (
     group_row_ordering,
 )
 from daskms.utils import group_cols_str, index_cols_str, assert_liveness
-
-
-ct = lazy_import("casacore.tables")
 
 
 def table_proxy(ms):
