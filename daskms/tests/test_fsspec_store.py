@@ -1,4 +1,3 @@
-from io import BytesIO
 import pickle
 
 import numpy as np
@@ -96,26 +95,25 @@ def test_store_subtable_access(tmp_path_factory):
 
 
 @pytest.mark.skipif(s3fs is None, reason="s3fs not installed")
-def test_minio_server(
+def test_s3_server(
     tmp_path,
-    py_minio_client,
-    minio_user_key,
-    minio_url,
+    s3_fs,
+    s3_key,
+    s3_url,
     s3_bucket_name,
 ):
     payload = "How now brown cow"
     stuff = tmp_path / "stuff.txt"
     stuff.write_text(payload)
 
-    py_minio_client.make_bucket(bucket_name=s3_bucket_name)
-    py_minio_client.fput_object(
-        bucket_name=s3_bucket_name, object_name="stuff.txt", file_path=str(stuff)
-    )
+    s3_fs.mkdir(s3_bucket_name)
+    s3_fs.put_file(str(stuff), f"{s3_bucket_name}/stuff.txt")
 
     s3 = s3fs.S3FileSystem(
-        key=minio_user_key,
-        secret=minio_user_key,
-        client_kwargs={"endpoint_url": minio_url, "region_name": "af-cpt"},
+        key=s3_key,
+        secret=s3_key,
+        client_kwargs={"endpoint_url": s3_url, "region_name": "af-cpt"},
+        skip_instance_cache=True,
     )
 
     with s3.open(f"{s3_bucket_name}/stuff.txt", "rb") as f:
@@ -125,28 +123,23 @@ def test_minio_server(
 @pytest.mark.skipif(s3fs is None, reason="s3fs not installed")
 def test_storage_options_from_config(
     tmp_path,
-    py_minio_client,
-    minio_user_key,
-    minio_url,
+    s3_fs,
+    s3_key,
+    s3_url,
     s3_bucket_name,
 ):
     filename = "test.txt"
     payload = "How now brown cow"
-    py_minio_client.make_bucket(bucket_name=s3_bucket_name)
-    py_minio_client.put_object(
-        bucket_name=s3_bucket_name,
-        object_name=f"subdir/{filename}",
-        data=BytesIO(payload.encode("utf-8")),
-        length=len(payload),
-    )
+    s3_fs.mkdir(s3_bucket_name)
+    s3_fs.pipe(f"{s3_bucket_name}/subdir/{filename}", payload.encode("utf-8"))
 
     url = f"s3://{s3_bucket_name}"
     config_file = tmp_path / "config.yaml"
     opts = {
-        "key": minio_user_key,
-        "secret": minio_user_key,
+        "key": s3_key,
+        "secret": s3_key,
         "client_kwargs": {
-            "endpoint_url": minio_url,
+            "endpoint_url": s3_url,
             "region_name": "af-south-1",
         },
     }

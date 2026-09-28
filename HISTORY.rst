@@ -7,6 +7,10 @@ X.Y.Z (YYYY-MM-DD)
 * Replace python-casacore with arcae in the CASA backend, removing the
   ``TableProxy``/``Executor`` pair that serialised all I/O for a table onto a
   single thread (:pr:`384`)
+* Replace the minio server with moto's ``ThreadedMotoServer`` in the test
+  suite (:pr:`385`)
+* Serialise reads on a shared ``pyarrow.parquet.ParquetFile``, as concurrent
+  reads from dask threads segfault (:pr:`385`)
 * Introduce pytest != 9.1.0 version restriction (:pr:`375`)
 
 0.2.32 (2026-05-18)

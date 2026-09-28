@@ -35,7 +35,7 @@ complete = [
 # independent oracle: a number of tests write through arcae and verify the
 # result through python-casacore, which is what catches divergence between
 # the two readers (the TaQL indexing style, for one).
-testing = ['minio >=7.2.0', 'pytest >=8.0.0, != 9.1.0', 'python-casacore >=3.7.0']
+testing = ['moto[server] >=5.0.0', 'pytest >=8.0.0, != 9.1.0', 'python-casacore >=3.7.0']
 dev = [
     "pre-commit>=4.3.0",
     "ruff>=0.14.0",

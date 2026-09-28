@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 
 import gc
+import logging
 import multiprocessing
 import os
-from pathlib import Path
-from subprocess import PIPE, Popen
-from urllib.parse import urlparse
+import socket
 from uuid import uuid4
 
 import numpy as np
@@ -252,9 +251,8 @@ def ant_table(tmp_path_factory, wsrt_antenna_positions):
     yield fn
 
 
-MINIO_ADMIN = "admin"
-MINIO_PASSWORD = "password"
-MINIO_URL = "http://127.0.0.1:9000"
+S3_KEY = "abcdef1234567890"
+S3_REGION = "af-cpt"
 
 
 @pytest.fixture(scope="function")
@@ -262,100 +260,43 @@ def s3_bucket_name():
     return f"test-bucket-{uuid4().hex[:8]}"
 
 
-@pytest.fixture
-def minio_url():
-    return MINIO_URL
-
-
-def find_executable(executable, path=None):
-    if not path:
-        paths = os.environ["PATH"].split(os.pathsep)
-
-        for path in map(Path, paths):
-            result = find_executable(executable, path=path)
-
-            if result:
-                return result
-    elif path.is_dir():
-        for child in path.iterdir():
-            result = find_executable(executable, child)
-
-            if result:
-                return result
-    elif path.is_file():
-        if path.stem == executable:
-            return path
-    else:
-        return None
-
-
 @pytest.fixture(scope="session")
-def minio_server(tmp_path_factory):
-    server_path = find_executable("minio")
+def s3_server():
+    """Starts a moto S3 server on a free local port, yielding its url"""
+    moto_server = pytest.importorskip("moto.server")
 
-    if not server_path:
-        pytest.skip('Unable to find "minio" server binary')
+    # The server logs every request, which is noisy under -s
+    logging.getLogger("werkzeug").setLevel(logging.WARNING)
 
-    data_dir = tmp_path_factory.mktemp("data")
-    args = [
-        str(server_path),
-        "server",
-        str(data_dir),
-        f"--address={urlparse(MINIO_URL).netloc}",
-    ]
-    env = {
-        "MINIO_ROOT_USER": MINIO_ADMIN,
-        "MINIO_ROOT_PASSWORD": MINIO_PASSWORD,
-        **os.environ,
-    }
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
 
-    # Start the server process and read a line from stdout so that we know
-    # it's started
-    server_process = Popen(args, env=env, shell=False, stdout=PIPE, stderr=PIPE)
+    server = moto_server.ThreadedMotoServer(ip_address="127.0.0.1", port=port)
+    server.start()
 
     try:
-        while line := server_process.stderr.readline():
-            if "Docs: ".encode("utf-8") in line:
-                break
-
-        retcode = server_process.poll()
-
-        if retcode is not None:
-            raise ValueError(f"Server failed to start with return code {retcode}")
-
-        yield server_process
+        yield f"http://127.0.0.1:{port}"
     finally:
-        server_process.kill()
+        server.stop()
 
 
 @pytest.fixture
-def minio_user_key():
-    return "abcdef1234567890"
+def s3_url(s3_server):
+    return s3_server
 
 
 @pytest.fixture
-def minio_admin(minio_server, minio_user_key):
-    minio = pytest.importorskip("minio")
-    credentials = pytest.importorskip("minio.credentials")
-    minio_admin = minio.MinioAdmin(
-        endpoint=urlparse(MINIO_URL).netloc,
-        credentials=credentials.StaticProvider(MINIO_ADMIN, MINIO_PASSWORD),
-        secure=False,
-    )
-    # Add a user and give it readwrite access
-    minio_admin.user_add(minio_user_key, minio_user_key)
-    minio_admin.policy_set("readwrite", user=minio_user_key)
-    yield minio_admin
-    minio_admin.user_remove(minio_user_key)
+def s3_key():
+    # moto accepts any credentials
+    return S3_KEY
 
 
 @pytest.fixture
-def py_minio_client(minio_admin, minio_user_key):
-    minio = pytest.importorskip("minio")
-    parsed_url = urlparse(MINIO_URL)
-    yield minio.Minio(
-        endpoint=parsed_url.netloc,
-        access_key=minio_user_key,
-        secret_key=minio_user_key,
-        secure=False,
+def s3_fs(s3_url, s3_key):
+    s3fs = pytest.importorskip("s3fs")
+    return s3fs.S3FileSystem(
+        key=s3_key,
+        secret=s3_key,
+        client_kwargs={"endpoint_url": s3_url, "region_name": S3_REGION},
     )
