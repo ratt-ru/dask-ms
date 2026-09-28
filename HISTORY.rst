@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Drop Python 3.10 (:pr:`386`)
 * Replace the minio server with moto's ``ThreadedMotoServer`` in the test
   suite (:pr:`385`)
 * Serialise reads on a shared ``pyarrow.parquet.ParquetFile``, as concurrent
