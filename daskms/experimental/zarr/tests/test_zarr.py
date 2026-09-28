@@ -183,16 +183,16 @@ def test_xds_to_zarr_local(ms, spw_table, ant_table, tmp_path_factory):
 
 @pytest.mark.skipif(s3fs is None, reason="s3fs not installed")
 def test_xds_to_zarr_s3(
-    ms, spw_table, ant_table, py_minio_client, minio_user_key, minio_url, s3_bucket_name
+    ms, spw_table, ant_table, s3_fs, s3_key, s3_url, s3_bucket_name
 ):
-    py_minio_client.make_bucket(bucket_name=s3_bucket_name)
+    s3_fs.mkdir(s3_bucket_name)
 
     zarr_store = DaskMSStore(
         f"s3://{s3_bucket_name}/measurementset.MS",
-        key=minio_user_key,
-        secret=minio_user_key,
+        key=s3_key,
+        secret=s3_key,
         client_kwargs={
-            "endpoint_url": minio_url,
+            "endpoint_url": s3_url,
             "region_name": "af-cpt",
         },
     )
