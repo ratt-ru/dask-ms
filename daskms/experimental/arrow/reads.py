@@ -98,7 +98,13 @@ class ParquetFileProxy(metaclass=Multiton):
         )
 
     def read_column(self, column, start=None, end=None):
-        chunks = self.file.read(columns=[column]).column(column).chunks
+        file_ = self.file
+
+        # Concurrent reads on a shared pq.ParquetFile segfault
+        with self.lock:
+            table = file_.read(columns=[column])
+
+        chunks = table.column(column).chunks
         assert len(chunks) == 1
 
         zero_copy = chunks[0].type not in (pa.string(), pa.bool_())

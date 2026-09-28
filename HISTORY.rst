@@ -5,6 +5,8 @@ History
 X.Y.Z (YYYY-MM-DD)
 ------------------
 * Replace the minio server with moto's ``ThreadedMotoServer`` in the test suite
+* Serialise reads on a shared ``pyarrow.parquet.ParquetFile``, which segfault
+  when issued concurrently from dask threads
 * Introduce pytest != 9.1.0 version restriction (:pr:`375`)
 
 0.2.32 (2026-05-18)
