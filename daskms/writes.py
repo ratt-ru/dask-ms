@@ -218,11 +218,6 @@ def _updated_table(table, datasets, columns, descriptor):
             _dminfo = {} if in_odminfo else _dminfo
             table_proxy.instance.addcols(_table_desc, _dminfo)
 
-        # Handles opened before the add cannot resync across the change in
-        # column count, so drop them now, while the write graph is still
-        # being built and nothing is reading
-        CasaTable.invalidate(table)
-
     return table_proxy
 
 

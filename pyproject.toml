@@ -7,7 +7,7 @@ version = "0.2.32"
 readme = "README.rst"
 authors = [{name = "Simon Perkins", email = "simon.perkins@gmail.com"}]
 requires-python = '>=3.11,<3.14'
-dependencies = ['appdirs >=1.4.4', 'dask[array] >=2023.1.1', 'donfig >=0.8.0', 'arcae >=0.4.0a12,<0.5', 'numpy >=2.0.0', 'fsspec >=2022.7.0', 'cacheout >=0.16.0', 'rarg-python-patterns >=0.0.5']
+dependencies = ['appdirs >=1.4.4', 'dask[array] >=2023.1.1', 'donfig >=0.8.0', 'arcae >=0.4.0a13,<0.5', 'numpy >=2.0.0', 'fsspec >=2022.7.0', 'cacheout >=0.16.0', 'rarg-python-patterns >=0.0.5']
 
 [project.scripts]
 dask-ms = "daskms.apps.entrypoint:main"
