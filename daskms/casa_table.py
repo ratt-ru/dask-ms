@@ -265,11 +265,21 @@ class CasaTable(Multiton):
         writer are independent, which means a handle opened before an
         ``addcols`` can never catch up (ska-sa/arcae#241).
 
-        Evicting the cached instance is enough: the handle itself is
-        unchanged, and its next :attr:`instance` access reopens the table
-        with the new column. Handles derived from a stale one -- a TAQL
-        query over it -- are invalidated too, since their query was run
-        against the table that is being dropped.
+        The handles themselves are left alone; only their cached tables go,
+        so the next :attr:`instance` access reopens the table with the new
+        column. Handles derived from a stale one -- a TAQL query over it --
+        are invalidated too, since their query was run against the table
+        that is being dropped.
+
+        Those tables are closed rather than left to the garbage collector.
+        They are known garbage: any further use throws the column count
+        error above, so nothing is lost by shutting them, and closing frees
+        each one's ``ninstances`` casacore tables and isolation threads at a
+        defined point instead of whenever the last reference happens to go.
+        A later use of one reports "TableProxy is closed", which beats the
+        casacore message. Note this is the opposite of
+        :func:`clear_table_cache`, which must not close, because there the
+        tables may still be in use.
 
         This deliberately includes the handle that did the ``addcols``. An
         arcae table is ``ninstances`` casacore tables, and only the one that
@@ -297,6 +307,18 @@ class CasaTable(Multiton):
                 break
 
             stale |= derived
+
+        # Handles sharing a key share one table, so close per key, and only
+        # where one was built: asking a handle for its instance would open a
+        # table here purely to shut it again
+        for key in {handle._key for handle in stale}:
+            if (entry := Multiton._INSTANCE_CACHE.get(key)) is None:
+                continue
+
+            try:
+                entry[0].close()
+            except Exception:  # pragma: no cover - best effort
+                log.debug("Error closing %s", entry[0], exc_info=True)
 
         for handle in stale:
             handle.release()
