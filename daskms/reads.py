@@ -9,6 +9,7 @@ import dask.array as da
 import numpy as np
 
 from daskms.columns import (
+    arcae_dtype,
     column_metadata,
     ColumnMetadataError,
     dim_extents_array,
@@ -72,12 +73,61 @@ def getter_wrapper(row_orders, *args):
     if dtype == object:
         # String columns come back as object arrays, which arcae cannot
         # write into a pre-allocated buffer
-        result[:] = table.getcol(column, index=index)
+        try:
+            data = table.getcol(column, index=index)
+        except TypeError:
+            # arcae refuses to flatten a variably shaped column into a single
+            # array, and says so with a TypeError. It will read such a column
+            # a row at a time though, so fall back to that.
+            _ragged_getcol(table, column, row_runs, index[1:], result)
+        else:
+            result[:] = data
     else:
-        table.getcol(column, index=index, result=result)
+        # arcae_dtype for the bool case: arcae would otherwise size a numpy
+        # bool buffer as bit-packed Arrow and reject it
+        table.getcol(column, index=index, result=result.view(arcae_dtype(dtype)))
 
     # Resort result if necessary
     return result[resort] if resort is not None else result
+
+
+def _ragged_getcol(table, column, row_runs, extent_index, result):
+    """Read a variably shaped ``column`` one row at a time into ``result``.
+
+    ``result`` has the single shape that ``column_metadata`` inferred from an
+    exemplar row, because a dask chunk cannot be ragged. Rows that disagree
+    with it are clipped to the overlapping region and the remainder is left at
+    whatever ``np.empty`` gave us. python-casacore did the same thing silently
+    -- its ``getcol`` shaped the whole read from the first row and dropped the
+    rest -- so this only makes the loss visible.
+    """
+    rows = np.concatenate([np.arange(s, s + l) for s, l in row_runs])
+    clipped = False
+
+    for i, row in enumerate(rows):
+        row = int(row)
+        data = table.getcol(column, index=(slice(row, row + 1),) + extent_index)[0]
+
+        if data.shape == result.shape[1:]:
+            result[i] = data
+            continue
+
+        clipped = True
+        # A short row would otherwise leave the tail of result[i] at whatever
+        # np.empty produced, which is None for an object array
+        result[i] = "" if result.dtype == object else 0
+        window = tuple(
+            slice(0, min(d, r)) for d, r in zip(data.shape, result.shape[1:])
+        )
+        result[(i,) + window] = data[window]
+
+    if clipped:
+        log.warning(
+            "Rows of variably shaped column '%s' do not all have shape %s. "
+            "Rows that differ have been clipped to it.",
+            column,
+            result.shape[1:],
+        )
 
 
 def _dataset_variable_factory(

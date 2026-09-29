@@ -54,6 +54,20 @@ _PY_TO_TABLE = OrderedDict(
 )
 
 
+def arcae_dtype(dtype):
+    """The dtype arcae uses on the wire for ``dtype``.
+
+    arcae hands casacore ``Bool`` columns back as ``uint8``. Arrow's boolean
+    type is bit-packed while casacore stores a byte per value, so arcae
+    exposes the buffer as the uint8 array it physically is. The layout is
+    identical to numpy's ``bool_``, so this only matters in two places: the
+    exemplar dtype check below, and reading into a preallocated array, where
+    handing arcae a ``bool_`` buffer makes it size the read as bit-packed and
+    reject the eight-times-larger array we actually allocated.
+    """
+    return np.dtype(np.uint8) if np.dtype(dtype) == np.bool_ else np.dtype(dtype)
+
+
 def infer_dtype(column, coldesc):
     # Extract valueType
     try:
@@ -195,7 +209,7 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
             shape = exemplar.shape
 
             # Double-check the dtype
-            if dtype != exemplar.dtype:
+            if arcae_dtype(dtype) != exemplar.dtype:
                 raise ColumnMetadataError(
                     "Inferred dtype '%s' does not match "
                     "the exemplar dtype '%s'" % (dtype, exemplar.dtype)

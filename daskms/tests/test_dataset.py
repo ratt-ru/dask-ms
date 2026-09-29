@@ -500,7 +500,13 @@ def test_write_dict_data(tmp_path, chunks, dtype):
 
     dask.compute(writes)
 
-    data = table_proxy.getvarcol("DATA").result()
+    # arcae has no getvarcol, but it reads a ragged column a row at a time.
+    # Rebuild casacore's varcol mapping, whose keys are 1-based row numbers.
+    table = table_proxy.instance
+    data = {
+        f"r{row + 1}": table.getcol("DATA", index=(slice(row, row + 1),))
+        for row in range(table.nrow())
+    }
 
     # First row chunk
     assert_array_almost_equal(layer[(name, 0, 0, 0)]["r1"], data["r1"])

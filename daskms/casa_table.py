@@ -251,3 +251,52 @@ class CasaTable(Multiton):
         return f"{type(self).__name__}({self._args[0] if self._args else ''})"
 
     __repr__ = __str__
+
+    @classmethod
+    def invalidate(cls, table: str) -> None:
+        """Force handles onto ``table`` to reopen it on next access.
+
+        casacore cannot resync a table across a change in its column count:
+        ``Table::lock`` throws "another process changed the number of
+        columns" instead. python-casacore never hit this because stock
+        casacore shares one ``PlainTable`` per path within a process, so
+        adding a column was visible to every handle at once. arcae's
+        casacore makes that cache thread-local, precisely so its readers and
+        writer are independent, which means a handle opened before an
+        ``addcols`` can never catch up (ska-sa/arcae#241).
+
+        Evicting the cached instance is enough: the handle itself is
+        unchanged, and its next :attr:`instance` access reopens the table
+        with the new column. Handles derived from a stale one -- a TAQL
+        query over it -- are invalidated too, since their query was run
+        against the table that is being dropped.
+
+        This deliberately includes the handle that did the ``addcols``. An
+        arcae table is ``ninstances`` casacore tables, and only the one that
+        took the write lock saw the new column; the rest are as stale as any
+        other reader, so that handle has to be reopened as well.
+        """
+        stale = {
+            handle
+            for handle in cls._INSTANCES
+            if handle._factory is open_table
+            and handle._args
+            and handle._args[0] == table
+        }
+
+        # Derivation can nest, so keep going until nothing new is reached
+        while True:
+            derived = {
+                handle
+                for handle in cls._INSTANCES
+                if handle not in stale
+                and any(t in stale for t in handle._kw.get("tables", ()))
+            }
+
+            if not derived:
+                break
+
+            stale |= derived
+
+        for handle in stale:
+            handle.release()
