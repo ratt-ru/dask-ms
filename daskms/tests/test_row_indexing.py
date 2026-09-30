@@ -89,3 +89,15 @@ def test_append_with_empty_row_chunk(tmp_path):
     t = open_table(table)
     assert t.nrow() == 10
     assert_array_equal(t.getcol("VALUE"), np.concatenate([data, data]))
+
+
+def test_read_empty_table(tmp_path):
+    table = str(tmp_path / "empty.table")
+    data = np.zeros((1, 3), dtype=np.float64)
+    ds = Dataset({"VALUE": (("row", "comp"), da.from_array(data, chunks=(1, 3)))})
+    dask.compute(xds_to_table(ds, table, ["VALUE"]))
+
+    # Select no rows so the only row chunk is empty
+    (rds,) = xds_from_table(table, taql_where="ROWID() < 0", columns=["VALUE"])
+    assert rds.VALUE.shape == (0, 3)
+    assert rds.VALUE.data.compute().shape == (0, 3)

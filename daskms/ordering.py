@@ -16,6 +16,10 @@ class GroupChunkingError(Exception):
 
 
 def _sorted_rows(taql_proxy, startrow, nrow):
+    # arcae treats an empty slice as selecting the whole dimension
+    if nrow == 0:
+        return np.empty(0, dtype=np.int64)
+
     index = (slice(startrow, startrow + nrow),)
     return taql_proxy.instance.getcol("__tablerow__", index=index)
 
