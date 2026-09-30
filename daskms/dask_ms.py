@@ -240,6 +240,13 @@ def xds_from_table(
 
             xds_from_table("WSRT.MS", taql_where="ANTENNA1 != ANTENNA2")
 
+    epoch : str, optional
+        Identifies the row structure of the table. The grouping and
+        indexing columns are read, and the rows partitioned and sorted,
+        once per epoch; calls with the same table, grouping, indexing,
+        ``taql_where`` and ``epoch`` share that structure. Defaults to a
+        new random string, so that each call reads the table afresh.
+
     chunks : list of dicts or dict, optional
         A :code:`{dim: chunk}` dictionary, specifying the chunking
         strategy of each dimension in the schema.

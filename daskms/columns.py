@@ -314,9 +314,7 @@ def dim_extents_array(dim, chunks):
     -------
     dim_extents : :class:`dask.array.Array`
         dask array where each chunk contains a single (start, end) tuple
-        defining the start and end of the chunk. The end is inclusive;
-        :func:`daskms.casa_table.build_index` converts these extents into
-        the half-open slices that arcae expects.
+        defining the start and end of the chunk. The end is inclusive.
 
         The array chunks match ``chunks`` and are inaccurate, but
         are used to define chunk sizes of final outputs.

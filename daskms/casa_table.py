@@ -71,21 +71,22 @@ def row_index(rows):
 
 
 def build_index(rows, extents=()):
-    """Build an arcae index from row ids and inclusive dimension extents.
+    """Build an arcae index from row ids and dimension extents.
 
-    ``extents`` are ``(blc, trc)`` pairs in the python-casacore style,
-    where ``trc`` is inclusive; arcae slices exclude their stop.
+    ``extents`` are half-open ``(start, stop)`` pairs, one per
+    non-row dimension, as :func:`dask.array.map_blocks` reports
+    in ``block_info``.
     """
     return (row_index(rows),) + tuple(
-        slice(int(blc), int(trc) + 1) for blc, trc in extents
+        slice(int(start), int(stop)) for start, stop in extents
     )
 
 
 # casacore's default TaQL style is Glish, which indexes arrays from one.
 # python-casacore hides this by prefixing every query with "using style
-# Python"; arcae does not. Without this prefix an expression such as
-# GROWID()[0] silently selects a different element -- see
-# daskms.ordering.group_ordering_taql, whose __firstrow__ depends on it.
+# Python"; arcae does not. Without this prefix an array index in a
+# query, such as one in a user's taql_where, silently selects a
+# different element.
 TAQL_STYLE = "USING STYLE PYTHON"
 
 

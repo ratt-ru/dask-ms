@@ -2,17 +2,12 @@
 
 import pickle
 
-import dask
+import numpy as np
 import pytest
 from numpy.testing import assert_array_equal
 
-from daskms.casa_table import CasaTable
-from daskms.ordering import (
-    group_ordering_taql,
-    group_row_ordering,
-    ordering_taql,
-    row_ordering,
-)
+from daskms.casa_table import CasaTable, taql_table
+from daskms.query import groupby_clause, orderby_clause, select_clause
 from daskms.structure import ROW_GROUP, TableStructure, structure_factory
 
 INDEX_COLS = [
@@ -31,19 +26,57 @@ def _table(ms):
     return CasaTable.from_table(ms, readonly=True)
 
 
-def _taql_groups(table, group_cols, index_cols, taql_where):
-    """The partitions of the TaQL GROUPBY ordering, as
-    (key, rows, exemplar_row) tuples in dataset order"""
-    order_taql = group_ordering_taql(table, group_cols, index_cols, taql_where)
-    orders = group_row_ordering(order_taql, group_cols, index_cols, [{"row": -1}])
-    (rows,) = dask.compute(orders)
-    values = [order_taql.instance.getcol(c) for c in group_cols]
-    exemplars = order_taql.instance.getcol("__firstrow__")
+def _where(taql_where):
+    return f"\nWHERE\n\t{taql_where}" if taql_where else ""
 
-    return [
-        (tuple(zip(group_cols, (v.item() for v in key))), r, int(e))
-        for key, r, e in zip(zip(*values), rows, exemplars)
-    ]
+
+def _taql_rows(table, index_cols, taql_where=""):
+    """Rows sorted by a TaQL ORDERBY, which is how dask-ms
+    ordered rows before TableStructure"""
+    select = select_clause(["ROWID() AS __tablerow__"])
+    orderby = orderby_clause(index_cols)
+    query = f"{select}\nFROM\n\t$1{_where(taql_where)}\n{orderby}"
+
+    with taql_table(query, (table,)) as result:
+        if result.nrow() == 0:
+            return np.empty(0, dtype=np.int64)
+
+        return result.getcol("__tablerow__")
+
+
+def _taql_groups(table, group_cols, index_cols, taql_where):
+    """The partitions of a TaQL GROUPBY, which is how dask-ms grouped
+    rows before TableStructure, as (key, rows, exemplar_row) tuples
+    in dataset order"""
+    select = select_clause(
+        group_cols
+        + [f"GAGGR({c}) AS GROUP_{c}" for c in index_cols]
+        + ["GROWID() AS __tablerow__", "GROWID()[0] AS __firstrow__"]
+    )
+    groupby = groupby_clause(group_cols)
+    query = f"{select}\nFROM\n\t$1{_where(taql_where)}\n{groupby}"
+    groups = []
+
+    with taql_table(query, (table,)) as result:
+        for g in range(result.nrow()):
+            # The aggregated columns are ragged, so read one group at a time
+            index = (slice(g, g + 1),)
+            rows = result.getcol("__tablerow__", index=index)[0]
+
+            if index_cols:
+                sort = [
+                    result.getcol(f"GROUP_{c}", index=index)[0]
+                    for c in reversed(index_cols)
+                ]
+                rows = rows[np.lexsort(sort)]
+
+            key = tuple(
+                (c, result.getcol(c, index=index)[0].item()) for c in group_cols
+            )
+            exemplar_row = int(result.getcol("__firstrow__", index=index)[0])
+            groups.append((key, rows, exemplar_row))
+
+    return groups
 
 
 @pytest.mark.parametrize("taql_where", TAQL_WHERE)
@@ -67,8 +100,7 @@ def test_structure_matches_group_ordering(ms, group_cols, index_cols, taql_where
 @pytest.mark.parametrize("index_cols", INDEX_COLS)
 def test_structure_matches_row_ordering(ms, index_cols, taql_where):
     table = _table(ms)
-    order_taql = ordering_taql(table, index_cols, taql_where)
-    (expected,) = dask.compute(row_ordering(order_taql, index_cols, {"row": -1}))
+    expected = _taql_rows(table, index_cols, taql_where)
     structure = TableStructure(table, [], index_cols, taql_where)
 
     assert list(structure) == [()]
@@ -87,8 +119,7 @@ def test_structure_first_appearance_order(ms):
 @pytest.mark.parametrize("index_cols", INDEX_COLS)
 def test_structure_row_grouping(ms, index_cols):
     table = _table(ms)
-    order_taql = ordering_taql(table, index_cols)
-    (expected,) = dask.compute(row_ordering(order_taql, index_cols, {"row": 1}))
+    expected = _taql_rows(table, index_cols)
     structure = TableStructure(table, [ROW_GROUP], index_cols)
 
     assert list(structure) == [((ROW_GROUP, int(r)),) for r in expected]
@@ -142,3 +173,31 @@ def test_structure_factory(ms):
     unpickled = pickle.loads(pickle.dumps(factory))
     assert unpickled == factory
     assert unpickled.instance is factory.instance
+
+
+def test_read_graph(ms):
+    """A read is the row ids, looked up in the structure, and one getcol
+    per block. Nothing else is cached or inlined in the graph"""
+    from daskms import xds_from_table
+
+    (ds,) = xds_from_table(ms, columns=["DATA"], chunks={"row": 3, "chan": 4})
+    data = ds.DATA.data
+    layers = data.__dask_graph__().layers
+
+    assert sorted(name.split("~")[0] for name in layers) == ["read", "rowid"]
+    assert data.numblocks == (4, 4, 1)
+    assert len(dict(data.__dask_graph__())) == 4 + 4 * 4
+
+
+def test_read_epoch(ms):
+    from daskms import xds_from_table
+
+    def rowid(**kwargs):
+        (ds,) = xds_from_table(ms, columns=["TIME"], **kwargs)
+        return ds.ROWID.data
+
+    # Each call builds its own structure by default
+    assert rowid().name != rowid().name
+    # An epoch shares one
+    assert rowid(epoch="a").name == rowid(epoch="a").name
+    assert rowid(epoch="a").name != rowid(epoch="b").name

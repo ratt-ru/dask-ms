@@ -1,31 +1,24 @@
 # -*- coding: utf-8 -*-
 
-import functools
 import logging
 from pathlib import Path
-import warnings
+from uuid import uuid4
 
 import dask
 import dask.array as da
+from dask.array.core import normalize_chunks
 import numpy as np
 
 from daskms.columns import (
     arcae_dtype,
     column_metadata,
     ColumnMetadataError,
-    dim_extents_array,
     infer_dtype,
 )
 from daskms.casa_table import CasaTable, build_index, ninstances
 from daskms.constants import DASKMS_PARTITION_KEY
-from daskms.ordering import (
-    ordering_taql,
-    row_ordering,
-    group_ordering_taql,
-    group_row_ordering,
-)
-from daskms.optimisation import inlined_array
 from daskms.dataset import Dataset
+from daskms.structure import ROW_GROUP, structure_factory
 from daskms.table import table_exists
 from daskms.table_schemas import lookup_table_schema
 from daskms.utils import table_path_split
@@ -35,41 +28,36 @@ _DEFAULT_ROW_CHUNKS = 10000
 log = logging.getLogger(__name__)
 
 
-def getter_wrapper(rows, *args):
-    """Read a chunk of ``column`` out of the table.
+class GroupChunkingError(ValueError):
+    pass
 
-    arcae reads a whole chunk in a single call: the row ids and the
-    per-dimension chunk extents are combined into one index, and the data
-    is read directly into the output buffer. arcae returns rows in the
-    order requested, so no resorting is required.
+
+def getter_wrapper(
+    rows, casa_table, column, col_shape, dtype, variable, block_info=None
+):
+    """Read a block of ``column`` out of the table.
+
+    Called through :func:`dask.array.map_blocks`, whose ``block_info``
+    supplies the block's half-open extent along each non-row dimension.
+    arcae reads a whole block in a single call: the row ids and the
+    extents are combined into one index, and the data is read directly
+    into the output buffer. arcae returns rows in the order requested,
+    so no resorting is required.
 
     Cells of a ``variable`` (variably shaped) column that are smaller than
     ``col_shape`` are padded with :func:`pad_value`.
     """
-    # Infer number of shape arguments
-    nextent_args = len(args) - 5
-    # Extract other arguments
-    casa_table, column, col_shape, dtype, variable = args[nextent_args:]
-
-    # args[:nextent_args] is one inclusive (blc, trc) pair per non-row
-    # dimension of the column, defining the extent of this chunk
-    extents = args[:nextent_args]
-
-    # Handle dask compute_meta gracefully: it passes empty arrays
-    # in place of the extent pairs
-    if any(isinstance(e, np.ndarray) for e in extents):
-        return np.empty((0,) * (nextent_args + 1), dtype=dtype)
-
-    if nextent_args > 0:
-        shape = tuple(trc - blc + 1 for blc, trc in extents)
-    # Otherwise the full resolution data for each row is requested
-    else:
-        shape = col_shape
-
-    shape = (len(rows),) + tuple(shape)
+    extents = block_info[None]["array-location"][1:]
+    shape = (len(rows),) + tuple(stop - start for start, stop in extents)
 
     if np.prod(shape) == 0:
         return np.empty(shape, dtype=dtype)
+
+    # Only select along the non-row dimensions if they are chunked.
+    # Otherwise whole cells are read, which are padded if they are
+    # smaller than col_shape
+    if all(extent == (0, s) for extent, s in zip(map(tuple, extents), col_shape)):
+        extents = ()
 
     table = casa_table.instance
     index = build_index(rows, extents)
@@ -77,7 +65,7 @@ def getter_wrapper(rows, *args):
     try:
         return _getcol(table, column, index, shape, dtype, variable)
     except IndexError as e:
-        if not (variable and nextent_args > 0):
+        if not (variable and extents):
             raise
 
         # arcae rejects a selection that extends past the end of a cell.
@@ -90,6 +78,40 @@ def getter_wrapper(rows, *args):
             f"grouping for a Measurement Set, or group_cols='__row__' for a "
             f"subtable), or leave the non-row dimensions of '{column}' unchunked."
         ) from e
+
+
+def _rowid_block(structure_factory, key, block_info=None):
+    """A block of a partition's sorted row ids"""
+    ((start, stop),) = block_info[None]["array-location"]
+    return structure_factory.instance[key].rows[start:stop]
+
+
+def rowid_array(structure_factory, partition, row_chunks, array_suffix):
+    """A dask array of ``partition``'s sorted row ids, whose blocks
+    are looked up in the structure when they are computed"""
+    try:
+        chunks = normalize_chunks(row_chunks, shape=(partition.nrow,))
+    except ValueError as e:
+        raise GroupChunkingError(
+            f"{e}\n"
+            f"Unable to match chunks '{row_chunks}' with shape "
+            f"'{(partition.nrow,)}' for partition {partition.key}. "
+            f"This can occur if too few chunk dictionaries have been "
+            f"supplied for the number of groups and an earlier group's "
+            f"chunking strategy is applied to a later one."
+        ) from e
+
+    token = dask.base.tokenize(structure_factory, partition.key, chunks)
+
+    return da.map_blocks(
+        _rowid_block,
+        structure_factory,
+        partition.key,
+        chunks=chunks,
+        dtype=np.int64,
+        meta=np.empty((0,), dtype=np.int64),
+        name=f"rowid~{array_suffix}-{token}",
+    )
 
 
 def pad_value(dtype):
@@ -161,8 +183,8 @@ def _dataset_variable_factory(
     table_proxy,
     table_schema,
     select_cols,
-    exemplar_row,
-    sorted_rows,
+    partition,
+    rowid,
     chunks,
     array_suffix,
 ):
@@ -180,12 +202,12 @@ def _dataset_variable_factory(
         Table schema
     select_cols : list of strings
         List of columns to return
-    exemplar_row : int
-        row id used to possibly extract an exemplar array in
-        order to determine the column shape and dtype attributes
-    sorted_rows : :class:`dask.array.Array`
-        The rows to extract from the table, in the order
-        they should appear in the dataset.
+    partition : :class:`daskms.structure.PartitionData`
+        The partition of the table that the dataset holds. Its rows and
+        exemplar row determine the shape of variably shaped columns.
+    rowid : :class:`dask.array.Array`
+        The partition's sorted row ids, in the order that they
+        should appear in the dataset.
     chunks : dict
         Chunking strategy for the dataset.
     array_suffix : str
@@ -197,13 +219,7 @@ def _dataset_variable_factory(
         A dictionary looking like :code:`{column: (arrays, dims)}`.
     """
 
-    dataset_vars = {"ROWID": (("row",), sorted_rows)}
-
-    # The shape of a variably shaped column is maximal over the dataset's
-    # rows, which are materialised here, once, if such a column exists
-    @functools.cache
-    def dataset_rows():
-        return sorted_rows.compute(scheduler="sync")
+    dataset_vars = {"ROWID": (("row",), rowid)}
 
     for column in select_cols:
         try:
@@ -212,8 +228,8 @@ def _dataset_variable_factory(
                 table_proxy,
                 table_schema,
                 chunks,
-                exemplar_row,
-                rows=dataset_rows,
+                partition.exemplar_row,
+                rows=partition.rows,
             )
         except ColumnMetadataError as e:
             exc_info = logging.DEBUG >= log.getEffectiveLevel()
@@ -221,57 +237,24 @@ def _dataset_variable_factory(
             continue
 
         full_dims = ("row",) + meta.dims
-        args = [sorted_rows, ("row",)]
-
-        # We only need to pass in dimension extent arrays if
-        # there is more than one chunk in any of the non-row columns.
-        # Otherwise the whole of each row is read.
-        if not all(len(c) == 1 for c in meta.chunks):
-            for d, c in zip(meta.dims, meta.chunks):
-                # Create an array describing the dimension chunk extents
-                args.append(dim_extents_array(d, c))
-                args.append((d,))
-
-            new_axes = {}
-        else:
-            # We need to inform blockwise about the size of our
-            # new dimensions as no arrays with them are supplied
-            new_axes = {d: s for d, s in zip(meta.dims, meta.shape)}
-
-        # Add other variables
-        args.extend(
-            [
-                table_proxy,
-                None,
-                column,
-                None,
-                meta.shape,
-                None,
-                meta.dtype,
-                None,
-                meta.variable,
-                None,
-            ]
-        )
-
-        # Name of the dask array representing this column
-        token = dask.base.tokenize(args)
+        ndim = len(full_dims)
+        token = dask.base.tokenize(rowid.name, table_proxy, column, meta)
         name = "~".join(("read", column, array_suffix)) + "-" + token
 
-        # Construct the array
-
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", category=da.PerformanceWarning)
-            dask_array = da.blockwise(
-                getter_wrapper,
-                full_dims,
-                *args,
-                name=name,
-                new_axes=new_axes,
-                dtype=meta.dtype,
-            )
-
-        dask_array = inlined_array(dask_array)
+        dask_array = da.map_blocks(
+            getter_wrapper,
+            rowid,
+            table_proxy,
+            column,
+            meta.shape,
+            meta.dtype,
+            meta.variable,
+            new_axis=list(range(1, ndim)),
+            chunks=rowid.chunks + tuple(meta.chunks),
+            dtype=meta.dtype,
+            meta=np.empty((0,) * ndim, dtype=meta.dtype),
+            name=name,
+        )
 
         # Assign into variable and dimension dataset
         dataset_vars[column] = (full_dims, dask_array)
@@ -309,6 +292,7 @@ class DatasetFactory(object):
         self.column_keywords = kwargs.pop("column_keywords", False)
         self.table_proxy = kwargs.pop("table_proxy", False)
         self.context = kwargs.pop("context", None)
+        self.epoch = kwargs.pop("epoch", None) or uuid4().hex[:16]
 
         if len(kwargs) > 0:
             raise ValueError(f"Unhandled kwargs: {kwargs}")
@@ -321,88 +305,96 @@ class DatasetFactory(object):
     def _table_schema(self):
         return lookup_table_schema(self.canonical_name, self.table_schema)
 
-    def _single_dataset(self, table_proxy, orders, exemplar_row=0):
+    def _single_dataset(self, table_proxy, factory, partition):
         _, t, s = table_path_split(self.canonical_name)
         short_table_name = "/".join((t, s)) if s else t
+        chunks = self.chunks[0]
 
         table_schema = self._table_schema()
         select_cols = set(self.select_cols or table_proxy.instance.columns())
+        rowid = rowid_array(factory, partition, chunks["row"], short_table_name)
         variables = _dataset_variable_factory(
             table_proxy,
             table_schema,
             select_cols,
-            exemplar_row,
-            orders,
-            self.chunks[0],
+            partition,
+            rowid,
+            chunks,
             short_table_name,
         )
 
         try:
-            rowid = variables.pop("ROWID")
+            coords = {"ROWID": variables.pop("ROWID")}
         except KeyError:
             coords = None
-        else:
-            coords = {"ROWID": rowid}
 
         attrs = {DASKMS_PARTITION_KEY: ()}
         dataset = Dataset(variables, coords=coords, attrs=attrs)
         return self.postprocess_dataset(
-            dataset, table_proxy, exemplar_row, orders, self.chunks[0], short_table_name
+            dataset, table_proxy, partition, rowid, chunks, short_table_name
         )
 
-    def _group_datasets(self, table_proxy, groups, exemplar_rows, orders):
+    def _group_datasets(self, table_proxy, factory, partitions):
         _, t, s = table_path_split(self.canonical_name)
         short_table_name = "/".join((t, s)) if s else t
         table_schema = self._table_schema()
 
-        datasets = []
-        group_ids = list(zip(*groups))
+        # Cast group values to the actual column dtype
+        group_types = [
+            infer_dtype(c, table_proxy.instance.getcoldesc(c)) for c in self.group_cols
+        ]
 
-        assert len(group_ids) == len(orders)
+        datasets = []
 
         # Select columns, excluding grouping columns
         select_cols = set(self.select_cols or table_proxy.instance.columns())
         select_cols -= set(self.group_cols)
 
         # Create a dataset for each group
-        it = enumerate(zip(group_ids, exemplar_rows, orders))
-
-        for g, (group_id, exemplar_row, order) in it:
+        for g, partition in enumerate(partitions):
             # Extract group chunks
             try:
                 group_chunks = self.chunks[g]  # Get group chunking strategy
             except IndexError:
                 group_chunks = self.chunks[-1]  # Re-use last group's chunks
 
+            try:
+                row_chunks = group_chunks["row"]
+            except KeyError:
+                raise ValueError(f"No row chunking scheme found in {group_chunks}!")
+
+            group_id = [
+                np.asarray(v).astype(t) for (_, v), t in zip(partition.key, group_types)
+            ]
+
             # Prefix dataset
             gid_str = ",".join(str(gid) for gid in group_id)
             array_suffix = f"[{gid_str}]-{short_table_name}"
 
             # Create dataset variables
+            rowid = rowid_array(factory, partition, row_chunks, array_suffix)
             group_var_dims = _dataset_variable_factory(
                 table_proxy,
                 table_schema,
                 select_cols,
-                exemplar_row,
-                order,
+                partition,
+                rowid,
                 group_chunks,
                 array_suffix,
             )
 
             # Extract ROWID
             try:
-                rowid = group_var_dims.pop("ROWID")
+                coords = {"ROWID": group_var_dims.pop("ROWID")}
             except KeyError:
                 coords = None
-            else:
-                coords = {"ROWID": rowid}
 
             # Assign values for the dataset's grouping columns
             # as attributes
-            partitions = tuple(
+            partitions_attr = tuple(
                 (c, g.dtype.name) for c, g in zip(self.group_cols, group_id)
             )
-            attrs = {DASKMS_PARTITION_KEY: partitions}
+            attrs = {DASKMS_PARTITION_KEY: partitions_attr}
 
             # Use python types which are json serializable
             group_id = [gid.item() for gid in group_id]
@@ -410,14 +402,14 @@ class DatasetFactory(object):
 
             dataset = Dataset(group_var_dims, attrs=attrs, coords=coords)
             dataset = self.postprocess_dataset(
-                dataset, table_proxy, exemplar_row, order, group_chunks, array_suffix
+                dataset, table_proxy, partition, rowid, group_chunks, array_suffix
             )
             datasets.append(dataset)
 
         return datasets
 
     def postprocess_dataset(
-        self, dataset, table_proxy, exemplar_row, order, chunks, array_suffix
+        self, dataset, table_proxy, partition, rowid, chunks, array_suffix
     ):
         if not self.context or self.context != "ms":
             return dataset
@@ -459,8 +451,8 @@ class DatasetFactory(object):
                 table_proxy,
                 schema_updates,
                 list(schema_updates.keys()),
-                exemplar_row,
-                order,
+                partition,
+                rowid,
                 chunks,
                 array_suffix,
             )
@@ -468,55 +460,27 @@ class DatasetFactory(object):
 
     def datasets(self):
         table_proxy = self._casa_table_factory()
+        factory = structure_factory(
+            table_proxy,
+            self.group_cols,
+            self.index_cols,
+            self.taql_where,
+            self.epoch,
+        )
+        structure = factory.instance
 
-        # No grouping case
-        if len(self.group_cols) == 0:
-            order_taql = ordering_taql(table_proxy, self.index_cols, self.taql_where)
-            orders = row_ordering(order_taql, self.index_cols, self.chunks[0])
-            datasets = [self._single_dataset(table_proxy, orders)]
-        # Group by row
-        elif len(self.group_cols) == 1 and self.group_cols[0] == "__row__":
-            order_taql = ordering_taql(table_proxy, self.index_cols, self.taql_where)
-            sorted_rows = row_ordering(
-                order_taql,
-                self.index_cols,
-                # chunk ordering on each row
-                dict(self.chunks[0], row=1),
-            )
-
-            # Produce a dataset for each chunk (block),
-            # each containing a single row
-            row_blocks = sorted_rows.blocks
-
-            # Exemplar actually correspond to the sorted rows.
-            # We reify them here so they can be assigned on each
-            # dataset as an attribute
-            np_sorted_row = sorted_rows.compute()
-
+        # No grouping, or grouping by row, where each
+        # row becomes a dataset of its own
+        if len(self.group_cols) == 0 or self.group_cols == [ROW_GROUP]:
             datasets = [
-                self._single_dataset(table_proxy, row_blocks[r], exemplar_row=er)
-                for r, er in enumerate(np_sorted_row)
+                self._single_dataset(table_proxy, factory, partition)
+                for partition in structure.values()
             ]
         # Grouping column case
         else:
-            order_taql = group_ordering_taql(
-                table_proxy, self.group_cols, self.index_cols, self.taql_where
+            datasets = self._group_datasets(
+                table_proxy, factory, list(structure.values())
             )
-            orders = group_row_ordering(
-                order_taql, self.group_cols, self.index_cols, self.chunks
-            )
-
-            groups = [order_taql.instance.getcol(g) for g in self.group_cols]
-            # Cast to actual column dtype
-            group_types = [
-                infer_dtype(c, table_proxy.instance.getcoldesc(c))
-                for c in self.group_cols
-            ]
-            groups = [g.astype(t) for g, t in zip(groups, group_types)]
-            exemplar_rows = order_taql.instance.getcol("__firstrow__")
-            assert len(orders) == len(exemplar_rows)
-
-            datasets = self._group_datasets(table_proxy, groups, exemplar_rows, orders)
 
         ret = (datasets,)
 

@@ -86,7 +86,8 @@ def putter_wrapper(rows, *args):
         if len(rows) > 0:
             # args[:nextent_args] is one inclusive (blc, trc) pair per
             # non-row dimension of the column
-            index = build_index(rows, args[:nextent_args])
+            extents = [(blc, trc + 1) for blc, trc in args[:nextent_args]]
+            index = build_index(rows, extents)
             casa_table.instance.putcol(column, data, index=index)
     else:
         raise TypeError(f"data {type(data)} must be a numpy array or dict")

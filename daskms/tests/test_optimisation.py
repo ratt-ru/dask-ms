@@ -97,20 +97,20 @@ def test_cached_array(ms):
     cached_data = cached_array(data)
     assert_array_almost_equal(cached_data, data)
 
-    # row blocks + row x chan x corr blocks
-    assert len(_key_cache) == data.numblocks[0] + data.npartitions
-    # rows and data array cache's
-    assert len(_array_cache_cache) == 2
+    # row x chan x corr blocks. Reads no longer cache their rows
+    assert len(_key_cache) == data.npartitions
+    # The data array's cache
+    assert len(_array_cache_cache) == 1
 
     # Pickling works
     pickled_data = pickle.loads(pickle.dumps(cached_data))
     assert_array_almost_equal(pickled_data, data)
 
     # Same underlying caching is re-used
-    # row blocks + row x chan x corr blocks
-    assert len(_key_cache) == data.numblocks[0] + data.npartitions
-    # rows and data array cache's
-    assert len(_array_cache_cache) == 2
+    # row x chan x corr blocks. Reads no longer cache their rows
+    assert len(_key_cache) == data.npartitions
+    # The data array's cache
+    assert len(_array_cache_cache) == 1
 
     del pickled_data, cached_data, data, ds
     gc.collect()
