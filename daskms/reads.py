@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import functools
 import logging
 from pathlib import Path
 import warnings
@@ -41,11 +42,14 @@ def getter_wrapper(rows, *args):
     per-dimension chunk extents are combined into one index, and the data
     is read directly into the output buffer. arcae returns rows in the
     order requested, so no resorting is required.
+
+    Cells of a ``variable`` (variably shaped) column that are smaller than
+    ``col_shape`` are padded with :func:`pad_value`.
     """
     # Infer number of shape arguments
-    nextent_args = len(args) - 4
+    nextent_args = len(args) - 5
     # Extract other arguments
-    casa_table, column, col_shape, dtype = args[nextent_args:]
+    casa_table, column, col_shape, dtype, variable = args[nextent_args:]
 
     # args[:nextent_args] is one inclusive (blc, trc) pair per non-row
     # dimension of the column, defining the extent of this chunk
@@ -62,70 +66,95 @@ def getter_wrapper(rows, *args):
     else:
         shape = col_shape
 
-    result = np.empty((len(rows),) + tuple(shape), dtype=dtype)
+    shape = (len(rows),) + tuple(shape)
 
-    if result.size == 0:
-        return result
+    if np.prod(shape) == 0:
+        return np.empty(shape, dtype=dtype)
 
-    index = build_index(rows, extents)
     table = casa_table.instance
+    index = build_index(rows, extents)
+
+    try:
+        return _getcol(table, column, index, shape, dtype, variable)
+    except IndexError as e:
+        if not (variable and nextent_args > 0):
+            raise
+
+        # arcae rejects a selection that extends past the end of a cell.
+        # This only happens if a dataset mixes cells of different shapes
+        # and the column's non-row dimensions are also chunked
+        raise IndexError(
+            f"Chunk {index[1:]} of variably shaped column '{column}' extends "
+            f"past the end of some of its cells. Group the table so that the "
+            f"cells in each dataset share a shape (the default DATA_DESC_ID "
+            f"grouping for a Measurement Set, or group_cols='__row__' for a "
+            f"subtable), or leave the non-row dimensions of '{column}' unchunked."
+        ) from e
+
+
+def pad_value(dtype):
+    """The value that pads cells of a variably shaped column"""
+    dtype = np.dtype(dtype)
 
     if dtype == object:
-        # String columns come back as object arrays, which arcae cannot
-        # write into a pre-allocated buffer
-        try:
-            data = table.getcol(column, index=index)
-        except TypeError:
-            # arcae refuses to flatten a variably shaped column into a single
-            # array, and says so with a TypeError. It will read such a column
-            # a row at a time though, so fall back to that.
-            _ragged_getcol(table, column, rows, index[1:], result)
-        else:
-            result[:] = data
-    else:
-        # arcae_dtype for the bool case: arcae would otherwise size a numpy
-        # bool buffer as bit-packed Arrow and reject it
-        table.getcol(column, index=index, result=result.view(arcae_dtype(dtype)))
+        return ""
+    elif dtype.kind in "fc":
+        return np.nan
+    elif dtype.kind == "b":
+        return False
 
+    return 0
+
+
+def _getcol(table, column, index, shape, dtype, variable):
+    if dtype == object:
+        # arcae cannot read strings into a pre-allocated buffer
+        if variable:
+            return _variable_string_getcol(table, column, index, shape)
+
+        return table.getcol(column, index=index)
+
+    if variable:
+        # arcae pads cells that are smaller than the result
+        result = np.full(shape, pad_value(dtype), dtype=dtype)
+    else:
+        result = np.empty(shape, dtype=dtype)
+
+    # arcae_dtype for the bool case: arcae would otherwise size a numpy
+    # bool buffer as bit-packed Arrow and reject it
+    table.getcol(column, index=index, result=result.view(arcae_dtype(dtype)))
     return result
 
 
-def _ragged_getcol(table, column, rows, extent_index, result):
-    """Read a variably shaped ``column`` one row at a time into ``result``.
+def _variable_string_getcol(table, column, index, shape):
+    """Read a variably shaped string ``column``, padding cells to ``shape``.
 
-    ``result`` has the single shape that ``column_metadata`` inferred from an
-    exemplar row, because a dask chunk cannot be ragged. Rows that disagree
-    with it are clipped to the overlapping region and the remainder is left at
-    whatever ``np.empty`` gave us. python-casacore did the same thing silently
-    -- its ``getcol`` shaped the whole read from the first row and dropped the
-    rest -- so this only makes the loss visible.
+    arcae returns such a column as nested Arrow lists, rather than
+    reading it into a pre-allocated buffer, so the padding happens here.
+    It cannot select along secondary dimensions when doing so, so whole
+    cells are read and the ``index[1:]`` slices applied to each of them.
     """
-    clipped = False
+    rows, secondary = index[0], index[1:]
 
-    for i, row in enumerate(rows):
-        row = int(row)
-        data = table.getcol(column, index=(slice(row, row + 1),) + extent_index)[0]
+    if isinstance(rows, slice):
+        rows = np.arange(rows.start, rows.stop)
 
-        if data.shape == result.shape[1:]:
-            result[i] = data
-            continue
+    result = np.full(shape, pad_value(object), dtype=object)
 
-        clipped = True
-        # A short row would otherwise leave the tail of result[i] at whatever
-        # np.empty produced, which is None for an object array
-        result[i] = "" if result.dtype == object else 0
-        window = tuple(
-            slice(0, min(d, r)) for d, r in zip(data.shape, result.shape[1:])
-        )
-        result[(i,) + window] = data[window]
+    # arcae omits the column entirely if any requested cell is
+    # undefined, so only read those that are
+    (defined,) = np.nonzero(table.row_shapes(column, (rows,)).is_valid())
 
-    if clipped:
-        log.warning(
-            "Rows of variably shaped column '%s' do not all have shape %s. "
-            "Rows that differ have been clipped to it.",
-            column,
-            result.shape[1:],
-        )
+    if len(defined) == 0:
+        return result
+
+    arrow_table = table.to_arrow((rows[defined],), column)
+
+    for i, cell in zip(defined, arrow_table.column(column).to_pylist()):
+        cell = np.array(cell, dtype=object)[secondary]
+        result[(i,) + tuple(slice(0, s) for s in cell.shape)] = cell
+
+    return result
 
 
 def _dataset_variable_factory(
@@ -170,10 +199,21 @@ def _dataset_variable_factory(
 
     dataset_vars = {"ROWID": (("row",), sorted_rows)}
 
+    # The shape of a variably shaped column is maximal over the dataset's
+    # rows, which are materialised here, once, if such a column exists
+    @functools.cache
+    def dataset_rows():
+        return sorted_rows.compute(scheduler="sync")
+
     for column in select_cols:
         try:
             meta = column_metadata(
-                column, table_proxy, table_schema, chunks, exemplar_row
+                column,
+                table_proxy,
+                table_schema,
+                chunks,
+                exemplar_row,
+                rows=dataset_rows,
             )
         except ColumnMetadataError as e:
             exc_info = logging.DEBUG >= log.getEffectiveLevel()
@@ -200,7 +240,18 @@ def _dataset_variable_factory(
 
         # Add other variables
         args.extend(
-            [table_proxy, None, column, None, meta.shape, None, meta.dtype, None]
+            [
+                table_proxy,
+                None,
+                column,
+                None,
+                meta.shape,
+                None,
+                meta.dtype,
+                None,
+                meta.variable,
+                None,
+            ]
         )
 
         # Name of the dask array representing this column

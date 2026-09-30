@@ -60,10 +60,10 @@ def arcae_dtype(dtype):
     arcae hands casacore ``Bool`` columns back as ``uint8``. Arrow's boolean
     type is bit-packed while casacore stores a byte per value, so arcae
     exposes the buffer as the uint8 array it physically is. The layout is
-    identical to numpy's ``bool_``, so this only matters in two places: the
-    exemplar dtype check below, and reading into a preallocated array, where
-    handing arcae a ``bool_`` buffer makes it size the read as bit-packed and
-    reject the eight-times-larger array we actually allocated.
+    identical to numpy's ``bool_``, so this only matters when reading into a
+    preallocated array, where handing arcae a ``bool_`` buffer makes it size
+    the read as bit-packed and reject the eight-times-larger array we
+    actually allocated.
     """
     return np.dtype(np.uint8) if np.dtype(dtype) == np.bool_ else np.dtype(dtype)
 
@@ -111,10 +111,47 @@ class ColumnMetadataError(Exception):
     pass
 
 
-ColumnMetadata = namedtuple("ColumnMetadata", ["shape", "dims", "chunks", "dtype"])
+ColumnMetadata = namedtuple(
+    "ColumnMetadata",
+    ["shape", "dims", "chunks", "dtype", "variable"],
+    defaults=(False,),
+)
 
 
-def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
+def _maximal_row_shape(column, table, rows, exemplar_row):
+    """The per-dimension maximum of ``column``'s cell shapes over ``rows``.
+
+    Undefined cells are ignored. If ``rows`` is empty, the
+    ``exemplar_row`` cell supplies the shape instead.
+    """
+    if callable(rows):
+        rows = rows()
+
+    if rows is None:
+        index = None
+    elif len(rows) == 0:
+        index = (slice(exemplar_row, exemplar_row + 1),)
+    else:
+        index = (np.asarray(rows),)
+
+    try:
+        shapes = table.row_shapes(column, index).drop_null()
+    except Exception as e:
+        raise ColumnMetadataError(f"Unable to infer shape of column '{column}'") from e
+
+    if len(shapes) == 0:
+        raise ColumnMetadataError(
+            f"Unable to infer shape of column '{column}' as it has no defined rows"
+        )
+
+    ndim = shapes.type.list_size
+    shapes = shapes.flatten().to_numpy().reshape(len(shapes), ndim)
+    return tuple(int(s) for s in shapes.max(axis=0))
+
+
+def column_metadata(
+    column, table_proxy, table_schema, chunks, exemplar_row=0, rows=None
+):
     """
     Infers column metadata for the purposes of creating dask arrays
     that reference their contents.
@@ -130,8 +167,13 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
     chunks : dict of tuple of ints
         :code:`{dim: chunks}` mapping
     exemplar_row : int, optional
-        Table row accessed when inferring a shape and dtype
-        from a getcol.
+        Table row whose shape is used for a variably shaped column
+        if ``rows`` is empty.
+    rows : :class:`numpy.ndarray` or callable, optional
+        Rows of the dataset, or a callable returning them, which is only
+        called for a variably shaped column. The shape of such a column is
+        the maximal shape of its cells over these rows, so that every cell
+        fits. Defaults to all rows in the table.
 
 
     Returns
@@ -145,6 +187,9 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
         Dimension chunks. For example :code:`[chan_chunks, corr_chunks]`.
     dtype : :class:`numpy.dtype`
         Column data type (numpy)
+    variable : bool
+        True if the column is variably shaped. Cells smaller than
+        ``shape`` are padded when read.
 
 
     Raises
@@ -193,32 +238,7 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
             ) from e
     # Variably shaped...
     else:
-        try:
-            # Get an exemplar row and infer the shape.
-            # A single-row read also works for ragged columns, which
-            # arcae cannot read across multiple rows
-            index = (slice(exemplar_row, exemplar_row + 1),)
-            exemplar = table_proxy.instance.getcol(column, index=index)[0]
-        except Exception as e:
-            raise ColumnMetadataError(
-                f"Unable to infer shape of column '{column}'"
-            ) from e
-
-        # Try figure out the shape
-        if isinstance(exemplar, np.ndarray):
-            shape = exemplar.shape
-
-            # Double-check the dtype
-            if arcae_dtype(dtype) != exemplar.dtype:
-                raise ColumnMetadataError(
-                    "Inferred dtype '%s' does not match "
-                    "the exemplar dtype '%s'" % (dtype, exemplar.dtype)
-                )
-        elif isinstance(exemplar, list):
-            shape = (len(exemplar),)
-            assert dtype == object
-        else:
-            raise ColumnMetadataError(f"Unhandled exemplar type '{type(exemplar)}'")
+        shape = _maximal_row_shape(column, table_proxy.instance, rows, exemplar_row)
 
         # NOTE(sjperkins)
         # -1 implies each row can be any shape whatsoever
@@ -227,7 +247,7 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
             log.warning(
                 "The shape of column '%s' is unconstrained "
                 "(ndim == -1). Assuming shape is %s from "
-                "exemplar",
+                "the largest row",
                 column,
                 shape,
             )
@@ -235,7 +255,7 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
         elif len(shape) != ndim:
             raise ColumnMetadataError(
                 "'ndim=%d' in column descriptor doesn't "
-                "match shape of exemplar=%s" % (ndim, shape)
+                "match the row shapes %s" % (ndim, shape)
             )
 
     # Get the column schema, or create a default
@@ -275,7 +295,8 @@ def column_metadata(column, table_proxy, table_schema, chunks, exemplar_row=0):
             "dim_chunks '%s' do not agree." % (shape, dims, dim_chunks)
         )
 
-    return ColumnMetadata(shape, dims, dim_chunks, dtype)
+    variable = ndim != "row" and not option & 4
+    return ColumnMetadata(shape, dims, dim_chunks, dtype, variable)
 
 
 def dim_extents_array(dim, chunks):
