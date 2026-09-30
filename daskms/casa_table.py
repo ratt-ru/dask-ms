@@ -54,26 +54,29 @@ def ninstances() -> int:
     return max(1, int(n))
 
 
-def row_index(row_runs):
-    """Convert ``(start, length)`` row runs into an arcae row index.
+def row_index(rows):
+    """Convert an array of row ids into an arcae row index.
 
-    A single run becomes a slice, which arcae can read without
-    materialising the intervening row numbers.
+    arcae accepts rows in any order and sorts them internally, returning
+    (or writing) data in the requested order. A contiguous ascending run
+    becomes a slice, which arcae can read without materialising the
+    intervening row numbers.
     """
-    if len(row_runs) == 1:
-        start, length = row_runs[0]
-        return slice(int(start), int(start) + int(length))
+    rows = np.asarray(rows, dtype=np.int64)
 
-    return np.concatenate([np.arange(s, s + l) for s, l in row_runs])
+    if rows.size > 0 and np.all(np.diff(rows) == 1):
+        return slice(int(rows[0]), int(rows[-1]) + 1)
+
+    return rows
 
 
-def build_index(row_runs, extents=()):
-    """Build an arcae index from row runs and inclusive dimension extents.
+def build_index(rows, extents=()):
+    """Build an arcae index from row ids and inclusive dimension extents.
 
     ``extents`` are ``(blc, trc)`` pairs in the python-casacore style,
     where ``trc`` is inclusive; arcae slices exclude their stop.
     """
-    return (row_index(row_runs),) + tuple(
+    return (row_index(rows),) + tuple(
         slice(int(blc), int(trc) + 1) for blc, trc in extents
     )
 

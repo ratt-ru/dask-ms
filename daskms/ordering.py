@@ -15,48 +15,6 @@ class GroupChunkingError(Exception):
     pass
 
 
-def row_run_factory(rows, sort="auto", sort_dir="read"):
-    """
-    Generate consecutive row runs, as well as sorting index
-    if ``sort`` is True.
-    """
-    if len(rows) == 0:
-        return np.empty((0, 2), dtype=np.int32)
-
-    if sort == "auto":
-        # Don't sort if rows monotically increase
-        sort = False if np.all(np.diff(rows) >= 0) else True
-
-    if sort is False:
-        resort = None
-    else:
-        # Sort input rows and map them to their original location
-        sorted_rows = np.sort(rows)
-        argsort = np.searchsorted(sorted_rows, rows)
-
-        # Generate index that recovers the original sort ordering
-        if sort_dir == "read":
-            resort = argsort
-        elif sort_dir == "write":
-            dtype = np.min_scalar_type(argsort.size)
-            inv_argsort = np.empty_like(argsort, dtype=dtype)
-            inv_argsort[argsort] = np.arange(argsort.size, dtype=dtype)
-            resort = inv_argsort
-        else:
-            raise ValueError(f"Invalid sort_dir '{sort_dir}'")
-
-        # Use sorted rows for creating row runs
-        rows = sorted_rows
-
-    diff = np.ediff1d(rows, to_begin=-10, to_end=-10)
-    idx = np.nonzero(diff != 1)[0]
-    start_and_len = np.empty((idx.size - 1, 2), dtype=np.int32)
-    start_and_len[:, 0] = rows[idx[:-1]]
-    start_and_len[:, 1] = np.diff(idx)
-
-    return start_and_len, resort
-
-
 def _sorted_rows(taql_proxy, startrow, nrow):
     index = (slice(startrow, startrow + nrow),)
     return taql_proxy.instance.getcol("__tablerow__", index=index)
@@ -88,11 +46,8 @@ def row_ordering(taql_proxy, index_cols, chunks):
 
     graph = HighLevelGraph.from_collections(name, layers, [])
     rows = da.Array(graph, name, chunks=chunks, dtype=np.int64)
-    rows = cached_array(rows)
-    row_runs = rows.map_blocks(row_run_factory, sort_dir="read", dtype=object)
-    row_runs = cached_array(row_runs)
 
-    return rows, row_runs
+    return cached_array(rows)
 
 
 def _sorted_group_rows(taql_proxy, group, index_cols):
@@ -124,10 +79,6 @@ def _group_ordering_arrays(
     -------
     sorted_rows : :class:`dask.array.Array`
         Sorted table rows chunked on ``group_row_chunks``.
-    row_runs : :class:`dask.array.Array`.
-        Array containing (row_run, resort) tuples.
-        Should not be directly computed.
-        Chunked on ``group_row_chunks``.
     """
     token = dask.base.tokenize(taql_proxy, group, group_nrows)
     name = "group-rows-" + token
@@ -153,12 +104,7 @@ def _group_ordering_arrays(
             "is applied to a later one." % (str(e), group_row_chunks, shape, group)
         )
 
-    group_rows = group_rows.rechunk(group_row_chunks)
-    row_runs = group_rows.map_blocks(row_run_factory, sort_dir="read", dtype=object)
-
-    row_runs = cached_array(row_runs)
-
-    return group_rows, row_runs
+    return group_rows.rechunk(group_row_chunks)
 
 
 def group_ordering_taql(table_proxy, group_cols, index_cols, taql_where=""):

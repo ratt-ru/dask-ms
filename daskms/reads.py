@@ -34,27 +34,27 @@ _DEFAULT_ROW_CHUNKS = 10000
 log = logging.getLogger(__name__)
 
 
-def getter_wrapper(row_orders, *args):
+def getter_wrapper(rows, *args):
     """Read a chunk of ``column`` out of the table.
 
-    arcae reads a whole chunk in a single call: the row runs and the
+    arcae reads a whole chunk in a single call: the row ids and the
     per-dimension chunk extents are combined into one index, and the data
-    is read directly into the output buffer.
+    is read directly into the output buffer. arcae returns rows in the
+    order requested, so no resorting is required.
     """
     # Infer number of shape arguments
     nextent_args = len(args) - 4
     # Extract other arguments
     casa_table, column, col_shape, dtype = args[nextent_args:]
 
-    # Handle dask compute_meta gracefully
-    if len(row_orders) == 0:
-        return np.empty((0,) * (nextent_args + 1), dtype=dtype)
-
-    row_runs, resort = row_orders
-
     # args[:nextent_args] is one inclusive (blc, trc) pair per non-row
     # dimension of the column, defining the extent of this chunk
     extents = args[:nextent_args]
+
+    # Handle dask compute_meta gracefully: it passes empty arrays
+    # in place of the extent pairs
+    if any(isinstance(e, np.ndarray) for e in extents):
+        return np.empty((0,) * (nextent_args + 1), dtype=dtype)
 
     if nextent_args > 0:
         shape = tuple(trc - blc + 1 for blc, trc in extents)
@@ -62,12 +62,12 @@ def getter_wrapper(row_orders, *args):
     else:
         shape = col_shape
 
-    result = np.empty((int(row_runs[:, 1].sum()),) + tuple(shape), dtype=dtype)
+    result = np.empty((len(rows),) + tuple(shape), dtype=dtype)
 
     if result.size == 0:
         return result
 
-    index = build_index(row_runs, extents)
+    index = build_index(rows, extents)
     table = casa_table.instance
 
     if dtype == object:
@@ -79,7 +79,7 @@ def getter_wrapper(row_orders, *args):
             # arcae refuses to flatten a variably shaped column into a single
             # array, and says so with a TypeError. It will read such a column
             # a row at a time though, so fall back to that.
-            _ragged_getcol(table, column, row_runs, index[1:], result)
+            _ragged_getcol(table, column, rows, index[1:], result)
         else:
             result[:] = data
     else:
@@ -87,11 +87,10 @@ def getter_wrapper(row_orders, *args):
         # bool buffer as bit-packed Arrow and reject it
         table.getcol(column, index=index, result=result.view(arcae_dtype(dtype)))
 
-    # Resort result if necessary
-    return result[resort] if resort is not None else result
+    return result
 
 
-def _ragged_getcol(table, column, row_runs, extent_index, result):
+def _ragged_getcol(table, column, rows, extent_index, result):
     """Read a variably shaped ``column`` one row at a time into ``result``.
 
     ``result`` has the single shape that ``column_metadata`` inferred from an
@@ -101,7 +100,6 @@ def _ragged_getcol(table, column, row_runs, extent_index, result):
     -- its ``getcol`` shaped the whole read from the first row and dropped the
     rest -- so this only makes the loss visible.
     """
-    rows = np.concatenate([np.arange(s, s + l) for s, l in row_runs])
     clipped = False
 
     for i, row in enumerate(rows):
@@ -131,7 +129,13 @@ def _ragged_getcol(table, column, row_runs, extent_index, result):
 
 
 def _dataset_variable_factory(
-    table_proxy, table_schema, select_cols, exemplar_row, orders, chunks, array_suffix
+    table_proxy,
+    table_schema,
+    select_cols,
+    exemplar_row,
+    sorted_rows,
+    chunks,
+    array_suffix,
 ):
     """
     Returns a dictionary of dask arrays representing
@@ -150,9 +154,9 @@ def _dataset_variable_factory(
     exemplar_row : int
         row id used to possibly extract an exemplar array in
         order to determine the column shape and dtype attributes
-    orders : tuple of :class:`dask.array.Array`
-        A (sorted_rows, row_runs) tuple, specifying the
-        appropriate rows to extract from the table.
+    sorted_rows : :class:`dask.array.Array`
+        The rows to extract from the table, in the order
+        they should appear in the dataset.
     chunks : dict
         Chunking strategy for the dataset.
     array_suffix : str
@@ -164,7 +168,6 @@ def _dataset_variable_factory(
         A dictionary looking like :code:`{column: (arrays, dims)}`.
     """
 
-    sorted_rows, row_runs = orders
     dataset_vars = {"ROWID": (("row",), sorted_rows)}
 
     for column in select_cols:
@@ -178,7 +181,7 @@ def _dataset_variable_factory(
             continue
 
         full_dims = ("row",) + meta.dims
-        args = [row_runs, ("row",)]
+        args = [sorted_rows, ("row",)]
 
         # We only need to pass in dimension extent arrays if
         # there is more than one chunk in any of the non-row columns.
@@ -423,7 +426,7 @@ class DatasetFactory(object):
         # Group by row
         elif len(self.group_cols) == 1 and self.group_cols[0] == "__row__":
             order_taql = ordering_taql(table_proxy, self.index_cols, self.taql_where)
-            sorted_rows, row_runs = row_ordering(
+            sorted_rows = row_ordering(
                 order_taql,
                 self.index_cols,
                 # chunk ordering on each row
@@ -433,7 +436,6 @@ class DatasetFactory(object):
             # Produce a dataset for each chunk (block),
             # each containing a single row
             row_blocks = sorted_rows.blocks
-            run_blocks = row_runs.blocks
 
             # Exemplar actually correspond to the sorted rows.
             # We reify them here so they can be assigned on each
@@ -441,9 +443,7 @@ class DatasetFactory(object):
             np_sorted_row = sorted_rows.compute()
 
             datasets = [
-                self._single_dataset(
-                    table_proxy, (row_blocks[r], run_blocks[r]), exemplar_row=er
-                )
+                self._single_dataset(table_proxy, row_blocks[r], exemplar_row=er)
                 for r, er in enumerate(np_sorted_row)
             ]
         # Grouping column case

@@ -25,16 +25,18 @@ from daskms.casa_table import (
     ninstances,
 )
 from daskms.optimisation import cached_array, inlined_array
-from daskms.ordering import row_run_factory
 from daskms.table import table_exists
 from daskms.utils import table_path_split
 
 log = logging.getLogger(__name__)
 
 
-def putter_wrapper(row_orders, *args):
+def putter_wrapper(rows, *args):
     """
     Write a chunk of ``column`` into the table.
+
+    arcae writes rows in the order given, sorting them internally,
+    so ``rows`` need not be sorted.
 
     Returns
     -------
@@ -46,13 +48,6 @@ def putter_wrapper(row_orders, *args):
     nextent_args = len(args) - 3
     # Extract other arguments
     casa_table, column, data = args[nextent_args:]
-
-    # Handle dask compute_meta gracefully
-    if len(row_orders) == 0:
-        return np.empty((0,) * nextent_args, dtype=bool)
-
-    row_runs, resort = row_orders
-    dict_data = False
 
     if isinstance(data, dict):
         # NOTE(sjperkins)
@@ -69,46 +64,32 @@ def putter_wrapper(row_orders, *args):
             )
 
         out_shape = (1,) * max(len(np.asarray(v).shape) for v in data.values())
-        dict_data = True
 
-        if resort is not None:
-            data = {
-                "r%d" % (i + 1): data["r%d" % (s + 1)] for i, s in enumerate(resort)
-            }
+        # Variably shaped rows differ in shape from one another, so each
+        # is written individually -- arcae can only address a ragged
+        # column one row at a time. Key "r<i + 1>" holds rows[i].
+        for i, row in enumerate(rows):
+            value = np.asarray(data["r%d" % (i + 1)])
+            # Restore the leading row dimension for scalar cells
+            if value.ndim == 0:
+                value = value[None]
+            row = int(row)
+            casa_table.instance.putcol(column, value, index=(slice(row, row + 1),))
 
     elif is_array_api_obj(data):
         data = np.asarray(to_device_cpu(data))
         # Infer output shape
         out_shape = (1,) * len(data.shape)
 
-        if resort is not None:
-            data = data[resort]
+        # An empty chunk has nothing to write. This also covers dask's
+        # compute_meta, which passes empty arrays for every argument
+        if len(rows) > 0:
+            # args[:nextent_args] is one inclusive (blc, trc) pair per
+            # non-row dimension of the column
+            index = build_index(rows, args[:nextent_args])
+            casa_table.instance.putcol(column, data, index=index)
     else:
         raise TypeError(f"data {type(data)} must be a numpy array or dict")
-
-    table = casa_table.instance
-
-    if dict_data:
-        # Variably shaped rows differ in shape from one another, so each
-        # is written individually -- arcae can only address a ragged
-        # column one row at a time
-        if row_runs.shape[0] != 1:
-            raise ValueError("Row runs unsupported for dictionary data")
-
-        startrow = int(row_runs[0, 0])
-
-        for i in range(len(data)):
-            value = np.asarray(data["r%d" % (i + 1)])
-            # Restore the leading row dimension for scalar cells
-            if value.ndim == 0:
-                value = value[None]
-            row = startrow + i
-            table.putcol(column, value, index=(slice(row, row + 1),))
-    else:
-        # args[:nextent_args] is one inclusive (blc, trc) pair per
-        # non-row dimension of the column
-        index = build_index(row_runs, args[:nextent_args])
-        table.putcol(column, data, index=index)
 
     return np.full(out_shape, True)
 
@@ -229,7 +210,7 @@ def _add_row_wrapper(table, rows, checkrow=-1):
 
     table.addrows(rows)
 
-    return (np.array([[startrow, rows]], dtype=np.int32), None)
+    return np.arange(startrow, startrow + rows, dtype=np.int64)
 
 
 def add_row_orders(data, table_proxy, prev=None):
@@ -243,9 +224,9 @@ def add_row_orders(data, table_proxy, prev=None):
 
     This function addresses this by ingesting a chunk of data. From this
     the number of rows in the chunk can be determined and added to the table.
-    The starting row and number of rows in the chunk are then returned
-    as a result, which is passed as input to the ``add_row_orders`` call,
-    operating on an adjacent chunk of row data.
+    The ids of the added rows are then returned as a result, which is passed
+    as input to the ``add_row_orders`` call, operating on an adjacent chunk
+    of row data.
 
     Parameters
     ----------
@@ -256,28 +237,23 @@ def add_row_orders(data, table_proxy, prev=None):
         set to the length of the dict.
     table_proxy : :class:`daskms.casa_table.CasaTable`
         Table Proxy object
-    prev : tuple or None
-        Previous row run array. This argument serves two purposes:
+    prev : :class:`numpy.ndarray` or None
+        Row ids added by the previous link in the chain.
+        This argument serves two purposes:
 
-        1. It is used to determine the *starting row* of the current
-           row ordering.
+        1. It is used to check the *starting row* of the current
+           row ordering: rows should be added directly after the last
+           row in ``prev``. The check is skipped if ``prev`` is empty.
         2. When this function is embedded in a dask graph, it establishes a
            dependency on the dask task which creates the previous rows.
 
-        Defaults to ``None``. If ``None``, assumes we're adding rows to
-        an empty table. :code:`([[0, rows]], None)` is returned.
-
-        If a :code:`(row_run, resort)` tuple, the first entry in
-        the starting row of the previous ``row_run`` is added
-        to it's length to produce the starting row of the current row run.
+        Defaults to ``None``, which indicates the first link in the chain.
+        Rows are then added from the table's current row count.
 
     Returns
     -------
     :class:`numpy.ndarray`
-        Row runs of shape :code:`(nruns, 2)` where the first component
-        contains the starting row and the last, the number of rows.
-    None
-        Indicate that row resorting should not occur by default
+        The ids of the added rows.
     """
     if is_array_api_obj(data):
         rows = data.shape[0]
@@ -292,15 +268,13 @@ def add_row_orders(data, table_proxy, prev=None):
     # are chained sequentially by add_row_order_factory rather than run
     # concurrently.
     #
-    # This is the first link in the chain
-    if prev is None:
+    # This is the first link in the chain,
+    # or the previous link added no rows
+    if prev is None or len(prev) == 0:
         return _add_row_wrapper(table_proxy.instance, rows, -1)
     else:
         # There's a previous link in the chain
-        prev_runs, _ = prev
-        startrow = prev_runs.sum()
-
-        return _add_row_wrapper(table_proxy.instance, rows, startrow)
+        return _add_row_wrapper(table_proxy.instance, rows, int(prev[-1]) + 1)
 
 
 def add_row_order_factory(table_proxy, datasets):
@@ -352,7 +326,7 @@ def add_row_order_factory(table_proxy, datasets):
 
             graph = HighLevelGraph.from_collections(name, layers, prev_deps + [array])
             chunks = (array.chunks[0],)
-            row_adds = da.Array(graph, name, chunks, dtype=object)
+            row_adds = da.Array(graph, name, chunks, dtype=np.int64)
             row_add_ops.append(row_adds)
             prev_deps = [row_adds]
 
@@ -370,7 +344,7 @@ def add_row_order_factory(table_proxy, datasets):
 
 def cached_row_order(rowid):
     """
-    Produce a cached row_order array from the given rowid array.
+    Produce a cached copy of the given rowid array.
 
     There's an assumption here that rowid is an
     operation with minimal dependencies
@@ -390,7 +364,7 @@ def cached_row_order(rowid):
     Returns
     -------
     row_order : :class:`dask.array.Array`
-        A array of row order tuples
+        A cached array of row ids
     """
     layers = rowid.__dask_graph__().layers
 
@@ -439,7 +413,11 @@ def cached_row_order(rowid):
             layer_names,
         )
 
-    row_order = rowid.map_blocks(row_run_factory, sort_dir="write", dtype=object)
+    # cached_array keeps the name of the array it is given, so copy rowid
+    # into a new layer first. Otherwise the cached array would have the
+    # same keys as rowid, but a different graph.
+    name = "row-order-" + dask.base.tokenize(rowid)
+    row_order = rowid.map_blocks(np.asarray, name=name, dtype=rowid.dtype)
 
     return cached_array(row_order)
 

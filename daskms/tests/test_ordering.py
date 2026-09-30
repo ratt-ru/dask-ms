@@ -131,7 +131,7 @@ def test_ordering_multiple_groups(ms, group_cols, index_cols):
 
     assert_array_equal(first_rows, [0, 1, 3, 4, 7, 8])
 
-    rowid_arrays = tuple(o[0] for o in orders)
+    rowid_arrays = tuple(orders)
     rowids = dask.compute(rowid_arrays)[0]
 
     assert_array_equal(rowids[0], [2, 0])
@@ -162,9 +162,9 @@ def test_row_ordering_no_group(ms, index_cols, chunks):
     # Normalise chunks to match that of the output array
     expected_chunks = da.core.normalize_chunks(chunks["row"], (10,))
 
-    assert orders[0].chunks == expected_chunks
+    assert orders.chunks == expected_chunks
 
-    rowids = dask.compute(orders[0])[0]
+    rowids = dask.compute(orders)[0]
     assert_array_equal(rowids, [9, 8, 7, 6, 5, 4, 3, 2, 1, 0])
 
     del orders, order_taql
@@ -199,7 +199,7 @@ def test_row_ordering_multiple_groups(ms, group_cols, index_cols, chunks):
     assert len(orders) == len(first_rows) == 2
     assert_array_equal(first_rows, [0, 7])
 
-    rowid_arrays = tuple(o[0] for o in orders)
+    rowid_arrays = tuple(orders)
     rowids = dask.compute(rowid_arrays)[0]
 
     # Check the two resulting groups
