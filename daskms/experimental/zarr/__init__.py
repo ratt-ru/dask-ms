@@ -18,12 +18,10 @@ from daskms.constants import DASKMS_PARTITION_KEY
 from daskms.dataset import Dataset, Variable
 from daskms.dataset_schema import DatasetSchema, encode_type, decode_type, decode_attr
 from daskms.experimental.utils import (
-    extent_args,
     select_vars_and_coords,
     column_iterator,
     promote_columns,
 )
-from daskms.optimisation import inlined_array
 from daskms.utils import requires
 from daskms.fsspec_store import DaskMSStore
 
@@ -206,28 +204,29 @@ def maybe_rechunk(dataset, group, rechunk=False):
     return dataset, group
 
 
-def zarr_setter(data, name, group, *extents):
+def zarr_setter(data, name, group, block_info=None):
+    """Write a block of ``data`` into the ``name`` array of ``group``.
+    Called through :func:`dask.array.map_blocks`, whose ``block_info``
+    supplies the block's extents"""
     try:
         zarray = getattr(group, name)
     except AttributeError:
         raise ValueError(f"{name} is not a variable of {group}")
 
-    selection = tuple(slice(start, end) for start, end in extents)
-    zarray[selection] = data
+    extents = block_info[0]["array-location"]
+    zarray[tuple(slice(start, end) for start, end in extents)] = data
     return np.full((1,) * len(extents), True)
 
 
 def _gen_writes(variables, chunks, factory, epoch, indirect_dims=False):
     for name, var in variables.items():
         if isinstance(var.data, da.Array):
-            ext_args = extent_args(var.dims, var.chunks)
             var_data = var.data
         elif isinstance(var.data, np.ndarray):
             try:
                 var_chunks = tuple(chunks[d] for d in var.dims)
             except KeyError:
                 var_chunks = tuple((s,) for s in var.shape)
-            ext_args = extent_args(var.dims, var_chunks)
             var_data = da.from_array(
                 var.data, chunks=var_chunks, inline_array=True, name=False
             )
@@ -237,28 +236,19 @@ def _gen_writes(variables, chunks, factory, epoch, indirect_dims=False):
         if var_data.nbytes == 0:
             continue
 
-        token_name = (
-            f"write~{name}-" f"{tokenize(var_data, name, factory, epoch, *ext_args)}"
-        )
+        token_name = f"write~{name}-{tokenize(var_data, name, factory, epoch)}"
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", category=da.PerformanceWarning)
-            write = da.blockwise(
-                zarr_setter,
-                var.dims,
-                var_data,
-                var.dims,
-                name,
-                None,
-                factory,
-                None,
-                *ext_args,
-                adjust_chunks={d: 1 for d in var.dims},
-                concatenate=False,
-                name=token_name,
-                meta=np.empty((1,) * len(var.dims), bool),
-            )
-        write = inlined_array(write, ext_args[::2])
+        # Each block reduces to a single bool
+        write = da.map_blocks(
+            zarr_setter,
+            var_data,
+            name,
+            factory,
+            chunks=tuple((1,) * n for n in var_data.numblocks),
+            dtype=bool,
+            meta=np.empty((0,) * var_data.ndim, bool),
+            name=token_name,
+        )
 
         # Alter the dimension names to preserve laziness on coordinates.
         dims = [f"_{d}_" for d in var.dims] if indirect_dims else var.dims
@@ -364,12 +354,17 @@ def xds_to_zarr(
     return write_datasets
 
 
-def zarr_getter(zarray, *extents):
-    if any([start == end for start, end in extents]):  # Empty slice.
-        shape = [start - end for start, end in extents]
+def zarr_getter(zarray, block_info=None):
+    """Read a block of ``zarray``. Called through
+    :func:`dask.array.map_blocks`, whose ``block_info``
+    supplies the block's extents"""
+    extents = block_info[None]["array-location"]
+
+    if any(start == end for start, end in extents):  # Empty slice.
+        shape = tuple(end - start for start, end in extents)
         return np.empty(shape, dtype=zarray.dtype)
-    else:
-        return zarray[tuple(slice(start, end) for start, end in extents)]
+
+    return zarray[tuple(slice(start, end) for start, end in extents)]
 
 
 def group_sortkey(element):
@@ -489,23 +484,16 @@ def xds_from_zarr(
             )
 
             array_chunks = da.core.normalize_chunks(array_chunks, zarray.shape)
-            ext_args = extent_args(dims, array_chunks)
-            token_name = f"read~{name}-{tokenize(zarray, epoch, *ext_args)}"
+            token_name = f"read~{name}-{tokenize(zarray, epoch, array_chunks)}"
 
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", category=da.PerformanceWarning)
-                read = da.blockwise(
-                    zarr_getter,
-                    dims,
-                    zarray,
-                    None,
-                    *ext_args,
-                    concatenate=False,
-                    name=token_name,
-                    meta=np.empty((0,) * zarray.ndim, zarray.dtype),
-                )
-
-            read = inlined_array(read, ext_args[::2])
+            read = da.map_blocks(
+                zarr_getter,
+                zarray,
+                chunks=array_chunks,
+                dtype=zarray.dtype,
+                meta=np.empty((0,) * zarray.ndim, zarray.dtype),
+                name=token_name,
+            )
             var = Variable(dims, read, attrs)
             (coords if coordinate else data_vars)[name] = var
 
