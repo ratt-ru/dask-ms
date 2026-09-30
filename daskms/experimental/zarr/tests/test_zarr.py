@@ -1,3 +1,4 @@
+import json
 import multiprocessing
 from multiprocessing import Pool
 import os
@@ -41,7 +42,43 @@ def test_zarr_string_array(tmp_path_factory):
     assert len(new_datasets) == len(datasets)
 
     for nds, ds in zip(new_datasets, datasets):
+        assert nds.DATA.dtype == object
         assert_array_equal(nds.DATA.data, ds.DATA.data)
+
+
+@pytest.mark.parametrize("consolidated", [True, False])
+def test_zarr2_json_string_array(tmp_path_factory, consolidated):
+    """Stores written by dask-ms with zarr-python 2 JSON encode
+    string columns, which zarr-python 3 cannot read"""
+    zarr_store = tmp_path_factory.mktemp("json-strings") / "test.zarr"
+
+    data = np.array(["hello", "world"], dtype=object)
+    datasets = [Dataset({"DATA": (("x",), da.from_array(data, chunks=1))})]
+    dask.compute(xds_to_zarr(datasets, zarr_store, consolidated=consolidated))
+
+    def as_zarr2(array_meta):
+        return {
+            **array_meta,
+            "dtype": "|O",
+            "filters": [{"id": "json2", "allow_nan": True}],
+        }
+
+    # Rewrite the metadata as dask-ms with zarr-python 2 would have written it
+    group_path = zarr_store / "MAIN" / "MAIN_0"
+
+    if consolidated:
+        metadata_path = group_path / ".zmetadata"
+        metadata = json.loads(metadata_path.read_text())
+        key = "DATA/.zarray"
+        metadata["metadata"][key] = as_zarr2(metadata["metadata"][key])
+    else:
+        metadata_path = group_path / "DATA" / ".zarray"
+        metadata = as_zarr2(json.loads(metadata_path.read_text()))
+
+    metadata_path.write_text(json.dumps(metadata))
+
+    with pytest.raises(ValueError, match="older dask-ms with zarr-python 2"):
+        xds_from_zarr(zarr_store, consolidated=consolidated)
 
 
 def test_xds_to_zarr_coords(tmp_path_factory):
