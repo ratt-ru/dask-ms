@@ -1,21 +1,63 @@
+"""Parallel partitioning and sorting of table indexing columns.
+
+Adapted from xarray-ms's ``xarray_ms.backend.msv2.partition``.
+"""
+
+from __future__ import annotations
+
 import concurrent.futures as cf
-from typing import Dict, List, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Sequence, Tuple
 
 import numpy as np
 import numpy.typing as npt
 
-PartitionKeyT = Tuple[Tuple[str, int | str], ...]
+PartitionKeyT = Tuple[Tuple[str, Any], ...]
+
+# The dtypes that arcae's merge_np_partitions accepts
+_MERGE_DTYPES = {np.dtype(np.int32), np.dtype(np.int64), np.dtype(np.float64)}
+
+
+def _mergeable(
+    values: npt.NDArray,
+) -> Tuple[npt.NDArray, Callable[[npt.NDArray], npt.NDArray]]:
+    """Map ``values`` onto a dtype that merge_np_partitions accepts,
+    preserving their order, and return a function that maps them back"""
+    dtype = values.dtype
+
+    if dtype in _MERGE_DTYPES:
+        return values, lambda v: v
+
+    # Integers that int64 represents exactly, and floats that
+    # float64 does, are widened
+    if dtype.kind in "biu" and dtype.itemsize <= 4:
+        return values.astype(np.int64), lambda v: v.astype(dtype)
+
+    if dtype.kind == "f" and dtype.itemsize < 8:
+        return values.astype(np.float64), lambda v: v.astype(dtype)
+
+    # Otherwise, such as for strings, replace values with their rank
+    uniques, ranks = np.unique(values, return_inverse=True)
+    return ranks.astype(np.int64), lambda v: uniques[v]
 
 
 class TablePartitioner:
-    """Partitions and sorts MSv2 indexing columns"""
+    """Partitions rows by ``partitionby`` columns and sorts each partition
+    by ``sortby`` columns, followed by ``other`` columns.
+
+    ``other`` may contain ``"row"``, which adds each row's position
+    in the input. As ``"row"`` is unique, placing it last makes the
+    sort order fully determined.
+    """
 
     _partitionby: List[str]
     _sortby: List[str]
     _other: List[str]
 
     def __init__(
-        self, partitionby: Sequence[str], sortby: Sequence[str], other: Sequence[str]
+        self,
+        partitionby: Sequence[str],
+        sortby: Sequence[str],
+        other: Sequence[str] = (),
     ):
         self._partitionby = list(partitionby)
         self._sortby = list(sortby)
@@ -24,82 +66,79 @@ class TablePartitioner:
     def partition(
         self, index: Dict[str, npt.NDArray], pool: cf.ThreadPoolExecutor
     ) -> Dict[PartitionKeyT, Dict[str, npt.NDArray]]:
-        other = set(self._other)
+        """Partition and sort the 1D arrays in ``index``.
 
-        if len(index) == 0:
-            raise ValueError(f"Empty index")
+        Returns:
+            A mapping from partition key to the partition's columns, in
+            ascending key order. A key is a tuple of ``(column, value)``
+            pairs in ``partitionby`` order, and is empty if there are
+            no ``partitionby`` columns.
+        """
+        index = {k: np.asarray(v) for k, v in index.items()}
+        nrows = {len(v) for v in index.values()}
 
-        if len(set_nrows := set(len(v) for v in index.values())) > 1:
-            raise ValueError(f"Index array length mismatch: {list(set_nrows)}")
+        if len(nrows) > 1:
+            raise ValueError(f"Index array length mismatch: {sorted(nrows)}")
 
-        nrows = next(iter(set_nrows))
+        if len(nrows) == 0 and "row" not in self._other:
+            raise ValueError("Empty index")
 
-        try:
-            other.remove("row")
-            index["row"] = np.arange(nrows, dtype=np.min_scalar_type(nrows))
-        except KeyError:
-            pass
+        nrow = nrows.pop() if nrows else 0
 
-        nrow = len(index)
-        nworkers = pool._max_workers
+        if "row" in self._other:
+            index["row"] = np.arange(nrow, dtype=np.int64)
+
+        # Order columns by partitioning, then sorting, then other columns.
+        # Remaining columns are carried along, and must also take part in
+        # the sort for merge_np_partitions to work
+        ordered = self._partitionby + self._sortby + self._other
+
+        if missing := set(ordered) - set(index):
+            raise ValueError(f"Columns {sorted(missing)} are missing from the index")
+
+        ordered += [c for c in index if c not in ordered]
+
+        if nrow == 0:
+            return {}
+
+        restore = {}
+        columns = {}
+
+        for column in ordered:
+            columns[column], restore[column] = _mergeable(index[column])
+
+        nworkers = getattr(pool, "_max_workers", 1)
         chunk = (nrow + nworkers - 1) // nworkers
-
-        # Order columns by
-        #
-        # 1. Partitioning columns
-        # 2. Sorting columns
-        # 3. Others (such as row and INTERVAL)
-        # 4. Remaining columns
-        #
-        # 4 is needed for the merge_np_partitions to work
-        ordered_columns = self._partitionby + self._sortby + self._other
-        ordered_columns += list(set(index.column_names) - set(ordered_columns))
-
-        # Create a dictionary out of the pyarrow table
-        table_dict = {k: index[k].to_numpy() for k in ordered_columns}
-        # Partition the data over the workers in the pool
-        partitions = [
-            {k: v[s : s + chunk] for k, v in table_dict.items()}
-            for s in range(0, nrow, chunk)
-        ]
-
-        # Sort each partition in parallel
-        def sort_partition(p):
-            sort_arrays = tuple(p[k] for k in reversed(ordered_columns))
-            indices = np.lexsort(sort_arrays)
-            return {k: v[indices] for k, v in p.items()}
-
-        partitions = list(pool.map(sort_partition, partitions))
-        # Merge partitions
-        merged = merge_np_partitions(partitions)
-
-        # Find the edges of the group partitions in parallel by
-        # partitioning the sorted merged values into chunks, including
-        # the starting value of the next chunk.
         starts = list(range(0, nrow, chunk))
-        group_values = [
-            {
-                k: v[s : s + chunk + 1]
-                for k, v in merged.items()
-                if k in self._partitionby
-            }
-            for s in starts
-        ]
-        assert len(starts) == len(group_values)
 
-        # Find the group start and end points in parallel by finding edges
-        def find_edges(p, s):
-            diffs = [np.diff(p[v]) > 0 for v in self._partitionby]
-            return np.where(np.logical_or.reduce(diffs))[0] + s + 1
+        # Sort each chunk in parallel
+        def sort_chunk(start):
+            chunk_columns = {k: v[start : start + chunk] for k, v in columns.items()}
+            indices = np.lexsort(tuple(chunk_columns[k] for k in reversed(ordered)))
+            return {k: v[indices] for k, v in chunk_columns.items()}
 
-        edges = list(pool.map(find_edges, group_values, starts))
-        group_offsets = np.concatenate([[0]] + edges + [[nrow]])
+        from arcae.lib.arrow_tables import merge_np_partitions
 
-        # Create the grouped partitions
-        groups: Dict[PartitionKeyT, Dict[str, npt.NDArray]] = {}
+        merged = merge_np_partitions(list(pool.map(sort_chunk, starts)))
 
-        for start, end in zip(group_offsets[:-1], group_offsets[1:]):
-            key = tuple(sorted((k, merged[k][start].item()) for k in self._partitionby))
-            groups[key] = {k: v[start:end] for k, v in merged.items()}
+        # Find partition edges in parallel. Each chunk includes the first
+        # value of the next chunk, so that an edge between chunks is found
+        def find_edges(start):
+            if not self._partitionby:
+                return np.empty(0, dtype=np.int64)
 
-        return groups
+            values = [merged[k][start : start + chunk + 1] for k in self._partitionby]
+            changed = np.logical_or.reduce([np.diff(v) > 0 for v in values])
+            return np.flatnonzero(changed) + start + 1
+
+        edges = list(pool.map(find_edges, starts))
+        offsets = np.concatenate([[0], *edges, [nrow]])
+
+        merged = {k: restore[k](v) for k, v in merged.items()}
+        partitions: Dict[PartitionKeyT, Dict[str, npt.NDArray]] = {}
+
+        for start, end in zip(offsets[:-1], offsets[1:]):
+            key = tuple((k, merged[k][start].item()) for k in self._partitionby)
+            partitions[key] = {k: v[start:end] for k, v in merged.items()}
+
+        return partitions
