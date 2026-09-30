@@ -4,6 +4,8 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Support Python 3.14 (:pr:`388`)
+* Cap xarray below 2026.9.0 while dask-ms is on zarr 2 (:pr:`388`)
 * Drop Python 3.10 (:pr:`386`)
 * Replace the minio server with moto's ``ThreadedMotoServer`` in the test
   suite (:pr:`385`)
