@@ -15,7 +15,7 @@ fragments = "daskms.apps.fragments:main"
 
 [project.optional-dependencies]
 # xarray 2026.9.0 requires zarr >=3 for zarr I/O, but dask-ms is pinned to
-# zarr <3, so xarray is capped below it until dask-ms moves to zarr 3
+# zarr <3, so xarray is capped below it until dask-ms moves to zarr 3 (#387)
 arrow = ['pandas >=2.1.2', 'pyarrow >=14.0.1']
 katdal = [
     'katdal >=0.23',
