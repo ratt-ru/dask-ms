@@ -8,7 +8,6 @@ import numpy as np
 from dask.highlevelgraph import HighLevelGraph
 
 from daskms.array_api_utils import is_array_api_obj, to_device_cpu
-from daskms.columns import dim_extents_array
 from daskms.constants import DASKMS_PARTITION_KEY
 from daskms.dataset import Dataset
 from daskms.dataset_schema import DatasetSchema
@@ -24,17 +23,19 @@ from daskms.casa_table import (
     create_table,
     ninstances,
 )
-from daskms.optimisation import cached_array, inlined_array
 from daskms.table import table_exists
 from daskms.utils import table_path_split
 
 log = logging.getLogger(__name__)
 
 
-def putter_wrapper(rows, *args):
+def putter_wrapper(data, rows, casa_table, column, block_info=None):
     """
-    Write a chunk of ``column`` into the table.
+    Write a block of ``column`` into the table.
 
+    Called through :func:`dask.array.map_blocks`, whose ``block_info``
+    supplies the block's half-open extent along each non-row dimension.
+    ``rows`` holds the block's row ids, with singleton non-row dimensions.
     arcae writes rows in the order given, sorting them internally,
     so ``rows`` need not be sorted.
 
@@ -44,26 +45,22 @@ def putter_wrapper(rows, *args):
         singleton array containing True,
         having the same dimensionality as the input data.
     """
-    # Infer number of shape arguments
-    nextent_args = len(args) - 3
-    # Extract other arguments
-    casa_table, column, data = args[nextent_args:]
+    info = block_info[0]
+    shape = info["shape"]
+    extents = info["array-location"][1:]
+    rows = np.asarray(rows).ravel()
+
+    # Only select along the non-row dimensions if they are chunked
+    if all(tuple(extent) == (0, s) for extent, s in zip(extents, shape[1:])):
+        extents = ()
 
     if isinstance(data, dict):
-        # NOTE(sjperkins)
-        # Here we're trying to reconcile the internal returned shape
-        # with the returned shape expected by dask. The external dask
-        # array metadata is plainly incorrect as a dict isn't a valid
-        # numpy array representation, so we heuristically guess the
-        # output shape here.
         # Dimension slicing is not supported for variably shaped data.
-        if nextent_args > 0:
+        if extents:
             raise ValueError(
                 "Chunked writes for secondary dimensions "
                 "unsupported for dictionary data"
             )
-
-        out_shape = (1,) * max(len(np.asarray(v).shape) for v in data.values())
 
         # Variably shaped rows differ in shape from one another, so each
         # is written individually -- arcae can only address a ragged
@@ -78,21 +75,15 @@ def putter_wrapper(rows, *args):
 
     elif is_array_api_obj(data):
         data = np.asarray(to_device_cpu(data))
-        # Infer output shape
-        out_shape = (1,) * len(data.shape)
 
-        # An empty chunk has nothing to write. This also covers dask's
-        # compute_meta, which passes empty arrays for every argument
+        # An empty block has nothing to write
         if len(rows) > 0:
-            # args[:nextent_args] is one inclusive (blc, trc) pair per
-            # non-row dimension of the column
-            extents = [(blc, trc + 1) for blc, trc in args[:nextent_args]]
             index = build_index(rows, extents)
             casa_table.instance.putcol(column, data, index=index)
     else:
         raise TypeError(f"data {type(data)} must be a numpy array or dict")
 
-    return np.full(out_shape, True)
+    return np.full((1,) * len(shape), True)
 
 
 def descriptor_builder(table, descriptor):
@@ -343,86 +334,6 @@ def add_row_order_factory(table_proxy, datasets):
     return row_add_ops
 
 
-def cached_row_order(rowid):
-    """
-    Produce a cached copy of the given rowid array.
-
-    There's an assumption here that rowid is an
-    operation with minimal dependencies
-    (i.e. derived from xds_from_{ms, table})
-    Caching flattens the graph into one or two layers
-    depending on whether standard or group ordering is requested
-
-    Therfore, this functions warns if the rowid graph looks unusual,
-    mostly because it'll be included in the cached row_order array,
-    so we don't want it's graph to be too big or unusual.
-
-    Parameters
-    ----------
-    rowid : :class:`dask.array.Array`
-        rowid array
-
-    Returns
-    -------
-    row_order : :class:`dask.array.Array`
-        A cached array of row ids
-    """
-    layers = rowid.__dask_graph__().layers
-
-    # daskms.ordering.row_ordering case
-    # or daskms.ordering.group_row_ordering case without rechunking
-    # Check for standard layer
-    if len(layers) == 1:
-        layer_name = list(layers.keys())[0]
-
-        if not layer_name.startswith("row-") and not layer_name.startswith(
-            "group-rows-"
-        ):
-            log.warning(
-                "Unusual ROWID layer %s. "
-                "This is probably OK but "
-                "could foreshadow incorrect "
-                "behaviour.",
-                layer_name,
-            )
-    # daskms.ordering.group_row_ordering case with rechunking
-    # Check for standard layers
-    elif len(layers) == 2:
-        layer_names = list(sorted(layers.keys()))
-
-        if not (
-            layer_names[0].startswith("group-rows-")
-            and layer_names[1].startswith("rechunk-merge-")
-        ):
-            log.warning(
-                "Unusual ROWID layers %s for "
-                "the group ordering case. "
-                "This is probably OK but "
-                "could foreshadow incorrect "
-                "behaviour.",
-                layer_names,
-            )
-    # ROWID has been extended or modified somehow, warn
-    else:
-        layer_names = list(sorted(layers.keys()))
-        log.warning(
-            "Unusual number of ROWID layers > 2 "
-            "%s. This is probably OK but "
-            "could foreshadow incorrect "
-            "behaviour or sub-par performance if "
-            "the ROWID graph is large.",
-            layer_names,
-        )
-
-    # cached_array keeps the name of the array it is given, so copy rowid
-    # into a new layer first. Otherwise the cached array would have the
-    # same keys as rowid, but a different graph.
-    name = "row-order-" + dask.base.tokenize(rowid)
-    row_order = rowid.map_blocks(np.asarray, name=name, dtype=rowid.dtype)
-
-    return cached_array(row_order)
-
-
 def _write_datasets(
     table, table_proxy, datasets, columns, descriptor, table_keywords, column_keywords
 ):
@@ -458,26 +369,19 @@ def _write_datasets(
             last_datasets = datasets[di:]
             last_row_orders = add_row_order_factory(table_proxy, last_datasets)
 
-            # We don't inline the row ordering if it is derived
-            # from the row sizes of provided arrays.
-            # The range of possible dependencies are far too large to inline
-            row_orders.extend([(False, lro) for lro in last_row_orders])
+            row_orders.extend(last_row_orders)
             # We have established row orders for all datasets
             # at this point, quit the loop
             break
         else:
-            # Update operation
-            # Generate row orderings from existing row IDs
-            row_order = cached_row_order(rowid)
-
-            # Inline the row ordering in the graph
-            row_orders.append((True, row_order))
+            # Update operation, writing to the existing rows in ROWID
+            row_orders.append(rowid)
 
     assert len(row_orders) == len(datasets)
 
     datasets = []
 
-    for (di, ds), (inline, row_order) in zip(sorted_datasets, row_orders):
+    for (di, ds), row_order in zip(sorted_datasets, row_orders):
         # Hold the variables representing array writes
         write_vars = {}
 
@@ -498,14 +402,6 @@ def _write_datasets(
                     "but a %s" % (column, di, type(array))
                 )
 
-            args = [row_order, ("row",)]
-
-            # We only need to pass in dimension extent arrays if
-            # there is more than one chunk in any of the non-row columns.
-            # In that case, we can putcol, otherwise putcolslice is required
-
-            inlinable_arrays = [row_order]
-
             if not (
                 np.isnan(row_order.shape[0])
                 if np.isnan(array.shape[0])
@@ -519,35 +415,26 @@ def _write_datasets(
                     f"ROWID shape and/or chunking does not match that of {column}"
                 )
 
-            if not all(len(c) == 1 for c in array.chunks[1:]):
-                # Add extent arrays
-                for d, c in zip(full_dims[1:], array.chunks[1:]):
-                    extent_array = dim_extents_array(d, c)
-                    args.append(extent_array)
-                    inlinable_arrays.append(extent_array)
-                    args.append((d,))
-
-            # Add other variables
-            args.extend([table_proxy, None, column, None, array, full_dims])
+            # Give the row ids singleton non-row dimensions,
+            # so that map_blocks aligns them with the array's rows
+            rows = row_order[(slice(None),) + (None,) * (array.ndim - 1)]
 
             # Name of the dask array representing this column
-            token = dask.base.tokenize(di, args)
+            token = dask.base.tokenize(di, row_order, table_proxy, column, array)
             name = "".join(("write~", column, "-", table_name, "-", token))
 
-            write_col = da.blockwise(
+            # All dims shrink to 1, a single bool is returned
+            write_col = da.map_blocks(
                 putter_wrapper,
-                full_dims,
-                *args,
-                # All dims shrink to 1,
-                # a single bool is returned
-                adjust_chunks={d: 1 for d in full_dims},
-                name=name,
-                align_arrays=False,
+                array,
+                rows,
+                table_proxy,
+                column,
+                chunks=tuple((1,) * n for n in array.numblocks),
                 dtype=bool,
+                meta=np.empty((0,) * array.ndim, dtype=bool),
+                name=name,
             )
-
-            if inline:
-                write_col = inlined_array(write_col, inlinable_arrays)
 
             write_vars[column] = (full_dims, write_col)
 

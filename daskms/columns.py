@@ -4,9 +4,7 @@ from collections import OrderedDict, namedtuple
 import logging
 from pprint import pformat
 
-import dask
 import dask.array as da
-from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 
 log = logging.getLogger(__name__)
@@ -297,41 +295,3 @@ def column_metadata(
 
     variable = ndim != "row" and not option & 4
     return ColumnMetadata(shape, dims, dim_chunks, dtype, variable)
-
-
-def dim_extents_array(dim, chunks):
-    """
-    Produces a an array of chunk extents for a given dimension.
-
-    Parameters
-    ----------
-    dim : str
-        Name of the dimension
-    chunks : tuple of ints
-        Dimension chunks
-
-    Returns
-    -------
-    dim_extents : :class:`dask.array.Array`
-        dask array where each chunk contains a single (start, end) tuple
-        defining the start and end of the chunk. The end is inclusive.
-
-        The array chunks match ``chunks`` and are inaccurate, but
-        are used to define chunk sizes of final outputs.
-
-    Notes
-    -----
-    The returned array should never be computed directly, but
-    rather used to produce dataset arrays.
-    """
-
-    name = "-".join((dim, dask.base.tokenize(dim, chunks)))
-    layers = {}
-    start = 0
-
-    for i, c in enumerate(chunks):
-        layers[(name, i)] = (start, start + c - 1)  # chunk end is inclusive
-        start += c
-
-    graph = HighLevelGraph.from_collections(name, layers, [])
-    return da.Array(graph, name, chunks=(chunks,), dtype=object)

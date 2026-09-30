@@ -101,3 +101,17 @@ def test_read_empty_table(tmp_path):
     (rds,) = xds_from_table(table, taql_where="ROWID() < 0", columns=["VALUE"])
     assert rds.VALUE.shape == (0, 3)
     assert rds.VALUE.data.compute().shape == (0, 3)
+
+
+def test_write_graph(ms):
+    """A write is one putcol per block, fed by the data and its row ids.
+    Nothing is cached or inlined in the graph"""
+    (ds,) = xds_from_table(ms, columns=["DATA"], chunks={"row": 3, "chan": 4})
+    (write,) = xds_to_table(ds, ms, ["DATA"])
+    graph = write.DATA.data.__dask_graph__()
+    prefixes = {name.split("~")[0].split("-")[0] for name in graph.layers}
+
+    # Read the data and its rows, give the rows the data's rank, then write
+    assert prefixes == {"read", "rowid", "getitem", "write"}
+    assert write.DATA.data.numblocks == ds.DATA.data.numblocks
+    dask.compute(write)
