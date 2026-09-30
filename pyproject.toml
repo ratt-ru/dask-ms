@@ -14,21 +14,23 @@ dask-ms = "daskms.apps.entrypoint:main"
 fragments = "daskms.apps.fragments:main"
 
 [project.optional-dependencies]
+# xarray 2026.9.0 requires zarr >=3 for zarr I/O, but dask-ms is pinned to
+# zarr <3, so xarray is capped below it until dask-ms moves to zarr 3
 arrow = ['pandas >=2.1.2', 'pyarrow >=14.0.1']
 katdal = [
     'katdal >=0.23',
-    'xarray >=2023.01.0',
+    'xarray >=2023.01.0, <2026.9.0',
     'zarr (>=2.12.0, < 3.0.0)',
     'numcodecs < 0.16.0'
 ]
-xarray = ['xarray >= 2023.01.0']
+xarray = ['xarray >=2023.01.0, <2026.9.0']
 zarr = ['zarr (>= 2.12.0, < 3.0.0)', 'numcodecs < 0.16.0']
 s3 = ['s3fs >=2023.1.0']
 complete = [
     's3fs >= 2023.1.0',
     'pandas',
     'pyarrow >=14.0.1',
-    'xarray>=2023.01.0', 'zarr (>= 2.12.0, < 3.0.0)',
+    'xarray >=2023.01.0, <2026.9.0', 'zarr (>= 2.12.0, < 3.0.0)',
     'numcodecs < 0.16.0',
     'katdal >= 0.23']
 # python-casacore is no longer a runtime dependency. It is kept here as an
