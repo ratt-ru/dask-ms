@@ -4,7 +4,7 @@ github_url = "https://github.com/ratt-ru/dask-ms"
 [version]
 current = "0.2.32"
 
-# Example of a semver regexp.
+# https://semver.org/#spec-item-9
 # Make sure this matches current_version before
 # using tbump
 regex = '''
@@ -13,7 +13,9 @@ regex = '''
   (?P<minor>\d+)
   \.
   (?P<patch>\d+)
-  '''
+  -?
+  (?P<ptype>(alpha|beta|rc)\.(?P<prerelease>\d+))?
+'''
 
 [git]
 message_template = "Bump to {new_version}"
