@@ -5,7 +5,10 @@ History
 X.Y.Z (YYYY-MM-DD)
 ------------------
 * Support Python 3.14 (:pr:`388`)
-* Cap xarray below 2026.9.0 while dask-ms is on zarr 2 (:pr:`388`)
+* Move ``daskms.experimental.zarr`` to zarr-python 3, still writing the zarr v2
+  format. String columns are now written as ``VariableLengthUTF8`` rather than
+  JSON encoded object arrays. Stores with string columns written by earlier
+  versions cannot be read and raise an informative error (:pr:`389`)
 * Drop Python 3.10 (:pr:`386`)
 * Replace the minio server with moto's ``ThreadedMotoServer`` in the test
   suite (:pr:`385`)

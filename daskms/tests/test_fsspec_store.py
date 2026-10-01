@@ -45,6 +45,8 @@ def test_store_type(tmp_path_factory):
 
 def test_local_store(tmp_path):
     zarr = pytest.importorskip("zarr")
+    from daskms.experimental.zarr import zarr_store
+
     payload = "How now brown cow"
     filename = "cow.txt"
     (tmp_path / filename).write_text(payload)
@@ -56,8 +58,8 @@ def test_local_store(tmp_path):
 
     assert store.map[filename] == payload.encode("utf-8")
 
-    root = zarr.group(store=store.map)
-    data = root.require_dataset("MODEL_DATA", shape=1000, dtype=np.complex128)  # noqa
+    root = zarr.group(store=zarr_store(store.fs, store.full_path))
+    data = root.require_array("MODEL_DATA", shape=1000, dtype=np.complex128)  # noqa
 
 
 def test_store_main_access(tmp_path_factory):
