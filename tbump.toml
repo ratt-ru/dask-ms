@@ -2,7 +2,7 @@
 github_url = "https://github.com/ratt-ru/dask-ms"
 
 [version]
-current = "0.2.32"
+current = "0.3.0-alpha.1"
 
 # https://semver.org/#spec-item-9
 # Make sure this matches current_version before
