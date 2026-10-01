@@ -2,8 +2,6 @@ import abc
 from functools import partial
 from pathlib import Path
 
-from daskms.patterns import lazy_import
-
 CASA_INPUT_ONLY_ARGS = ("group_columns", "index_columns", "taql_where")
 
 
@@ -121,12 +119,6 @@ class CasaMainFormat(CasaFormat):
     def __init__(self, version, subtables):
         super().__init__(version)
         self._subtables = subtables
-
-    def subtable_format(self, subtable: str):
-        if subtable not in self._subtables:
-            raise ValueError(f"{subtable} is not a valid subtable")
-
-        return CasaSubtableFormat(self.version, subtable)
 
     @property
     def subtables(self):

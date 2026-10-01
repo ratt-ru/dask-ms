@@ -10,7 +10,6 @@ import dask.array as da
 from dask.array.core import normalize_chunks
 from dask.base import tokenize
 import numpy as np
-import warnings
 
 ARRAY_DIMENSION = "_ARRAY_DIMENSIONS"
 
@@ -395,10 +394,6 @@ def zarr_getter(zarray, block_info=None):
 
     data = zarray[tuple(slice(start, end) for start, end in extents)]
     return data.astype(dtype, copy=False)
-
-
-def group_sortkey(element):
-    return int(element[0].split("_")[-1])
 
 
 @requires("pip install dask-ms[zarr] for zarr support", zarr_import_error)

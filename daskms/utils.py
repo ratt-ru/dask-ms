@@ -5,7 +5,6 @@ from collections import OrderedDict
 import logging
 from pathlib import PurePath, Path
 import re
-import time
 import inspect
 import warnings
 
@@ -185,20 +184,6 @@ def assert_liveness(tables, executors=None, collect=True):
                 lines.append(f"\t{str(r)}")
 
         raise ValueError("\n".join(lines))
-
-
-def log_call(fn):
-    def _wrapper(*args, **kwargs):
-        log.info("%s() start at %s", fn.__name__, time.clock())
-        try:
-            return fn(*args, **kwargs)
-        except Exception:
-            log.exception("%s() exception", fn.__name__)
-            raise
-        finally:
-            log.info("%s() done at %s", fn.__name__, time.clock())
-
-    return _wrapper
 
 
 def requires(*args):
