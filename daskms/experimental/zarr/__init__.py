@@ -89,7 +89,8 @@ def zarr_chunks(column, dims, chunks):
                 f"zarr does not currently support this"
             )
 
-    return tuple(zchunks)
+    # zarr 3 rejects zero chunk sizes, which arise on empty dimensions
+    return tuple(max(c, 1) for c in zchunks)
 
 
 def create_array(ds_group, column, column_schema, schema_chunks, coordinate=False):
@@ -395,7 +396,7 @@ def zarr_getter(zarray, *extents):
     dtype = object if is_string_dtype(zarray.dtype) else zarray.dtype
 
     if any([start == end for start, end in extents]):  # Empty slice.
-        shape = [start - end for start, end in extents]
+        shape = [end - start for start, end in extents]
         return np.empty(shape, dtype=dtype)
     else:
         data = zarray[tuple(slice(start, end) for start, end in extents)]

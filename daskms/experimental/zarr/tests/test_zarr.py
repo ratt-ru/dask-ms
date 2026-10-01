@@ -338,6 +338,17 @@ def test_basic_roundtrip(tmp_path):
     dask.compute(xds_to_zarr(xdsl, path))
 
 
+def test_empty_dimension_roundtrip(tmp_path):
+    path = tmp_path / "test.zarr"
+
+    x = da.zeros((10, 0), chunks=(5, 0))
+    dask.compute(xds_to_zarr([Dataset({"x": (("row", "chan"), x)})], path))
+
+    (xds,) = xds_from_zarr(path)
+    assert xds.x.shape == (10, 0)
+    assert_array_equal(xds.x.values, x.compute())
+
+
 @pytest.mark.skipif(xarray is None, reason="depends on xarray")
 @pytest.mark.parametrize(
     "prechunking",
