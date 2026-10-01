@@ -6,7 +6,7 @@ license = "BSD-3-Clause"
 version = "0.2.32"
 readme = "README.rst"
 authors = [{name = "Simon Perkins", email = "simon.perkins@gmail.com"}]
-requires-python = '>=3.11,<3.14'
+requires-python = '>=3.11,<3.15'
 dependencies = ['appdirs >=1.4.4', 'dask[array] >=2023.1.1', 'donfig >=0.8.0', 'python-casacore >=3.7.0', 'numpy >=2.0.0', 'fsspec >=2022.7.0', 'cacheout >=0.16.0']
 
 [project.scripts]
@@ -14,21 +14,23 @@ dask-ms = "daskms.apps.entrypoint:main"
 fragments = "daskms.apps.fragments:main"
 
 [project.optional-dependencies]
+# xarray 2026.9.0 requires zarr >=3 for zarr I/O, but dask-ms is pinned to
+# zarr <3, so xarray is capped below it until dask-ms moves to zarr 3 (#387)
 arrow = ['pandas >=2.1.2', 'pyarrow >=14.0.1']
 katdal = [
     'katdal >=0.23',
-    'xarray >=2023.01.0',
+    'xarray >=2023.01.0, <2026.9.0',
     'zarr (>=2.12.0, < 3.0.0)',
     'numcodecs < 0.16.0'
 ]
-xarray = ['xarray >= 2023.01.0']
+xarray = ['xarray >=2023.01.0, <2026.9.0']
 zarr = ['zarr (>= 2.12.0, < 3.0.0)', 'numcodecs < 0.16.0']
 s3 = ['s3fs >=2023.1.0']
 complete = [
     's3fs >= 2023.1.0',
     'pandas',
     'pyarrow >=14.0.1',
-    'xarray>=2023.01.0', 'zarr (>= 2.12.0, < 3.0.0)',
+    'xarray >=2023.01.0, <2026.9.0', 'zarr (>= 2.12.0, < 3.0.0)',
     'numcodecs < 0.16.0',
     'katdal >= 0.23']
 testing = ['moto[server] >=5.0.0', 'pytest >=8.0.0, != 9.1.0']
