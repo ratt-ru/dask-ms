@@ -25,7 +25,7 @@ import sys
 sys.path.insert(0, os.path.abspath(".."))
 import daskms  # noqa
 
-autodoc_mock_imports = ["pyrap", "s3fs", "xarray"]
+autodoc_mock_imports = ["arcae", "s3fs", "xarray"]
 
 # -- General configuration ---------------------------------------------
 
@@ -131,7 +131,6 @@ extlinks = {
 intersphinx_mapping = {
     "dask": ("https://dask.pydata.org/en/stable", None),
     "numpy": ("https://docs.scipy.org/doc/numpy/", None),
-    "pyrap": ("https://casacore.github.io/python-casacore", None),
     "python": ("https://docs.python.org/3/", None),
     "xarray": ("https://xarray.pydata.org/en/stable", None),
 }

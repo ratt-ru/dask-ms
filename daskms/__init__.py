@@ -18,4 +18,4 @@ from daskms.dask_ms import (
 )  # noqa
 
 from daskms.dataset import Dataset, Variable  # noqa
-from daskms.table_proxy import TableProxy  # noqa
+from daskms.casa_table import CasaTable  # noqa

@@ -214,7 +214,7 @@ def xds_to_table_fragment(xds, store, parent, **kwargs):
     write_datasets : list of :class:`xarray.Dataset`
         Datasets containing arrays representing write operations
         into a CASA Table
-    table_proxy : :class:`daskms.TableProxy`, optional
+    table_proxy : :class:`daskms.CasaTable`, optional
         The Table Proxy associated with the datasets
     """
 

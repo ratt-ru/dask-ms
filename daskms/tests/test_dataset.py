@@ -59,9 +59,9 @@ else:
 def test_dataset(ms, select_cols, group_cols, index_cols, shapes, chunks):
     """Test dataset creation"""
     datasets = read_datasets(ms, select_cols, group_cols, index_cols, chunks=chunks)
-    # (1) Read-only TableProxy
-    # (2) Read-only TAQL TableProxy
-    assert_liveness(2, 1)
+    # The read-only table. Rows are ordered by the TableStructure,
+    # rather than through a TAQL table
+    assert_liveness(1, 1)
 
     chans = shapes["chan"]
     corrs = shapes["corr"]
@@ -128,7 +128,7 @@ def test_dataset_updates(ms, select_cols, group_cols, index_cols, shapes, chunks
 
     try:
         datasets = read_datasets(ms, select_cols, group_cols, index_cols, chunks=chunks)
-        assert_liveness(2, 1)
+        assert_liveness(1, 1)
 
         # Test writes
         writes = []
@@ -183,7 +183,7 @@ def test_row_grouping(spw_table, spw_chan_freqs, chunks):
     """Test grouping on single rows"""
     datasets = read_datasets(spw_table, [], ["__row__"], [], chunks=chunks)
 
-    assert_liveness(2, 1)
+    assert_liveness(1, 1)
 
     assert len(datasets) == len(spw_chan_freqs)
 
@@ -500,7 +500,13 @@ def test_write_dict_data(tmp_path, chunks, dtype):
 
     dask.compute(writes)
 
-    data = table_proxy.getvarcol("DATA").result()
+    # arcae has no getvarcol, but it reads a ragged column a row at a time.
+    # Rebuild casacore's varcol mapping, whose keys are 1-based row numbers.
+    table = table_proxy.instance
+    data = {
+        f"r{row + 1}": table.getcol("DATA", index=(slice(row, row + 1),))
+        for row in range(table.nrow())
+    }
 
     # First row chunk
     assert_array_almost_equal(layer[(name, 0, 0, 0)]["r1"], data["r1"])
