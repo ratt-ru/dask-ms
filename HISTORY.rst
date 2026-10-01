@@ -4,6 +4,11 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Support Python 3.14 (:pr:`388`)
+* Move ``daskms.experimental.zarr`` to zarr-python 3, still writing the zarr v2
+  format. String columns are now written as ``VariableLengthUTF8`` rather than
+  JSON encoded object arrays. Stores with string columns written by earlier
+  versions cannot be read and raise an informative error (:pr:`389`)
 * Replace python-casacore with arcae in the CASA backend, removing the
   ``TableProxy``/``Executor`` pair that serialised all I/O for a table onto a
   single thread (:pr:`384`)
