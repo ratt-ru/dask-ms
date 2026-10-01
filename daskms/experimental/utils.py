@@ -1,5 +1,4 @@
 import logging
-from pathlib import Path
 from itertools import product
 
 import dask.array as da
@@ -74,26 +73,6 @@ def select_vars_and_coords(dataset, columns):
         ret_coords = {c: coords[c] for c in coord_sel}
 
     return ret_data_vars, ret_coords
-
-
-def store_path_split(store):
-    if not isinstance(store, Path):
-        store = Path(store)
-
-    parts = store.name.split("::", 1)
-
-    if len(parts) == 1:
-        name = parts[0]
-        subtable = "MAIN"
-    elif len(parts) == 2:
-        name, subtable = parts
-
-        if subtable == "MAIN":
-            raise ValueError("'MAIN' is a reserved subtable name")
-    else:
-        raise RuntimeError(f"len(parts) {len(parts)} not in (1, 2)")
-
-    return store.parent / name, subtable
 
 
 def largest_chunk(arr):

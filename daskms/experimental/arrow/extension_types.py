@@ -109,14 +109,6 @@ class TensorArray(ExtensionArray):
 
         return _tensor_to_array(obj, dtype)
 
-    @classmethod
-    def from_tensor(cls, obj):
-        assert isinstance(obj, pa.Tensor)
-        assert obj.is_contiguous
-        dtype = obj.type
-
-        return _tensor_to_array(obj, dtype)
-
     def to_numpy(self, zero_copy_only=True, writeable=False):
         if zero_copy_only is False:
             raise NotImplementedError("zero_copy_only is False for Tensors")
@@ -150,9 +142,6 @@ class TensorArray(ExtensionArray):
             return unpacked_array.view(np.bool_).reshape(shape)
         else:
             return np.ndarray(shape, buffer=bufs[3], dtype=dtype)
-
-    def to_tensor(self):
-        return pa.Tensor.from_numpy(self.to_numpy())
 
 
 class ComplexArray(ExtensionArray):

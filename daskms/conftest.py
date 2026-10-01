@@ -2,7 +2,6 @@
 
 import gc
 import logging
-import multiprocessing
 import os
 import socket
 from uuid import uuid4
