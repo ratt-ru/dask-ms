@@ -2,8 +2,6 @@ import abc
 from functools import partial
 from pathlib import Path
 
-from daskms.patterns import lazy_import
-
 CASA_INPUT_ONLY_ARGS = ("group_columns", "index_columns", "taql_where")
 
 
@@ -29,11 +27,10 @@ class TableFormat(abc.ABC):
         typ = store.type()
 
         if typ == "casa":
-            from daskms.table_proxy import TableProxy
-            import casacore.tables as ct
+            from daskms.casa_table import CasaTable
 
-            table_proxy = TableProxy(ct.table, store.root, readonly=True, ack=False)
-            keywords = table_proxy.getkeywords().result()
+            casa_table = CasaTable.from_table(store.root, readonly=True)
+            keywords = casa_table.instance.getkeywords()
             subtables = CasaFormat.find_subtables(keywords)
 
             try:
@@ -122,12 +119,6 @@ class CasaMainFormat(CasaFormat):
     def __init__(self, version, subtables):
         super().__init__(version)
         self._subtables = subtables
-
-    def subtable_format(self, subtable: str):
-        if subtable not in self._subtables:
-            raise ValueError(f"{subtable} is not a valid subtable")
-
-        return CasaSubtableFormat(self.version, subtable)
 
     @property
     def subtables(self):

@@ -4,7 +4,7 @@ import logging
 
 __author__ = """Simon Perkins"""
 __email__ = "sperkins@ska.ac.za"
-__version__ = "0.2.32"
+__version__ = "0.3.0-alpha.1"
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
@@ -18,4 +18,4 @@ from daskms.dask_ms import (
 )  # noqa
 
 from daskms.dataset import Dataset, Variable  # noqa
-from daskms.table_proxy import TableProxy  # noqa
+from daskms.casa_table import CasaTable  # noqa

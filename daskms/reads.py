@@ -2,195 +2,191 @@
 
 import logging
 from pathlib import Path
-import warnings
+from uuid import uuid4
 
 import dask
 import dask.array as da
+from dask.array.core import normalize_chunks
 import numpy as np
 
 from daskms.columns import (
+    arcae_dtype,
     column_metadata,
     ColumnMetadataError,
-    dim_extents_array,
     infer_dtype,
 )
+from daskms.casa_table import CasaTable, build_index, ninstances
 from daskms.constants import DASKMS_PARTITION_KEY
-from daskms.patterns import lazy_import
-from daskms.ordering import (
-    ordering_taql,
-    row_ordering,
-    group_ordering_taql,
-    group_row_ordering,
-)
-from daskms.optimisation import inlined_array
 from daskms.dataset import Dataset
-from daskms.table_executor import executor_key
+from daskms.structure import ROW_GROUP, structure_factory
 from daskms.table import table_exists
-from daskms.table_proxy import TableProxy, READLOCK
 from daskms.table_schemas import lookup_table_schema
 from daskms.utils import table_path_split
 
 _DEFAULT_ROW_CHUNKS = 10000
 
-ct = lazy_import("casacore.tables")
-
 log = logging.getLogger(__name__)
 
 
-def ndarray_getcol(row_runs, table_future, column, result, dtype):
-    """Get numpy array data"""
-    table = table_future.result()
-    getcolnp = table.getcolnp
-    rr = 0
-
-    table.lock(write=False)
-
-    try:
-        for rs, rl in row_runs:
-            getcolnp(column, result[rr : rr + rl], startrow=rs, nrow=rl)
-            rr += rl
-    finally:
-        table.unlock()
-
-    return result
+class GroupChunkingError(ValueError):
+    pass
 
 
-def ndarray_getcolslice(row_runs, table_future, column, result, blc, trc, dtype):
-    """Get numpy array data"""
-    table = table_future.result()
-    getcolslicenp = table.getcolslicenp
-    rr = 0
+def getter_wrapper(
+    rows, casa_table, column, col_shape, dtype, variable, block_info=None
+):
+    """Read a block of ``column`` out of the table.
 
-    table.lock(write=False)
+    Called through :func:`dask.array.map_blocks`, whose ``block_info``
+    supplies the block's half-open extent along each non-row dimension.
+    arcae reads a whole block in a single call: the row ids and the
+    extents are combined into one index, and the data is read directly
+    into the output buffer. arcae returns rows in the order requested,
+    so no resorting is required.
 
-    try:
-        for rs, rl in row_runs:
-            getcolslicenp(
-                column, result[rr : rr + rl], blc=blc, trc=trc, startrow=rs, nrow=rl
-            )
-            rr += rl
-    finally:
-        table.unlock()
-
-    return result
-
-
-def object_getcol(row_runs, table_future, column, result, dtype):
-    """Get object list data"""
-    table = table_future.result()
-    getcol = table.getcol
-    rr = 0
-
-    table.lock(write=False)
-
-    try:
-        for rs, rl in row_runs:
-            data = getcol(column, rs, rl)
-
-            # Multi-dimensional string arrays are returned as a
-            # dict with 'array' and 'shape' keys. Massage the data.
-            if isinstance(data, dict):
-                data = np.asarray(data["array"], dtype=dtype).reshape(data["shape"])
-
-            # NOTE(sjperkins)
-            # Dask wants ndarrays internally, so we asarray objects
-            # the returning list of objects.
-            # See https://github.com/ska-sa/dask-ms/issues/42
-            result[rr : rr + rl] = np.asarray(data, dtype=dtype)
-
-            rr += rl
-    finally:
-        table.unlock()
-
-    return result
-
-
-def object_getcolslice(row_runs, table_future, column, result, blc, trc, dtype):
-    """Get object list data"""
-    table = table_future.result()
-    getcolslice = table.getcolslice
-    rr = 0
-
-    table.lock(write=False)
-
-    try:
-        for rs, rl in row_runs:
-            data = getcolslice(column, blc, trc, startrow=rs, nrow=rl)
-
-            # Multi-dimensional string arrays are returned as a
-            # dict with 'array' and 'shape' keys. Massage the data.
-            if isinstance(data, dict):
-                data = np.asarray(data["array"], dtype=dtype).reshape(data["shape"])
-
-            # NOTE(sjperkins)
-            # Dask wants ndarrays internally, so we asarray objects
-            # the returning list of objects.
-            # See https://github.com/ska-sa/dask-ms/issues/42
-            result[rr : rr + rl] = np.asarray(data, dtype=dtype)
-
-            rr += rl
-    finally:
-        table.unlock()
-
-    return result
-
-
-def getter_wrapper(row_orders, *args):
+    Cells of a ``variable`` (variably shaped) column that are smaller than
+    ``col_shape`` are padded with :func:`pad_value`.
     """
-    Wrapper running I/O operations
-    within the table_proxy's associated executor
-    """
-    # Infer number of shape arguments
-    nextent_args = len(args) - 4
-    # Extract other arguments
-    table_proxy, column, col_shape, dtype = args[nextent_args:]
+    extents = block_info[None]["array-location"][1:]
+    shape = (len(rows),) + tuple(stop - start for start, stop in extents)
 
-    # Handle dask compute_meta gracefully
-    if len(row_orders) == 0:
-        return np.empty((0,) * (nextent_args + 1), dtype=dtype)
+    if np.prod(shape) == 0:
+        return np.empty(shape, dtype=dtype)
 
-    row_runs, resort = row_orders
+    # Only select along the non-row dimensions if they are chunked.
+    # Otherwise whole cells are read, which are padded if they are
+    # smaller than col_shape
+    if all(extent == (0, s) for extent, s in zip(map(tuple, extents), col_shape)):
+        extents = ()
 
-    # In this case, we've been passed dimension extent arrays
-    # that define a slice of the column and we defer to getcolslice.
-    if nextent_args > 0:
-        blc, trc = zip(*args[:nextent_args])
-        shape = tuple(t - b + 1 for b, t in zip(blc, trc))
-        result = np.empty((np.sum(row_runs[:, 1]),) + shape, dtype=dtype)
+    table = casa_table.instance
+    index = build_index(rows, extents)
 
-        if result.size == 0:
-            return result
+    try:
+        return _getcol(table, column, index, shape, dtype, variable)
+    except IndexError as e:
+        if not (variable and extents):
+            raise
 
-        io_fn = object_getcolslice if np.dtype == object else ndarray_getcolslice
+        # arcae rejects a selection that extends past the end of a cell.
+        # This only happens if a dataset mixes cells of different shapes
+        # and the column's non-row dimensions are also chunked
+        raise IndexError(
+            f"Chunk {index[1:]} of variably shaped column '{column}' extends "
+            f"past the end of some of its cells. Group the table so that the "
+            f"cells in each dataset share a shape (the default DATA_DESC_ID "
+            f"grouping for a Measurement Set, or group_cols='__row__' for a "
+            f"subtable), or leave the non-row dimensions of '{column}' unchunked."
+        ) from e
 
-        # Submit table I/O on executor
-        future = table_proxy._ex.submit(
-            io_fn, row_runs, table_proxy._table_future, column, result, blc, trc, dtype
-        )
-    # In this case, the full resolution data
-    # for each row is requested, so we defer to getcol
+
+def _rowid_block(structure_factory, key, block_info=None):
+    """A block of a partition's sorted row ids"""
+    ((start, stop),) = block_info[None]["array-location"]
+    return structure_factory.instance[key].rows[start:stop]
+
+
+def rowid_array(structure_factory, partition, row_chunks, array_suffix):
+    """A dask array of ``partition``'s sorted row ids, whose blocks
+    are looked up in the structure when they are computed"""
+    try:
+        chunks = normalize_chunks(row_chunks, shape=(partition.nrow,))
+    except ValueError as e:
+        raise GroupChunkingError(
+            f"{e}\n"
+            f"Unable to match chunks '{row_chunks}' with shape "
+            f"'{(partition.nrow,)}' for partition {partition.key}. "
+            f"This can occur if too few chunk dictionaries have been "
+            f"supplied for the number of groups and an earlier group's "
+            f"chunking strategy is applied to a later one."
+        ) from e
+
+    token = dask.base.tokenize(structure_factory, partition.key, chunks)
+
+    return da.map_blocks(
+        _rowid_block,
+        structure_factory,
+        partition.key,
+        chunks=chunks,
+        dtype=np.int64,
+        meta=np.empty((0,), dtype=np.int64),
+        name=f"rowid~{array_suffix}-{token}",
+    )
+
+
+def pad_value(dtype):
+    """The value that pads cells of a variably shaped column"""
+    dtype = np.dtype(dtype)
+
+    if dtype == object:
+        return ""
+    elif dtype.kind in "fc":
+        return np.nan
+    elif dtype.kind == "b":
+        return False
+
+    return 0
+
+
+def _getcol(table, column, index, shape, dtype, variable):
+    if dtype == object:
+        # arcae cannot read strings into a pre-allocated buffer
+        if variable:
+            return _variable_string_getcol(table, column, index, shape)
+
+        return table.getcol(column, index=index)
+
+    if variable:
+        # arcae pads cells that are smaller than the result
+        result = np.full(shape, pad_value(dtype), dtype=dtype)
     else:
-        result = np.empty((np.sum(row_runs[:, 1]),) + col_shape, dtype=dtype)
+        result = np.empty(shape, dtype=dtype)
 
-        if result.size == 0:
-            return result
+    # arcae_dtype for the bool case: arcae would otherwise size a numpy
+    # bool buffer as bit-packed Arrow and reject it
+    table.getcol(column, index=index, result=result.view(arcae_dtype(dtype)))
+    return result
 
-        io_fn = object_getcol if dtype == object else ndarray_getcol
 
-        # Submit table I/O on executor
-        future = table_proxy._ex.submit(
-            io_fn, row_runs, table_proxy._table_future, column, result, dtype
-        )
+def _variable_string_getcol(table, column, index, shape):
+    """Read a variably shaped string ``column``, padding cells to ``shape``.
 
-    # Resort result if necessary
-    if resort is not None:
-        return future.result()[resort]
+    arcae returns such a column as nested Arrow lists, rather than
+    reading it into a pre-allocated buffer, so the padding happens here.
+    It cannot select along secondary dimensions when doing so, so whole
+    cells are read and the ``index[1:]`` slices applied to each of them.
+    """
+    rows, secondary = index[0], index[1:]
 
-    return future.result()
+    if isinstance(rows, slice):
+        rows = np.arange(rows.start, rows.stop)
+
+    result = np.full(shape, pad_value(object), dtype=object)
+
+    # arcae omits the column entirely if any requested cell is
+    # undefined, so only read those that are
+    (defined,) = np.nonzero(table.row_shapes(column, (rows,)).is_valid())
+
+    if len(defined) == 0:
+        return result
+
+    arrow_table = table.to_arrow((rows[defined],), column)
+
+    for i, cell in zip(defined, arrow_table.column(column).to_pylist()):
+        cell = np.array(cell, dtype=object)[secondary]
+        result[(i,) + tuple(slice(0, s) for s in cell.shape)] = cell
+
+    return result
 
 
 def _dataset_variable_factory(
-    table_proxy, table_schema, select_cols, exemplar_row, orders, chunks, array_suffix
+    table_proxy,
+    table_schema,
+    select_cols,
+    partition,
+    rowid,
+    chunks,
+    array_suffix,
 ):
     """
     Returns a dictionary of dask arrays representing
@@ -200,18 +196,18 @@ def _dataset_variable_factory(
 
     Parameters
     ----------
-    table_proxy : :class:`daskms.table_proxy.TableProxy`
+    table_proxy : :class:`daskms.casa_table.CasaTable`
         Table proxy object
     table_schema : dict
         Table schema
     select_cols : list of strings
         List of columns to return
-    exemplar_row : int
-        row id used to possibly extract an exemplar array in
-        order to determine the column shape and dtype attributes
-    orders : tuple of :class:`dask.array.Array`
-        A (sorted_rows, row_runs) tuple, specifying the
-        appropriate rows to extract from the table.
+    partition : :class:`daskms.structure.PartitionData`
+        The partition of the table that the dataset holds. Its rows and
+        exemplar row determine the shape of variably shaped columns.
+    rowid : :class:`dask.array.Array`
+        The partition's sorted row ids, in the order that they
+        should appear in the dataset.
     chunks : dict
         Chunking strategy for the dataset.
     array_suffix : str
@@ -223,13 +219,17 @@ def _dataset_variable_factory(
         A dictionary looking like :code:`{column: (arrays, dims)}`.
     """
 
-    sorted_rows, row_runs = orders
-    dataset_vars = {"ROWID": (("row",), sorted_rows)}
+    dataset_vars = {"ROWID": (("row",), rowid)}
 
     for column in select_cols:
         try:
             meta = column_metadata(
-                column, table_proxy, table_schema, chunks, exemplar_row
+                column,
+                table_proxy,
+                table_schema,
+                chunks,
+                partition.exemplar_row,
+                rows=partition.rows,
             )
         except ColumnMetadataError as e:
             exc_info = logging.DEBUG >= log.getEffectiveLevel()
@@ -237,51 +237,24 @@ def _dataset_variable_factory(
             continue
 
         full_dims = ("row",) + meta.dims
-        args = [row_runs, ("row",)]
-
-        # We only need to pass in dimension extent arrays if
-        # there is more than one chunk in any of the non-row columns.
-        # In that case, we can getcol, otherwise getcolslice is required
-        if not all(len(c) == 1 for c in meta.chunks):
-            for d, c in zip(meta.dims, meta.chunks):
-                # Create an array describing the dimension chunk extents
-                args.append(dim_extents_array(d, c))
-                args.append((d,))
-
-            # Disable getcolslice caching
-            # https://github.com/ska-sa/dask-ms/issues/92
-            # https://github.com/casacore/casacore/issues/1018
-            table_proxy.setmaxcachesize(column, 1).result()
-
-            new_axes = {}
-        else:
-            # We need to inform blockwise about the size of our
-            # new dimensions as no arrays with them are supplied
-            new_axes = {d: s for d, s in zip(meta.dims, meta.shape)}
-
-        # Add other variables
-        args.extend(
-            [table_proxy, None, column, None, meta.shape, None, meta.dtype, None]
-        )
-
-        # Name of the dask array representing this column
-        token = dask.base.tokenize(args)
+        ndim = len(full_dims)
+        token = dask.base.tokenize(rowid.name, table_proxy, column, meta)
         name = "~".join(("read", column, array_suffix)) + "-" + token
 
-        # Construct the array
-
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", category=da.PerformanceWarning)
-            dask_array = da.blockwise(
-                getter_wrapper,
-                full_dims,
-                *args,
-                name=name,
-                new_axes=new_axes,
-                dtype=meta.dtype,
-            )
-
-        dask_array = inlined_array(dask_array)
+        dask_array = da.map_blocks(
+            getter_wrapper,
+            rowid,
+            table_proxy,
+            column,
+            meta.shape,
+            meta.dtype,
+            meta.variable,
+            new_axis=list(range(1, ndim)),
+            chunks=rowid.chunks + tuple(meta.chunks),
+            dtype=meta.dtype,
+            meta=np.empty((0,) * ndim, dtype=meta.dtype),
+            name=name,
+        )
 
         # Assign into variable and dimension dataset
         dataset_vars[column] = (full_dims, dask_array)
@@ -291,7 +264,7 @@ def _dataset_variable_factory(
 
 def _col_keyword_getter(table):
     """Gets column keywords for all columns in table"""
-    return {c: table.getcolkeywords(c) for c in table.colnames()}
+    return {c: table.getcolkeywords(c) for c in table.columns()}
 
 
 class DatasetFactory(object):
@@ -319,105 +292,109 @@ class DatasetFactory(object):
         self.column_keywords = kwargs.pop("column_keywords", False)
         self.table_proxy = kwargs.pop("table_proxy", False)
         self.context = kwargs.pop("context", None)
+        self.epoch = kwargs.pop("epoch", None) or uuid4().hex[:16]
 
         if len(kwargs) > 0:
             raise ValueError(f"Unhandled kwargs: {kwargs}")
 
-    def _table_proxy_factory(self):
-        return TableProxy(
-            ct.table,
-            self.table_path,
-            ack=False,
-            readonly=True,
-            lockoptions="user",
-            __executor_key__=executor_key(self.canonical_name),
+    def _casa_table_factory(self):
+        return CasaTable.from_table(
+            self.table_path, ninstances=ninstances(), readonly=True
         )
 
     def _table_schema(self):
         return lookup_table_schema(self.canonical_name, self.table_schema)
 
-    def _single_dataset(self, table_proxy, orders, exemplar_row=0):
+    def _single_dataset(self, table_proxy, factory, partition):
         _, t, s = table_path_split(self.canonical_name)
         short_table_name = "/".join((t, s)) if s else t
+        chunks = self.chunks[0]
 
         table_schema = self._table_schema()
-        select_cols = set(self.select_cols or table_proxy.colnames().result())
+        select_cols = set(self.select_cols or table_proxy.instance.columns())
+        rowid = rowid_array(factory, partition, chunks["row"], short_table_name)
         variables = _dataset_variable_factory(
             table_proxy,
             table_schema,
             select_cols,
-            exemplar_row,
-            orders,
-            self.chunks[0],
+            partition,
+            rowid,
+            chunks,
             short_table_name,
         )
 
         try:
-            rowid = variables.pop("ROWID")
+            coords = {"ROWID": variables.pop("ROWID")}
         except KeyError:
             coords = None
-        else:
-            coords = {"ROWID": rowid}
 
         attrs = {DASKMS_PARTITION_KEY: ()}
         dataset = Dataset(variables, coords=coords, attrs=attrs)
         return self.postprocess_dataset(
-            dataset, table_proxy, exemplar_row, orders, self.chunks[0], short_table_name
+            dataset, table_proxy, partition, rowid, chunks, short_table_name
         )
 
-    def _group_datasets(self, table_proxy, groups, exemplar_rows, orders):
+    def _group_datasets(self, table_proxy, factory, partitions):
         _, t, s = table_path_split(self.canonical_name)
         short_table_name = "/".join((t, s)) if s else t
         table_schema = self._table_schema()
 
-        datasets = []
-        group_ids = list(zip(*groups))
+        # Cast group values to the actual column dtype
+        group_types = [
+            infer_dtype(c, table_proxy.instance.getcoldesc(c)) for c in self.group_cols
+        ]
 
-        assert len(group_ids) == len(orders)
+        datasets = []
 
         # Select columns, excluding grouping columns
-        select_cols = set(self.select_cols or table_proxy.colnames().result())
+        select_cols = set(self.select_cols or table_proxy.instance.columns())
         select_cols -= set(self.group_cols)
 
         # Create a dataset for each group
-        it = enumerate(zip(group_ids, exemplar_rows, orders))
-
-        for g, (group_id, exemplar_row, order) in it:
+        for g, partition in enumerate(partitions):
             # Extract group chunks
             try:
                 group_chunks = self.chunks[g]  # Get group chunking strategy
             except IndexError:
                 group_chunks = self.chunks[-1]  # Re-use last group's chunks
 
+            try:
+                row_chunks = group_chunks["row"]
+            except KeyError:
+                raise ValueError(f"No row chunking scheme found in {group_chunks}!")
+
+            group_id = [
+                np.asarray(v).astype(t) for (_, v), t in zip(partition.key, group_types)
+            ]
+
             # Prefix dataset
             gid_str = ",".join(str(gid) for gid in group_id)
             array_suffix = f"[{gid_str}]-{short_table_name}"
 
             # Create dataset variables
+            rowid = rowid_array(factory, partition, row_chunks, array_suffix)
             group_var_dims = _dataset_variable_factory(
                 table_proxy,
                 table_schema,
                 select_cols,
-                exemplar_row,
-                order,
+                partition,
+                rowid,
                 group_chunks,
                 array_suffix,
             )
 
             # Extract ROWID
             try:
-                rowid = group_var_dims.pop("ROWID")
+                coords = {"ROWID": group_var_dims.pop("ROWID")}
             except KeyError:
                 coords = None
-            else:
-                coords = {"ROWID": rowid}
 
             # Assign values for the dataset's grouping columns
             # as attributes
-            partitions = tuple(
+            partitions_attr = tuple(
                 (c, g.dtype.name) for c, g in zip(self.group_cols, group_id)
             )
-            attrs = {DASKMS_PARTITION_KEY: partitions}
+            attrs = {DASKMS_PARTITION_KEY: partitions_attr}
 
             # Use python types which are json serializable
             group_id = [gid.item() for gid in group_id]
@@ -425,14 +402,14 @@ class DatasetFactory(object):
 
             dataset = Dataset(group_var_dims, attrs=attrs, coords=coords)
             dataset = self.postprocess_dataset(
-                dataset, table_proxy, exemplar_row, order, group_chunks, array_suffix
+                dataset, table_proxy, partition, rowid, group_chunks, array_suffix
             )
             datasets.append(dataset)
 
         return datasets
 
     def postprocess_dataset(
-        self, dataset, table_proxy, exemplar_row, order, chunks, array_suffix
+        self, dataset, table_proxy, partition, rowid, chunks, array_suffix
     ):
         if not self.context or self.context != "ms":
             return dataset
@@ -474,76 +451,44 @@ class DatasetFactory(object):
                 table_proxy,
                 schema_updates,
                 list(schema_updates.keys()),
-                exemplar_row,
-                order,
+                partition,
+                rowid,
                 chunks,
                 array_suffix,
             )
         )
 
     def datasets(self):
-        table_proxy = self._table_proxy_factory()
+        table_proxy = self._casa_table_factory()
+        factory = structure_factory(
+            table_proxy,
+            self.group_cols,
+            self.index_cols,
+            self.taql_where,
+            self.epoch,
+        )
+        structure = factory.instance
 
-        # No grouping case
-        if len(self.group_cols) == 0:
-            order_taql = ordering_taql(table_proxy, self.index_cols, self.taql_where)
-            orders = row_ordering(order_taql, self.index_cols, self.chunks[0])
-            datasets = [self._single_dataset(table_proxy, orders)]
-        # Group by row
-        elif len(self.group_cols) == 1 and self.group_cols[0] == "__row__":
-            order_taql = ordering_taql(table_proxy, self.index_cols, self.taql_where)
-            sorted_rows, row_runs = row_ordering(
-                order_taql,
-                self.index_cols,
-                # chunk ordering on each row
-                dict(self.chunks[0], row=1),
-            )
-
-            # Produce a dataset for each chunk (block),
-            # each containing a single row
-            row_blocks = sorted_rows.blocks
-            run_blocks = row_runs.blocks
-
-            # Exemplar actually correspond to the sorted rows.
-            # We reify them here so they can be assigned on each
-            # dataset as an attribute
-            np_sorted_row = sorted_rows.compute()
-
+        # No grouping, or grouping by row, where each
+        # row becomes a dataset of its own
+        if len(self.group_cols) == 0 or self.group_cols == [ROW_GROUP]:
             datasets = [
-                self._single_dataset(
-                    table_proxy, (row_blocks[r], run_blocks[r]), exemplar_row=er
-                )
-                for r, er in enumerate(np_sorted_row)
+                self._single_dataset(table_proxy, factory, partition)
+                for partition in structure.values()
             ]
         # Grouping column case
         else:
-            order_taql = group_ordering_taql(
-                table_proxy, self.group_cols, self.index_cols, self.taql_where
+            datasets = self._group_datasets(
+                table_proxy, factory, list(structure.values())
             )
-            orders = group_row_ordering(
-                order_taql, self.group_cols, self.index_cols, self.chunks
-            )
-
-            groups = [order_taql.getcol(g).result() for g in self.group_cols]
-            # Cast to actual column dtype
-            group_types = [
-                infer_dtype(c, table_proxy.getcoldesc(c).result())
-                for c in self.group_cols
-            ]
-            groups = [g.astype(t) for g, t in zip(groups, group_types)]
-            exemplar_rows = order_taql.getcol("__firstrow__").result()
-            assert len(orders) == len(exemplar_rows)
-
-            datasets = self._group_datasets(table_proxy, groups, exemplar_rows, orders)
 
         ret = (datasets,)
 
         if self.table_keywords is True:
-            ret += (table_proxy.getkeywords().result(),)
+            ret += (table_proxy.instance.getkeywords(),)
 
         if self.column_keywords is True:
-            keywords = table_proxy.submit(_col_keyword_getter, READLOCK)
-            ret += (keywords.result(),)
+            ret += (_col_keyword_getter(table_proxy.instance),)
 
         if self.table_proxy is True:
             ret += (table_proxy,)
