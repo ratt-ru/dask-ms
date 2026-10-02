@@ -227,8 +227,12 @@ def _writelock_runner(table_future, fn, args, kwargs):
     table.lock(write=True)
 
     try:
+        # The write functions (`ndarray_putcol` / `ndarray_putcell` etc.)
+        # flush at the end of a column write, and the table is flushed again
+        # at close; the per-proxied-call flush here would otherwise rewrite
+        # the whole column once per dask-ms row chunk (dozens of full-column
+        # flushes per written column).
         result = fn(table, *args, **kwargs)
-        table.flush()
     except Exception:
         if logging.DEBUG >= log.getEffectiveLevel():
             log.exception("Exception in %s", fn.__name__)
