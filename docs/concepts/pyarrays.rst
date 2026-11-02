@@ -14,13 +14,13 @@ CASA Support for NumPy
 ~~~~~~~~~~~~~~~~~~~~~~
 
 CASA Supports reading and writing Table data into
-Numpy arrays via the `python-casacore
-<https://github.com/casacore/python-casacore>`_ library.
+Numpy arrays via the `casacure
+<https://github.com/tmolteno/casacure>`_ library.
 
 
 .. testcode::
 
-    import casacore.tables as pt
+    import casacure.tables as pt
     from daskms.example_data import example_ms
 
     ms_filename = example_ms()
@@ -34,7 +34,6 @@ produces the following output:
 
 .. testoutput::
 
-    Successful readonly open of default-locked table /tmp/tmp7wkejl07.ms: 22 columns, 10 rows
     [0 0 0 0 1 1 1 1 1 1]
     <class 'numpy.ndarray'>
 
@@ -70,16 +69,16 @@ for each row, rather than a single array produced by `getcol`:
 
 .. testoutput::
 
-    {'r1': (1, 16, 4),
-     'r2': (1, 16, 4),
-     'r3': (1, 16, 4),
-     'r4': (1, 16, 4),
-     'r5': (1, 32, 2),
-     'r6': (1, 32, 2),
-     'r7': (1, 32, 2),
-     'r8': (1, 32, 2),
-     'r9': (1, 32, 2),
-     'r10': (1, 32, 2)}
+    {'r1': (16, 4),
+     'r10': (32, 2),
+     'r2': (16, 4),
+     'r3': (16, 4),
+     'r4': (16, 4),
+     'r5': (32, 2),
+     'r6': (32, 2),
+     'r7': (32, 2),
+     'r8': (32, 2),
+     'r9': (32, 2)}
 
 However, if we know the first four rows (DATA_DESC_ID = 0) and last
 six rows (DATA_DESC_ID = 1) all have the same shape, we can request
@@ -100,8 +99,8 @@ data with `getcol`:
     (6, 32, 2)
 
 
-Consult the `python-casacore
-<https://github.com/casacore/python-casacore>`_ library for further
+Consult the `casacure
+<https://github.com/tmolteno/casacure>`_ library for further
 information.
 
 Dask

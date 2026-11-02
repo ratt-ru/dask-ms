@@ -49,10 +49,8 @@ which must be set before ``daskms`` is imported:
 
     $ DASK_MS_BACKEND=casacure python my_pipeline.py
 
-casacure is the supported backend of dask-ms-2. If ``DASK_MS_BACKEND`` is
-unset, the package falls back to python-casacore
-(``pip install "dask-ms-2[casacore]"``); that path exists for compatibility
-only. Without either extra the package still imports, and raises when a table
-is opened.
+casacure is the backend of dask-ms-2. Without ``DASK_MS_BACKEND=casacure``,
+or without the extra installed, the package still imports and raises when a
+table is opened.
 
 .. _casacure: https://github.com/tmolteno/casacure

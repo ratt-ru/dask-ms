@@ -15,9 +15,9 @@ Select it with the environment variable::
     DASK_MS_BACKEND=casacure python ...
 
 With the variable set, casacure must be importable (``pip install casacure``,
-or ``pip install "dask-ms[casacure]"``); otherwise an ``ImportError`` is
-raised.  Without the variable, dask-ms keeps using the real python-casacore as
-before (its hard dependency).
+or ``pip install "dask-ms-2[casacure]"``); otherwise an ``ImportError`` is
+raised.  Without the variable no alias is installed, so table I/O uses
+``casacore.tables`` (python-casacore), which dask-ms-2 does not install.
 """
 
 import os
