@@ -29,7 +29,7 @@ To install with xarray_ support:
 
 .. code-block:: bash
 
-  $ pip install dask-ms[xarray]
+  $ pip install dask-ms-2[xarray]
 
 Without xarray_ similar, but reduced Dataset functionality is replicated
 in dask-ms itself. Expert users may wish to use this option to reduce
@@ -37,7 +37,7 @@ python package dependencies.
 
 .. code-block:: bash
 
-  $ pip install dask-ms
+  $ pip install dask-ms-2
 
 
 Documentation
