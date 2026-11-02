@@ -160,7 +160,7 @@ def putter_wrapper(row_orders, *args):
     # because dask.array handles ndarrays we're passed
     # ndarrays of python objects (strings).
     # Without this conversion python-casacore can segfault
-    # See https://github.com/ska-sa/dask-ms/issues/42
+    # See https://github.com/ratt-ru/dask-ms/issues/42
     multidim_str = False
     dict_data = False
 

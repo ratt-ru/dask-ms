@@ -26,7 +26,7 @@ you through the process.
 python-casacore
 ---------------
 
-python-casacore is a `dependency <https://github.com/ska-sa/dask-ms/blob/83b09651f35b78b5e9f0ded3712bb7e10c496d1c/setup.py#L27_>`_
+python-casacore is a `dependency <https://github.com/ratt-ru/dask-ms/blob/83b09651f35b78b5e9f0ded3712bb7e10c496d1c/setup.py#L27_>`_
 of dask-ms, used to access CASA tables. This means that when we do the following:
 
 

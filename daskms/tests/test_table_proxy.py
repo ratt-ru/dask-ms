@@ -149,7 +149,7 @@ def test_proxy_dask_embedding(ms):
 # This really just tests
 # that the cases produce the right results.
 # This isn't likely a big deal as the taql_factory readonly kwarg
-# exists to fix https://github.com/ska-sa/dask-ms/issues/73
+# exists to fix https://github.com/ratt-ru/dask-ms/issues/73
 @pytest.mark.parametrize(
     "readonly",
     [

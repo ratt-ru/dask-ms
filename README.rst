@@ -2,17 +2,19 @@
 xarray Datasets from CASA Tables
 ================================
 
-.. image:: https://img.shields.io/pypi/v/dask-ms.svg
-        :target: https://pypi.python.org/pypi/dask-ms
+.. image:: https://img.shields.io/pypi/v/dask-ms-2.svg
+        :target: https://pypi.org/project/dask-ms-2/
+        :alt: PyPI package dask-ms-2
 
-.. image:: https://github.com/ratt-ru/dask-ms/actions/workflows/ci.yml/badge.svg
-        :target: https://github.com/ratt-ru/dask-ms/actions/workflows/ci.yml
+.. image:: https://github.com/tmolteno/dask-ms/actions/workflows/ci.yml/badge.svg
+        :target: https://github.com/tmolteno/dask-ms/actions/workflows/ci.yml
 
 .. image:: https://readthedocs.org/projects/dask-ms/badge/?version=latest
         :target: https://dask-ms.readthedocs.io/en/latest/?badge=latest
         :alt: Documentation Status
 
-Constructs xarray_ ``Datasets`` from CASA Tables via python-casacore_.
+Constructs xarray_ ``Datasets`` from CASA Tables via python-casacore_,
+or via casacure_, a pure-Rust replacement for the casacore table system.
 The ``Variables`` contained in the ``Dataset`` are dask_ arrays backed by
 deferred calls to :code:`casacore.tables.table.getcol`.
 
@@ -38,6 +40,33 @@ python package dependencies.
 .. code-block:: bash
 
   $ pip install dask-ms-2
+
+
+--------
+Backends
+--------
+
+Table I/O needs a casacore implementation. This package is published on
+`PyPI <https://pypi.org/project/dask-ms-2/>`_ as ``dask-ms-2`` and supports two
+interchangeable backends, chosen with the ``DASK_MS_BACKEND`` environment
+variable:
+
+.. code-block:: bash
+
+  # casacure: pure-Rust casacore.tables replacement (installs the casacure package)
+  $ pip install "dask-ms-2[casacure]"
+  $ DASK_MS_BACKEND=casacure python my_pipeline.py
+
+  # python-casacore: the reference backend, used when DASK_MS_BACKEND is unset
+  $ pip install "dask-ms-2[casacore]"
+  $ python my_pipeline.py
+
+casacure_ has minimal dependencies and ships wheels for Linux, macOS and
+Windows, so it is the practical choice where python-casacore does not build.
+Installing the ``casacure`` extra alone does not switch backends —
+``DASK_MS_BACKEND=casacure`` does, and it is read when ``daskms`` is first
+imported. Without either extra the package still imports, and raises only when
+a table is opened.
 
 
 Documentation
@@ -121,6 +150,7 @@ Limitations
    each Spectral Window.
 
 .. _dask: https://dask.pydata.org
-.. _dask-ms: https://github.com/ska-sa/dask-ms
+.. _dask-ms: https://pypi.org/project/dask-ms-2/
 .. _xarray: https://xarray.pydata.org
 .. _python-casacore: https://github.com/casacore/python-casacore
+.. _casacure: https://github.com/tmolteno/casacure
