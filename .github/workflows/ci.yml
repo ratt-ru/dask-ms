@@ -43,13 +43,13 @@ jobs:
           fetch-depth: 1
 
       - name: Install dask-ms base
-        run: pip install .[arrow,testing,zarr]
+        run: pip install .[arrow,testing,zarr,casacore]
 
       - name: Test dask-ms base
         run: py.test -s -vvv daskms/
 
       - name: Install dask-ms complete
-        run: pip install .[complete,testing]
+        run: pip install .[complete,testing,casacore]
 
       - name: Test dask-ms complete
         run: py.test -s -vvv daskms/
@@ -94,7 +94,7 @@ jobs:
           fetch-depth: 1
 
       - name: Install dask-ms complete
-        run: pip install .[complete,testing]
+        run: pip install .[complete,testing,casacore]
 
       - name: Test dask-ms applications
         run: py.test -s -vvv --applications daskms/
@@ -103,32 +103,6 @@ jobs:
       #   if: ${{ failure() }}
       #   uses: mxschmitt/action-tmate@v3
 
-
-  deploy:
-    environment:
-      name: pypi
-      url: https:/pypi.org/p/dask-ms
-    permissions:
-      id-token: write
-    needs: [test, test_apps]
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v7
-        with:
-          python-version: 3.11
-
-      - name: Checkout source
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 1
-
-      - name: Build distributions
-        run: |
-          pip install -U pip build
-          python -m build --sdist --wheel
-
-      - name: Publish distribution 📦 to PyPI
-        if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags')
-        uses: pypa/gh-action-pypi-publish@release/v1
+# Publishing lives in publish-pypi.yaml (PyPI Trusted Publishing is
+# registered against that workflow + environment `pypi`); the deploy job
+# previously here raced with it on tag pushes.
