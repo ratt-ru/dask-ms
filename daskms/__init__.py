@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
-# Activate the casacure backend (DASK_MS_BACKEND=casacure) before any
-# module pulls in casacore.tables via lazy_import.
+# Install the casacure -> casacore.tables alias before any module pulls in
+# casacore.tables via lazy_import.
 from daskms.casacure_backend import activate_casacure_backend
 
 import logging

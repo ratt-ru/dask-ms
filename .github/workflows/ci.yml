@@ -26,8 +26,6 @@ jobs:
     needs: check_skip
     runs-on: ubuntu-latest
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
-    env:
-      DASK_MS_BACKEND: casacure
     strategy:
       fail-fast: false
       matrix:
@@ -45,13 +43,13 @@ jobs:
           fetch-depth: 1
 
       - name: Install dask-ms base
-        run: pip install .[arrow,testing,zarr,casacure]
+        run: pip install .[arrow,testing,zarr]
 
       - name: Test dask-ms base
         run: py.test -s -vvv daskms/
 
       - name: Install dask-ms complete
-        run: pip install .[complete,testing,casacure]
+        run: pip install .[complete,testing]
 
       - name: Test dask-ms complete
         # xarray >= 2026.x calls zarr.open_group(zarr_format=...), which is
@@ -72,8 +70,6 @@ jobs:
     needs: check_skip
     runs-on: ubuntu-latest
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
-    env:
-      DASK_MS_BACKEND: casacure
     strategy:
       fail-fast: false
       matrix:
@@ -106,7 +102,7 @@ jobs:
           fetch-depth: 1
 
       - name: Install dask-ms complete
-        run: pip install .[complete,testing,casacure]
+        run: pip install .[complete,testing]
 
       - name: Test dask-ms applications
         run: py.test -s -vvv --applications daskms/

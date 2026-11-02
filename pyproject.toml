@@ -7,11 +7,10 @@ version = "0.2.33"
 readme = "README.rst"
 authors = [{name = "Simon Perkins", email = "simon.perkins@gmail.com"}]
 requires-python = '>=3.11,<3.15'
-dependencies = ['appdirs >=1.4.4', 'dask[array] >=2023.1.1', 'donfig >=0.8.0', 'numpy >=2.0.0', 'fsspec >=2022.7.0', 'cacheout >=0.16.0']
-# The table backend is casacure, a pure-Rust replacement for the casacore
-# table system: `dask-ms-2[casacure]` (or `dask-ms-2[backend]`) installs it,
-# and DASK_MS_BACKEND=casacure selects it at runtime. Without it, dask-ms
-# imports but raises when a table is actually opened.
+dependencies = ['appdirs >=1.4.4', 'dask[array] >=2023.1.1', 'donfig >=0.8.0', 'numpy >=2.0.0', 'fsspec >=2022.7.0', 'cacheout >=0.16.0', 'casacure >=3.8.36']
+# Table I/O goes through casacure, a pure-Rust implementation of the CASA
+# table system. It is a core dependency and is always the backend: there is
+# nothing to select or configure at runtime.
 
 [project.scripts]
 dask-ms = "daskms.apps.entrypoint:main"
@@ -26,8 +25,10 @@ katdal = [
     'numcodecs < 0.16.0'
 ]
 xarray = ['xarray >= 2023.01.0']
+# No-op alias: casacure is a core dependency, so this extra installs
+# nothing beyond the base package. Kept so that existing
+# `dask-ms-2[casacure]` install commands keep working.
 casacure = ['casacure']
-backend = ['casacure']
 zarr = ['zarr (>= 2.12.0, < 3.0.0)', 'numcodecs < 0.16.0']
 s3 = ['s3fs >=2023.1.0']
 complete = [

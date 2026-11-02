@@ -8,12 +8,11 @@ Installation
 Stable release
 --------------
 
-To install dask-ms-2 with its casacure_ table backend, run this command in
-your terminal:
+To install dask-ms-2, run this command in your terminal:
 
 .. code-block:: console
 
-    $ pip install "dask-ms-2[casacure]"
+    $ pip install dask-ms-2
 
 This is the preferred method to install dask-ms-2, as it will always install the most recent stable release.
 
@@ -28,29 +27,11 @@ casacure
 --------
 
 dask-ms-2 reads and writes CASA tables through casacure_, a pure-Rust
-replacement for the casacore table system. The ``casacure`` extra installs
-it:
-
-.. code-block:: console
-
-    $ pip install "dask-ms-2[casacure]"
+implementation of the CASA table system. It is installed with the package
+and used automatically — there is nothing to select or configure.
 
 casacure ships pre-built wheels for Linux, macOS and Windows, so there is
 nothing to compile: no C/C++ casacore build, and no casacore Measures data to
 download or keep up to date.
-
-Selecting the backend
-~~~~~~~~~~~~~~~~~~~~~
-
-The backend is chosen with the ``DASK_MS_BACKEND`` environment variable,
-which must be set before ``daskms`` is imported:
-
-.. code-block:: console
-
-    $ DASK_MS_BACKEND=casacure python my_pipeline.py
-
-casacure is the backend of dask-ms-2. Without ``DASK_MS_BACKEND=casacure``,
-or without the extra installed, the package still imports and raises when a
-table is opened.
 
 .. _casacure: https://github.com/tmolteno/casacure

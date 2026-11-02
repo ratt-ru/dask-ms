@@ -14,7 +14,7 @@ xarray Datasets from CASA Tables
         :alt: Documentation Status
 
 Constructs xarray_ ``Datasets`` from CASA Tables via casacure_, a pure-Rust
-replacement for the casacore table system.
+implementation of the CASA table system.
 The ``Variables`` contained in the ``Dataset`` are dask_ arrays backed by
 deferred calls to :code:`casacure.tables.table.getcol`.
 
@@ -31,7 +31,7 @@ To install with xarray_ support:
 
 .. code-block:: bash
 
-  $ pip install "dask-ms-2[xarray,casacure]"
+  $ pip install dask-ms-2[xarray]
 
 Without xarray_ similar, but reduced Dataset functionality is replicated
 in dask-ms itself. Expert users may wish to use this option to reduce
@@ -39,28 +39,26 @@ python package dependencies.
 
 .. code-block:: bash
 
-  $ pip install "dask-ms-2[casacure]"
+  $ pip install dask-ms-2
 
 
 -------
 Backend
 -------
 
-Table I/O goes through casacure_, a pure-Rust replacement for the casacore
-table system. This package is published on
-`PyPI <https://pypi.org/project/dask-ms-2/>`_ as ``dask-ms-2``; install the
-backend with its extra and select it before ``daskms`` is imported:
+Table I/O goes through casacure_, a pure-Rust implementation of the CASA
+table system, installed as a dependency of this package and used
+automatically — there is nothing to select, configure or build. The package
+is published on `PyPI <https://pypi.org/project/dask-ms-2/>`_ as
+``dask-ms-2``:
 
 .. code-block:: bash
 
-  $ pip install "dask-ms-2[casacure]"
-  $ DASK_MS_BACKEND=casacure python my_pipeline.py
+  $ pip install dask-ms-2
+  $ python my_pipeline.py
 
-casacure_ has minimal dependencies and ships wheels for Linux, macOS and
-Windows, so there is nothing to build. Installing the ``casacure`` extra
-alone does not select the backend — ``DASK_MS_BACKEND=casacure`` does, and it
-is read when ``daskms`` is first imported. Without the extra the package
-still imports, and raises only when a table is opened.
+casacure_ ships wheels for Linux, macOS and Windows, so no C/C++ casacore
+libraries are involved and no casacore Measures data is needed.
 
 
 Documentation
