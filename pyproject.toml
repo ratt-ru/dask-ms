@@ -3,7 +3,7 @@
 name = "dask-ms-2"
 description = "xarray Dataset from CASA Tables"
 license = "BSD-3-Clause"
-version = "0.2.33"
+version = "0.2.34"
 readme = "README.rst"
 authors = [{name = "Simon Perkins", email = "simon.perkins@gmail.com"}]
 requires-python = '>=3.11,<3.15'

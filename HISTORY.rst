@@ -2,8 +2,17 @@
 History
 =======
 
-X.Y.Z (YYYY-MM-DD)
-------------------
+0.2.34 (2026-11-06)
+--------------------
+* casacure is always the table backend: importing ``daskms`` aliases
+  ``casacore`` -> ``casacure`` unconditionally, so python-casacore is no
+  longer a dependency and ``DASK_MS_BACKEND`` is no longer consulted.
+* Install docs, README and CI go casacure-only.
+
+0.2.33 (2026-11-02)
+--------------------
+* Rename the distribution to ``dask-ms-2``, widen ``requires-python`` to
+  ``<3.15``, and publish with GitHub Trusted Publishing.
 * Drop Python 3.10 (:pr:`386`)
 * Replace the minio server with moto's ``ThreadedMotoServer`` in the test
   suite (:pr:`385`)
