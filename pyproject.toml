@@ -7,7 +7,7 @@ version = "0.2.34"
 readme = "README.rst"
 authors = [{name = "Simon Perkins", email = "simon.perkins@gmail.com"}]
 requires-python = '>=3.11,<3.15'
-dependencies = ['appdirs >=1.4.4', 'dask[array] >=2023.1.1', 'donfig >=0.8.0', 'numpy >=2.0.0', 'fsspec >=2022.7.0', 'cacheout >=0.16.0', 'casacure >=3.8.36']
+dependencies = ['appdirs >=1.4.4', 'dask[array] >=2023.1.1', 'donfig >=0.8.0', 'numpy >=2.0.0', 'fsspec >=2022.7.0', 'cacheout >=0.16.0', 'casacure >=3.8.39']
 # Table I/O goes through casacure, a pure-Rust implementation of the CASA
 # table system. It is a core dependency and is always the backend: there is
 # nothing to select or configure at runtime.
