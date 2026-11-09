@@ -2,6 +2,15 @@
 History
 =======
 
+0.2.35 (2026-11-09)
+--------------------
+* Require casacure >= 3.8.40. casacure <= 3.8.39 wrote string-array column
+  keywords (``QuantumUnits``, ``MEASINFO`` neighbours, ...) as
+  ``{shape, array}`` sub-records where casacore declares ``Array<String>``,
+  and CASA then refused the written table
+  (casacure#40 / tmolteno/skarabina#14) -- every ``xds_to_table`` write was
+  affected, ``dask-ms convert`` on any MS included.
+
 0.2.34 (2026-11-06)
 --------------------
 * casacure is always the table backend: importing ``daskms`` aliases
