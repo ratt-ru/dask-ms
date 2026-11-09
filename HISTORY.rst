@@ -2,6 +2,15 @@
 History
 =======
 
+0.2.36 (2026-11-10)
+--------------------
+* Require casacure >= 3.8.41. casacure 3.8.40 wrote keyword records as
+  *Fixed* records (casacore writes *Variable*), so CASA and python-casacore
+  could not add keywords or tiled columns to a table this package wrote --
+  CASA ``clearcal``'s ``MODEL_DATA`` add failed on it
+  (casacure#41 / tmolteno/skarabina#14). 3.8.41 writes Variable and keeps
+  nested records frameless like casacore.
+
 0.2.35 (2026-11-09)
 --------------------
 * Require casacure >= 3.8.40. casacure <= 3.8.39 wrote string-array column
