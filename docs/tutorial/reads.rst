@@ -108,7 +108,7 @@ and DATA_DESCRIPTION sub-tables.
 ``::``, the traditional scope operator used by
 `Taql <https://casacore.github.io/casacore-notes/199.html>`_
 used to reference the sub-tables of a table, is
-understood by python-casacore and dask-ms.
+understood by casacure and dask-ms.
 The following convention specifies that the ``ANTENNA`` sub-table
 of ``TEST.MS`` should be opened:
 

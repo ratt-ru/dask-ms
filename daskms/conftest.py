@@ -81,7 +81,7 @@ def big_ms(tmp_path_factory, request):
 
     # Remove the temporary directory
     # except it causes issues with casacore files on py3
-    # https://github.com/ska-sa/dask-ms/issues/32
+    # https://github.com/ratt-ru/dask-ms/issues/32
     # shutil.rmtree(str(msdir))
 
 
@@ -139,7 +139,7 @@ def ms(tmp_path_factory):
 
     # Remove the temporary directory
     # except it causes issues with casacore files on py3
-    # https://github.com/ska-sa/dask-ms/issues/32
+    # https://github.com/ratt-ru/dask-ms/issues/32
     # shutil.rmtree(str(msdir))
 
 
@@ -181,7 +181,7 @@ def spw_table(tmp_path_factory, spw_chan_freqs):
 
     # Remove the temporary directory
     # except it causes issues with casacore files on py3
-    # https://github.com/ska-sa/dask-ms/issues/32
+    # https://github.com/ratt-ru/dask-ms/issues/32
     # shutil.rmtree(str(spw_dir))
 
 

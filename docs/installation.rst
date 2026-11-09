@@ -8,13 +8,13 @@ Installation
 Stable release
 --------------
 
-To install dask-ms, run this command in your terminal:
+To install dask-ms-2, run this command in your terminal:
 
 .. code-block:: console
 
-    $ pip install dask-ms
+    $ pip install dask-ms-2
 
-This is the preferred method to install dask-ms, as it will always install the most recent stable release.
+This is the preferred method to install dask-ms-2, as it will always install the most recent stable release.
 
 If you don't have `pip`_ installed, this `Python installation guide`_ can guide
 you through the process.
@@ -23,51 +23,15 @@ you through the process.
 .. _Python installation guide: http://docs.python-guide.org/en/latest/starting/installation/
 
 
-python-casacore
----------------
+casacure
+--------
 
-python-casacore is a `dependency <https://github.com/ska-sa/dask-ms/blob/83b09651f35b78b5e9f0ded3712bb7e10c496d1c/setup.py#L27_>`_
-of dask-ms, used to access CASA tables. This means that when we do the following:
+dask-ms-2 reads and writes CASA tables through casacure_, a pure-Rust
+implementation of the CASA table system. It is installed with the package
+and used automatically — there is nothing to select or configure.
 
+casacure ships pre-built wheels for Linux, macOS and Windows, so there is
+nothing to compile: no C/C++ casacore build, and no casacore Measures data to
+download or keep up to date.
 
-.. code-block:: console
-
-    $ pip install dask-ms
-
-
-pip will download python-casacore and try to install it.
-There are binary wheels for versions of python-casacore >= 3.1.1 which,
-in general, make the installation process trivial.
-
-*However*, pip will attempt to build earlier versions from source.
-
-Building python-casacore from source
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-For pip to build python-casacore from source, the appropriate
-C and C++ libraries must be installed otherwise this build process will fail.
-The full list of packages are available here:
-
-- https://github.com/casacore/casacore#requirements
-- https://github.com/casacore/python-casacore#from-source
-
-Updating casacore Measures data
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-python-casacore wraps an internal casacore Measurement system that is used
-to relate astronomical objects to each other in space and time.
-Measures data is frequently updated and casacore/python-casacore
-will complain if it is out of date.
-
-The measures data can be downloaded at the location specified here:
-
-- https://github.com/casacore/casacore#obtaining-measures-data
-
-Uncompress the measures data to some appropriate location, such
-as ``~/opt/casacore/data`` and point your python-casacore installation
-to it by creating a ``.casarc`` file in your home directory
-with the following contents:
-
-.. code-block:: ini
-
-    measures.directory: ~/opt/casacore/data/
+.. _casacure: https://github.com/tmolteno/casacure

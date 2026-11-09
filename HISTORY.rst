@@ -2,8 +2,35 @@
 History
 =======
 
-X.Y.Z (YYYY-MM-DD)
-------------------
+0.2.36 (2026-11-10)
+--------------------
+* Require casacure >= 3.8.41. casacure 3.8.40 wrote keyword records as
+  *Fixed* records (casacore writes *Variable*), so CASA and python-casacore
+  could not add keywords or tiled columns to a table this package wrote --
+  CASA ``clearcal``'s ``MODEL_DATA`` add failed on it
+  (casacure#41 / tmolteno/skarabina#14). 3.8.41 writes Variable and keeps
+  nested records frameless like casacore.
+
+0.2.35 (2026-11-09)
+--------------------
+* Require casacure >= 3.8.40. casacure <= 3.8.39 wrote string-array column
+  keywords (``QuantumUnits``, ``MEASINFO`` neighbours, ...) as
+  ``{shape, array}`` sub-records where casacore declares ``Array<String>``,
+  and CASA then refused the written table
+  (casacure#40 / tmolteno/skarabina#14) -- every ``xds_to_table`` write was
+  affected, ``dask-ms convert`` on any MS included.
+
+0.2.34 (2026-11-06)
+--------------------
+* casacure is always the table backend: importing ``daskms`` aliases
+  ``casacore`` -> ``casacure`` unconditionally, so python-casacore is no
+  longer a dependency and ``DASK_MS_BACKEND`` is no longer consulted.
+* Install docs, README and CI go casacure-only.
+
+0.2.33 (2026-11-02)
+--------------------
+* Rename the distribution to ``dask-ms-2``, widen ``requires-python`` to
+  ``<3.15``, and publish with GitHub Trusted Publishing.
 * Drop Python 3.10 (:pr:`386`)
 * Replace the minio server with moto's ``ThreadedMotoServer`` in the test
   suite (:pr:`385`)

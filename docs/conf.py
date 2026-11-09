@@ -123,15 +123,14 @@ napoleon_google_docstring = False
 numpydoc_show_class_members = False
 
 extlinks = {
-    "issue": ("https://github.com/ska-sa/dask-ms/issues/%s", "GH#%s"),
-    "pr": ("https://github.com/ska-sa/dask-ms/pull/%s", "GH#%s"),
+    "issue": ("https://github.com/ratt-ru/dask-ms/issues/%s", "GH#%s"),
+    "pr": ("https://github.com/ratt-ru/dask-ms/pull/%s", "GH#%s"),
 }
 
 # Example configuration for intersphinx: refer to the Python standard library.
 intersphinx_mapping = {
     "dask": ("https://dask.pydata.org/en/stable", None),
     "numpy": ("https://docs.scipy.org/doc/numpy/", None),
-    "pyrap": ("https://casacore.github.io/python-casacore", None),
     "python": ("https://docs.python.org/3/", None),
     "xarray": ("https://xarray.pydata.org/en/stable", None),
 }

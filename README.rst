@@ -2,19 +2,21 @@
 xarray Datasets from CASA Tables
 ================================
 
-.. image:: https://img.shields.io/pypi/v/dask-ms.svg
-        :target: https://pypi.python.org/pypi/dask-ms
+.. image:: https://img.shields.io/pypi/v/dask-ms-2.svg
+        :target: https://pypi.org/project/dask-ms-2/
+        :alt: PyPI package dask-ms-2
 
-.. image:: https://github.com/ratt-ru/dask-ms/actions/workflows/ci.yml/badge.svg
-        :target: https://github.com/ratt-ru/dask-ms/actions/workflows/ci.yml
+.. image:: https://github.com/tmolteno/dask-ms/actions/workflows/ci.yml/badge.svg
+        :target: https://github.com/tmolteno/dask-ms/actions/workflows/ci.yml
 
 .. image:: https://readthedocs.org/projects/dask-ms/badge/?version=latest
         :target: https://dask-ms.readthedocs.io/en/latest/?badge=latest
         :alt: Documentation Status
 
-Constructs xarray_ ``Datasets`` from CASA Tables via python-casacore_.
+Constructs xarray_ ``Datasets`` from CASA Tables via casacure_, a pure-Rust
+implementation of the CASA table system.
 The ``Variables`` contained in the ``Dataset`` are dask_ arrays backed by
-deferred calls to :code:`casacore.tables.table.getcol`.
+deferred calls to :code:`casacure.tables.table.getcol`.
 
 Supports writing ``Variables`` back to the respective column in the Table.
 
@@ -29,7 +31,7 @@ To install with xarray_ support:
 
 .. code-block:: bash
 
-  $ pip install dask-ms[xarray]
+  $ pip install dask-ms-2[xarray]
 
 Without xarray_ similar, but reduced Dataset functionality is replicated
 in dask-ms itself. Expert users may wish to use this option to reduce
@@ -37,7 +39,26 @@ python package dependencies.
 
 .. code-block:: bash
 
-  $ pip install dask-ms
+  $ pip install dask-ms-2
+
+
+-------
+Backend
+-------
+
+Table I/O goes through casacure_, a pure-Rust implementation of the CASA
+table system, installed as a dependency of this package and used
+automatically — there is nothing to select, configure or build. The package
+is published on `PyPI <https://pypi.org/project/dask-ms-2/>`_ as
+``dask-ms-2``:
+
+.. code-block:: bash
+
+  $ pip install dask-ms-2
+  $ python my_pipeline.py
+
+casacure_ ships wheels for Linux, macOS and Windows, so no C/C++ casacore
+libraries are involved and no casacore Measures data is needed.
 
 
 Documentation
@@ -121,6 +142,6 @@ Limitations
    each Spectral Window.
 
 .. _dask: https://dask.pydata.org
-.. _dask-ms: https://github.com/ska-sa/dask-ms
+.. _dask-ms: https://pypi.org/project/dask-ms-2/
 .. _xarray: https://xarray.pydata.org
-.. _python-casacore: https://github.com/casacore/python-casacore
+.. _casacure: https://github.com/tmolteno/casacure

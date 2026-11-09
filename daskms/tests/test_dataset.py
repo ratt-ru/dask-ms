@@ -149,7 +149,7 @@ def test_dataset_updates(ms, select_cols, group_cols, index_cols, shapes, chunks
         # NOTE(sjperkins)
         # Interesting behaviour here. If these objects are not
         # cleared up at this point, attempts to re-open the table below
-        # can fail, reproducing https://github.com/ska-sa/dask-ms/issues/26
+        # can fail, reproducing https://github.com/ratt-ru/dask-ms/issues/26
         # Adding auto-locking to the table opening command seems to fix
         # this somehow
         del ds, new_ds, datasets, writes, state_var, data_var

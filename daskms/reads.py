@@ -95,7 +95,7 @@ def object_getcol(row_runs, table_future, column, result, dtype):
             # NOTE(sjperkins)
             # Dask wants ndarrays internally, so we asarray objects
             # the returning list of objects.
-            # See https://github.com/ska-sa/dask-ms/issues/42
+            # See https://github.com/ratt-ru/dask-ms/issues/42
             result[rr : rr + rl] = np.asarray(data, dtype=dtype)
 
             rr += rl
@@ -125,7 +125,7 @@ def object_getcolslice(row_runs, table_future, column, result, blc, trc, dtype):
             # NOTE(sjperkins)
             # Dask wants ndarrays internally, so we asarray objects
             # the returning list of objects.
-            # See https://github.com/ska-sa/dask-ms/issues/42
+            # See https://github.com/ratt-ru/dask-ms/issues/42
             result[rr : rr + rl] = np.asarray(data, dtype=dtype)
 
             rr += rl
@@ -249,7 +249,7 @@ def _dataset_variable_factory(
                 args.append((d,))
 
             # Disable getcolslice caching
-            # https://github.com/ska-sa/dask-ms/issues/92
+            # https://github.com/ratt-ru/dask-ms/issues/92
             # https://github.com/casacore/casacore/issues/1018
             table_proxy.setmaxcachesize(column, 1).result()
 

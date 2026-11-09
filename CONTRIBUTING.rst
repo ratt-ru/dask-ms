@@ -15,7 +15,7 @@ Types of Contributions
 Report Bugs
 ~~~~~~~~~~~
 
-Report bugs at https://github.com/ska-sa/dask-ms/issues.
+Report bugs at https://github.com/tmolteno/dask-ms/issues.
 
 If you are reporting a bug, please include:
 
@@ -45,7 +45,7 @@ articles, and such.
 Submit Feedback
 ~~~~~~~~~~~~~~~
 
-The best way to send feedback is to file an issue at https://github.com/ska-sa/dask-ms/issues.
+The best way to send feedback is to file an issue at https://github.com/tmolteno/dask-ms/issues.
 
 If you are proposing a feature:
 
@@ -102,8 +102,8 @@ Before you submit a pull request, check that it meets these guidelines:
 2. If the pull request adds functionality, the docs should be updated. Put
    your new functionality into a function with a docstring, and add the
    feature to the list in README.rst.
-3. The pull request should work for Python 2.7, 3.4, 3.5 and 3.6, and for PyPy. Check
-   https://travis-ci.org/ska-sa/dask-ms/pull_requests
+3. The pull request should work for the Python versions listed in
+   ``pyproject.toml``. Check the GitHub Actions CI run on the pull request
    and make sure that the tests pass for all supported Python versions.
 
 Tips
@@ -132,5 +132,6 @@ A reminder for the maintainers on how to deploy.
 
        $ git push --follow-tags
 
-4. Travis should automatically deploy the tagged release to PyPI
-   if the automated tests pass.
+4. Pushing the ``v*.*.*`` tag triggers the ``Publish dask-ms-2 package``
+   GitHub Actions workflow, which builds the wheel and source distribution
+   and publishes them to PyPI with Trusted Publishing.
