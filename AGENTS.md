@@ -35,11 +35,12 @@ Other entry points in [daskms/__init__.py](daskms/__init__.py):
 
 ## Tooling
 
-This package is managed by the `uv` tool. Dependencies are declared as
-`[project.optional-dependencies]` extras, not dependency groups, so select them
-with `--extra`.
+This package is managed by the `uv` tool. Optional dependencies are declared
+as `[project.optional-dependencies]` extras, so select them with `--extra`.
+Developer tooling (pre-commit, ruff, tbump) is the `dev` dependency group,
+which `uv sync` and `uv run` install by default.
 
-- Install: `uv sync --extra testing --extra dev`.
+- Install: `uv sync --extra testing`.
   Add `--extra complete` for the arrow, zarr, s3, xarray and katdal backends,
   as CI does.
 - Test: `uv run --extra testing py.test -s -vvv daskms/`.
@@ -50,9 +51,9 @@ with `--extra`.
   - python-casacore is a test-only dependency, used as an independent oracle
     to verify what arcae wrote.
 - Pre-commit hooks gate commits; run them before proposing a change as done:
-  `uv run --extra dev pre-commit run -a`.
+  `uv run pre-commit run -a`.
   Format with the pre-commit's pinned ruff (v0.1.3), not the `ruff` in the
-  `dev` extra: newer ruff versions reformat untouched code.
+  `dev` group: newer ruff versions reformat untouched code.
 - Docs: Sphinx; source in [docs/](docs), hosted on ReadTheDocs
   ([readthedocs.yml](readthedocs.yml)). Build with
   `uv run --extra docs sphinx-build docs docs/_build/html`.

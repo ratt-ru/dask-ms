@@ -7,7 +7,15 @@ version = "0.3.0-alpha.1"
 readme = "README.rst"
 authors = [{name = "Simon Perkins", email = "simon.perkins@gmail.com"}]
 requires-python = '>=3.11,<3.15'
-dependencies = ['appdirs >=1.4.4', 'dask[array] >=2023.1.1', 'donfig >=0.8.0', 'arcae >=0.4.0a16,<0.5', 'numpy >=2.0.0', 'fsspec >=2022.7.0', 'rarg-python-patterns >=0.0.5']
+dependencies = [
+    'appdirs >=1.4.4',
+    'dask[array] >=2023.1.1',
+    'donfig >=0.8.0',
+    'arcae >=0.4.0a17,<0.5',
+    'numpy >=2.0.0',
+    'fsspec >=2022.7.0',
+    'rarg-python-patterns >=0.0.5'
+]
 
 [project.scripts]
 dask-ms = "daskms.apps.entrypoint:main"
@@ -35,17 +43,21 @@ complete = [
 # result through python-casacore, which is what catches divergence between
 # the two readers (the TaQL indexing style, for one).
 testing = ['moto[server] >=5.0.0', 'pytest >=8.0.0, != 9.1.0', 'python-casacore >=3.7.0']
-dev = [
-    "pre-commit>=4.3.0",
-    "ruff>=0.14.0",
-    "tbump>=6.11.0",
-]
 docs = [
     "furo >=2025.9.25",
     "sphinx >=5.1.1",
     "numpydoc >=1.9.0",
     "pygments >=2.19.2",
     "sphinx-copybutton >=0.5.2"
+]
+
+# Developer tooling: a dependency group rather than an extra, so it is not
+# published with the package and `uv run` / `uv sync` install it by default.
+[dependency-groups]
+dev = [
+    "pre-commit>=4.3.0",
+    "ruff>=0.14.0",
+    "tbump>=6.11.0",
 ]
 
 [build-system]
