@@ -2,7 +2,7 @@
 History
 =======
 
-X.Y.Z (YYYY-MM-DD)
+0.3.0 (2026-11-03)
 ------------------
 * Support Python 3.14 (:pr:`388`)
 * Move ``daskms.experimental.zarr`` to zarr-python 3, still writing the zarr v2
