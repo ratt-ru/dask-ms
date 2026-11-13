@@ -4,7 +4,7 @@ import logging
 from urllib.parse import urlparse
 
 from daskms.fsspec_store import DaskMSStore
-from daskms.table_proxy import TableProxy
+from daskms.casa_table import CasaTable
 from daskms.reads import DatasetFactory
 from daskms.writes import write_datasets
 from daskms.utils import promote_columns, filter_kwargs
@@ -75,7 +75,7 @@ def xds_to_table(
     write_datasets : list of :class:`xarray.Dataset`
         Datasets containing arrays representing write operations
         into a CASA Table
-    table_proxy : :class:`daskms.TableProxy`, optional
+    table_proxy : :class:`daskms.CasaTable`, optional
         The Table Proxy associated with the datasets
     """
     if isinstance(table_name, DaskMSStore):
@@ -114,7 +114,7 @@ def xds_to_table(
     if table_proxy is True:
         assert isinstance(out_ds, tuple)
         out_ds, tp = out_ds
-        assert isinstance(tp, TableProxy)
+        assert isinstance(tp, CasaTable)
     else:
         tp = None
 
@@ -240,6 +240,13 @@ def xds_from_table(
 
             xds_from_table("WSRT.MS", taql_where="ANTENNA1 != ANTENNA2")
 
+    epoch : str, optional
+        Identifies the row structure of the table. The grouping and
+        indexing columns are read, and the rows partitioned and sorted,
+        once per epoch; calls with the same table, grouping, indexing,
+        ``taql_where`` and ``epoch`` share that structure. Defaults to a
+        new random string, so that each call reads the table afresh.
+
     chunks : list of dicts or dict, optional
         A :code:`{dim: chunk}` dictionary, specifying the chunking
         strategy of each dimension in the schema.
@@ -274,7 +281,7 @@ def xds_from_table(
         Returned if ``table_keywords is True``
     column_keywords : dict, optional
         Returned if ``column_keywords is True``
-    table_proxy : :class:`daskms.TableProxy`, optional
+    table_proxy : :class:`daskms.CasaTable`, optional
         Returned if ``table_proxy is True``
 
 

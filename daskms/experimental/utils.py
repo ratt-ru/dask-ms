@@ -1,35 +1,11 @@
 import logging
-from pathlib import Path
 from itertools import product
 
-import dask
 import dask.array as da
-from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 
 
 log = logging.getLogger(__name__)
-
-
-def extent_args(dims, chunks):
-    args = []
-    meta = np.empty((1,), dtype=np.int32)
-
-    for dim, chunks in zip(dims, chunks):
-        name = "-".join((dim, dask.base.tokenize(chunks)))
-        layers = {}
-        start = 0
-
-        for i, c in enumerate(chunks):
-            end = start + c
-            layers[(name, i)] = (start, end)
-            start = end
-
-        graph = HighLevelGraph.from_collections(name, layers, [])
-        args.append(da.Array(graph, name, chunks=(chunks,), meta=meta))
-        args.append((dim,))
-
-    return args
 
 
 def column_iterator(variables, columns):
@@ -97,26 +73,6 @@ def select_vars_and_coords(dataset, columns):
         ret_coords = {c: coords[c] for c in coord_sel}
 
     return ret_data_vars, ret_coords
-
-
-def store_path_split(store):
-    if not isinstance(store, Path):
-        store = Path(store)
-
-    parts = store.name.split("::", 1)
-
-    if len(parts) == 1:
-        name = parts[0]
-        subtable = "MAIN"
-    elif len(parts) == 2:
-        name, subtable = parts
-
-        if subtable == "MAIN":
-            raise ValueError("'MAIN' is a reserved subtable name")
-    else:
-        raise RuntimeError(f"len(parts) {len(parts)} not in (1, 2)")
-
-    return store.parent / name, subtable
 
 
 def largest_chunk(arr):

@@ -12,9 +12,10 @@ xarray Datasets from CASA Tables
         :target: https://dask-ms.readthedocs.io/en/latest/?badge=latest
         :alt: Documentation Status
 
-Constructs xarray_ ``Datasets`` from CASA Tables via python-casacore_.
+Constructs xarray_ ``Datasets`` from CASA Tables via arcae_.
 The ``Variables`` contained in the ``Dataset`` are dask_ arrays backed by
-deferred calls to :code:`casacore.tables.table.getcol`.
+deferred calls to :code:`arcae.lib.arrow_tables.Table.getcol`, which release
+the GIL and read through multiple independent table instances.
 
 Supports writing ``Variables`` back to the respective column in the Table.
 
@@ -123,4 +124,4 @@ Limitations
 .. _dask: https://dask.pydata.org
 .. _dask-ms: https://github.com/ska-sa/dask-ms
 .. _xarray: https://xarray.pydata.org
-.. _python-casacore: https://github.com/casacore/python-casacore
+.. _arcae: https://github.com/ratt-ru/arcae

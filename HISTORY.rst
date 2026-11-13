@@ -4,6 +4,23 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Support Python 3.14 (:pr:`388`)
+* Move ``daskms.experimental.zarr`` to zarr-python 3, still writing the zarr v2
+  format. String columns are now written as ``VariableLengthUTF8`` rather than
+  JSON encoded object arrays. Stores with string columns written by earlier
+  versions cannot be read and raise an informative error (:pr:`389`)
+* Replace python-casacore with arcae in the CASA backend, removing the
+  ``TableProxy``/``Executor`` pair that serialised all I/O for a table onto a
+  single thread (:pr:`384`)
+* Partition and sort table rows once, in a ``TableStructure`` held in a
+  ``Multiton``, rather than through TaQL ``ORDERBY``/``GROUPBY`` queries.
+  ``xds_from_table`` and ``xds_from_ms`` take an ``epoch`` identifying that
+  structure (:pr:`384`)
+* Build CASA and zarr reads and writes with ``dask.array.map_blocks``, taking
+  chunk extents from ``block_info`` (:pr:`384`)
+* Remove ``daskms.optimisation``. ``cached_array`` and ``inlined_array``
+  rewrote dask's low-level graphs, and nothing in dask-ms uses them
+  any more (:pr:`384`)
 * Drop Python 3.10 (:pr:`386`)
 * Replace the minio server with moto's ``ThreadedMotoServer`` in the test
   suite (:pr:`385`)

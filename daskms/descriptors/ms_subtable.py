@@ -4,23 +4,19 @@ from daskms.descriptors.builder import (
     register_descriptor_builder,
     AbstractDescriptorBuilder,
 )
-from daskms.patterns import lazy_import
+from daskms.casa_table import ms_descriptor
 from daskms.table_schemas import SUBTABLES
-
-ct = lazy_import("casacore.tables")
 
 
 @register_descriptor_builder("mssubtable")
 class MSSubTableDescriptorBuilder(AbstractDescriptorBuilder):
     def __init__(self, subtable):
         if subtable not in SUBTABLES:
-            raise ValueError(
-                f"'{subtable}' is not a valid " f"Measurement Set sub-table"
-            )
+            raise ValueError(f"'{subtable}' is not a valid Measurement Set sub-table")
 
         self.subtable = subtable
-        self.DEFAULT_TABLE_DESC = ct.complete_ms_desc(subtable)
-        self.REQUIRED_FIELDS = set(ct.required_ms_desc(subtable).keys())
+        self.DEFAULT_TABLE_DESC = ms_descriptor(subtable, complete=True)
+        self.REQUIRED_FIELDS = set(ms_descriptor(subtable, complete=False).keys())
 
     def default_descriptor(self):
         return self.DEFAULT_TABLE_DESC.copy()

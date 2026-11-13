@@ -38,10 +38,10 @@ Variables and Datasets
     .. automethod:: __init__
 
 
-TableProxies
-------------
+Table Handles
+-------------
 
-.. autoclass:: daskms.TableProxy
+.. autoclass:: daskms.CasaTable
     :members:
 
 Data Column Expressions

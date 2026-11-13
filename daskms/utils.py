@@ -5,7 +5,6 @@ from collections import OrderedDict
 import logging
 from pathlib import PurePath, Path
 import re
-import time
 import inspect
 import warnings
 
@@ -65,7 +64,7 @@ def arg_hasher(args):
         # NOTE(sjperkins)
         # https://stackoverflow.com/a/16592241/1611416
         # Slowish, but we shouldn't be passing
-        # huge numpy arrays in the TableProxy constructor
+        # huge numpy arrays in the CasaTable constructor
         return hash(args.tostring())
     else:
         return hash(args)
@@ -82,7 +81,7 @@ def freeze(arg):
     elif isinstance(arg, ndarray):
         if arg.nbytes > 10:
             warnings.warn(
-                f"freezing ndarray of size {arg.nbytes} " f" is probably inefficient"
+                f"freezing ndarray of size {arg.nbytes}  is probably inefficient"
             )
         return freeze(arg.tolist())
     else:
@@ -158,51 +157,33 @@ def select_cols_str(select_cols):
     return f"select_cols={select_cols}"
 
 
-def assert_liveness(table_proxies, executors, collect=True):
+def assert_liveness(tables, executors=None, collect=True):
     """
-    Asserts that the given number of TableProxy
-    and Executor objects are alive.
+    Asserts that the given number of :class:`~daskms.casa_table.CasaTable`
+    handles are alive.
+
+    ``executors`` is accepted and ignored. dask-ms no longer runs table
+    I/O on its own threads -- arcae manages its own instances -- so there
+    are no executors to count.
     """
-    from daskms.table_proxy import _table_cache
-    from daskms.table_executor import _executor_cache
+    from daskms.casa_table import CasaTable
     import gc
 
     if collect:
         gc.collect()
 
-    if table_proxies is not None and len(_table_cache) != table_proxies:
-        lines = ["len(_table_cache)[%d] != %d" % (len(_table_cache), table_proxies)]
-        for i, v in enumerate(_table_cache.values()):
-            lines.append("%d: %s is referred to by " "the following objects" % (i, v))
+    live = CasaTable._INSTANCES
+
+    if tables is not None and len(live) != tables:
+        lines = ["len(CasaTable._INSTANCES)[%d] != %d" % (len(live), tables)]
+
+        for i, v in enumerate(live):
+            lines.append("%d: %s is referred to by the following objects" % (i, v))
 
             for r in gc.get_referrers(v):
                 lines.append(f"\t{str(r)}")
 
         raise ValueError("\n".join(lines))
-
-    if executors is not None and len(_executor_cache) != executors:
-        lines = ["len(_executor_cache)[%d] != %d" % (len(_executor_cache), executors)]
-        for i, v in enumerate(_executor_cache.values()):
-            lines.append("%d: %s is referred to by " "the following objects" % (i, v))
-
-            for r in gc.get_referrers(v):
-                lines.append(f"\t{str(r)}")
-
-        raise ValueError("\n".join(lines))
-
-
-def log_call(fn):
-    def _wrapper(*args, **kwargs):
-        log.info("%s() start at %s", fn.__name__, time.clock())
-        try:
-            return fn(*args, **kwargs)
-        except Exception:
-            log.exception("%s() exception", fn.__name__)
-            raise
-        finally:
-            log.info("%s() done at %s", fn.__name__, time.clock())
-
-    return _wrapper
 
 
 def requires(*args):

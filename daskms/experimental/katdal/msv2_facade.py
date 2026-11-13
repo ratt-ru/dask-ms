@@ -59,7 +59,6 @@ class XArrayMSv2Facade:
         row_view: bool = True,
     ):
         self._dataset = dataset
-        self._no_auto = no_auto
         self._row_view = row_view
         self._pols_to_use = ["HH", "HV", "VH", "VV"]
         # Reset the dataset selection
@@ -113,10 +112,6 @@ class XArrayMSv2Facade:
     @property
     def nbl(self):
         return self._cp_info.cp_index.shape[0]
-
-    @property
-    def npol(self):
-        return self._cp_info.cp_index.shape[1]
 
     def _main_xarray_factory(
         self, field_id, state_id, scan_index, scan_state, target, chunks

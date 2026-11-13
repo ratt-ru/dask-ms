@@ -7,7 +7,6 @@ import dask.array as da
 import numpy as np
 
 from daskms.dataset import Dataset
-from daskms.optimisation import inlined_array
 from daskms.constants import DASKMS_PARTITION_KEY
 from daskms.fsspec_store import DaskMSStore
 from daskms.experimental.arrow.arrow_schema import ArrowSchema
@@ -159,8 +158,6 @@ def xds_to_parquet(xds, store, columns=None, **kwargs):
             adjust_chunks={"row": 1},
             meta=np.empty((0,), bool),
         )
-
-        writes = inlined_array(writes, chunk_ids)
 
         # Transfer any partition information over to the write dataset
         partition = ds.attrs.get(DASKMS_PARTITION_KEY, False)

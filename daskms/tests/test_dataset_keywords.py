@@ -4,7 +4,7 @@ import dask
 import pytest
 
 from daskms.example_data import example_ms
-from daskms.table_proxy import TableProxy
+from daskms.casa_table import CasaTable
 from daskms import xds_to_table, xds_from_ms
 from daskms.dataset import Dataset
 from daskms.patterns import lazy_import
@@ -52,8 +52,8 @@ def test_read_keywords(keyword_ms, table_kw, column_kw, table_proxy):
 
         if table_proxy is True:
             tp = ret[ret_pos]
-            assert isinstance(tp, TableProxy)
-            assert tp.nrows().result() == 10
+            assert isinstance(tp, CasaTable)
+            assert tp.instance.nrow() == 10
 
             ret_pos += 1
     else:
@@ -107,12 +107,12 @@ def test_write_keywords(ms):
 def test_write_table_proxy_keyword(ms):
     datasets = xds_from_ms(ms)
 
-    # Test that we get a TableProxy if requested
+    # Test that we get a CasaTable if requested
     writes, tp = xds_to_table(datasets, ms, [], table_proxy=True)
     assert isinstance(writes, list)
     assert all(isinstance(w, Dataset) for w in writes)
-    assert isinstance(tp, TableProxy)
-    assert tp.nrows().result() == 10
+    assert isinstance(tp, CasaTable)
+    assert tp.instance.nrow() == 10
 
     writes = xds_to_table(datasets, ms, [], table_proxy=False)
     assert isinstance(writes, list)
